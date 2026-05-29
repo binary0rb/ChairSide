@@ -27,6 +27,8 @@ public sealed class BoardStoreTests
         Assert.Equal("pledger", updated.AssignedDoctor);
         Assert.Equal("EXT", updated.ProcedureCode);
         Assert.Empty(context.Store.GetReports().DoctorSummaries);
+        Assert.Equal(0, context.Store.GetReports().CompletedRoomCyclesCount);
+        Assert.Empty(context.Repository.LoadCompletedCycles());
 
         var canceled = context.Store.CancelSeating(1);
         Assert.NotNull(canceled);
@@ -183,6 +185,39 @@ public sealed class BoardStoreTests
         Assert.Equal(RoomStates.Turnover, afterCompleteReload.Store.GetRoom(1)?.State);
     }
 
+    [Theory]
+    [InlineData(6, 59, RoomStates.Seated, false, false)]
+    [InlineData(7, 0, RoomStates.Aging, true, false)]
+    [InlineData(11, 59, RoomStates.Aging, true, false)]
+    [InlineData(12, 0, RoomStates.Stale, true, true)]
+    public void Threshold_boundaries_resolve_deterministically(
+        int elapsedMinutes,
+        int elapsedSeconds,
+        string expectedState,
+        bool expectedAgingStarted,
+        bool expectedStaleStarted)
+    {
+        using var workspace = TestWorkspace.Create();
+        var now = new DateTimeOffset(2026, 5, 29, 18, 0, 0, TimeSpan.Zero);
+        var clock = new ManualTimeProvider(now);
+        var context = StoreContext.Create(
+            workspace,
+            environmentName: Environments.Production,
+            agingMinutes: 7,
+            staleMinutes: 12,
+            timeProvider: clock);
+
+        Assert.NotNull(context.Store.SeatRoom(1, "otte", "CON"));
+        clock.SetUtcNow(now.AddMinutes(elapsedMinutes).AddSeconds(elapsedSeconds));
+
+        var room = context.Store.GetRoom(1);
+
+        Assert.NotNull(room);
+        Assert.Equal(expectedState, room.State);
+        Assert.Equal(expectedAgingStarted, room.AgingStartedAt is not null);
+        Assert.Equal(expectedStaleStarted, room.StaleStartedAt is not null);
+    }
+
     [Fact]
     public void Production_database_path_inside_content_root_fails_fast()
     {
@@ -210,6 +245,20 @@ public sealed class BoardStoreTests
             Assert.Null(room.SeatedAt);
         });
         Assert.Equal(0, context.Store.GetReports().CompletedRoomCyclesCount);
+    }
+
+    [Fact]
+    public void Development_fresh_database_seeds_demo_active_rooms()
+    {
+        using var workspace = TestWorkspace.Create();
+        var context = StoreContext.Create(workspace, environmentName: Environments.Development, roomCount: 12);
+
+        var snapshot = context.Store.GetSnapshot();
+        var activeRooms = snapshot.Rooms.Where(room => room.State != RoomStates.Available || room.SeatedAt is not null).ToList();
+
+        Assert.Equal(12, snapshot.RoomCount);
+        Assert.NotEmpty(activeRooms);
+        Assert.Contains(activeRooms, room => room.AssignedDoctor == "otte" && room.ProcedureCode == "CON");
     }
 
     [Fact]
@@ -249,6 +298,19 @@ public sealed class BoardStoreTests
         using var command = connection.CreateCommand();
         command.CommandText = "SELECT COUNT(*) FROM completed_room_cycles WHERE room_id = 1;";
         Assert.Equal(1L, (long)command.ExecuteScalar()!);
+    }
+
+    [Fact]
+    public void SQLite_database_uses_wal_journal_mode()
+    {
+        using var workspace = TestWorkspace.Create();
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production);
+
+        using var connection = OpenConnection(context.DatabasePath);
+        using var command = connection.CreateCommand();
+        command.CommandText = "PRAGMA journal_mode;";
+
+        Assert.Equal("wal", (string)command.ExecuteScalar()!);
     }
 
     private static readonly HashSet<string> AllowedActiveRoomColumns =
@@ -379,7 +441,9 @@ internal sealed class StoreContext
         string environmentName,
         string? databasePath = null,
         int agingMinutes = 7,
-        int staleMinutes = 12)
+        int staleMinutes = 12,
+        int roomCount = 3,
+        TimeProvider? timeProvider = null)
     {
         var resolvedDatabasePath = databasePath ?? (environmentName == Environments.Production
             ? workspace.ProductionDatabasePath()
@@ -394,9 +458,10 @@ internal sealed class StoreContext
                 AgingMinutes = agingMinutes,
                 StaleMinutes = staleMinutes
             }),
-            Microsoft.Extensions.Options.Options.Create(new BoardOptions { RoomCount = 3 }),
+            Microsoft.Extensions.Options.Options.Create(new BoardOptions { RoomCount = roomCount }),
             repository,
-            environment);
+            environment,
+            timeProvider);
 
         return new StoreContext(store, repository, resolvedDatabasePath);
     }
@@ -460,4 +525,13 @@ internal sealed class TestOptionsMonitor<T>(T value) : IOptionsMonitor<T>
     public T Get(string? name) => CurrentValue;
 
     public IDisposable? OnChange(Action<T, string?> listener) => null;
+}
+
+internal sealed class ManualTimeProvider(DateTimeOffset utcNow) : TimeProvider
+{
+    private DateTimeOffset _utcNow = utcNow;
+
+    public override DateTimeOffset GetUtcNow() => _utcNow;
+
+    public void SetUtcNow(DateTimeOffset utcNow) => _utcNow = utcNow;
 }

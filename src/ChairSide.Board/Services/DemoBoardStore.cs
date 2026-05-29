@@ -8,6 +8,7 @@ public sealed class DemoBoardStore
     private readonly object _syncRoot = new();
     private readonly IOptionsMonitor<BoardThresholdOptions> _thresholdOptions;
     private readonly SqliteBoardRepository _repository;
+    private readonly TimeProvider _timeProvider;
     private readonly int _roomCount;
     private readonly List<Doctor> _doctors =
     [
@@ -35,12 +36,14 @@ public sealed class DemoBoardStore
         IOptionsMonitor<BoardThresholdOptions> thresholdOptions,
         IOptions<BoardOptions> boardOptions,
         SqliteBoardRepository repository,
-        IWebHostEnvironment environment)
+        IWebHostEnvironment environment,
+        TimeProvider? timeProvider = null)
     {
         _thresholdOptions = thresholdOptions;
         _repository = repository;
+        _timeProvider = timeProvider ?? TimeProvider.System;
         _roomCount = boardOptions.Value.RoomCount;
-        var now = DateTimeOffset.UtcNow;
+        var now = Now;
 
         var hasPersistedRooms = _repository.HasAnyRoomRows();
         _repository.EnsureConfiguredRooms(_roomCount);
@@ -61,7 +64,7 @@ public sealed class DemoBoardStore
     {
         lock (_syncRoot)
         {
-            var now = DateTimeOffset.UtcNow;
+            var now = Now;
             _rooms.ForEach(room => UpdateRoomState(room, now));
 
             return new BoardSnapshot(
@@ -88,7 +91,7 @@ public sealed class DemoBoardStore
                 return null;
             }
 
-            var now = DateTimeOffset.UtcNow;
+            var now = Now;
             UpdateRoomState(room, now);
             return ToRoomStatus(room, now);
         }
@@ -114,7 +117,7 @@ public sealed class DemoBoardStore
                 return null;
             }
 
-            var now = DateTimeOffset.UtcNow;
+            var now = Now;
             var simulatedElapsed = TimeSpan.FromMinutes(Math.Clamp(demoElapsedMinutes, 0, 240));
             room.AssignedDoctor = doctor.Id;
             room.ProcedureCode = procedure.Label;
@@ -145,7 +148,7 @@ public sealed class DemoBoardStore
                 return null;
             }
 
-            var now = DateTimeOffset.UtcNow;
+            var now = Now;
             UpdateRoomState(room, now);
             if (!CanMarkDoctorArrived(room) || room.SeatedAt is null)
             {
@@ -172,7 +175,7 @@ public sealed class DemoBoardStore
                 return null;
             }
 
-            var now = DateTimeOffset.UtcNow;
+            var now = Now;
             UpdateRoomState(room, now);
             if (!CanMarkDoctorArrived(room) || room.SeatedAt is null)
             {
@@ -197,7 +200,7 @@ public sealed class DemoBoardStore
                 return null;
             }
 
-            var now = DateTimeOffset.UtcNow;
+            var now = Now;
             UpdateRoomState(room, now);
             if (!CanMarkDoctorArrived(room) || room.SeatedAt is null || room.AssignedDoctor is null || room.ProcedureCode is null)
             {
@@ -248,7 +251,7 @@ public sealed class DemoBoardStore
                 return null;
             }
 
-            var now = DateTimeOffset.UtcNow;
+            var now = Now;
             room.DoctorCompleteAt = now;
             room.State = RoomStates.Turnover;
             UpdateCycleReport(room, cycle =>
@@ -274,7 +277,7 @@ public sealed class DemoBoardStore
                 return null;
             }
 
-            var now = DateTimeOffset.UtcNow;
+            var now = Now;
             room.RoomAvailableAt = now;
             UpdateCycleReport(room, cycle =>
             {
@@ -482,7 +485,7 @@ public sealed class DemoBoardStore
             SeatedAt = seatedAt
         };
 
-        UpdateRoomState(room, DateTimeOffset.UtcNow);
+        UpdateRoomState(room, Now);
         return room;
     }
 
@@ -529,6 +532,8 @@ public sealed class DemoBoardStore
     }
 
     private BoardThresholdOptions Thresholds => _thresholdOptions.CurrentValue;
+
+    private DateTimeOffset Now => _timeProvider.GetUtcNow();
 
     private static int SecondsBetween(DateTimeOffset start, DateTimeOffset end) =>
         Math.Max(0, (int)Math.Round((end - start).TotalSeconds));
