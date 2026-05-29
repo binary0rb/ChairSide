@@ -11,6 +11,7 @@ const app = {
   lastPollAt: 0,
   serverOffsetMs: 0,
   connectionStatus: "stale",
+  realtimeDegraded: false,
   pollInFlight: false,
   roomNumber: getRoomNumber(),
   doctorId: new URLSearchParams(location.search).get("doctor") || "otte",
@@ -82,7 +83,8 @@ async function loadReports() {
 function connectRealtime() {
   if (!window.signalR) {
     app.hubReady = false;
-    setConnectionStatus("stale");
+    app.realtimeDegraded = true;
+    updateConnectionStatus();
     return;
   }
 
@@ -109,13 +111,15 @@ function connectRealtime() {
   if (typeof connection.onreconnecting === "function") {
     connection.onreconnecting(() => {
       app.hubReady = false;
-      setConnectionStatus("reconnecting");
+      app.realtimeDegraded = true;
+      updateConnectionStatus();
     });
   }
 
   if (typeof connection.onreconnected === "function") {
     connection.onreconnected(() => {
       app.hubReady = true;
+      app.realtimeDegraded = false;
       setConnectionStatus("live");
       loadBoard();
     });
@@ -124,6 +128,7 @@ function connectRealtime() {
   if (typeof connection.onclose === "function") {
     connection.onclose(() => {
       app.hubReady = false;
+      app.realtimeDegraded = true;
       updateConnectionStatus();
     });
   }
@@ -131,12 +136,14 @@ function connectRealtime() {
   connection.start()
     .then(() => {
       app.hubReady = true;
+      app.realtimeDegraded = false;
       setConnectionStatus("live");
     })
     .catch(error => {
       console.warn("[ChairSide] SignalR connection failed; polling fallback remains active.", error);
       app.hubReady = false;
-      setConnectionStatus("reconnecting");
+      app.realtimeDegraded = true;
+      updateConnectionStatus();
       scheduleRealtimeRetry();
     });
 }

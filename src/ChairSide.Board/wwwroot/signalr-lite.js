@@ -34,6 +34,7 @@
       this.closeHandlers = [];
       this.reconnectingHandlers = [];
       this.reconnectedHandlers = [];
+      this.keepAliveTimer = null;
       this.state = "Disconnected";
     }
 
@@ -66,6 +67,7 @@
     }
 
     async start() {
+      this.stopKeepAlive();
       const negotiateUrl = `${this.url}/negotiate?negotiateVersion=1`;
       const response = await fetch(negotiateUrl, { method: "POST" });
       if (!response.ok) {
@@ -94,6 +96,7 @@
           }
         });
         socket.addEventListener("close", () => {
+          this.stopKeepAlive();
           if (!this.handshakeComplete) {
             reject(new Error("SignalR connection closed before handshake completed."));
           }
@@ -117,6 +120,16 @@
           this.state = "Connected";
           this.handshakeResolver?.();
           this.handshakeResolver = null;
+          this.startKeepAlive();
+          continue;
+        }
+
+        if (message.type === 6) {
+          continue;
+        }
+
+        if (message.type === 7) {
+          this.socket?.close();
           continue;
         }
 
@@ -147,6 +160,24 @@
           this.scheduleReconnect();
         }
       }, 1500);
+    }
+
+    startKeepAlive() {
+      this.stopKeepAlive();
+      this.keepAliveTimer = window.setInterval(() => {
+        if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
+          return;
+        }
+
+        this.socket.send(JSON.stringify({ type: 6 }) + recordSeparator);
+      }, 15000);
+    }
+
+    stopKeepAlive() {
+      if (this.keepAliveTimer) {
+        window.clearInterval(this.keepAliveTimer);
+        this.keepAliveTimer = null;
+      }
     }
   }
 
