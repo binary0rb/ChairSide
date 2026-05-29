@@ -8,7 +8,7 @@ It tracks rooms, assigned doctors, procedure categories, timers, and seated-to-d
 
 - ASP.NET Core 8 minimal web app
 - SignalR hub for live board updates
-- Shared in-memory state for the configured room count
+- SQLite-backed active room state for the configured room count
 - Static browser UI with master board, room panel, doctor read-only view, and basic reports
 - No patient fields, free-text notes, dates of birth, chart numbers, diagnoses, insurance, or billing data
 
@@ -25,7 +25,7 @@ Each room tracks only non-PHI operational state:
 - `doctorCompleteAt`
 - `roomAvailableAt`
 
-Completed room cycles are tracked in memory for reporting with:
+Completed room cycles are persisted for reporting with:
 
 - `roomId`
 - `assignedDoctor`
@@ -105,13 +105,24 @@ Thresholds are configured in `src/ChairSide.Board/appsettings.json`:
   },
   "BoardOptions": {
     "RoomCount": 12
+  },
+  "BoardPersistenceOptions": {
+    "DatabasePath": "./data/chairside-dev.db"
   }
 }
 ```
 
 Change those values to adjust room timing without code edits. `StaleMinutes` must be greater than `AgingMinutes`; the app validates this at startup.
 
-`RoomCount` controls how many room states are created in memory. The default is 12, so Room 1 through Room 12 are active. Change `BoardOptions:RoomCount` and restart the app to use a different room count.
+`RoomCount` controls how many room states are configured. The default is 12, so Room 1 through Room 12 are active. Change `BoardOptions:RoomCount` and restart the app to use a different room count.
+
+`BoardPersistenceOptions:DatabasePath` controls the SQLite database location. The default development path is local to the app project, `./data/chairside-dev.db`. For staging or production, set this to an operational data location such as `C:\ChairSide\Data\chairside.db` through environment-specific configuration or command-line configuration:
+
+```powershell
+dotnet run --project .\src\ChairSide.Board\ChairSide.Board.csproj --BoardPersistenceOptions:DatabasePath="C:\ChairSide\Data\chairside.db"
+```
+
+The app creates the SQLite database and schema on startup if they do not exist. Persisted data remains non-PHI and is limited to room assignments, procedure categories, lifecycle state, operational timestamps, and completed-cycle durations.
 
 ## Seed Data
 
@@ -162,11 +173,13 @@ Compatibility URLs:
 
 ## Reset Demo Data
 
-The current scaffold uses in-memory seed data. Restart the app to reset the demo board.
+The development database is stored at `src/ChairSide.Board/data/chairside-dev.db` by default. Stop the app and delete that file, plus any matching `chairside-dev.db-wal` or `chairside-dev.db-shm` files, to reset local demo data.
+
+Demo room states are only seeded when a non-Production database is brand new. Production starts with configured rooms in the available state and does not seed demo room activity.
 
 ## Reports
 
-The reports page shows completed room cycle count, seated-to-doctor average and median, doctor-in-room average and median, turnover average and median, aging event count, stale event count, and recent completed cycles. Data is in memory for now and resets when the app restarts.
+The reports page shows completed room cycle count, seated-to-doctor average and median, doctor-in-room average and median, turnover average and median, aging event count, stale event count, and recent completed cycles. Active room state and completed cycles are stored in SQLite and survive app restarts.
 
 The underlying completed-cycle records include assigned doctor and completion timestamps so monthly doctor-level reporting can be added later without introducing PHI.
 
@@ -188,6 +201,6 @@ Room panels include a `Demo Timer` select. Use `Start now`, `Simulate aging wait
 10. Click `Room Available`. Expected result: Room 1 returns to the gray available state.
 11. Open `http://localhost:5000/reports.html`. Expected result: reports show non-PHI room-flow metrics and completed Room 1 cycles.
 
-## Future Database
+## Persistence
 
-The intended early persistence target is SQLite or SQL Server Express. Keep persisted fields limited to room number, doctor assignment, procedure category, room state, event timestamps, device identity, and non-PHI operational metrics.
+SQLite persistence is intentionally narrow for the MVP. It stores only room number, doctor id/display name, procedure code/category, room state, lifecycle timestamps, completed-cycle durations, and operational audit timestamps. It does not store patient names, DOBs, chart numbers, medical notes, diagnosis, insurance, billing data, or free-text patient notes.

@@ -7,6 +7,7 @@ public sealed class DemoBoardStore
 {
     private readonly object _syncRoot = new();
     private readonly IOptionsMonitor<BoardThresholdOptions> _thresholdOptions;
+    private readonly SqliteBoardRepository _repository;
     private readonly int _roomCount;
     private readonly List<Doctor> _doctors =
     [
@@ -32,16 +33,27 @@ public sealed class DemoBoardStore
 
     public DemoBoardStore(
         IOptionsMonitor<BoardThresholdOptions> thresholdOptions,
-        IOptions<BoardOptions> boardOptions)
+        IOptions<BoardOptions> boardOptions,
+        SqliteBoardRepository repository,
+        IWebHostEnvironment environment)
     {
         _thresholdOptions = thresholdOptions;
+        _repository = repository;
         _roomCount = boardOptions.Value.RoomCount;
         var now = DateTimeOffset.UtcNow;
-        _rooms = Enumerable.Range(1, _roomCount)
-            .Select(Available)
-            .ToList();
 
-        SeedDemoRooms(now);
+        var hasPersistedRooms = _repository.HasAnyRoomRows();
+        _repository.EnsureConfiguredRooms(_roomCount);
+        _rooms = _repository.LoadRooms(_roomCount).ToList();
+        AddMissingRooms();
+
+        if (!hasPersistedRooms && !environment.IsProduction())
+        {
+            SeedDemoRooms(now);
+        }
+
+        _repository.SaveRooms(_rooms, _doctors, _procedures);
+        _completedCycles = _repository.LoadCompletedCycles().ToList();
     }
 
     public BoardSnapshot GetSnapshot()
@@ -114,6 +126,7 @@ public sealed class DemoBoardStore
             room.State = RoomStates.Seated;
             UpdateRoomState(room, now);
             _events.Add(new RoomEvent(room.RoomId, "Seated", now, doctor.Id, procedure.Label));
+            PersistRoom(room);
 
             return ToRoomStatus(room, now);
         }
@@ -142,6 +155,7 @@ public sealed class DemoBoardStore
             room.ProcedureCode = procedure.Label;
             UpdateRoomState(room, now);
             _events.Add(new RoomEvent(room.RoomId, "AssignmentUpdated", now, doctor.Id, procedure.Label));
+            PersistRoom(room);
 
             return ToRoomStatus(room, now);
         }
@@ -166,6 +180,7 @@ public sealed class DemoBoardStore
 
             _events.Add(new RoomEvent(room.RoomId, "SeatingCanceled", now, room.AssignedDoctor, room.ProcedureCode));
             ResetRoom(room);
+            PersistRoom(room);
 
             return ToRoomStatus(room, now);
         }
@@ -194,9 +209,10 @@ public sealed class DemoBoardStore
             room.State = RoomStates.DoctorInRoom;
             _events.Add(new RoomEvent(room.RoomId, "DoctorArrived", now, room.AssignedDoctor, room.ProcedureCode, TimeSpan.FromSeconds(seatedToDoctorSeconds)));
 
+            CompletedRoomCycle? cycle = null;
             if (!HasCycleReport(room.RoomId, room.SeatedAt.Value))
             {
-                _completedCycles.Add(new CompletedRoomCycle
+                cycle = new CompletedRoomCycle
                 {
                     RoomId = room.RoomId,
                     AssignedDoctor = room.AssignedDoctor,
@@ -207,7 +223,14 @@ public sealed class DemoBoardStore
                     FinalWaitState = finalWaitState,
                     AgingThresholdReached = room.AgingStartedAt is not null,
                     StaleThresholdReached = room.StaleStartedAt is not null
-                });
+                };
+                _completedCycles.Add(cycle);
+            }
+
+            PersistRoom(room);
+            if (cycle is not null)
+            {
+                PersistCycle(cycle);
             }
 
             return ToRoomStatus(room, now);
@@ -233,6 +256,8 @@ public sealed class DemoBoardStore
                 cycle.DoctorInRoomSeconds = SecondsBetween(room.DoctorArrivedAt.Value, now);
             });
             _events.Add(new RoomEvent(room.RoomId, "DoctorComplete", now, room.AssignedDoctor, room.ProcedureCode));
+            PersistRoom(room);
+            PersistCycleForRoom(room);
 
             return ToRoomStatus(room, now);
         }
@@ -257,8 +282,10 @@ public sealed class DemoBoardStore
                 cycle.TotalRoomCycleSeconds = SecondsBetween(room.SeatedAt.Value, now);
             });
             _events.Add(new RoomEvent(room.RoomId, "RoomAvailable", now, room.AssignedDoctor, room.ProcedureCode));
+            PersistCycleForRoom(room);
 
             ResetRoom(room);
+            PersistRoom(room);
 
             return ToRoomStatus(room, now);
         }
@@ -355,6 +382,20 @@ public sealed class DemoBoardStore
             string.Equals(item.Label, procedureCode, StringComparison.OrdinalIgnoreCase));
 
     private static RoomState Available(int roomId) => new(roomId);
+
+    private void AddMissingRooms()
+    {
+        var existingRoomIds = _rooms.Select(room => room.RoomId).ToHashSet();
+        for (var roomId = 1; roomId <= _roomCount; roomId++)
+        {
+            if (!existingRoomIds.Contains(roomId))
+            {
+                _rooms.Add(Available(roomId));
+            }
+        }
+
+        _rooms.Sort((left, right) => left.RoomId.CompareTo(right.RoomId));
+    }
 
     private void SeedDemoRooms(DateTimeOffset now)
     {
@@ -455,6 +496,26 @@ public sealed class DemoBoardStore
         if (cycle is not null)
         {
             update(cycle);
+        }
+    }
+
+    private void PersistRoom(RoomState room) =>
+        _repository.SaveRoom(room, _doctors, _procedures);
+
+    private void PersistCycle(CompletedRoomCycle cycle) =>
+        _repository.SaveCompletedCycle(cycle, _doctors, _procedures);
+
+    private void PersistCycleForRoom(RoomState room)
+    {
+        if (room.SeatedAt is null)
+        {
+            return;
+        }
+
+        var cycle = _completedCycles.FirstOrDefault(item => item.RoomId == room.RoomId && item.SeatedAt == room.SeatedAt);
+        if (cycle is not null)
+        {
+            PersistCycle(cycle);
         }
     }
 
