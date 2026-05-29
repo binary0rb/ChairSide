@@ -19,10 +19,18 @@ builder.Services
     .Validate(options => options.RoomCount > 0, "RoomCount must be greater than 0.")
     .ValidateOnStart();
 
+builder.Services
+    .AddOptions<BoardPersistenceOptions>()
+    .Bind(builder.Configuration.GetSection(BoardPersistenceOptions.SectionName))
+    .Validate(options => !string.IsNullOrWhiteSpace(options.DatabasePath), "DatabasePath is required.")
+    .ValidateOnStart();
+
 builder.Services.AddSignalR();
+builder.Services.AddSingleton<SqliteBoardRepository>();
 builder.Services.AddSingleton<DemoBoardStore>();
 
 var app = builder.Build();
+_ = app.Services.GetRequiredService<DemoBoardStore>();
 
 app.UseDefaultFiles();
 app.UseStaticFiles();
