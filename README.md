@@ -124,6 +124,14 @@ dotnet run --project .\src\ChairSide.Board\ChairSide.Board.csproj --BoardPersist
 
 The app creates the SQLite database and schema on startup if they do not exist. Persisted data remains non-PHI and is limited to room assignments, procedure categories, lifecycle state, operational timestamps, and completed-cycle durations.
 
+Production database guidance:
+
+- Recommended path: `C:\ChairSide\Data\chairside.db`
+- Do not store the production database under the deployed app/content root.
+- The IIS app pool identity needs Modify permission on `C:\ChairSide\Data`.
+- SQLite WAL mode creates `chairside.db-wal` and `chairside.db-shm` beside the database, so the directory must be writable, not just the database file.
+- In Production, the app fails fast if the configured database path resolves inside the app content root or if the database directory cannot be created/written by the running process.
+
 ## Seed Data
 
 Doctors:

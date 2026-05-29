@@ -30,6 +30,7 @@ builder.Services.AddSingleton<SqliteBoardRepository>();
 builder.Services.AddSingleton<DemoBoardStore>();
 
 var app = builder.Build();
+_ = app.Services.GetRequiredService<DemoBoardStore>();
 
 app.UseDefaultFiles();
 app.UseStaticFiles();

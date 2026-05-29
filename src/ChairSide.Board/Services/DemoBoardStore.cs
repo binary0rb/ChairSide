@@ -46,6 +46,7 @@ public sealed class DemoBoardStore
         _repository.EnsureConfiguredRooms(_roomCount);
         _rooms = _repository.LoadRooms(_roomCount).ToList();
         AddMissingRooms();
+        RecomputeLoadedRoomStates(now);
 
         if (!hasPersistedRooms && !environment.IsProduction())
         {
@@ -395,6 +396,14 @@ public sealed class DemoBoardStore
         }
 
         _rooms.Sort((left, right) => left.RoomId.CompareTo(right.RoomId));
+    }
+
+    private void RecomputeLoadedRoomStates(DateTimeOffset now)
+    {
+        foreach (var room in _rooms)
+        {
+            UpdateRoomState(room, now);
+        }
     }
 
     private void SeedDemoRooms(DateTimeOffset now)

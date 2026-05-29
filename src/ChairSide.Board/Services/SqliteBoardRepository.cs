@@ -15,14 +15,16 @@ public sealed class SqliteBoardRepository
     {
         _databasePath = ResolveDatabasePath(options.Value.DatabasePath, environment.ContentRootPath);
         var directory = Path.GetDirectoryName(_databasePath);
-        if (!string.IsNullOrWhiteSpace(directory))
+        if (string.IsNullOrWhiteSpace(directory))
         {
-            Directory.CreateDirectory(directory);
+            throw new InvalidOperationException("SQLite database path must include a directory.");
         }
 
+        ValidateDatabasePath(environment, directory);
         _connectionString = new SqliteConnectionStringBuilder
         {
-            DataSource = _databasePath
+            DataSource = _databasePath,
+            DefaultTimeout = 5
         }.ToString();
 
         Initialize();
@@ -273,6 +275,7 @@ public sealed class SqliteBoardRepository
         using var command = connection.CreateCommand();
         command.CommandText = """
             PRAGMA journal_mode = WAL;
+            PRAGMA busy_timeout = 5000;
 
             CREATE TABLE IF NOT EXISTS active_rooms (
                 room_id INTEGER PRIMARY KEY,
@@ -398,7 +401,53 @@ public sealed class SqliteBoardRepository
     {
         var connection = new SqliteConnection(_connectionString);
         connection.Open();
+        using var command = connection.CreateCommand();
+        command.CommandText = "PRAGMA busy_timeout = 5000;";
+        command.ExecuteNonQuery();
         return connection;
+    }
+
+    private static void ValidateDatabasePath(IWebHostEnvironment environment, string databaseDirectory)
+    {
+        if (environment.IsProduction() && IsPathInsideContentRoot(databaseDirectory, environment.ContentRootPath))
+        {
+            throw new InvalidOperationException(
+                "Production SQLite database path must be outside the deployed app content root. Use an operational data directory such as C:\\ChairSide\\Data\\chairside.db.");
+        }
+
+        Directory.CreateDirectory(databaseDirectory);
+        VerifyDirectoryWritable(databaseDirectory);
+    }
+
+    private static bool IsPathInsideContentRoot(string path, string contentRootPath)
+    {
+        var fullPath = NormalizeDirectoryPath(path);
+        var fullContentRoot = NormalizeDirectoryPath(contentRootPath);
+        return fullPath.StartsWith(fullContentRoot, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string NormalizeDirectoryPath(string path)
+    {
+        var fullPath = Path.GetFullPath(path);
+        return fullPath.EndsWith(Path.DirectorySeparatorChar)
+            ? fullPath
+            : fullPath + Path.DirectorySeparatorChar;
+    }
+
+    private static void VerifyDirectoryWritable(string directory)
+    {
+        var testPath = Path.Combine(directory, $".chairside-write-test-{Guid.NewGuid():N}.tmp");
+        try
+        {
+            File.WriteAllText(testPath, "write-test");
+        }
+        finally
+        {
+            if (File.Exists(testPath))
+            {
+                File.Delete(testPath);
+            }
+        }
     }
 
     private static string ResolveDatabasePath(string databasePath, string contentRootPath) =>
