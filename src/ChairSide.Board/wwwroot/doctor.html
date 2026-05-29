@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ChairSide Board - Doctor View</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body data-view="doctor">
+  <header class="app-header compact">
+    <div>
+      <span class="brand-kicker">ChairSide Board</span>
+      <h1 id="doctorViewTitle">Doctor View</h1>
+      <p>Read-only room status.</p>
+    </div>
+    <nav class="view-links" aria-label="Views">
+      <a href="/master.html">Master</a>
+      <a href="/doctor.html">Doctor</a>
+      <a href="/reports.html">Reports</a>
+      <a href="/room.html?roomId=1">Room 1</a>
+    </nav>
+  </header>
+
+  <main class="doctor-shell">
+    <section class="doctor-list" id="doctorRoomList"></section>
+  </main>
+
+  <script src="/signalr-lite.js"></script>
+  <script src="/board.js"></script>
+</body>
+</html>

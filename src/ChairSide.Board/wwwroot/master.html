@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ChairSide Board</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body data-view="master">
+  <header class="app-header">
+    <div>
+      <h1>ChairSide Board</h1>
+      <p>Room status only. No patient data.</p>
+    </div>
+    <nav class="view-links" aria-label="Views">
+      <a href="/master.html">Master</a>
+      <a href="/doctor.html">Doctor</a>
+      <a href="/reports.html">Reports</a>
+      <a href="/room.html?roomId=1">Room 1</a>
+    </nav>
+  </header>
+
+  <main class="master-shell">
+    <section class="legend" aria-label="Doctor color legend">
+      <div class="legend-group" id="doctorLegend"></div>
+      <div class="legend-group procedure-key" id="procedureLegend"></div>
+      <div class="state-key">
+        <span><i class="state-dot empty"></i> Available: gray</span>
+        <span><i class="state-dot seated"></i> Seated: solid doctor color</span>
+        <span><i class="state-dot aging"></i> Aging: yellow pulsing border</span>
+        <span><i class="state-dot stale"></i> Stale: red pulsing border</span>
+        <span><i class="state-dot doctor-in-room"></i> Doctor In Room: stable doctor color with IN ROOM badge</span>
+        <span><i class="state-dot turnover"></i> Turnover: diagonal gray/black stripe</span>
+      </div>
+    </section>
+
+    <section class="room-grid" id="roomGrid" aria-label="Room card grid"></section>
+  </main>
+
+  <script src="/signalr-lite.js"></script>
+  <script src="/board.js"></script>
+</body>
+</html>

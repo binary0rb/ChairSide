@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ChairSide Board - Room 1 Panel</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body data-view="room" data-room-number="1">
+  <header class="app-header compact">
+    <div>
+      <span class="brand-kicker">ChairSide Board</span>
+      <h1 id="roomPanelTitle">Room 1</h1>
+      <p>Room-local staff panel. No patient data.</p>
+    </div>
+    <nav class="view-links" aria-label="Views">
+      <a href="/master.html">Master</a>
+      <a href="/doctor.html">Doctor</a>
+      <a href="/reports.html">Reports</a>
+      <a href="/room.html?roomId=1">Room 1</a>
+    </nav>
+  </header>
+
+  <main class="panel-shell">
+    <section class="panel-status" id="roomPanelStatus"></section>
+    <section class="touch-controls" aria-label="Room 1 lifecycle controls">
+      <div>
+        <label for="doctorSelect">Doctor</label>
+        <select id="doctorSelect"></select>
+      </div>
+      <div>
+        <label for="procedureSelect">Procedure</label>
+        <select id="procedureSelect"></select>
+      </div>
+      <div>
+        <label for="demoElapsedSelect">Demo Timer</label>
+        <select id="demoElapsedSelect"></select>
+      </div>
+      <button class="primary-button" id="seatButton" type="button">Seat Room</button>
+      <button class="secondary-button" id="doctorArrivedButton" type="button">Doctor Arrived</button>
+      <button class="secondary-button" id="doctorCompleteButton" type="button">Doctor Complete</button>
+      <button class="available-button" id="roomAvailableButton" type="button">Room Available</button>
+      <div class="action-status" id="roomActionStatus" role="status" aria-live="polite"></div>
+    </section>
+  </main>
+
+  <script src="/signalr-lite.js"></script>
+  <script src="/board.js"></script>
+</body>
+</html>
