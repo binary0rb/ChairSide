@@ -57,6 +57,13 @@ The room lifecycle is:
 
 `Seat Room` starts the seated-to-doctor timer and records only doctor, procedure, and operational timestamps. `Doctor Arrived` is available only for seated, aging, or stale rooms; it records `doctorArrivedAt`, calculates `seatedToDoctorSeconds`, and moves the room to Doctor In Room. `Doctor Complete` is available only while the doctor is in the room; it records `doctorCompleteAt` and starts Turnover. `Room Available` is available only during Turnover; it records `roomAvailableAt`, calculates turnover and total cycle durations, and resets the active room card to available.
 
+Before `Doctor Arrived`, staff can safely correct common seating mistakes:
+
+- `Update Assignment` changes the assigned doctor and procedure while preserving the original `seatedAt` timestamp.
+- `Cancel Seating` requires confirmation, resets the room to available, and does not create a report entry.
+
+After `Doctor Arrived`, correction actions are blocked. Seated-to-doctor reporting is recorded only at `Doctor Arrived`.
+
 The server calculates the seated wait state from `seatedAt`, `agingStartedAt`, `staleStartedAt`, and the configured thresholds:
 
 - Available when there is no active `seatedAt`
@@ -74,6 +81,19 @@ Visual state rules:
 - Stale = red pulsing border
 - Doctor In Room = stable doctor color with IN ROOM badge
 - Turnover = diagonal gray/black stripe
+
+The room panel is touch-first for tablet use. Doctor and procedure choices render as large selectable tiles with configured doctor names/colors, procedure icons, procedure codes, and procedure labels. Lifecycle buttons are large touch targets and remain keyboard/mouse compatible.
+
+Procedure icons are high-contrast inline SVGs used consistently across legends, room cards, room panels, and reports:
+
+- `CON` = Consult, speech bubble
+- `EXT` = Extraction, bold forceps/pliers
+- `SED` = Sedation, crescent moon
+- `POST` = Post-op, checkmark in square
+- `IMP` = Implant, screw/bolt
+- `BX` = Biopsy, vial/sample
+
+Full doctor names remain visible in the doctor legend, room panel tiles, reports, and configuration-facing context. Master board and doctor-view room cards use compact last names without the `Dr.` prefix, such as `Pledger` and `Schroeder`, to keep room cards readable.
 
 Thresholds are configured in `src/ChairSide.Board/appsettings.json`:
 
@@ -158,14 +178,15 @@ Room panels include a `Demo Timer` select. Use `Start now`, `Simulate aging wait
 
 1. Open `http://localhost:5000/master.html` and `http://localhost:5000/room.html?roomId=1`.
 2. On the Room 1 panel, choose `Start now` and click `Seat Room`. Expected result: Room 1 appears on the master board as a solid doctor-color card with a seated timer.
-3. Click `Doctor Arrived`, `Doctor Complete`, then `Room Available` to reset Room 1 for the next demo state.
-4. Choose `Simulate aging wait` and click `Seat Room`. Expected result: Room 1 appears as a solid doctor-color card with a slow pulsing yellow border.
-5. Click `Doctor Arrived`, `Doctor Complete`, then `Room Available` to reset Room 1 again.
-6. Choose `Simulate stale wait` and click `Seat Room`. Expected result: Room 1 appears as a solid doctor-color card with a faster pulsing red border.
-7. Click `Doctor Arrived`. Expected result: Room 1 changes to stable doctor color with the `IN ROOM` badge, and seated-to-doctor metrics are recorded.
-8. Click `Doctor Complete`. Expected result: Room 1 changes to the neutral diagonal stripe turnover card with the `TURNOVER` badge.
-9. Click `Room Available`. Expected result: Room 1 returns to the gray available state.
-10. Open `http://localhost:5000/reports.html`. Expected result: reports show non-PHI room-flow metrics and completed Room 1 cycles.
+3. Change the selected doctor or procedure and click `Update Assignment`. Expected result: Room 1 keeps the same seated timer but updates doctor/procedure on the master board.
+4. Click `Cancel Seating` and confirm. Expected result: Room 1 returns to available without creating a report entry.
+5. Choose `Simulate aging wait` and click `Seat Room`. Expected result: Room 1 appears as a solid doctor-color card with a slow pulsing yellow border.
+6. Click `Doctor Arrived`, `Doctor Complete`, then `Room Available` to reset Room 1 again.
+7. Choose `Simulate stale wait` and click `Seat Room`. Expected result: Room 1 appears as a solid doctor-color card with a faster pulsing red border.
+8. Click `Doctor Arrived`. Expected result: Room 1 changes to stable doctor color with the `IN ROOM` badge, and seated-to-doctor metrics are recorded.
+9. Click `Doctor Complete`. Expected result: Room 1 changes to the neutral diagonal stripe turnover card with the `TURNOVER` badge.
+10. Click `Room Available`. Expected result: Room 1 returns to the gray available state.
+11. Open `http://localhost:5000/reports.html`. Expected result: reports show non-PHI room-flow metrics and completed Room 1 cycles.
 
 ## Future Database
 
