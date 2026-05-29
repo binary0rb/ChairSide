@@ -11,6 +11,8 @@ const app = {
   lastPollAt: 0,
   serverOffsetMs: 0,
   connectionStatus: "stale",
+  realtimeDegraded: false,
+  realtimeLostAt: 0,
   pollInFlight: false,
   roomNumber: getRoomNumber(),
   doctorId: new URLSearchParams(location.search).get("doctor") || "otte",
@@ -81,8 +83,8 @@ async function loadReports() {
 
 function connectRealtime() {
   if (!window.signalR) {
-    app.hubReady = false;
-    setConnectionStatus("stale");
+    markRealtimeDegraded();
+    updateConnectionStatus();
     return;
   }
 
@@ -108,14 +110,16 @@ function connectRealtime() {
 
   if (typeof connection.onreconnecting === "function") {
     connection.onreconnecting(() => {
-      app.hubReady = false;
-      setConnectionStatus("reconnecting");
+      markRealtimeDegraded();
+      updateConnectionStatus();
     });
   }
 
   if (typeof connection.onreconnected === "function") {
     connection.onreconnected(() => {
       app.hubReady = true;
+      app.realtimeDegraded = false;
+      app.realtimeLostAt = 0;
       setConnectionStatus("live");
       loadBoard();
     });
@@ -123,7 +127,7 @@ function connectRealtime() {
 
   if (typeof connection.onclose === "function") {
     connection.onclose(() => {
-      app.hubReady = false;
+      markRealtimeDegraded();
       updateConnectionStatus();
     });
   }
@@ -131,14 +135,24 @@ function connectRealtime() {
   connection.start()
     .then(() => {
       app.hubReady = true;
+      app.realtimeDegraded = false;
+      app.realtimeLostAt = 0;
       setConnectionStatus("live");
     })
     .catch(error => {
       console.warn("[ChairSide] SignalR connection failed; polling fallback remains active.", error);
-      app.hubReady = false;
-      setConnectionStatus("reconnecting");
+      markRealtimeDegraded();
+      updateConnectionStatus();
       scheduleRealtimeRetry();
     });
+}
+
+function markRealtimeDegraded() {
+  app.hubReady = false;
+  app.realtimeDegraded = true;
+  if (!app.realtimeLostAt) {
+    app.realtimeLostAt = Date.now();
+  }
 }
 
 function scheduleRealtimeRetry() {
@@ -225,13 +239,21 @@ function setConnectionStatus(status) {
 function updateConnectionStatus() {
   const snapshotAgeMs = app.lastSnapshotAt ? Date.now() - app.lastSnapshotAt : Number.POSITIVE_INFINITY;
   const staleAfterMs = 15000;
+  const pollingFreshAfterRealtimeLoss = app.realtimeDegraded
+    && app.lastPollAt > app.realtimeLostAt
+    && Date.now() - app.lastPollAt <= 7000;
 
   if (snapshotAgeMs > staleAfterMs) {
     setConnectionStatus("stale");
     return;
   }
 
-  setConnectionStatus(app.hubReady ? "live" : "reconnecting");
+  if (app.hubReady || pollingFreshAfterRealtimeLoss || !app.realtimeDegraded) {
+    setConnectionStatus("live");
+    return;
+  }
+
+  setConnectionStatus("reconnecting");
 }
 
 function renderLegend() {
