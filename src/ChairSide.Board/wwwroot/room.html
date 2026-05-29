@@ -24,19 +24,21 @@
   <main class="panel-shell">
     <section class="panel-status" id="roomPanelStatus"></section>
     <section class="touch-controls" aria-label="Room lifecycle controls">
-      <div>
-        <label for="doctorSelect">Doctor</label>
-        <select id="doctorSelect"></select>
+      <div class="selection-section">
+        <span class="control-label" id="doctorTilesLabel">Doctor</span>
+        <div class="selection-grid doctor-selection-grid" id="doctorTiles" role="radiogroup" aria-labelledby="doctorTilesLabel"></div>
       </div>
-      <div>
-        <label for="procedureSelect">Procedure</label>
-        <select id="procedureSelect"></select>
+      <div class="selection-section">
+        <span class="control-label" id="procedureTilesLabel">Procedure</span>
+        <div class="selection-grid procedure-selection-grid" id="procedureTiles" role="radiogroup" aria-labelledby="procedureTilesLabel"></div>
       </div>
-      <div>
+      <div class="demo-timer-control">
         <label for="demoElapsedSelect">Demo Timer</label>
         <select id="demoElapsedSelect"></select>
       </div>
       <button class="primary-button" id="seatButton" type="button">Seat Room</button>
+      <button class="secondary-button" id="updateAssignmentButton" type="button">Update Assignment</button>
+      <button class="danger-button" id="cancelSeatingButton" type="button">Cancel Seating</button>
       <button class="secondary-button" id="doctorArrivedButton" type="button">Doctor Arrived</button>
       <button class="secondary-button" id="doctorCompleteButton" type="button">Doctor Complete</button>
       <button class="available-button" id="roomAvailableButton" type="button">Room Available</button>

@@ -63,6 +63,47 @@ app.MapPost("/api/rooms/{roomNumber:int}/seat", async Task<IResult> (
     return Results.Ok(result);
 });
 
+app.MapPost("/api/rooms/{roomNumber:int}/assignment", async Task<IResult> (
+    int roomNumber,
+    UpdateAssignmentRequest request,
+    DemoBoardStore store,
+    Microsoft.AspNetCore.SignalR.IHubContext<BoardHub> hubContext) =>
+{
+    var procedureCode = request.ProcedureCode ?? request.ProcedureId;
+    if (string.IsNullOrWhiteSpace(procedureCode))
+    {
+        return Results.BadRequest("Procedure code is required.");
+    }
+
+    var result = store.UpdateAssignment(roomNumber, request.DoctorId, procedureCode);
+    if (result is null)
+    {
+        return store.IsConfiguredRoom(roomNumber)
+            ? Results.BadRequest("Update Assignment is only available for seated, aging, or stale rooms with a valid doctor and procedure.")
+            : Results.NotFound("Room is not configured.");
+    }
+
+    await hubContext.Clients.All.SendAsync("boardUpdated", store.GetSnapshot());
+    return Results.Ok(result);
+});
+
+app.MapPost("/api/rooms/{roomNumber:int}/cancel-seating", async Task<IResult> (
+    int roomNumber,
+    DemoBoardStore store,
+    Microsoft.AspNetCore.SignalR.IHubContext<BoardHub> hubContext) =>
+{
+    var result = store.CancelSeating(roomNumber);
+    if (result is null)
+    {
+        return store.IsConfiguredRoom(roomNumber)
+            ? Results.BadRequest("Cancel Seating is only available for seated, aging, or stale rooms.")
+            : Results.NotFound("Room is not configured.");
+    }
+
+    await hubContext.Clients.All.SendAsync("boardUpdated", store.GetSnapshot());
+    return Results.Ok(result);
+});
+
 app.MapPost("/api/rooms/{roomNumber:int}/doctor-arrived", async Task<IResult> (
     int roomNumber,
     DemoBoardStore store,
@@ -121,3 +162,8 @@ public sealed record SeatRoomRequest(
     string? ProcedureCode = null,
     string? ProcedureId = null,
     int DemoElapsedMinutes = 0);
+
+public sealed record UpdateAssignmentRequest(
+    string DoctorId,
+    string? ProcedureCode = null,
+    string? ProcedureId = null);

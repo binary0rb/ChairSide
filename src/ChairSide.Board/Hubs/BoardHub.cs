@@ -18,6 +18,28 @@ public sealed class BoardHub(DemoBoardStore store) : Hub
         await Clients.All.SendAsync("boardUpdated", store.GetSnapshot());
     }
 
+    public async Task UpdateAssignment(int roomId, string doctorId, string procedureCode)
+    {
+        var result = store.UpdateAssignment(roomId, doctorId, procedureCode);
+        if (result is null)
+        {
+            return;
+        }
+
+        await Clients.All.SendAsync("boardUpdated", store.GetSnapshot());
+    }
+
+    public async Task CancelSeating(int roomId)
+    {
+        var result = store.CancelSeating(roomId);
+        if (result is null)
+        {
+            return;
+        }
+
+        await Clients.All.SendAsync("boardUpdated", store.GetSnapshot());
+    }
+
     public async Task DoctorArrived(int roomId)
     {
         var result = store.MarkDoctorArrived(roomId);

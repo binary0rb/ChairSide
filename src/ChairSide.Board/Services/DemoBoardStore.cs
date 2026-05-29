@@ -54,6 +54,8 @@ public sealed class DemoBoardStore
             return new BoardSnapshot(
                 now,
                 _roomCount,
+                Thresholds.AgingMinutes,
+                Thresholds.StaleMinutes,
                 Thresholds.AgingThreshold,
                 Thresholds.StaleThreshold,
                 _doctors,
@@ -112,6 +114,58 @@ public sealed class DemoBoardStore
             room.State = RoomStates.Seated;
             UpdateRoomState(room, now);
             _events.Add(new RoomEvent(room.RoomId, "Seated", now, doctor.Id, procedure.Label));
+
+            return ToRoomStatus(room, now);
+        }
+    }
+
+    public RoomStatus? UpdateAssignment(int roomNumber, string doctorId, string procedureCode)
+    {
+        lock (_syncRoot)
+        {
+            var room = _rooms.FirstOrDefault(item => item.RoomId == roomNumber);
+            var doctor = _doctors.FirstOrDefault(item => item.Id == doctorId);
+            var procedure = FindProcedure(procedureCode);
+            if (room is null || doctor is null || procedure is null)
+            {
+                return null;
+            }
+
+            var now = DateTimeOffset.UtcNow;
+            UpdateRoomState(room, now);
+            if (!CanMarkDoctorArrived(room) || room.SeatedAt is null)
+            {
+                return null;
+            }
+
+            room.AssignedDoctor = doctor.Id;
+            room.ProcedureCode = procedure.Label;
+            UpdateRoomState(room, now);
+            _events.Add(new RoomEvent(room.RoomId, "AssignmentUpdated", now, doctor.Id, procedure.Label));
+
+            return ToRoomStatus(room, now);
+        }
+    }
+
+    public RoomStatus? CancelSeating(int roomNumber)
+    {
+        lock (_syncRoot)
+        {
+            var room = _rooms.FirstOrDefault(item => item.RoomId == roomNumber);
+            if (room is null)
+            {
+                return null;
+            }
+
+            var now = DateTimeOffset.UtcNow;
+            UpdateRoomState(room, now);
+            if (!CanMarkDoctorArrived(room) || room.SeatedAt is null)
+            {
+                return null;
+            }
+
+            _events.Add(new RoomEvent(room.RoomId, "SeatingCanceled", now, room.AssignedDoctor, room.ProcedureCode));
+            ResetRoom(room);
 
             return ToRoomStatus(room, now);
         }
@@ -204,14 +258,7 @@ public sealed class DemoBoardStore
             });
             _events.Add(new RoomEvent(room.RoomId, "RoomAvailable", now, room.AssignedDoctor, room.ProcedureCode));
 
-            room.AssignedDoctor = null;
-            room.ProcedureCode = null;
-            room.State = RoomStates.Available;
-            room.SeatedAt = null;
-            room.AgingStartedAt = null;
-            room.StaleStartedAt = null;
-            room.DoctorArrivedAt = null;
-            room.DoctorCompleteAt = null;
+            ResetRoom(room);
 
             return ToRoomStatus(room, now);
         }
@@ -353,6 +400,19 @@ public sealed class DemoBoardStore
     private static TimeSpan StaleSample(BoardThresholdOptions thresholds, TimeSpan extraElapsed) =>
         thresholds.StaleThreshold + extraElapsed;
 
+    private static void ResetRoom(RoomState room)
+    {
+        room.AssignedDoctor = null;
+        room.ProcedureCode = null;
+        room.State = RoomStates.Available;
+        room.SeatedAt = null;
+        room.AgingStartedAt = null;
+        room.StaleStartedAt = null;
+        room.DoctorArrivedAt = null;
+        room.DoctorCompleteAt = null;
+        room.RoomAvailableAt = null;
+    }
+
     private void SeedDemoRoom(int roomId, string doctorId, string procedureCode, DateTimeOffset seatedAt)
     {
         var index = _rooms.FindIndex(room => room.RoomId == roomId);
@@ -450,6 +510,8 @@ public sealed class DemoBoardStore
 public sealed record BoardSnapshot(
     DateTimeOffset ServerTime,
     int RoomCount,
+    int AgingMinutes,
+    int StaleMinutes,
     TimeSpan AgingThreshold,
     TimeSpan StaleThreshold,
     IReadOnlyList<Doctor> Doctors,

@@ -83,6 +83,47 @@ select {
   text-decoration: none;
 }
 
+.connection-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  padding: 8px 11px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.86);
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.connection-status i {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: currentColor;
+}
+
+.connection-status.live {
+  border-color: #86efac;
+  color: #166534;
+}
+
+.connection-status.reconnecting {
+  border-color: #fde68a;
+  color: #854d0e;
+}
+
+.connection-status.reconnecting i {
+  animation: connectionPulse 1.4s ease-in-out infinite;
+}
+
+.connection-status.stale {
+  border-color: #fecaca;
+  color: #991b1b;
+}
+
 .master-shell,
 .panel-shell,
 .doctor-shell,
@@ -122,6 +163,17 @@ select {
   line-height: 1.25;
 }
 
+.procedure-chip strong,
+.procedure-chip small {
+  line-height: 1.1;
+}
+
+.procedure-chip small {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
 .doctor-chip i,
 .state-dot {
   width: 14px;
@@ -135,6 +187,7 @@ select {
   place-items: center;
 }
 
+.procedure-icon,
 .procedure-chip svg {
   width: 18px;
   height: 18px;
@@ -142,7 +195,11 @@ select {
   stroke: currentColor;
   stroke-linecap: round;
   stroke-linejoin: round;
-  stroke-width: 2.4;
+  stroke-width: 2.8;
+}
+
+.forceps-icon {
+  stroke-width: 3.1;
 }
 
 .state-dot.empty {
@@ -284,15 +341,39 @@ select {
   font-size: clamp(15px, 1.6vw, 24px);
 }
 
-.room-footer time {
-  min-width: 128px;
+.room-footer {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(72px, auto);
+  align-items: end;
+}
+
+.room-doctor-name {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  line-height: 1.08;
+}
+
+.room-timer {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
   text-align: right;
   font-variant-numeric: tabular-nums;
+  line-height: 1.05;
+}
+
+.room-timer span {
+  font-size: 0.72em;
+  text-transform: uppercase;
+}
+
+.room-timer strong {
+  white-space: nowrap;
 }
 
 .panel-shell {
   display: grid;
-  grid-template-columns: minmax(280px, 1fr) minmax(280px, 420px);
+  grid-template-columns: minmax(280px, 1fr) minmax(360px, 540px);
   gap: 18px;
   align-items: start;
   padding-top: 18px;
@@ -304,25 +385,100 @@ select {
 
 .touch-controls {
   display: grid;
-  gap: 14px;
+  gap: 16px;
   padding: 18px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.86);
 }
 
-label {
+label,
+.control-label {
   display: block;
   margin-bottom: 6px;
   color: var(--muted);
+  font-size: 16px;
   font-weight: 800;
+}
+
+.selection-section {
+  display: grid;
+  gap: 8px;
+}
+
+.selection-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.doctor-selection-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.procedure-selection-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.selection-tile {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 12px;
+  min-height: 76px;
+  padding: 12px;
+  border: 2px solid var(--line);
+  text-align: left;
+}
+
+.selection-tile.selected {
+  border-color: #172033;
+  box-shadow: 0 0 0 4px rgba(23, 32, 51, 0.12);
+}
+
+.doctor-tile.selected {
+  border-color: var(--doctor-color);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--doctor-color) 24%, transparent);
+}
+
+.doctor-color-swatch {
+  width: 18px;
+  height: 44px;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  background: var(--doctor-color);
+}
+
+.selection-tile strong {
+  min-width: 0;
+  font-size: 19px;
+  line-height: 1.1;
+}
+
+.procedure-tile svg {
+  width: 40px;
+  height: 40px;
+  flex: 0 0 auto;
+}
+
+.procedure-tile span {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.procedure-tile small {
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 800;
+  line-height: 1.1;
 }
 
 select,
 button {
   width: 100%;
-  min-height: 56px;
+  min-height: 64px;
   padding: 0 14px;
+  font-size: 18px;
 }
 
 button {
@@ -343,6 +499,11 @@ button {
 .available-button {
   background: #e2e8f0;
   color: #172033;
+}
+
+.danger-button {
+  background: #fee2e2;
+  color: #7f1d1d;
 }
 
 .action-status {
@@ -459,6 +620,28 @@ button {
   font-weight: 650;
 }
 
+.procedure-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.procedure-badge svg {
+  width: 22px;
+  height: 22px;
+}
+
+.procedure-badge span {
+  display: grid;
+  gap: 2px;
+}
+
+.procedure-badge small {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
 .empty-message {
   padding: 24px;
   border: 1px solid var(--line);
@@ -556,12 +739,29 @@ button:disabled {
   }
 }
 
+@keyframes connectionPulse {
+  0%,
+  100% {
+    opacity: 0.45;
+    transform: scale(0.9);
+  }
+
+  50% {
+    opacity: 1;
+    transform: scale(1.18);
+  }
+}
+
 @media (max-width: 980px) {
   .app-header,
   .legend,
   .panel-shell {
     display: grid;
     grid-template-columns: 1fr;
+  }
+
+  .connection-status {
+    width: fit-content;
   }
 
   .room-grid {
