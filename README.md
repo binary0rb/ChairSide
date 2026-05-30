@@ -179,6 +179,78 @@ Compatibility URLs:
 - Room 1 panel: `http://localhost:5000/room-1.html`
 - Older room query format: `http://localhost:5000/room.html?room=1`
 
+## IIS Deployment
+
+ChairSide Board is intended for internal-only deployment on the practice network. Do not expose it directly to the public internet, and do not configure public DNS for the app. A typical internal URL is `http://chairside`, backed by internal DNS or a local network alias.
+
+Recommended server folder layout:
+
+```text
+C:\ChairSide\App
+C:\ChairSide\Data
+C:\ChairSide\Logs
+```
+
+`C:\ChairSide\App` contains the published ASP.NET Core app. `C:\ChairSide\Data` contains the SQLite database and WAL files. `C:\ChairSide\Logs` is optional for IIS/stdout or operational logs if enabled later.
+
+Publish from the repository root:
+
+```powershell
+dotnet publish .\src\ChairSide.Board\ChairSide.Board.csproj -c Release -o .\publish
+```
+
+Copy the contents of `.\publish` to `C:\ChairSide\App`.
+
+Production configuration is supplied by `src/ChairSide.Board/appsettings.Production.json`:
+
+```json
+{
+  "BoardPersistenceOptions": {
+    "DatabasePath": "C:\\ChairSide\\Data\\chairside.db"
+  }
+}
+```
+
+The app validates this path at startup in Production. It must resolve outside the deployed app/content root. The app creates the SQLite database and schema if missing, but the data directory must be writable by the IIS app pool identity.
+
+IIS app pool guidance:
+
+- Create a dedicated app pool, for example `ChairSideBoard`.
+- Set `.NET CLR version` to `No Managed Code`.
+- Set `Start Mode` to `AlwaysRunning`.
+- Set idle timeout to disabled, such as `0` minutes.
+- Use a single worker process: `Maximum Worker Processes = 1`.
+- Avoid web garden mode. SQLite persistence is designed for a single app instance.
+- Consider disabling overlapped recycle for this app pool so two worker processes do not briefly write the SQLite database at the same time during recycle.
+
+NTFS permissions:
+
+- Grant `IIS AppPool\ChairSideBoard` Modify permission on `C:\ChairSide\Data`.
+- SQLite WAL mode writes `chairside.db-wal` and `chairside.db-shm` beside `chairside.db`, so directory write access is required, not only file write access.
+- Keep the production database out of `C:\ChairSide\App`.
+
+Internal network access:
+
+- Use internal DNS such as `http://chairside`.
+- Bind IIS to the internal site/host name only.
+- If Windows Firewall blocks inbound HTTP, add an internal HTTP/80 rule as needed.
+- Keep access limited to trusted internal clinical workstations/tablets and wall displays.
+
+Deployment smoke checklist:
+
+1. Browse `http://chairside/master.html`.
+2. Browse `http://chairside/room.html?roomId=1`.
+3. Browse `http://chairside/doctor.html`.
+4. Browse `http://chairside/reports.html`.
+5. Seat Room 1 from the room panel.
+6. Restart the IIS site or `ChairSideBoard` app pool.
+7. Confirm Room 1 is still seated after restart.
+8. Mark Doctor Arrived, Doctor Complete, and Room Available.
+9. Confirm `/reports.html` shows the completed room cycle.
+10. Restart the IIS site or app pool again.
+11. Confirm the report remains after restart.
+12. Confirm no patient-identifying fields are requested or displayed.
+
 ## Reset Demo Data
 
 The development database is stored at `src/ChairSide.Board/data/chairside-dev.db` by default. Stop the app and delete that file, plus any matching `chairside-dev.db-wal` or `chairside-dev.db-shm` files, to reset local demo data.
