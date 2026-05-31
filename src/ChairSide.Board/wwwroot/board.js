@@ -557,12 +557,12 @@ function renderProcedureBadge(procedureCode) {
 
 function renderProcedureIcon(icon) {
   const icons = {
-    speech: `<svg class="procedure-icon" viewBox="0 0 24 24" aria-hidden="true"><path class="icon-stroke" d="M8 4h8v3h3v14H5V7h3V4z"/><path class="icon-stroke" d="M9 12h6M9 16h5"/></svg>`,
-    forceps: `<svg class="procedure-icon forceps-icon" viewBox="0 0 24 24" aria-hidden="true"><path class="icon-stroke" d="M6 3l6 8 6-8"/><path class="icon-stroke" d="M5 8l7 4 7-4"/><path class="icon-stroke" d="M8 21l4-9 4 9"/><circle class="icon-fill" cx="12" cy="12" r="2.1"/></svg>`,
-    moon: `<svg class="procedure-icon" viewBox="0 0 24 24" aria-hidden="true"><path class="icon-fill" d="M19.5 15.1A8.6 8.6 0 0 1 8.9 4.5 9.1 9.1 0 1 0 19.5 15.1z"/></svg>`,
-    check: `<svg class="procedure-icon" viewBox="0 0 24 24" aria-hidden="true"><path class="icon-stroke" d="M5 5h14v14H5z"/><path class="icon-stroke check-mark" d="M8.2 12.6l3 3 5-6.2"/></svg>`,
-    bolt: `<svg class="procedure-icon" viewBox="0 0 24 24" aria-hidden="true"><path class="icon-stroke" d="M9 4h6v4l-2 2v9l-1 1.5L11 19v-9L9 8V4z"/><path class="icon-stroke" d="M8 11h8M8 14h8M8.5 17h7"/></svg>`,
-    vial: `<svg class="procedure-icon" viewBox="0 0 24 24" aria-hidden="true"><path class="icon-stroke" d="M8 3h8M10 3v6l-4 8.5A3 3 0 0 0 8.7 21h6.6a3 3 0 0 0 2.7-3.5L14 9V3"/><path class="icon-fill" d="M8 16h8.1l.8 2.1c.3.8-.3 1.6-1.2 1.6H8.4c-.9 0-1.5-.8-1.2-1.6L8 16z"/></svg>`
+    speech: `<svg class="procedure-icon" viewBox="0 0 24 24" aria-hidden="true"><path class="icon-stroke" d="M5 5.5h14v10H9l-4 3v-13z"/><path class="icon-stroke" d="M8.5 9h7M8.5 12h5"/></svg>`,
+    forceps: `<svg class="procedure-icon tooth-icon" viewBox="0 0 24 24" aria-hidden="true"><path class="icon-stroke" d="M12 5.5C10.9 4.8 9.5 4 8 4 5.7 4 4 5.7 4 9.2 4 14 6.3 21 8.4 21c1.2 0 1.5-3.2 3.6-3.2S14.4 21 15.6 21C17.7 21 20 14 20 9.2 20 5.7 18.3 4 16 4c-1.5 0-2.9.8-4 1.5z"/><path class="icon-stroke" d="M10 8.2h4"/></svg>`,
+    moon: `<svg class="procedure-icon" viewBox="0 0 24 24" aria-hidden="true"><path class="icon-stroke" d="M18.8 15.2A7.5 7.5 0 0 1 8.8 5.2 8.4 8.4 0 1 0 18.8 15.2z"/></svg>`,
+    check: `<svg class="procedure-icon" viewBox="0 0 24 24" aria-hidden="true"><path class="icon-stroke" d="M5 5h14v14H5z"/><path class="icon-stroke check-mark" d="M8.2 12.5l3 3 5-6"/></svg>`,
+    bolt: `<svg class="procedure-icon implant-icon" viewBox="0 0 24 24" aria-hidden="true"><path class="icon-stroke" d="M9 3.5h6M10 6h4v4l-1.4 1.4v7.1L12 20.5l-.6-2v-7.1L10 10V6z"/><path class="icon-stroke" d="M8.5 12h7M8.8 14.3h6.4M9.2 16.6h5.6"/></svg>`,
+    vial: `<svg class="procedure-icon" viewBox="0 0 24 24" aria-hidden="true"><path class="icon-stroke" d="M9 3.5h6M10 3.5v5.8l-4.1 7.9A2.6 2.6 0 0 0 8.2 21h7.6a2.6 2.6 0 0 0 2.3-3.8L14 9.3V3.5"/><path class="icon-stroke" d="M7.4 16h9.2"/></svg>`
   };
 
   return icons[icon] || renderEmptyIcon();
@@ -608,7 +608,10 @@ function renderDoctorTiles(room) {
       data-doctor-id="${doctor.id}"
       ${isEnabled ? "" : "disabled"}>
       <span class="doctor-color-swatch"></span>
-      <strong>${doctor.name}</strong>
+      <span class="selection-copy">
+        <strong>${doctor.name}</strong>
+      </span>
+      ${doctor.id === app.selectedDoctorId ? `<span class="selected-indicator" aria-hidden="true">&#10003;</span>` : ""}
     </button>
   `).join("");
 }
@@ -629,10 +632,11 @@ function renderProcedureTiles(room) {
       data-procedure-id="${procedure.id}"
       ${isEnabled ? "" : "disabled"}>
       ${renderProcedureIcon(procedure.icon)}
-      <span>
+      <span class="selection-copy">
         <strong>${procedure.label}</strong>
         <small>${procedure.name}</small>
       </span>
+      ${procedure.id === app.selectedProcedureId ? `<span class="selected-indicator" aria-hidden="true">&#10003;</span>` : ""}
     </button>
   `).join("");
 }

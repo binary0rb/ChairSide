@@ -86,8 +86,8 @@ The room panel is touch-first for tablet use. Doctor and procedure choices rende
 
 Procedure icons are high-contrast inline SVGs used consistently across legends, room cards, room panels, and reports:
 
-- `CON` = Consult, clipboard/document
-- `EXT` = Extraction, bold forceps/pliers
+- `CON` = Consult, speech bubble
+- `EXT` = Extraction, tooth/dental extraction
 - `SED` = Sedation, crescent moon
 - `POST` = Post-op, checkmark document
 - `IMP` = Implant, screw/post
