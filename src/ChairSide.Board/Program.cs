@@ -32,6 +32,32 @@ builder.Services
     .ValidateOnStart();
 builder.Services.AddSingleton<IValidateOptions<RoomDeviceBindingOptions>, RoomDeviceBindingOptionsValidator>();
 
+builder.Services
+    .AddOptions<DoctorRosterOptions>()
+    .Bind(builder.Configuration.GetSection(DoctorRosterOptions.SectionName))
+    .ValidateOnStart();
+builder.Services.PostConfigure<DoctorRosterOptions>(options =>
+{
+    if (options.Doctors.Count == 0)
+    {
+        options.Doctors = DoctorRosterOptions.DefaultDoctors();
+    }
+});
+builder.Services.AddSingleton<IValidateOptions<DoctorRosterOptions>, DoctorRosterOptionsValidator>();
+
+builder.Services
+    .AddOptions<ProcedureRosterOptions>()
+    .Bind(builder.Configuration.GetSection(ProcedureRosterOptions.SectionName))
+    .ValidateOnStart();
+builder.Services.PostConfigure<ProcedureRosterOptions>(options =>
+{
+    if (options.Procedures.Count == 0)
+    {
+        options.Procedures = ProcedureRosterOptions.DefaultProcedures();
+    }
+});
+builder.Services.AddSingleton<IValidateOptions<ProcedureRosterOptions>, ProcedureRosterOptionsValidator>();
+
 builder.Services.AddSignalR();
 builder.Services.AddSingleton<SqliteBoardRepository>();
 builder.Services.AddSingleton<DemoBoardStore>();

@@ -270,7 +270,7 @@ function renderLegend() {
   if (doctorTarget) {
     doctorTarget.innerHTML = app.snapshot.doctors.map(doctor => `
       <span class="doctor-chip">
-        <i style="--doctor-color: ${doctor.color}"></i>${doctor.name}
+        <i style="--doctor-color: ${escapeAttribute(doctor.color)}"></i>${escapeHtml(doctor.name)}
       </span>
     `).join("");
   }
@@ -280,8 +280,8 @@ function renderLegend() {
     procedureTarget.innerHTML = app.snapshot.procedures.map(procedure => `
       <span class="procedure-chip">
         <span>${renderProcedureIcon(procedure.icon)}</span>
-        <strong>${procedure.label}</strong>
-        <small>${procedure.name}</small>
+        <strong>${escapeHtml(procedure.label)}</strong>
+        <small>${escapeHtml(procedure.name)}</small>
       </span>
     `).join("");
   }
@@ -317,7 +317,7 @@ function renderDoctorView() {
 
   target.innerHTML = rooms.length
     ? rooms.map(room => renderRoomTile(room)).join("")
-    : `<div class="empty-message">No active rooms for ${doctor.name}.</div>`;
+    : `<div class="empty-message">No active rooms for ${escapeHtml(doctor.name)}.</div>`;
 }
 
 function renderReports() {
@@ -360,7 +360,7 @@ function renderCycleRow(cycle) {
   return `
     <tr>
       <td>Room ${cycle.roomId}</td>
-      <td>${doctor}</td>
+      <td>${escapeHtml(doctor)}</td>
       <td>${renderProcedureBadge(cycle.procedureCode)}</td>
       <td>${formatDateTime(cycle.seatedAt)}</td>
       <td>${formatDateTime(cycle.doctorArrivedAt)}</td>
@@ -370,7 +370,7 @@ function renderCycleRow(cycle) {
       <td>${formatDuration(cycle.doctorInRoomSeconds)}</td>
       <td>${formatDuration(cycle.turnoverSeconds)}</td>
       <td>${formatDuration(cycle.totalRoomCycleSeconds)}</td>
-      <td>${String(cycle.finalWaitState || "--").toUpperCase()}</td>
+      <td>${escapeHtml(String(cycle.finalWaitState || "--").toUpperCase())}</td>
       <td>${cycle.agingThresholdReached ? "Yes" : "No"}</td>
       <td>${cycle.staleThresholdReached ? "Yes" : "No"}</td>
     </tr>
@@ -390,20 +390,20 @@ function renderRoomTile(room, large = false) {
   const badge = stateBadge(state);
   const timer = seatedToDoctorLabel(room);
   const fullDoctorName = room.doctor ? room.doctor.name : "Unassigned";
-  const doctorDisplayName = large ? fullDoctorName : cardDoctorName(fullDoctorName);
+  const doctorDisplayName = large ? fullDoctorName : (room.doctor?.shortName || cardDoctorName(fullDoctorName));
 
   return `
-    <article class="room-tile ${state} ${large ? "large" : ""}" style="--doctor-color: ${doctorColor}">
+    <article class="room-tile ${state} ${large ? "large" : ""}" style="--doctor-color: ${escapeAttribute(doctorColor)}">
       <div class="room-topline">
         <strong>Room ${roomId}</strong>
         <span>${badge}</span>
       </div>
       <div class="procedure-lockup">
         ${procedure ? renderProcedureIcon(procedure.icon) : renderEmptyIcon()}
-        <span>${procedure ? procedure.label : "OPEN"}</span>
+        <span>${procedure ? escapeHtml(procedure.label) : "OPEN"}</span>
       </div>
       <div class="room-footer">
-        <span class="room-doctor-name" title="${fullDoctorName}">${doctorDisplayName}</span>
+        <span class="room-doctor-name" title="${escapeAttribute(fullDoctorName)}">${escapeHtml(doctorDisplayName)}</span>
         <time class="room-timer">
           <span>${timer.label}</span>
           <strong>${timer.value}</strong>
@@ -541,15 +541,15 @@ function procedureFromCode(procedureCode) {
 function renderProcedureBadge(procedureCode) {
   const procedure = procedureFromCode(procedureCode);
   if (!procedure) {
-    return procedureCode || "--";
+    return escapeHtml(procedureCode || "--");
   }
 
   return `
     <span class="procedure-badge">
       ${renderProcedureIcon(procedure.icon)}
       <span>
-        <strong>${procedure.label}</strong>
-        <small>${procedure.name}</small>
+        <strong>${escapeHtml(procedure.label)}</strong>
+        <small>${escapeHtml(procedure.name)}</small>
       </span>
     </span>
   `;
@@ -570,6 +570,19 @@ function renderProcedureIcon(icon) {
 
 function renderEmptyIcon() {
   return `<svg class="procedure-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/></svg>`;
+}
+
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+}
+
+function escapeAttribute(value) {
+  return escapeHtml(value);
 }
 
 function syncRoomSelection(room) {
@@ -601,15 +614,15 @@ function renderDoctorTiles(room) {
   target.innerHTML = app.snapshot.doctors.map(doctor => `
     <button
       class="selection-tile doctor-tile ${doctor.id === app.selectedDoctorId ? "selected" : ""}"
-      style="--doctor-color: ${doctor.color}"
+      style="--doctor-color: ${escapeAttribute(doctor.color)}"
       type="button"
       role="radio"
       aria-checked="${doctor.id === app.selectedDoctorId}"
-      data-doctor-id="${doctor.id}"
+      data-doctor-id="${escapeAttribute(doctor.id)}"
       ${isEnabled ? "" : "disabled"}>
       <span class="doctor-color-swatch"></span>
       <span class="selection-copy">
-        <strong>${doctor.name}</strong>
+        <strong>${escapeHtml(doctor.name)}</strong>
       </span>
       ${doctor.id === app.selectedDoctorId ? `<span class="selected-indicator" aria-hidden="true">&#10003;</span>` : ""}
     </button>
@@ -629,12 +642,12 @@ function renderProcedureTiles(room) {
       type="button"
       role="radio"
       aria-checked="${procedure.id === app.selectedProcedureId}"
-      data-procedure-id="${procedure.id}"
+      data-procedure-id="${escapeAttribute(procedure.id)}"
       ${isEnabled ? "" : "disabled"}>
       ${renderProcedureIcon(procedure.icon)}
       <span class="selection-copy">
-        <strong>${procedure.label}</strong>
-        <small>${procedure.name}</small>
+        <strong>${escapeHtml(procedure.label)}</strong>
+        <small>${escapeHtml(procedure.name)}</small>
       </span>
       ${procedure.id === app.selectedProcedureId ? `<span class="selected-indicator" aria-hidden="true">&#10003;</span>` : ""}
     </button>
