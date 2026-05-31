@@ -33,6 +33,12 @@ builder.Services
 builder.Services.AddSingleton<IValidateOptions<RoomDeviceBindingOptions>, RoomDeviceBindingOptionsValidator>();
 
 builder.Services
+    .AddOptions<AdminAccessOptions>()
+    .Bind(builder.Configuration.GetSection(AdminAccessOptions.SectionName))
+    .ValidateOnStart();
+builder.Services.AddSingleton<IValidateOptions<AdminAccessOptions>, AdminAccessOptionsValidator>();
+
+builder.Services
     .AddOptions<DoctorRosterOptions>()
     .Bind(builder.Configuration.GetSection(DoctorRosterOptions.SectionName))
     .ValidateOnStart();
@@ -62,9 +68,39 @@ builder.Services.AddSignalR();
 builder.Services.AddSingleton<SqliteBoardRepository>();
 builder.Services.AddSingleton<DemoBoardStore>();
 builder.Services.AddSingleton<RoomDeviceTokenValidator>();
+builder.Services.AddSingleton<AdminAccessTokenValidator>();
 
 var app = builder.Build();
 _ = app.Services.GetRequiredService<DemoBoardStore>();
+
+app.Use(async (context, next) =>
+{
+    if (!AdminAccessGuard.IsProtectedPath(context.Request.Path))
+    {
+        await next();
+        return;
+    }
+
+    var validator = context.RequestServices.GetRequiredService<AdminAccessTokenValidator>();
+    var failure = AdminAccessGuard.ValidateRequest(context.Request, validator);
+    if (failure is null)
+    {
+        await next();
+        return;
+    }
+
+    var isReportsPage = context.Request.Path.Equals("/reports.html", StringComparison.OrdinalIgnoreCase)
+        && HttpMethods.IsGet(context.Request.Method);
+    var isMissingToken = validator.Validate(context.Request.Headers[AdminAccessTokenValidator.HeaderName].FirstOrDefault())
+        == AdminAccessTokenValidationResult.Missing;
+    if (isReportsPage && isMissingToken)
+    {
+        await AdminAccessGuard.WriteReportsAccessPromptAsync(context);
+        return;
+    }
+
+    await failure.ExecuteAsync(context);
+});
 
 app.UseDefaultFiles();
 app.UseStaticFiles();

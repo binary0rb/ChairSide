@@ -672,6 +672,71 @@ button {
   gap: 12px;
 }
 
+.report-access-panel {
+  display: grid;
+  gap: 12px;
+  padding: 18px;
+  border: 1px solid #bfdbfe;
+  border-radius: 8px;
+  background: rgba(239, 246, 255, 0.94);
+}
+
+.report-access-panel h2,
+.access-card h1 {
+  margin: 0;
+  letter-spacing: 0;
+}
+
+.report-access-form,
+.access-form {
+  display: grid;
+  gap: 10px;
+}
+
+.report-access-form label,
+.access-form label {
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.report-access-form input,
+.access-form input {
+  width: 100%;
+  min-height: 54px;
+  padding: 0 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+  color: var(--ink);
+  font: inherit;
+  font-size: 18px;
+}
+
+.access-shell {
+  display: grid;
+  min-height: 100vh;
+  place-items: center;
+  padding: 24px;
+}
+
+.access-card {
+  display: grid;
+  width: min(520px, 100%);
+  gap: 14px;
+  padding: 24px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 18px 60px rgba(23, 32, 51, 0.12);
+}
+
+.access-message {
+  min-height: 24px;
+  font-weight: 800;
+}
+
 .metric-card {
   min-height: 104px;
   padding: 16px;

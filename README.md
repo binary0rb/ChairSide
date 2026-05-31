@@ -116,6 +116,10 @@ Thresholds are configured in `src/ChairSide.Board/appsettings.json`:
       "2": "dev-room-2-token"
     }
   },
+  "AdminAccessOptions": {
+    "Enabled": false,
+    "SharedToken": "dev-admin-token"
+  },
   "DoctorRosterOptions": {
     "Doctors": [
       {
@@ -163,11 +167,26 @@ Room-device binding is a first-pass operational control for room tablets. When `
 - Doctor Complete
 - Room Available
 
-Read-only views and APIs remain open for the internal board: `/master.html`, `/doctor.html`, `/reports.html`, and board state reads do not require room tokens. Room mutation API calls must send the token in the `X-ChairSide-Room-Token` header. Do not place room tokens in URLs. URLs may be logged by IIS, browsers, proxies, network tools, and browser history.
+Read-only board views and APIs remain open for the internal board: `/master.html`, `/doctor.html`, and board state reads do not require room tokens. `/reports.html` does not require a room token, but it can be protected separately with admin/report access protection. Room mutation API calls must send the token in the `X-ChairSide-Room-Token` header. Do not place room tokens in URLs. URLs may be logged by IIS, browsers, proxies, network tools, and browser history.
 
 Production tokens must not use the `dev-room-*-token` sample values. Supply production tokens through environment-specific configuration or deployment-time configuration, and do not commit real room tokens as source-controlled secrets.
 
-Room tokens are operational controls, not full authentication. They do not protect reports/admin surfaces, do not replace HTTPS, and do not provide user-level access control. Full access control, report protection, CSRF protection, and stronger room-device binding remain future hardening work before broader rollout.
+Room tokens are operational controls, not full authentication. They do not replace HTTPS and do not provide user-level access control. Full access control, CSRF protection, and stronger room-device binding remain future hardening work before broader rollout.
+
+Admin/report access protection is a first-pass shared-token control for reports and future admin-style surfaces. When `AdminAccessOptions:Enabled` is `true`, `/reports.html` and `/api/reports` require the shared reports token:
+
+```json
+{
+  "AdminAccessOptions": {
+    "Enabled": true,
+    "SharedToken": "replace-with-production-report-token"
+  }
+}
+```
+
+Report API calls send the token in the `X-ChairSide-Admin-Token` header. The reports page uses a queryless browser-session prompt and stores the entered token in `sessionStorage` for that tab/session. Do not place admin/report tokens in URLs because URLs may be logged by IIS, browsers, proxies, network tools, and browser history.
+
+This is not full user authentication and does not provide user identity, roles, audit trails, CSRF protection, or network encryption. Production tokens must not use the `dev-admin-token` sample value and should be supplied through environment-specific configuration or deployment-time configuration, not committed as real source-controlled secrets.
 
 Production database guidance:
 
@@ -288,8 +307,8 @@ Security posture and accepted pilot risks:
 - ChairSide Board is internal-only.
 - Do not enter PHI. The system tracks rooms, doctors, procedures, and operational timestamps only.
 - HTTP/plaintext LAN traffic is an accepted pilot posture unless HTTPS is configured later.
-- Authentication, CSRF protection, and room-device binding are not currently enforced.
-- Reports/admin surfaces and room-local actions should be protected before broader clinic rollout.
+- Room-device binding and reports/admin shared-token protection are first-pass operational controls when enabled, not full authentication.
+- User authentication, CSRF protection, room-device hardening, and report/admin authorization should be strengthened before broader clinic rollout.
 
 First-boot troubleshooting:
 

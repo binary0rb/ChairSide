@@ -24,6 +24,10 @@ const app = {
 
 const stateNames = ["empty", "seated", "aging", "stale", "doctor-in-room", "turnover"];
 const activeSeatedStates = new Set(["seated", "aging", "stale"]);
+const adminAccess = {
+  storageKey: "chairside-admin-token",
+  headerName: "X-ChairSide-Admin-Token"
+};
 
 function getRoomNumber() {
   const query = new URLSearchParams(location.search);
@@ -85,7 +89,25 @@ async function loadBoard() {
 }
 
 async function loadReports() {
-  const response = await fetch("/api/reports");
+  const response = await fetch("/api/reports", {
+    cache: "no-store",
+    headers: adminRequestHeaders()
+  });
+
+  if (response.status === 401 || response.status === 403) {
+    if (response.status === 403) {
+      sessionStorage.removeItem(adminAccess.storageKey);
+    }
+
+    app.reports = null;
+    renderReportsAccessPrompt(response.status);
+    return;
+  }
+
+  if (!response.ok) {
+    throw new Error(`Reports failed with HTTP ${response.status}.`);
+  }
+
   app.reports = await response.json();
   render();
 }
@@ -344,6 +366,60 @@ function renderReports() {
   body.innerHTML = cycles.length
     ? cycles.map(renderCycleRow).join("")
     : `<tr><td colspan="14">No completed room cycles yet.</td></tr>`;
+}
+
+function renderReportsAccessPrompt(statusCode) {
+  const summary = document.getElementById("reportSummary");
+  const body = document.getElementById("completedCyclesBody");
+  if (!summary || !body) {
+    return;
+  }
+
+  const message = statusCode === 403
+    ? "The saved reports token was rejected. Enter the current internal reports token."
+    : "Reports access is required for this internal page.";
+
+  summary.innerHTML = `
+    <article class="report-access-panel">
+      <h2>Reports Access</h2>
+      <p>${escapeHtml(message)}</p>
+      <form id="reportAccessForm" class="report-access-form">
+        <label for="reportAccessToken">Reports token</label>
+        <input id="reportAccessToken" name="reportAccessToken" type="password" autocomplete="off" required>
+        <button type="submit" class="primary-button">Load Reports</button>
+      </form>
+      <button type="button" class="secondary-button utility-button" id="clearReportAccessToken">Clear Saved Token</button>
+    </article>
+  `;
+  body.innerHTML = `<tr><td colspan="14">Reports are protected. Enter an internal reports token to continue.</td></tr>`;
+  wireReportsAccessPrompt();
+}
+
+function wireReportsAccessPrompt() {
+  const form = document.getElementById("reportAccessForm");
+  const clearButton = document.getElementById("clearReportAccessToken");
+
+  form?.addEventListener("submit", event => {
+    event.preventDefault();
+    const input = document.getElementById("reportAccessToken");
+    const token = input?.value.trim() || "";
+    if (!token) {
+      return;
+    }
+
+    sessionStorage.setItem(adminAccess.storageKey, token);
+    loadReports();
+  });
+
+  clearButton?.addEventListener("click", () => {
+    sessionStorage.removeItem(adminAccess.storageKey);
+    renderReportsAccessPrompt(401);
+  });
+}
+
+function adminRequestHeaders() {
+  const token = sessionStorage.getItem(adminAccess.storageKey);
+  return token ? { [adminAccess.headerName]: token } : {};
 }
 
 function renderMetric(label, value) {
