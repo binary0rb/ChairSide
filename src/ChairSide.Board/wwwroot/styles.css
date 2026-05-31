@@ -195,11 +195,27 @@ select {
   stroke: currentColor;
   stroke-linecap: round;
   stroke-linejoin: round;
-  stroke-width: 2.8;
+  stroke-width: 2.2;
+  overflow: visible;
 }
 
-.forceps-icon {
-  stroke-width: 3.1;
+.tooth-icon,
+.implant-icon {
+  stroke-width: 2.35;
+}
+
+.procedure-icon .icon-fill {
+  fill: none;
+  stroke: currentColor;
+}
+
+.procedure-icon .icon-stroke {
+  fill: none;
+  stroke: currentColor;
+}
+
+.procedure-icon .check-mark {
+  stroke-width: 2.6;
 }
 
 .state-dot.empty {
@@ -329,7 +345,7 @@ select {
   stroke: currentColor;
   stroke-linecap: round;
   stroke-linejoin: round;
-  stroke-width: 2.4;
+  stroke-width: 2.2;
 }
 
 .procedure-lockup span {
@@ -379,6 +395,11 @@ select {
   padding-top: 18px;
 }
 
+.panel-left-column {
+  display: grid;
+  gap: 14px;
+}
+
 .panel-status .room-tile {
   min-height: min(60vh, 560px);
 }
@@ -420,6 +441,7 @@ label,
 }
 
 .selection-tile {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: flex-start;
@@ -427,17 +449,25 @@ label,
   min-height: 76px;
   padding: 12px;
   border: 2px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
   text-align: left;
 }
 
 .selection-tile.selected {
   border-color: #172033;
-  box-shadow: 0 0 0 4px rgba(23, 32, 51, 0.12);
+  background: #eef4ff;
+  box-shadow: 0 0 0 4px rgba(23, 32, 51, 0.16);
 }
 
 .doctor-tile.selected {
   border-color: var(--doctor-color);
-  box-shadow: 0 0 0 4px color-mix(in srgb, var(--doctor-color) 24%, transparent);
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--doctor-color) 18%, #ffffff) 0%, #ffffff 84%),
+    #ffffff;
+  box-shadow:
+    inset 0 0 0 2px color-mix(in srgb, var(--doctor-color) 56%, transparent),
+    0 0 0 4px color-mix(in srgb, var(--doctor-color) 28%, transparent);
 }
 
 .doctor-color-swatch {
@@ -446,6 +476,47 @@ label,
   flex: 0 0 auto;
   border-radius: 999px;
   background: var(--doctor-color);
+}
+
+.selection-copy {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+  padding-right: 38px;
+}
+
+.selected-indicator {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 2px solid currentColor;
+  border-radius: 999px;
+  background: #172033;
+  color: #ffffff;
+  font-size: 17px;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.doctor-tile.selected .selected-indicator {
+  border-color: var(--doctor-color);
+  background: var(--doctor-color);
+}
+
+.procedure-tile.selected {
+  border-color: #2563eb;
+  background: #dbeafe;
+  box-shadow:
+    inset 0 0 0 2px rgba(37, 99, 235, 0.28),
+    0 0 0 4px rgba(37, 99, 235, 0.18);
+}
+
+.procedure-tile.selected svg {
+  color: #1d4ed8;
 }
 
 .selection-tile strong {
@@ -460,17 +531,62 @@ label,
   flex: 0 0 auto;
 }
 
-.procedure-tile span {
-  display: grid;
-  min-width: 0;
-  gap: 3px;
-}
-
 .procedure-tile small {
   color: var(--muted);
   font-size: 14px;
   font-weight: 800;
   line-height: 1.1;
+}
+
+.primary-workflow-panel,
+.primary-action-grid,
+.secondary-action-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.primary-workflow-panel {
+  padding-top: 2px;
+}
+
+.primary-workflow-label {
+  margin-bottom: 0;
+  color: #172033;
+  font-size: 14px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.primary-action-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.corrections-panel {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: rgba(248, 250, 252, 0.72);
+}
+
+.secondary-actions-label {
+  margin-bottom: 0;
+  padding-bottom: 6px;
+  border-bottom: 1px solid #d8dee8;
+  color: #475569;
+  font-size: 14px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.secondary-action-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.utility-button {
+  min-height: 52px;
+  font-size: 16px;
 }
 
 select,
@@ -671,6 +787,14 @@ button:disabled {
   opacity: 0.55;
 }
 
+.selection-tile:disabled {
+  opacity: 0.72;
+}
+
+.selection-tile.selected:disabled {
+  opacity: 0.95;
+}
+
 @keyframes agingBorderPulse {
   0%,
   100% {
@@ -784,5 +908,12 @@ button:disabled {
 
   .room-tile {
     min-height: 136px;
+  }
+
+  .doctor-selection-grid,
+  .procedure-selection-grid,
+  .primary-action-grid,
+  .secondary-action-grid {
+    grid-template-columns: 1fr;
   }
 }
