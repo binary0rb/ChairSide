@@ -557,12 +557,12 @@ function renderProcedureBadge(procedureCode) {
 
 function renderProcedureIcon(icon) {
   const icons = {
-    speech: `<svg class="procedure-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5.5h16v10H9l-5 4v-14z"/><path d="M8 9h8M8 12h6"/></svg>`,
-    forceps: `<svg class="procedure-icon forceps-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3l6 8 6-8"/><path d="M8.5 21L12 11l3.5 10"/><path d="M5 7l5.5 5.5M19 7l-5.5 5.5"/><path d="M7 17h10"/></svg>`,
-    moon: `<svg class="procedure-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18.5 15.5A7.5 7.5 0 0 1 8.5 5.5 8.5 8.5 0 1 0 18.5 15.5z"/></svg>`,
-    check: `<svg class="procedure-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 4.5h15v15h-15z"/><path d="M8 12.5l3 3 5.5-7"/></svg>`,
-    bolt: `<svg class="procedure-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 2L6 13h5l-1 9 8-12h-5l1-8z"/><path d="M8 17h8"/></svg>`,
-    vial: `<svg class="procedure-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3h8"/><path d="M10 3v6l-4 8.5A2.8 2.8 0 0 0 8.5 21h7a2.8 2.8 0 0 0 2.5-3.5L14 9V3"/><path d="M8 16h8"/></svg>`
+    speech: `<svg class="procedure-icon" viewBox="0 0 24 24" aria-hidden="true"><path class="icon-stroke" d="M8 4h8v3h3v14H5V7h3V4z"/><path class="icon-stroke" d="M9 12h6M9 16h5"/></svg>`,
+    forceps: `<svg class="procedure-icon forceps-icon" viewBox="0 0 24 24" aria-hidden="true"><path class="icon-stroke" d="M6 3l6 8 6-8"/><path class="icon-stroke" d="M5 8l7 4 7-4"/><path class="icon-stroke" d="M8 21l4-9 4 9"/><circle class="icon-fill" cx="12" cy="12" r="2.1"/></svg>`,
+    moon: `<svg class="procedure-icon" viewBox="0 0 24 24" aria-hidden="true"><path class="icon-fill" d="M19.5 15.1A8.6 8.6 0 0 1 8.9 4.5 9.1 9.1 0 1 0 19.5 15.1z"/></svg>`,
+    check: `<svg class="procedure-icon" viewBox="0 0 24 24" aria-hidden="true"><path class="icon-stroke" d="M5 5h14v14H5z"/><path class="icon-stroke check-mark" d="M8.2 12.6l3 3 5-6.2"/></svg>`,
+    bolt: `<svg class="procedure-icon" viewBox="0 0 24 24" aria-hidden="true"><path class="icon-stroke" d="M9 4h6v4l-2 2v9l-1 1.5L11 19v-9L9 8V4z"/><path class="icon-stroke" d="M8 11h8M8 14h8M8.5 17h7"/></svg>`,
+    vial: `<svg class="procedure-icon" viewBox="0 0 24 24" aria-hidden="true"><path class="icon-stroke" d="M8 3h8M10 3v6l-4 8.5A3 3 0 0 0 8.7 21h6.6a3 3 0 0 0 2.7-3.5L14 9V3"/><path class="icon-fill" d="M8 16h8.1l.8 2.1c.3.8-.3 1.6-1.2 1.6H8.4c-.9 0-1.5-.8-1.2-1.6L8 16z"/></svg>`
   };
 
   return icons[icon] || renderEmptyIcon();

@@ -86,11 +86,11 @@ The room panel is touch-first for tablet use. Doctor and procedure choices rende
 
 Procedure icons are high-contrast inline SVGs used consistently across legends, room cards, room panels, and reports:
 
-- `CON` = Consult, speech bubble
+- `CON` = Consult, clipboard/document
 - `EXT` = Extraction, bold forceps/pliers
 - `SED` = Sedation, crescent moon
-- `POST` = Post-op, checkmark in square
-- `IMP` = Implant, screw/bolt
+- `POST` = Post-op, checkmark document
+- `IMP` = Implant, screw/post
 - `BX` = Biopsy, vial/sample
 
 Full doctor names remain visible in the doctor legend, room panel tiles, reports, and configuration-facing context. Master board and doctor-view room cards use compact last names without the `Dr.` prefix, such as `Pledger` and `Schroeder`, to keep room cards readable.
