@@ -140,7 +140,9 @@ Room-device binding is a first-pass operational control for room tablets. When `
 - Doctor Complete
 - Room Available
 
-Read-only views and APIs remain open for the internal board: `/master.html`, `/doctor.html`, `/reports.html`, and board state reads do not require room tokens. Room mutation API calls should send the token in the `X-ChairSide-Room-Token` header. For simple tablet setup, the room page can also receive `roomToken` or `token` in the room URL and pass it as the header for mutation calls.
+Read-only views and APIs remain open for the internal board: `/master.html`, `/doctor.html`, `/reports.html`, and board state reads do not require room tokens. Room mutation API calls must send the token in the `X-ChairSide-Room-Token` header. Do not place room tokens in URLs. URLs may be logged by IIS, browsers, proxies, network tools, and browser history.
+
+Production tokens must not use the `dev-room-*-token` sample values. Supply production tokens through environment-specific configuration or deployment-time configuration, and do not commit real room tokens as source-controlled secrets.
 
 Room tokens are operational controls, not full authentication. They do not protect reports/admin surfaces, do not replace HTTPS, and do not provide user-level access control. Full access control, report protection, CSRF protection, and stronger room-device binding remain future hardening work before broader rollout.
 

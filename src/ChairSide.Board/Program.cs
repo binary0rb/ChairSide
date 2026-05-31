@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.SignalR;
+using Microsoft.Extensions.Options;
 
 using ChairSide.Board.Hubs;
 using ChairSide.Board.Options;
@@ -29,6 +30,7 @@ builder.Services
     .AddOptions<RoomDeviceBindingOptions>()
     .Bind(builder.Configuration.GetSection(RoomDeviceBindingOptions.SectionName))
     .ValidateOnStart();
+builder.Services.AddSingleton<IValidateOptions<RoomDeviceBindingOptions>, RoomDeviceBindingOptionsValidator>();
 
 builder.Services.AddSignalR();
 builder.Services.AddSingleton<SqliteBoardRepository>();

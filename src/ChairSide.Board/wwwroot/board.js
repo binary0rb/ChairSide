@@ -38,9 +38,7 @@ function getRoomToken() {
     return "";
   }
 
-  const query = new URLSearchParams(location.search);
-  const metaToken = document.querySelector("meta[name='chairside-room-token']")?.content || "";
-  return query.get("roomToken") || query.get("token") || metaToken;
+  return document.querySelector("meta[name='chairside-room-token']")?.content || "";
 }
 
 async function boot() {

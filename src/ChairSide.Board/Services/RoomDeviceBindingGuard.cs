@@ -9,9 +9,7 @@ public static class RoomDeviceBindingGuard
         HttpRequest request,
         RoomDeviceTokenValidator roomDeviceTokenValidator)
     {
-        var token = request.Headers[RoomDeviceTokenValidator.HeaderName].FirstOrDefault()
-            ?? request.Query["roomToken"].FirstOrDefault()
-            ?? request.Query["token"].FirstOrDefault();
+        var token = request.Headers[RoomDeviceTokenValidator.HeaderName].FirstOrDefault();
 
         return roomDeviceTokenValidator.Validate(roomNumber, token) switch
         {

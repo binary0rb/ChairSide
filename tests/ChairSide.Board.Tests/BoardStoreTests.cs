@@ -395,7 +395,96 @@ public sealed class BoardStoreTests
         Assert.Equal(403, await ExecuteBindingResult(RoomDeviceBindingGuard.ValidateMutationRequest(2, RequestWithHeader("room-1-token"), enabledValidator)));
         Assert.Equal(403, await ExecuteBindingResult(RoomDeviceBindingGuard.ValidateMutationRequest(3, RequestWithHeader("room-3-token"), enabledValidator)));
         Assert.Null(RoomDeviceBindingGuard.ValidateMutationRequest(1, RequestWithHeader("room-1-token"), enabledValidator));
-        Assert.Null(RoomDeviceBindingGuard.ValidateMutationRequest(1, RequestWithQueryToken("room-1-token"), enabledValidator));
+        Assert.Equal(401, await ExecuteBindingResult(RoomDeviceBindingGuard.ValidateMutationRequest(1, RequestWithQueryToken("room-1-token"), enabledValidator)));
+    }
+
+    [Fact]
+    public void Room_device_binding_options_allow_disabled_config_without_room_tokens()
+    {
+        var result = ValidateBindingOptions(
+            roomCount: 3,
+            new RoomDeviceBindingOptions
+            {
+                Enabled = false,
+                RoomTokens = []
+            });
+
+        Assert.False(result.Failed);
+    }
+
+    [Fact]
+    public void Room_device_binding_options_require_all_configured_rooms_when_enabled()
+    {
+        var result = ValidateBindingOptions(
+            roomCount: 3,
+            new RoomDeviceBindingOptions
+            {
+                Enabled = true,
+                RoomTokens = new Dictionary<string, string>
+                {
+                    ["1"] = "room-1-token",
+                    ["2"] = "room-2-token"
+                }
+            });
+
+        Assert.True(result.Failed);
+        Assert.Contains("RoomDeviceBindingOptions:RoomTokens:3 is required", string.Join(" ", result.Failures));
+    }
+
+    [Fact]
+    public void Room_device_binding_options_reject_blank_tokens_when_enabled()
+    {
+        var result = ValidateBindingOptions(
+            roomCount: 2,
+            new RoomDeviceBindingOptions
+            {
+                Enabled = true,
+                RoomTokens = new Dictionary<string, string>
+                {
+                    ["1"] = "room-1-token",
+                    ["2"] = " "
+                }
+            });
+
+        Assert.True(result.Failed);
+        Assert.Contains("RoomDeviceBindingOptions:RoomTokens:2 must not be blank", string.Join(" ", result.Failures));
+    }
+
+    [Fact]
+    public void Room_device_binding_options_reject_duplicate_tokens_when_enabled()
+    {
+        var result = ValidateBindingOptions(
+            roomCount: 2,
+            new RoomDeviceBindingOptions
+            {
+                Enabled = true,
+                RoomTokens = new Dictionary<string, string>
+                {
+                    ["1"] = "same-token",
+                    ["2"] = "same-token"
+                }
+            });
+
+        Assert.True(result.Failed);
+        Assert.Contains("duplicate token values", string.Join(" ", result.Failures));
+    }
+
+    [Fact]
+    public void Room_device_binding_options_accept_complete_unique_room_tokens_when_enabled()
+    {
+        var result = ValidateBindingOptions(
+            roomCount: 2,
+            new RoomDeviceBindingOptions
+            {
+                Enabled = true,
+                RoomTokens = new Dictionary<string, string>
+                {
+                    ["1"] = "room-1-token",
+                    ["2"] = "room-2-token"
+                }
+            });
+
+        Assert.False(result.Failed);
     }
 
     private static readonly HashSet<string> AllowedActiveRoomColumns =
@@ -494,6 +583,13 @@ public sealed class BoardStoreTests
                 ["2"] = "room-2-token"
             }
         }));
+
+    private static ValidateOptionsResult ValidateBindingOptions(
+        int roomCount,
+        RoomDeviceBindingOptions options) =>
+        new RoomDeviceBindingOptionsValidator(
+            Microsoft.Extensions.Options.Options.Create(new BoardOptions { RoomCount = roomCount }))
+            .Validate(null, options);
 
     private static HttpRequest RequestWithHeader(string? token)
     {
