@@ -633,6 +633,87 @@ public sealed class BoardStoreTests
         Assert.False(result.Failed);
     }
 
+    [Fact]
+    public void Admin_access_disabled_allows_reports_behavior()
+    {
+        var validator = CreateAdminValidator(enabled: false);
+
+        Assert.Equal(AdminAccessTokenValidationResult.Disabled, validator.Validate(token: null));
+        Assert.Null(AdminAccessGuard.ValidateRequest(RequestWithAdminHeader(token: null), validator));
+    }
+
+    [Fact]
+    public async Task Admin_access_enabled_rejects_missing_and_wrong_token()
+    {
+        var validator = CreateAdminValidator(enabled: true);
+
+        Assert.Equal(AdminAccessTokenValidationResult.Missing, validator.Validate(token: null));
+        Assert.Equal(AdminAccessTokenValidationResult.Invalid, validator.Validate("wrong-token"));
+        Assert.Equal(401, await ExecuteBindingResult(AdminAccessGuard.ValidateRequest(RequestWithAdminHeader(token: null), validator)));
+        Assert.Equal(403, await ExecuteBindingResult(AdminAccessGuard.ValidateRequest(RequestWithAdminHeader("wrong-token"), validator)));
+    }
+
+    [Fact]
+    public void Admin_access_enabled_accepts_correct_token()
+    {
+        var validator = CreateAdminValidator(enabled: true);
+
+        Assert.Equal(AdminAccessTokenValidationResult.Valid, validator.Validate("admin-token"));
+        Assert.Null(AdminAccessGuard.ValidateRequest(RequestWithAdminHeader("admin-token"), validator));
+    }
+
+    [Fact]
+    public async Task Admin_access_rejects_query_string_token_and_accepts_header_token()
+    {
+        var validator = CreateAdminValidator(enabled: true);
+
+        Assert.Equal(401, await ExecuteBindingResult(AdminAccessGuard.ValidateRequest(RequestWithAdminQueryToken("admin-token"), validator)));
+        Assert.Null(AdminAccessGuard.ValidateRequest(RequestWithAdminHeader("admin-token"), validator));
+    }
+
+    [Fact]
+    public void Admin_access_protects_reports_and_keeps_board_room_surfaces_open()
+    {
+        Assert.True(AdminAccessGuard.IsProtectedPath("/reports.html"));
+        Assert.True(AdminAccessGuard.IsProtectedPath("/api/reports"));
+
+        Assert.False(AdminAccessGuard.IsProtectedPath("/"));
+        Assert.False(AdminAccessGuard.IsProtectedPath("/master.html"));
+        Assert.False(AdminAccessGuard.IsProtectedPath("/doctor.html"));
+        Assert.False(AdminAccessGuard.IsProtectedPath("/room.html"));
+        Assert.False(AdminAccessGuard.IsProtectedPath("/room-1.html"));
+        Assert.False(AdminAccessGuard.IsProtectedPath("/api/board"));
+        Assert.False(AdminAccessGuard.IsProtectedPath("/api/rooms/1"));
+    }
+
+    [Fact]
+    public void Admin_access_options_allow_disabled_config_without_token()
+    {
+        var result = ValidateAdminAccessOptions(new AdminAccessOptions { Enabled = false, SharedToken = "" });
+
+        Assert.False(result.Failed);
+    }
+
+    [Fact]
+    public void Admin_access_options_require_token_when_enabled()
+    {
+        var result = ValidateAdminAccessOptions(new AdminAccessOptions { Enabled = true, SharedToken = " " });
+
+        Assert.True(result.Failed);
+        Assert.Contains("AdminAccessOptions:SharedToken is required", string.Join(" ", result.Failures));
+    }
+
+    [Fact]
+    public void Admin_access_options_reject_sample_token_in_production()
+    {
+        var result = ValidateAdminAccessOptions(
+            new AdminAccessOptions { Enabled = true, SharedToken = "dev-admin-token" },
+            Environments.Production);
+
+        Assert.True(result.Failed);
+        Assert.Contains("must not use the dev-admin-token sample value in Production", string.Join(" ", result.Failures));
+    }
+
     private static readonly HashSet<string> AllowedActiveRoomColumns =
     [
         "room_id",
@@ -730,11 +811,24 @@ public sealed class BoardStoreTests
             }
         }));
 
+    private static AdminAccessTokenValidator CreateAdminValidator(bool enabled) =>
+        new(new TestOptionsMonitor<AdminAccessOptions>(new AdminAccessOptions
+        {
+            Enabled = enabled,
+            SharedToken = "admin-token"
+        }));
+
     private static ValidateOptionsResult ValidateBindingOptions(
         int roomCount,
         RoomDeviceBindingOptions options) =>
         new RoomDeviceBindingOptionsValidator(
             Microsoft.Extensions.Options.Options.Create(new BoardOptions { RoomCount = roomCount }))
+            .Validate(null, options);
+
+    private static ValidateOptionsResult ValidateAdminAccessOptions(
+        AdminAccessOptions options,
+        string environmentName = "Development") =>
+        new AdminAccessOptionsValidator(new TestWebHostEnvironment(Path.GetTempPath(), environmentName))
             .Validate(null, options);
 
     private static ValidateOptionsResult ValidateDoctorRoster(DoctorRosterOptions options) =>
@@ -774,6 +868,26 @@ public sealed class BoardStoreTests
     {
         var context = new DefaultHttpContext();
         context.Request.QueryString = new QueryString($"?roomToken={Uri.EscapeDataString(token)}");
+        return context.Request;
+    }
+
+    private static HttpRequest RequestWithAdminHeader(string? token)
+    {
+        var context = new DefaultHttpContext();
+        context.Request.Path = "/api/reports";
+        if (token is not null)
+        {
+            context.Request.Headers[AdminAccessTokenValidator.HeaderName] = token;
+        }
+
+        return context.Request;
+    }
+
+    private static HttpRequest RequestWithAdminQueryToken(string token)
+    {
+        var context = new DefaultHttpContext();
+        context.Request.Path = "/api/reports";
+        context.Request.QueryString = new QueryString($"?adminToken={Uri.EscapeDataString(token)}");
         return context.Request;
     }
 
