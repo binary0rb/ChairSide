@@ -10,23 +10,10 @@ public sealed class DemoBoardStore
     private readonly SqliteBoardRepository _repository;
     private readonly TimeProvider _timeProvider;
     private readonly int _roomCount;
-    private readonly List<Doctor> _doctors =
-    [
-        new("otte", "Dr. Otte", "#2563eb"),
-        new("pledger", "Dr. Pledger", "#16a34a"),
-        new("gibson", "Dr. Gibson", "#f97316"),
-        new("schroeder", "Dr. Schroeder", "#7c3aed")
-    ];
-
-    private readonly List<ProcedureCategory> _procedures =
-    [
-        new("consult", "CON", "Consult", "speech"),
-        new("extraction", "EXT", "Extraction", "forceps"),
-        new("sedation", "SED", "Sedation", "moon"),
-        new("post-op", "POST", "Post-op", "check"),
-        new("implant", "IMP", "Implant", "bolt"),
-        new("biopsy", "BX", "Biopsy", "vial")
-    ];
+    private readonly List<Doctor> _doctors;
+    private readonly List<Doctor> _activeDoctors;
+    private readonly List<ProcedureCategory> _procedures;
+    private readonly List<ProcedureCategory> _activeProcedures;
 
     private readonly List<RoomState> _rooms;
     private readonly List<RoomEvent> _events = [];
@@ -35,6 +22,8 @@ public sealed class DemoBoardStore
     public DemoBoardStore(
         IOptionsMonitor<BoardThresholdOptions> thresholdOptions,
         IOptions<BoardOptions> boardOptions,
+        IOptions<DoctorRosterOptions> doctorRosterOptions,
+        IOptions<ProcedureRosterOptions> procedureRosterOptions,
         SqliteBoardRepository repository,
         IWebHostEnvironment environment,
         TimeProvider? timeProvider = null)
@@ -43,6 +32,10 @@ public sealed class DemoBoardStore
         _repository = repository;
         _timeProvider = timeProvider ?? TimeProvider.System;
         _roomCount = boardOptions.Value.RoomCount;
+        _doctors = BuildDoctors(doctorRosterOptions.Value).ToList();
+        _activeDoctors = BuildDoctors(doctorRosterOptions.Value, activeOnly: true).ToList();
+        _procedures = BuildProcedures(procedureRosterOptions.Value).ToList();
+        _activeProcedures = BuildProcedures(procedureRosterOptions.Value, activeOnly: true).ToList();
         var now = Now;
 
         var hasPersistedRooms = _repository.HasAnyRoomRows();
@@ -74,8 +67,8 @@ public sealed class DemoBoardStore
                 Thresholds.StaleMinutes,
                 Thresholds.AgingThreshold,
                 Thresholds.StaleThreshold,
-                _doctors,
-                _procedures,
+                _activeDoctors,
+                _activeProcedures,
                 _rooms.Select(room => ToRoomStatus(room, now)).ToList(),
                 _events.OrderByDescending(item => item.Timestamp).Take(20).ToList());
         }
@@ -110,8 +103,8 @@ public sealed class DemoBoardStore
         lock (_syncRoot)
         {
             var room = _rooms.FirstOrDefault(item => item.RoomId == roomNumber);
-            var doctor = _doctors.FirstOrDefault(item => item.Id == doctorId);
-            var procedure = FindProcedure(procedureCode);
+            var doctor = _activeDoctors.FirstOrDefault(item => item.Id == doctorId);
+            var procedure = FindActiveProcedure(procedureCode);
             if (room is null || doctor is null || procedure is null || !CanSeat(room))
             {
                 return null;
@@ -141,8 +134,8 @@ public sealed class DemoBoardStore
         lock (_syncRoot)
         {
             var room = _rooms.FirstOrDefault(item => item.RoomId == roomNumber);
-            var doctor = _doctors.FirstOrDefault(item => item.Id == doctorId);
-            var procedure = FindProcedure(procedureCode);
+            var doctor = _activeDoctors.FirstOrDefault(item => item.Id == doctorId);
+            var procedure = FindActiveProcedure(procedureCode);
             if (room is null || doctor is null || procedure is null)
             {
                 return null;
@@ -385,6 +378,30 @@ public sealed class DemoBoardStore
             string.Equals(item.Id, procedureCode, StringComparison.OrdinalIgnoreCase) ||
             string.Equals(item.Label, procedureCode, StringComparison.OrdinalIgnoreCase));
 
+    private ProcedureCategory? FindActiveProcedure(string procedureCode) =>
+        _activeProcedures.FirstOrDefault(item =>
+            string.Equals(item.Id, procedureCode, StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(item.Label, procedureCode, StringComparison.OrdinalIgnoreCase));
+
+    private static IEnumerable<Doctor> BuildDoctors(DoctorRosterOptions options, bool activeOnly = false) =>
+        options.Doctors
+            .Where(doctor => !activeOnly || doctor.Active)
+            .Select(doctor => new Doctor(
+                doctor.Id,
+                doctor.DisplayName,
+                doctor.ShortName,
+                doctor.Color));
+
+    private static IEnumerable<ProcedureCategory> BuildProcedures(ProcedureRosterOptions options, bool activeOnly = false) =>
+        options.Procedures
+            .Where(procedure => !activeOnly || procedure.Active)
+            .Select(procedure => new ProcedureCategory(
+                string.IsNullOrWhiteSpace(procedure.Id) ? procedure.Code.ToLowerInvariant() : procedure.Id,
+                // Backward-compatible DTO mapping: Label is the short code, Name is the display label.
+                procedure.Code,
+                procedure.Label,
+                procedure.Icon));
+
     private static RoomState Available(int roomId) => new(roomId);
 
     private void AddMissingRooms()
@@ -594,7 +611,7 @@ public sealed record BoardSnapshot(
     IReadOnlyList<RoomStatus> Rooms,
     IReadOnlyList<RoomEvent> RecentEvents);
 
-public sealed record Doctor(string Id, string Name, string Color);
+public sealed record Doctor(string Id, string Name, string ShortName, string Color);
 
 public sealed record ProcedureCategory(string Id, string Label, string Name, string Icon);
 

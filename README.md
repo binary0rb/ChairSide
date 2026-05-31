@@ -115,6 +115,27 @@ Thresholds are configured in `src/ChairSide.Board/appsettings.json`:
       "1": "dev-room-1-token",
       "2": "dev-room-2-token"
     }
+  },
+  "DoctorRosterOptions": {
+    "Doctors": [
+      {
+        "Id": "otte",
+        "DisplayName": "Dr. Otte",
+        "ShortName": "Otte",
+        "Color": "#2563eb",
+        "Active": true
+      }
+    ]
+  },
+  "ProcedureRosterOptions": {
+    "Procedures": [
+      {
+        "Code": "CON",
+        "Label": "Consult",
+        "Icon": "speech",
+        "Active": true
+      }
+    ]
   }
 }
 ```
@@ -130,6 +151,8 @@ dotnet run --project .\src\ChairSide.Board\ChairSide.Board.csproj --BoardPersist
 ```
 
 The app creates the SQLite database and schema on startup if they do not exist. Persisted data remains non-PHI and is limited to room assignments, procedure categories, lifecycle state, operational timestamps, and completed-cycle durations.
+
+Doctor and procedure rosters are configured through `DoctorRosterOptions` and `ProcedureRosterOptions`. Doctors require unique nonblank `Id` values, `DisplayName`, `ShortName`, and a hex `Color`. Procedures require unique nonblank `Code` values, `Label`, and `Icon`. At least one doctor and one procedure must be active. Set `Active` to `false` to remove a doctor or procedure from room-panel selection while still allowing existing active rooms and historical reports to display safely. Do not put PHI in roster names or procedure labels.
 
 Room-device binding is a first-pass operational control for room tablets. When `RoomDeviceBindingOptions:Enabled` is `true`, room-local mutation actions require the configured token for that room:
 

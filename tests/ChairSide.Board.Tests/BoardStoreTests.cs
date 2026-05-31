@@ -263,6 +263,152 @@ public sealed class BoardStoreTests
     }
 
     [Fact]
+    public void Default_rosters_load_current_doctors_and_procedures()
+    {
+        using var workspace = TestWorkspace.Create();
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production);
+
+        var snapshot = context.Store.GetSnapshot();
+
+        Assert.Equal(["otte", "pledger", "gibson", "schroeder"], snapshot.Doctors.Select(doctor => doctor.Id));
+        Assert.Equal(["Dr. Otte", "Dr. Pledger", "Dr. Gibson", "Dr. Schroeder"], snapshot.Doctors.Select(doctor => doctor.Name));
+        Assert.Equal(["Otte", "Pledger", "Gibson", "Schroeder"], snapshot.Doctors.Select(doctor => doctor.ShortName));
+        Assert.Equal(["CON", "EXT", "SED", "POST", "IMP", "BX"], snapshot.Procedures.Select(procedure => procedure.Label));
+        Assert.Equal(["Consult", "Extraction", "Sedation", "Post-op", "Implant", "Biopsy"], snapshot.Procedures.Select(procedure => procedure.Name));
+    }
+
+    [Fact]
+    public void Inactive_doctors_and_procedures_are_not_selectable()
+    {
+        using var workspace = TestWorkspace.Create();
+        var context = StoreContext.Create(
+            workspace,
+            environmentName: Environments.Production,
+            doctorRosterOptions: new DoctorRosterOptions
+            {
+                Doctors =
+                [
+                    new() { Id = "active", DisplayName = "Dr. Active", ShortName = "Active", Color = "#2563eb", Active = true },
+                    new() { Id = "inactive", DisplayName = "Dr. Inactive", ShortName = "Inactive", Color = "#16a34a", Active = false }
+                ]
+            },
+            procedureRosterOptions: new ProcedureRosterOptions
+            {
+                Procedures =
+                [
+                    new() { Id = "active-procedure", Code = "ACT", Label = "Active", Icon = "speech", Active = true },
+                    new() { Id = "inactive-procedure", Code = "OFF", Label = "Inactive", Icon = "vial", Active = false }
+                ]
+            });
+
+        var snapshot = context.Store.GetSnapshot();
+
+        Assert.Equal(["active"], snapshot.Doctors.Select(doctor => doctor.Id));
+        Assert.Equal(["ACT"], snapshot.Procedures.Select(procedure => procedure.Label));
+        Assert.Null(context.Store.SeatRoom(1, "inactive", "ACT"));
+        Assert.Null(context.Store.SeatRoom(1, "active", "OFF"));
+        Assert.NotNull(context.Store.SeatRoom(1, "active", "ACT"));
+    }
+
+    [Fact]
+    public void Doctor_roster_validation_rejects_duplicates_and_blank_required_fields()
+    {
+        var duplicateResult = ValidateDoctorRoster(new DoctorRosterOptions
+        {
+            Doctors =
+            [
+                new() { Id = "otte", DisplayName = "Dr. Otte", ShortName = "Otte", Color = "#2563eb", Active = true },
+                new() { Id = "OTTE", DisplayName = "Dr. Other", ShortName = "Other", Color = "#16a34a", Active = true }
+            ]
+        });
+        var blankResult = ValidateDoctorRoster(new DoctorRosterOptions
+        {
+            Doctors =
+            [
+                new() { Id = "", DisplayName = "", ShortName = "", Color = "blue", Active = true }
+            ]
+        });
+
+        Assert.True(duplicateResult.Failed);
+        Assert.Contains("unique Id", string.Join(" ", duplicateResult.Failures));
+        Assert.True(blankResult.Failed);
+        Assert.Contains("Id is required", string.Join(" ", blankResult.Failures));
+        Assert.Contains("DisplayName is required", string.Join(" ", blankResult.Failures));
+        Assert.Contains("ShortName is required", string.Join(" ", blankResult.Failures));
+        Assert.Contains("Color must be a valid hex color", string.Join(" ", blankResult.Failures));
+    }
+
+    [Fact]
+    public void Procedure_roster_validation_rejects_duplicates_and_blank_required_fields()
+    {
+        var duplicateResult = ValidateProcedureRoster(new ProcedureRosterOptions
+        {
+            Procedures =
+            [
+                new() { Code = "CON", Label = "Consult", Icon = "speech", Active = true },
+                new() { Code = "con", Label = "Duplicate", Icon = "vial", Active = true }
+            ]
+        });
+        var blankResult = ValidateProcedureRoster(new ProcedureRosterOptions
+        {
+            Procedures =
+            [
+                new() { Code = "", Label = "", Icon = "", Active = true }
+            ]
+        });
+
+        Assert.True(duplicateResult.Failed);
+        Assert.Contains("unique Code", string.Join(" ", duplicateResult.Failures));
+        Assert.True(blankResult.Failed);
+        Assert.Contains("Code is required", string.Join(" ", blankResult.Failures));
+        Assert.Contains("Label is required", string.Join(" ", blankResult.Failures));
+        Assert.Contains("Icon is required", string.Join(" ", blankResult.Failures));
+    }
+
+    [Fact]
+    public void Roster_validation_requires_at_least_one_active_entry()
+    {
+        var doctorResult = ValidateDoctorRoster(new DoctorRosterOptions
+        {
+            Doctors =
+            [
+                new() { Id = "inactive", DisplayName = "Dr. Inactive", ShortName = "Inactive", Color = "#2563eb", Active = false }
+            ]
+        });
+        var procedureResult = ValidateProcedureRoster(new ProcedureRosterOptions
+        {
+            Procedures =
+            [
+                new() { Code = "OFF", Label = "Inactive", Icon = "vial", Active = false }
+            ]
+        });
+
+        Assert.True(doctorResult.Failed);
+        Assert.Contains("at least one active doctor", string.Join(" ", doctorResult.Failures));
+        Assert.True(procedureResult.Failed);
+        Assert.Contains("at least one active procedure", string.Join(" ", procedureResult.Failures));
+    }
+
+    [Fact]
+    public void Configured_roster_text_is_escaped_before_inner_html_rendering()
+    {
+        var boardJs = File.ReadAllText(Path.Combine(
+            FindRepositoryRoot(),
+            "src",
+            "ChairSide.Board",
+            "wwwroot",
+            "board.js"));
+
+        Assert.Contains("function escapeHtml", boardJs);
+        Assert.Contains("${escapeHtml(doctor.name)}", boardJs);
+        Assert.Contains("${escapeHtml(procedure.label)}", boardJs);
+        Assert.Contains("${escapeHtml(procedure.name)}", boardJs);
+        Assert.DoesNotContain(">${doctor.name}", boardJs);
+        Assert.DoesNotContain("<strong>${procedure.label}</strong>", boardJs);
+        Assert.DoesNotContain("<small>${procedure.name}</small>", boardJs);
+    }
+
+    [Fact]
     public void Persisted_schema_contains_only_non_phi_operational_fields()
     {
         using var workspace = TestWorkspace.Create();
@@ -591,6 +737,28 @@ public sealed class BoardStoreTests
             Microsoft.Extensions.Options.Options.Create(new BoardOptions { RoomCount = roomCount }))
             .Validate(null, options);
 
+    private static ValidateOptionsResult ValidateDoctorRoster(DoctorRosterOptions options) =>
+        new DoctorRosterOptionsValidator().Validate(null, options);
+
+    private static ValidateOptionsResult ValidateProcedureRoster(ProcedureRosterOptions options) =>
+        new ProcedureRosterOptionsValidator().Validate(null, options);
+
+    private static string FindRepositoryRoot()
+    {
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "ChairSide.Board.sln")))
+        {
+            directory = directory.Parent;
+        }
+
+        if (directory is null)
+        {
+            throw new DirectoryNotFoundException("Could not find ChairSide.Board.sln.");
+        }
+
+        return directory.FullName;
+    }
+
     private static HttpRequest RequestWithHeader(string? token)
     {
         var context = new DefaultHttpContext();
@@ -647,10 +815,10 @@ internal sealed class StoreContext
 
     public IReadOnlyList<Doctor> Doctors { get; } =
     [
-        new("otte", "Dr. Otte", "#2563eb"),
-        new("pledger", "Dr. Pledger", "#16a34a"),
-        new("gibson", "Dr. Gibson", "#f97316"),
-        new("schroeder", "Dr. Schroeder", "#7c3aed")
+        new("otte", "Dr. Otte", "Otte", "#2563eb"),
+        new("pledger", "Dr. Pledger", "Pledger", "#16a34a"),
+        new("gibson", "Dr. Gibson", "Gibson", "#f97316"),
+        new("schroeder", "Dr. Schroeder", "Schroeder", "#7c3aed")
     ];
 
     public IReadOnlyList<ProcedureCategory> Procedures { get; } =
@@ -670,6 +838,8 @@ internal sealed class StoreContext
         int agingMinutes = 7,
         int staleMinutes = 12,
         int roomCount = 3,
+        DoctorRosterOptions? doctorRosterOptions = null,
+        ProcedureRosterOptions? procedureRosterOptions = null,
         TimeProvider? timeProvider = null)
     {
         var resolvedDatabasePath = databasePath ?? (environmentName == Environments.Production
@@ -686,6 +856,14 @@ internal sealed class StoreContext
                 StaleMinutes = staleMinutes
             }),
             Microsoft.Extensions.Options.Options.Create(new BoardOptions { RoomCount = roomCount }),
+            Microsoft.Extensions.Options.Options.Create(doctorRosterOptions ?? new DoctorRosterOptions
+            {
+                Doctors = DoctorRosterOptions.DefaultDoctors()
+            }),
+            Microsoft.Extensions.Options.Options.Create(procedureRosterOptions ?? new ProcedureRosterOptions
+            {
+                Procedures = ProcedureRosterOptions.DefaultProcedures()
+            }),
             repository,
             environment,
             timeProvider);
