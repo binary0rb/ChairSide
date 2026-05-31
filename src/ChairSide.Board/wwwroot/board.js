@@ -15,6 +15,7 @@ const app = {
   realtimeLostAt: 0,
   pollInFlight: false,
   roomNumber: getRoomNumber(),
+  roomToken: getRoomToken(),
   doctorId: new URLSearchParams(location.search).get("doctor") || "otte",
   selectedDoctorId: null,
   selectedProcedureId: null,
@@ -30,6 +31,14 @@ function getRoomNumber() {
   const roomNumber = Number(requestedRoom);
 
   return Number.isInteger(roomNumber) ? roomNumber : 0;
+}
+
+function getRoomToken() {
+  if (document.body.dataset.view !== "room") {
+    return "";
+  }
+
+  return document.querySelector("meta[name='chairside-room-token']")?.content || "";
 }
 
 async function boot() {
@@ -935,7 +944,7 @@ async function sendSeatRoom(payload) {
   console.log("[ChairSide] Sending Seat Room payload.", payload);
   const response = await fetch(`/api/rooms/${payload.roomNumber}/seat`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: mutationHeaders({ "Content-Type": "application/json" }),
     body: JSON.stringify({
       doctorId: payload.doctorId,
       procedureCode: payload.procedureCode,
@@ -955,7 +964,7 @@ async function sendAssignmentUpdate(payload) {
   console.log("[ChairSide] Sending Update Assignment payload.", payload);
   const response = await fetch(`/api/rooms/${payload.roomNumber}/assignment`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: mutationHeaders({ "Content-Type": "application/json" }),
     body: JSON.stringify({
       doctorId: payload.doctorId,
       procedureCode: payload.procedureCode,
@@ -973,13 +982,25 @@ async function sendAssignmentUpdate(payload) {
 async function sendRoomAction(roomNumber, action, label) {
   const payload = { roomNumber, action };
   console.log(`[ChairSide] Sending ${label} payload.`, payload);
-  const response = await fetch(`/api/rooms/${roomNumber}/${action}`, { method: "POST" });
+  const response = await fetch(`/api/rooms/${roomNumber}/${action}`, {
+    method: "POST",
+    headers: mutationHeaders()
+  });
 
   if (!response.ok) {
     throw new Error(await readErrorMessage(response, `${label} failed with HTTP ${response.status}.`));
   }
 
   return response.json();
+}
+
+function mutationHeaders(baseHeaders = {}) {
+  const headers = { ...baseHeaders };
+  if (app.roomToken) {
+    headers["X-ChairSide-Room-Token"] = app.roomToken;
+  }
+
+  return headers;
 }
 
 async function readErrorMessage(response, fallback) {

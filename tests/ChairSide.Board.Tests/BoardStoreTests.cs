@@ -1,5 +1,6 @@
 using ChairSide.Board.Options;
 using ChairSide.Board.Services;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.FileProviders;
@@ -313,6 +314,179 @@ public sealed class BoardStoreTests
         Assert.Equal("wal", (string)command.ExecuteScalar()!);
     }
 
+    [Fact]
+    public void Room_device_binding_disabled_allows_existing_mutation_behavior()
+    {
+        using var workspace = TestWorkspace.Create();
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production);
+        var validator = CreateBindingValidator(enabled: false);
+
+        Assert.Equal(RoomDeviceTokenValidationResult.Disabled, validator.Validate(1, token: null));
+        Assert.NotNull(context.Store.SeatRoom(1, "otte", "CON"));
+    }
+
+    [Fact]
+    public void Room_device_binding_enabled_rejects_missing_token()
+    {
+        var validator = CreateBindingValidator(enabled: true);
+
+        Assert.Equal(RoomDeviceTokenValidationResult.Missing, validator.Validate(1, token: null));
+        Assert.Equal(RoomDeviceTokenValidationResult.Missing, validator.Validate(1, token: ""));
+    }
+
+    [Fact]
+    public void Room_device_binding_enabled_rejects_wrong_token()
+    {
+        var validator = CreateBindingValidator(enabled: true);
+
+        Assert.Equal(RoomDeviceTokenValidationResult.Invalid, validator.Validate(1, "wrong-token"));
+    }
+
+    [Fact]
+    public void Room_device_binding_enabled_accepts_correct_room_token()
+    {
+        var validator = CreateBindingValidator(enabled: true);
+
+        Assert.Equal(RoomDeviceTokenValidationResult.Valid, validator.Validate(1, "room-1-token"));
+    }
+
+    [Fact]
+    public void Room_device_binding_room_one_token_does_not_work_for_room_two()
+    {
+        var validator = CreateBindingValidator(enabled: true);
+
+        Assert.Equal(RoomDeviceTokenValidationResult.Invalid, validator.Validate(2, "room-1-token"));
+    }
+
+    [Fact]
+    public void Room_device_binding_enabled_fails_closed_when_room_has_no_configured_token()
+    {
+        var validator = CreateBindingValidator(enabled: true);
+
+        Assert.Equal(RoomDeviceTokenValidationResult.Invalid, validator.Validate(3, "room-3-token"));
+    }
+
+    [Fact]
+    public void Read_only_board_state_still_works_without_room_token()
+    {
+        using var workspace = TestWorkspace.Create();
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production);
+        var validator = CreateBindingValidator(enabled: true);
+
+        Assert.Equal(RoomDeviceTokenValidationResult.Missing, validator.Validate(1, token: null));
+
+        var snapshot = context.Store.GetSnapshot();
+        var reports = context.Store.GetReports();
+
+        Assert.Equal(3, snapshot.RoomCount);
+        Assert.Equal(3, snapshot.Rooms.Count);
+        Assert.Equal(0, reports.CompletedRoomCyclesCount);
+    }
+
+    [Fact]
+    public async Task Room_device_binding_guard_returns_expected_mutation_statuses()
+    {
+        var enabledValidator = CreateBindingValidator(enabled: true);
+        var disabledValidator = CreateBindingValidator(enabled: false);
+
+        Assert.Null(RoomDeviceBindingGuard.ValidateMutationRequest(1, RequestWithHeader(token: null), disabledValidator));
+        Assert.Equal(401, await ExecuteBindingResult(RoomDeviceBindingGuard.ValidateMutationRequest(1, RequestWithHeader(token: null), enabledValidator)));
+        Assert.Equal(403, await ExecuteBindingResult(RoomDeviceBindingGuard.ValidateMutationRequest(1, RequestWithHeader("wrong-token"), enabledValidator)));
+        Assert.Equal(403, await ExecuteBindingResult(RoomDeviceBindingGuard.ValidateMutationRequest(2, RequestWithHeader("room-1-token"), enabledValidator)));
+        Assert.Equal(403, await ExecuteBindingResult(RoomDeviceBindingGuard.ValidateMutationRequest(3, RequestWithHeader("room-3-token"), enabledValidator)));
+        Assert.Null(RoomDeviceBindingGuard.ValidateMutationRequest(1, RequestWithHeader("room-1-token"), enabledValidator));
+        Assert.Equal(401, await ExecuteBindingResult(RoomDeviceBindingGuard.ValidateMutationRequest(1, RequestWithQueryToken("room-1-token"), enabledValidator)));
+    }
+
+    [Fact]
+    public void Room_device_binding_options_allow_disabled_config_without_room_tokens()
+    {
+        var result = ValidateBindingOptions(
+            roomCount: 3,
+            new RoomDeviceBindingOptions
+            {
+                Enabled = false,
+                RoomTokens = []
+            });
+
+        Assert.False(result.Failed);
+    }
+
+    [Fact]
+    public void Room_device_binding_options_require_all_configured_rooms_when_enabled()
+    {
+        var result = ValidateBindingOptions(
+            roomCount: 3,
+            new RoomDeviceBindingOptions
+            {
+                Enabled = true,
+                RoomTokens = new Dictionary<string, string>
+                {
+                    ["1"] = "room-1-token",
+                    ["2"] = "room-2-token"
+                }
+            });
+
+        Assert.True(result.Failed);
+        Assert.Contains("RoomDeviceBindingOptions:RoomTokens:3 is required", string.Join(" ", result.Failures));
+    }
+
+    [Fact]
+    public void Room_device_binding_options_reject_blank_tokens_when_enabled()
+    {
+        var result = ValidateBindingOptions(
+            roomCount: 2,
+            new RoomDeviceBindingOptions
+            {
+                Enabled = true,
+                RoomTokens = new Dictionary<string, string>
+                {
+                    ["1"] = "room-1-token",
+                    ["2"] = " "
+                }
+            });
+
+        Assert.True(result.Failed);
+        Assert.Contains("RoomDeviceBindingOptions:RoomTokens:2 must not be blank", string.Join(" ", result.Failures));
+    }
+
+    [Fact]
+    public void Room_device_binding_options_reject_duplicate_tokens_when_enabled()
+    {
+        var result = ValidateBindingOptions(
+            roomCount: 2,
+            new RoomDeviceBindingOptions
+            {
+                Enabled = true,
+                RoomTokens = new Dictionary<string, string>
+                {
+                    ["1"] = "same-token",
+                    ["2"] = "same-token"
+                }
+            });
+
+        Assert.True(result.Failed);
+        Assert.Contains("duplicate token values", string.Join(" ", result.Failures));
+    }
+
+    [Fact]
+    public void Room_device_binding_options_accept_complete_unique_room_tokens_when_enabled()
+    {
+        var result = ValidateBindingOptions(
+            roomCount: 2,
+            new RoomDeviceBindingOptions
+            {
+                Enabled = true,
+                RoomTokens = new Dictionary<string, string>
+                {
+                    ["1"] = "room-1-token",
+                    ["2"] = "room-2-token"
+                }
+            });
+
+        Assert.False(result.Failed);
+    }
+
     private static readonly HashSet<string> AllowedActiveRoomColumns =
     [
         "room_id",
@@ -398,6 +572,59 @@ public sealed class BoardStoreTests
 
     private static string FormatDateTimeOffset(DateTimeOffset value) =>
         value.ToUniversalTime().ToString("O");
+
+    private static RoomDeviceTokenValidator CreateBindingValidator(bool enabled) =>
+        new(new TestOptionsMonitor<RoomDeviceBindingOptions>(new RoomDeviceBindingOptions
+        {
+            Enabled = enabled,
+            RoomTokens = new Dictionary<string, string>
+            {
+                ["1"] = "room-1-token",
+                ["2"] = "room-2-token"
+            }
+        }));
+
+    private static ValidateOptionsResult ValidateBindingOptions(
+        int roomCount,
+        RoomDeviceBindingOptions options) =>
+        new RoomDeviceBindingOptionsValidator(
+            Microsoft.Extensions.Options.Options.Create(new BoardOptions { RoomCount = roomCount }))
+            .Validate(null, options);
+
+    private static HttpRequest RequestWithHeader(string? token)
+    {
+        var context = new DefaultHttpContext();
+        if (token is not null)
+        {
+            context.Request.Headers[RoomDeviceTokenValidator.HeaderName] = token;
+        }
+
+        return context.Request;
+    }
+
+    private static HttpRequest RequestWithQueryToken(string token)
+    {
+        var context = new DefaultHttpContext();
+        context.Request.QueryString = new QueryString($"?roomToken={Uri.EscapeDataString(token)}");
+        return context.Request;
+    }
+
+    private static async Task<int?> ExecuteBindingResult(IResult? result)
+    {
+        if (result is null)
+        {
+            return null;
+        }
+
+        if (result is IStatusCodeHttpResult statusCodeHttpResult)
+        {
+            return statusCodeHttpResult.StatusCode;
+        }
+
+        var context = new DefaultHttpContext();
+        await result.ExecuteAsync(context);
+        return context.Response.StatusCode;
+    }
 }
 
 internal sealed class StoreContext
