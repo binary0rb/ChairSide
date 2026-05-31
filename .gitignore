@@ -7,5 +7,11 @@ obj/
 *.db
 *.db-shm
 *.db-wal
+*.bak
+backups/
+Backups/
+*-backup-*.db
+*-pre-restore-*/
+*-file-set/
 
 publish/

@@ -714,6 +714,23 @@ public sealed class BoardStoreTests
         Assert.Contains("must not use the dev-admin-token sample value in Production", string.Join(" ", result.Failures));
     }
 
+    [Fact]
+    public void Backup_restore_scripts_and_documentation_are_present()
+    {
+        var root = FindRepositoryRoot();
+        var backupScript = Path.Combine(root, "scripts", "Backup-ChairSideSqlite.ps1");
+        var restoreScript = Path.Combine(root, "scripts", "Restore-ChairSideSqlite.ps1");
+        var readme = File.ReadAllText(Path.Combine(root, "README.md"));
+
+        Assert.True(File.Exists(backupScript));
+        Assert.True(File.Exists(restoreScript));
+        Assert.Contains(@"C:\ChairSide\Data\chairside.db", readme);
+        Assert.Contains(@"C:\ChairSide\Backups", readme);
+        Assert.Contains("chairside.db-wal", readme);
+        Assert.Contains("Backup-ChairSideSqlite.ps1", readme);
+        Assert.Contains("Restore-ChairSideSqlite.ps1", readme);
+    }
+
     private static readonly HashSet<string> AllowedActiveRoomColumns =
     [
         "room_id",
