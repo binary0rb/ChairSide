@@ -7,3 +7,5 @@ obj/
 *.db
 *.db-shm
 *.db-wal
+
+publish/
