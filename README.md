@@ -171,13 +171,13 @@ Open:
 - Reports: `http://localhost:5000/reports.html`
 - Room panels: `http://localhost:5000/room.html?roomId=1` through `http://localhost:5000/room.html?roomId={RoomCount}`
 
-Room IDs above the configured `RoomCount` show a friendly invalid room message and do not update board state.
+Use `/room.html?roomId={roomNumber}` as the authoritative room panel URL. Room IDs above the configured `RoomCount` show a friendly invalid room message and do not update board state.
 
-Compatibility URLs:
+Compatibility and legacy URLs:
 
 - Root master board: `http://localhost:5000/`
-- Room 1 panel: `http://localhost:5000/room-1.html`
-- Older room query format: `http://localhost:5000/room.html?room=1`
+- Legacy Room 1 panel: `http://localhost:5000/room-1.html`
+- Legacy room query format: `http://localhost:5000/room.html?room=1`
 
 ## IIS Deployment
 
@@ -199,7 +199,7 @@ Publish from the repository root:
 dotnet publish .\src\ChairSide.Board\ChairSide.Board.csproj -c Release -o .\publish
 ```
 
-Copy the contents of `.\publish` to `C:\ChairSide\App`.
+Copy the contents of `.\publish` to `C:\ChairSide\App`. Publishing to `.\publish` is a local staging convention; do not commit the publish output.
 
 Production configuration is supplied by `src/ChairSide.Board/appsettings.Production.json`:
 
@@ -213,6 +213,8 @@ Production configuration is supplied by `src/ChairSide.Board/appsettings.Product
 
 The app validates this path at startup in Production. It must resolve outside the deployed app/content root. The app creates the SQLite database and schema if missing, but the data directory must be writable by the IIS app pool identity.
 
+`appsettings.Production.json` is environment-specific. If the production server does not use `C:\ChairSide\Data`, update `BoardPersistenceOptions:DatabasePath` before deployment.
+
 IIS app pool guidance:
 
 - Create a dedicated app pool, for example `ChairSideBoard`.
@@ -221,7 +223,7 @@ IIS app pool guidance:
 - Set idle timeout to disabled, such as `0` minutes.
 - Use a single worker process: `Maximum Worker Processes = 1`.
 - Avoid web garden mode. SQLite persistence is designed for a single app instance.
-- Consider disabling overlapped recycle for this app pool so two worker processes do not briefly write the SQLite database at the same time during recycle.
+- Set `Disallow Overlapping Rotation` to `true` (`disallowOverlappingRotation = true`). This is required for the SQLite single-instance deployment because it prevents two IIS worker processes from briefly writing to the same SQLite database during recycle.
 
 NTFS permissions:
 
@@ -235,6 +237,20 @@ Internal network access:
 - Bind IIS to the internal site/host name only.
 - If Windows Firewall blocks inbound HTTP, add an internal HTTP/80 rule as needed.
 - Keep access limited to trusted internal clinical workstations/tablets and wall displays.
+
+Security posture and accepted pilot risks:
+
+- ChairSide Board is internal-only.
+- Do not enter PHI. The system tracks rooms, doctors, procedures, and operational timestamps only.
+- HTTP/plaintext LAN traffic is an accepted pilot posture unless HTTPS is configured later.
+- Authentication, CSRF protection, and room-device binding are not currently enforced.
+- Reports/admin surfaces and room-local actions should be protected before broader clinic rollout.
+
+First-boot troubleshooting:
+
+- If the IIS site fails to start, check Windows Event Viewer first.
+- If more detail is needed, temporarily enable ASP.NET Core stdout logging and point logs to `C:\ChairSide\Logs`.
+- Disable stdout logging after troubleshooting.
 
 Deployment smoke checklist:
 
