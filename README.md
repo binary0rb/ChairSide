@@ -108,6 +108,13 @@ Thresholds are configured in `src/ChairSide.Board/appsettings.json`:
   },
   "BoardPersistenceOptions": {
     "DatabasePath": "./data/chairside-dev.db"
+  },
+  "RoomDeviceBindingOptions": {
+    "Enabled": false,
+    "RoomTokens": {
+      "1": "dev-room-1-token",
+      "2": "dev-room-2-token"
+    }
   }
 }
 ```
@@ -123,6 +130,19 @@ dotnet run --project .\src\ChairSide.Board\ChairSide.Board.csproj --BoardPersist
 ```
 
 The app creates the SQLite database and schema on startup if they do not exist. Persisted data remains non-PHI and is limited to room assignments, procedure categories, lifecycle state, operational timestamps, and completed-cycle durations.
+
+Room-device binding is a first-pass operational control for room tablets. When `RoomDeviceBindingOptions:Enabled` is `true`, room-local mutation actions require the configured token for that room:
+
+- Seat Room
+- Update Assignment
+- Cancel Seating
+- Doctor Arrived
+- Doctor Complete
+- Room Available
+
+Read-only views and APIs remain open for the internal board: `/master.html`, `/doctor.html`, `/reports.html`, and board state reads do not require room tokens. Room mutation API calls should send the token in the `X-ChairSide-Room-Token` header. For simple tablet setup, the room page can also receive `roomToken` or `token` in the room URL and pass it as the header for mutation calls.
+
+Room tokens are operational controls, not full authentication. They do not protect reports/admin surfaces, do not replace HTTPS, and do not provide user-level access control. Full access control, report protection, CSRF protection, and stronger room-device binding remain future hardening work before broader rollout.
 
 Production database guidance:
 

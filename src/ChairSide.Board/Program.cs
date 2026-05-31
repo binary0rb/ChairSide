@@ -25,9 +25,15 @@ builder.Services
     .Validate(options => !string.IsNullOrWhiteSpace(options.DatabasePath), "DatabasePath is required.")
     .ValidateOnStart();
 
+builder.Services
+    .AddOptions<RoomDeviceBindingOptions>()
+    .Bind(builder.Configuration.GetSection(RoomDeviceBindingOptions.SectionName))
+    .ValidateOnStart();
+
 builder.Services.AddSignalR();
 builder.Services.AddSingleton<SqliteBoardRepository>();
 builder.Services.AddSingleton<DemoBoardStore>();
+builder.Services.AddSingleton<RoomDeviceTokenValidator>();
 
 var app = builder.Build();
 _ = app.Services.GetRequiredService<DemoBoardStore>();
@@ -50,9 +56,20 @@ app.MapGet("/api/rooms/{roomNumber:int}", IResult (int roomNumber, DemoBoardStor
 app.MapPost("/api/rooms/{roomNumber:int}/seat", async Task<IResult> (
     int roomNumber,
     SeatRoomRequest request,
+    HttpContext httpContext,
+    RoomDeviceTokenValidator roomDeviceTokenValidator,
     DemoBoardStore store,
     Microsoft.AspNetCore.SignalR.IHubContext<BoardHub> hubContext) =>
 {
+    var bindingFailure = RoomDeviceBindingGuard.ValidateMutationRequest(
+        roomNumber,
+        httpContext.Request,
+        roomDeviceTokenValidator);
+    if (bindingFailure is not null)
+    {
+        return bindingFailure;
+    }
+
     var procedureCode = request.ProcedureCode ?? request.ProcedureId;
     if (string.IsNullOrWhiteSpace(procedureCode))
     {
@@ -74,9 +91,20 @@ app.MapPost("/api/rooms/{roomNumber:int}/seat", async Task<IResult> (
 app.MapPost("/api/rooms/{roomNumber:int}/assignment", async Task<IResult> (
     int roomNumber,
     UpdateAssignmentRequest request,
+    HttpContext httpContext,
+    RoomDeviceTokenValidator roomDeviceTokenValidator,
     DemoBoardStore store,
     Microsoft.AspNetCore.SignalR.IHubContext<BoardHub> hubContext) =>
 {
+    var bindingFailure = RoomDeviceBindingGuard.ValidateMutationRequest(
+        roomNumber,
+        httpContext.Request,
+        roomDeviceTokenValidator);
+    if (bindingFailure is not null)
+    {
+        return bindingFailure;
+    }
+
     var procedureCode = request.ProcedureCode ?? request.ProcedureId;
     if (string.IsNullOrWhiteSpace(procedureCode))
     {
@@ -97,9 +125,20 @@ app.MapPost("/api/rooms/{roomNumber:int}/assignment", async Task<IResult> (
 
 app.MapPost("/api/rooms/{roomNumber:int}/cancel-seating", async Task<IResult> (
     int roomNumber,
+    HttpContext httpContext,
+    RoomDeviceTokenValidator roomDeviceTokenValidator,
     DemoBoardStore store,
     Microsoft.AspNetCore.SignalR.IHubContext<BoardHub> hubContext) =>
 {
+    var bindingFailure = RoomDeviceBindingGuard.ValidateMutationRequest(
+        roomNumber,
+        httpContext.Request,
+        roomDeviceTokenValidator);
+    if (bindingFailure is not null)
+    {
+        return bindingFailure;
+    }
+
     var result = store.CancelSeating(roomNumber);
     if (result is null)
     {
@@ -114,9 +153,20 @@ app.MapPost("/api/rooms/{roomNumber:int}/cancel-seating", async Task<IResult> (
 
 app.MapPost("/api/rooms/{roomNumber:int}/doctor-arrived", async Task<IResult> (
     int roomNumber,
+    HttpContext httpContext,
+    RoomDeviceTokenValidator roomDeviceTokenValidator,
     DemoBoardStore store,
     Microsoft.AspNetCore.SignalR.IHubContext<BoardHub> hubContext) =>
 {
+    var bindingFailure = RoomDeviceBindingGuard.ValidateMutationRequest(
+        roomNumber,
+        httpContext.Request,
+        roomDeviceTokenValidator);
+    if (bindingFailure is not null)
+    {
+        return bindingFailure;
+    }
+
     var result = store.MarkDoctorArrived(roomNumber);
     if (result is null)
     {
@@ -131,9 +181,20 @@ app.MapPost("/api/rooms/{roomNumber:int}/doctor-arrived", async Task<IResult> (
 
 app.MapPost("/api/rooms/{roomNumber:int}/doctor-complete", async Task<IResult> (
     int roomNumber,
+    HttpContext httpContext,
+    RoomDeviceTokenValidator roomDeviceTokenValidator,
     DemoBoardStore store,
     Microsoft.AspNetCore.SignalR.IHubContext<BoardHub> hubContext) =>
 {
+    var bindingFailure = RoomDeviceBindingGuard.ValidateMutationRequest(
+        roomNumber,
+        httpContext.Request,
+        roomDeviceTokenValidator);
+    if (bindingFailure is not null)
+    {
+        return bindingFailure;
+    }
+
     var result = store.MarkDoctorComplete(roomNumber);
     if (result is null)
     {
@@ -148,9 +209,20 @@ app.MapPost("/api/rooms/{roomNumber:int}/doctor-complete", async Task<IResult> (
 
 app.MapPost("/api/rooms/{roomNumber:int}/available", async Task<IResult> (
     int roomNumber,
+    HttpContext httpContext,
+    RoomDeviceTokenValidator roomDeviceTokenValidator,
     DemoBoardStore store,
     Microsoft.AspNetCore.SignalR.IHubContext<BoardHub> hubContext) =>
 {
+    var bindingFailure = RoomDeviceBindingGuard.ValidateMutationRequest(
+        roomNumber,
+        httpContext.Request,
+        roomDeviceTokenValidator);
+    if (bindingFailure is not null)
+    {
+        return bindingFailure;
+    }
+
     var result = store.MarkRoomAvailable(roomNumber);
     if (result is null)
     {
