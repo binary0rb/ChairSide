@@ -298,6 +298,8 @@ Compatibility and legacy URLs:
 
 ChairSide Board is intended for internal-only deployment on the practice network. Do not expose it directly to the public internet, and do not configure public DNS for the app. A typical internal URL is `http://chairside`, backed by internal DNS or a local network alias.
 
+For go-live preparation, use the [Production Pilot Checklist](docs/Production-Pilot-Checklist.md).
+
 Recommended server folder layout:
 
 ```text
