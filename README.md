@@ -198,7 +198,7 @@ This is not full user authentication and does not provide user identity, roles, 
 
 On startup, ChairSide logs whether room-device binding and admin/report access protection are enabled. In Production, the app logs a warning when either control is disabled, but it does not fail startup solely because they are disabled.
 
-The room-panel Demo Timer is available by default outside Production and hidden/disabled by default in Production. To explicitly enable it for a controlled production demo, set `BoardUiOptions:DemoTimerEnabled` to `true` through environment-specific configuration. Server-side demo elapsed values remain clamped.
+The room-panel Demo Timer is available by default outside Production and hidden/disabled by default in Production. To explicitly enable it for a controlled production demo, set `BoardUiOptions:DemoTimerEnabled` to `true` through environment-specific configuration. The server also enforces this setting: when disabled, submitted demo elapsed values are ignored; when enabled, server-side demo elapsed values remain clamped.
 
 Production database guidance:
 
@@ -400,7 +400,7 @@ The underlying completed-cycle records include assigned doctor and completion ti
 
 ## Demo Aging
 
-Room panels include a `Demo Timer` select outside Production. Use `Start now`, `Simulate aging wait`, or `Simulate stale wait` before seating a room to test the aging and stale board states without waiting for the configured thresholds. In Production, the Demo Timer is hidden/disabled unless `BoardUiOptions:DemoTimerEnabled` is explicitly set to `true`.
+Room panels include a `Demo Timer` select outside Production. Use `Start now`, `Simulate aging wait`, or `Simulate stale wait` before seating a room to test the aging and stale board states without waiting for the configured thresholds. In Production, the Demo Timer is hidden/disabled unless `BoardUiOptions:DemoTimerEnabled` is explicitly set to `true`. Direct API submissions of demo elapsed minutes are ignored when the setting is disabled.
 
 ## Demo Script
 

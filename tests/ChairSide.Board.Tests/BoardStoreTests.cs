@@ -743,6 +743,37 @@ public sealed class BoardStoreTests
     }
 
     [Fact]
+    public void Demo_elapsed_is_applied_only_when_demo_timer_is_enabled()
+    {
+        using var workspace = TestWorkspace.Create();
+        var now = new DateTimeOffset(2026, 5, 31, 12, 0, 0, TimeSpan.Zero);
+        var enabledClock = new ManualTimeProvider(now);
+        var disabledClock = new ManualTimeProvider(now);
+        var enabled = StoreContext.Create(
+            workspace,
+            environmentName: Environments.Production,
+            databasePath: Path.Combine(workspace.DataRoot, "demo-enabled.db"),
+            boardUiOptions: new BoardUiOptions { DemoTimerEnabled = true },
+            timeProvider: enabledClock);
+        var disabled = StoreContext.Create(
+            workspace,
+            environmentName: Environments.Production,
+            databasePath: Path.Combine(workspace.DataRoot, "demo-disabled.db"),
+            boardUiOptions: new BoardUiOptions { DemoTimerEnabled = false },
+            timeProvider: disabledClock);
+
+        var enabledRoom = enabled.Store.SeatRoom(1, "otte", "CON", demoElapsedMinutes: 15);
+        var disabledRoom = disabled.Store.SeatRoom(1, "otte", "CON", demoElapsedMinutes: 15);
+
+        Assert.NotNull(enabledRoom);
+        Assert.NotNull(disabledRoom);
+        Assert.Equal(now.AddMinutes(-15), enabledRoom.SeatedAt);
+        Assert.Equal(RoomStates.Stale, enabledRoom.State);
+        Assert.Equal(now, disabledRoom.SeatedAt);
+        Assert.Equal(RoomStates.Seated, disabledRoom.State);
+    }
+
+    [Fact]
     public void Client_report_metrics_escape_labels_and_values()
     {
         var root = FindRepositoryRoot();
