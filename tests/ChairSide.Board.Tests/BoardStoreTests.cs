@@ -187,6 +187,26 @@ public sealed class BoardStoreTests
         Assert.Equal(RoomStates.Turnover, afterCompleteReload.Store.GetRoom(1)?.State);
     }
 
+    [Fact]
+    public void Turnover_seconds_calculated_from_doctor_complete_to_room_available()
+    {
+        using var workspace = TestWorkspace.Create();
+        var now = new DateTimeOffset(2026, 5, 29, 18, 0, 0, TimeSpan.Zero);
+        var clock = new ManualTimeProvider(now);
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production, timeProvider: clock);
+
+        Assert.NotNull(context.Store.SeatRoom(1, "otte", "CON"));
+        clock.SetUtcNow(now.AddMinutes(5));
+        Assert.NotNull(context.Store.MarkDoctorArrived(1));
+        clock.SetUtcNow(now.AddMinutes(10));
+        Assert.NotNull(context.Store.MarkDoctorComplete(1));
+        clock.SetUtcNow(now.AddMinutes(13));
+        Assert.NotNull(context.Store.MarkRoomAvailable(1));
+
+        var cycle = Assert.Single(context.Store.GetReports().RecentCompletedCycles);
+        Assert.Equal(3 * 60, cycle.TurnoverSeconds);
+    }
+
     [Theory]
     [InlineData(6, 59, RoomStates.Seated, false, false)]
     [InlineData(7, 0, RoomStates.Aging, true, false)]
