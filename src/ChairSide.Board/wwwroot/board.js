@@ -570,7 +570,7 @@ function renderRoomTile(room, large = false) {
   const doctorColor = room.doctor ? room.doctor.color : "#8b949e";
   const procedure = room.procedure || procedureFromCode(room.procedureCode);
   const badge = stateBadge(state);
-  const timer = seatedToDoctorLabel(room);
+  const timer = roomTimerLabel(room);
   const fullDoctorName = room.doctor ? room.doctor.name : "Unassigned";
   const doctorDisplayName = large ? fullDoctorName : (room.doctor?.shortName || cardDoctorName(fullDoctorName));
 
@@ -654,27 +654,13 @@ function stateBadge(state) {
   return state.toUpperCase();
 }
 
-function seatedToDoctorLabel(room) {
+function roomTimerLabel(room) {
   if (!room.seatedAt) {
     return { label: "Available", value: "--:--" };
   }
 
-  if (room.doctorCompleteAt) {
-    return {
-      label: "Turnover",
-      value: formatElapsed(room.doctorCompleteAt)
-    };
-  }
-
-  if (room.doctorArrivedAt) {
-    return {
-      label: "To doctor",
-      value: formatDuration(secondsBetweenDates(room.seatedAt, room.doctorArrivedAt))
-    };
-  }
-
   return {
-    label: "Waiting",
+    label: "Room time",
     value: formatElapsed(room.seatedAt)
   };
 }

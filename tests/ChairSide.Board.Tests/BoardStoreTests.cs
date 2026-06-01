@@ -207,6 +207,29 @@ public sealed class BoardStoreTests
         Assert.Equal(3 * 60, cycle.TurnoverSeconds);
     }
 
+    [Fact]
+    public void Room_status_preserves_seated_at_through_doctor_in_room_and_turnover()
+    {
+        // SeatedAt must be non-null in doctor-in-room and turnover RoomStatus
+        // because the client tile timer reads room.seatedAt for its live elapsed display.
+        using var workspace = TestWorkspace.Create();
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production);
+
+        var seated = context.Store.SeatRoom(1, "otte", "CON");
+        Assert.NotNull(seated);
+        Assert.NotNull(seated.SeatedAt);
+
+        var arrived = context.Store.MarkDoctorArrived(1);
+        Assert.NotNull(arrived);
+        Assert.Equal(RoomStates.DoctorInRoom, arrived.State);
+        Assert.NotNull(arrived.SeatedAt);
+
+        var complete = context.Store.MarkDoctorComplete(1);
+        Assert.NotNull(complete);
+        Assert.Equal(RoomStates.Turnover, complete.State);
+        Assert.NotNull(complete.SeatedAt);
+    }
+
     [Theory]
     [InlineData(6, 59, RoomStates.Seated, false, false)]
     [InlineData(7, 0, RoomStates.Aging, true, false)]
