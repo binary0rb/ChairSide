@@ -46,13 +46,24 @@ Use this checklist for a small internal pilot. Do not enter PHI.
 - [ ] Document the restore drill owner and timing.
 - [ ] Review restore safety: stop app pool, create pre-restore safety backup, restore, start app pool.
 - [ ] Confirm backups are protected even though they contain non-PHI operational data.
-- [ ] Decide backup retention policy.
+- [ ] Decide backup retention policy. Baseline suggestion: keep at least 7 days of daily backups unless clinic policy requires more.
+
+## Access Control Decisions
+
+- [ ] Decide whether `RoomDeviceBindingOptions:Enabled` is enabled for the pilot.
+- [ ] If room-device binding is enabled, configure unique per-room tokens outside source control.
+- [ ] If room-device binding is disabled, explicitly accept that any internal LAN device able to reach the app can mutate room state.
+- [ ] Decide whether `AdminAccessOptions:Enabled` is enabled for the pilot.
+- [ ] If admin/report protection is enabled, configure the shared report/admin token outside source control.
+- [ ] If admin/report protection is disabled, explicitly accept that report data is visible to anyone on the internal LAN.
 
 ## Room Tablets
 
 - [ ] Confirm canonical room URL format: `http://chairside/room.html?roomId={roomNumber}`.
 - [ ] Confirm Room 1 tablet loads `http://chairside/room.html?roomId=1`.
 - [ ] Choose room-token delivery method: deployment-time meta tag injection or tablet prompt/sessionStorage.
+- [ ] If using tablet prompt/sessionStorage delivery, no extra deployment tooling is required.
+- [ ] If using deployment-time meta tag room-token injection, confirm your deployment process handles injection. The client supports the meta tag, but this repo does not currently include a generator or injection script.
 - [ ] Confirm room tokens are never placed in URLs.
 - [ ] Confirm each room token is unique and environment-specific.
 - [ ] Confirm staff know how to use `Room access token required` prompt if binding is enabled.
