@@ -480,8 +480,8 @@ function showRoomTokenPrompt(statusCode) {
     "error");
 }
 
-function roomTokenStorageKey() {
-  return `chairside-room-token-${app.roomNumber}`;
+function roomTokenStorageKey(roomNumber = getRoomNumber()) {
+  return `chairside-room-token-${roomNumber}`;
 }
 
 function getStoredRoomToken() {
