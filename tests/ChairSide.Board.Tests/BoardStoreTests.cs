@@ -753,6 +753,20 @@ public sealed class BoardStoreTests
     }
 
     [Fact]
+    public void Client_room_token_prompt_uses_room_scoped_session_storage_and_header_only()
+    {
+        var root = FindRepositoryRoot();
+        var boardScript = File.ReadAllText(Path.Combine(root, "src", "ChairSide.Board", "wwwroot", "board.js"));
+
+        Assert.Contains("chairside-room-token-${app.roomNumber}", boardScript);
+        Assert.Contains("sessionStorage.setItem(roomTokenStorageKey(), token)", boardScript);
+        Assert.Contains("sessionStorage.removeItem(roomTokenStorageKey())", boardScript);
+        Assert.Contains("headers[\"X-ChairSide-Room-Token\"] = app.roomToken", boardScript);
+        Assert.Contains("Room access token required", boardScript);
+        Assert.DoesNotContain("roomToken=", boardScript);
+    }
+
+    [Fact]
     public void Admin_access_options_allow_disabled_config_without_token()
     {
         var result = ValidateAdminAccessOptions(new AdminAccessOptions { Enabled = false, SharedToken = "" });

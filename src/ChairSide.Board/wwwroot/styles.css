@@ -649,6 +649,49 @@ button {
   color: #7f1d1d;
 }
 
+.room-token-panel {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid #fbbf24;
+  border-radius: 8px;
+  background: #fffbeb;
+}
+
+.room-token-panel h2 {
+  margin: 0;
+  font-size: 19px;
+  letter-spacing: 0;
+}
+
+.room-token-panel p {
+  font-size: 15px;
+}
+
+.room-token-form {
+  display: grid;
+  gap: 10px;
+}
+
+.room-token-form label {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.room-token-form input {
+  width: 100%;
+  min-height: 54px;
+  padding: 0 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+  color: var(--ink);
+  font: inherit;
+  font-size: 18px;
+}
+
 .doctor-shell {
   padding-top: 18px;
   border-top: 6px solid var(--active-doctor);
