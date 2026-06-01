@@ -111,7 +111,8 @@ public sealed class BoardStoreTests
             environmentName: Environments.Production,
             databasePath: databasePath,
             agingMinutes: 1,
-            staleMinutes: 2);
+            staleMinutes: 2,
+            boardUiOptions: new BoardUiOptions { DemoTimerEnabled = true });
         Assert.NotNull(first.Store.SeatRoom(1, "otte", "CON"));
 
         var staleSeatedAt = DateTimeOffset.UtcNow.AddMinutes(-3);
