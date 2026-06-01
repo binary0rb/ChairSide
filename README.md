@@ -167,13 +167,13 @@ Room-device binding is a first-pass operational control for room tablets. When `
 - Doctor Complete
 - Room Available
 
-Read-only board views and APIs remain open for the internal board: `/master.html`, `/doctor.html`, and board state reads do not require room tokens. `/reports.html` does not require a room token, but it can be protected separately with admin/report access protection. Room mutation API calls must send the token in the `X-ChairSide-Room-Token` header. Do not place room tokens in URLs. URLs may be logged by IIS, browsers, proxies, network tools, and browser history.
+Read-only board views and APIs remain open for the internal board: `/master.html`, `/doctor.html`, and board state reads do not require room tokens. `/reports.html` is an unauthenticated browser shell, but report data can be protected separately with admin/report access protection. Room mutation API calls must send the token in the `X-ChairSide-Room-Token` header. Do not place room tokens in URLs. URLs may be logged by IIS, browsers, proxies, network tools, and browser history.
 
 Production tokens must not use the `dev-room-*-token` sample values. Supply production tokens through environment-specific configuration or deployment-time configuration, and do not commit real room tokens as source-controlled secrets.
 
-Room tokens are operational controls, not full authentication. They do not replace HTTPS and do not provide user-level access control. Full access control, CSRF protection, and stronger room-device binding remain future hardening work before broader rollout.
+Room tokens are operational controls, not full authentication. They do not replace HTTPS and do not provide user-level access control. Before enabling room-device binding for a pilot, define a room-token delivery plan for each tablet, such as deployment-time meta tag injection or another local configuration process that does not put tokens in URLs. Full access control, CSRF protection, and stronger room-device binding remain future hardening work before broader rollout.
 
-Admin/report access protection is a first-pass shared-token control for reports and future admin-style surfaces. When `AdminAccessOptions:Enabled` is `true`, `/reports.html` and `/api/reports` require the shared reports token:
+Admin/report access protection is a first-pass shared-token control for report data and future admin-style APIs. When `AdminAccessOptions:Enabled` is `true`, `/api/reports` requires the shared reports token. `/reports.html` still loads as an unauthenticated shell and shows an in-page token prompt before loading report data:
 
 ```json
 {
@@ -187,6 +187,10 @@ Admin/report access protection is a first-pass shared-token control for reports 
 Report API calls send the token in the `X-ChairSide-Admin-Token` header. The reports page uses a queryless browser-session prompt and stores the entered token in `sessionStorage` for that tab/session. Do not place admin/report tokens in URLs because URLs may be logged by IIS, browsers, proxies, network tools, and browser history.
 
 This is not full user authentication and does not provide user identity, roles, audit trails, CSRF protection, or network encryption. Production tokens must not use the `dev-admin-token` sample value and should be supplied through environment-specific configuration or deployment-time configuration, not committed as real source-controlled secrets.
+
+On startup, ChairSide logs whether room-device binding and admin/report access protection are enabled. In Production, the app logs a warning when either control is disabled, but it does not fail startup solely because they are disabled.
+
+The room-panel Demo Timer is available by default outside Production and hidden/disabled by default in Production. To explicitly enable it for a controlled production demo, set `BoardUiOptions:DemoTimerEnabled` to `true` through environment-specific configuration. Server-side demo elapsed values remain clamped.
 
 Production database guidance:
 
@@ -348,6 +352,9 @@ Security posture and accepted pilot risks:
 - Do not enter PHI. The system tracks rooms, doctors, procedures, and operational timestamps only.
 - HTTP/plaintext LAN traffic is an accepted pilot posture unless HTTPS is configured later.
 - Room-device binding and reports/admin shared-token protection are first-pass operational controls when enabled, not full authentication.
+- Startup logs announce whether those operational controls are enabled and warn in Production when disabled.
+- `/reports.html` is a public shell; `/api/reports` is protected when admin/report access protection is enabled.
+- The Demo Timer is hidden/disabled in Production unless explicitly enabled through `BoardUiOptions`.
 - User authentication, CSRF protection, room-device hardening, and report/admin authorization should be strengthened before broader clinic rollout.
 
 First-boot troubleshooting:
@@ -385,7 +392,7 @@ The underlying completed-cycle records include assigned doctor and completion ti
 
 ## Demo Aging
 
-Room panels include a `Demo Timer` select. Use `Start now`, `Simulate aging wait`, or `Simulate stale wait` before seating a room to test the aging and stale board states without waiting for the configured thresholds.
+Room panels include a `Demo Timer` select outside Production. Use `Start now`, `Simulate aging wait`, or `Simulate stale wait` before seating a room to test the aging and stale board states without waiting for the configured thresholds. In Production, the Demo Timer is hidden/disabled unless `BoardUiOptions:DemoTimerEnabled` is explicitly set to `true`.
 
 ## Demo Script
 

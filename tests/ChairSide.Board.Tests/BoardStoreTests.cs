@@ -674,7 +674,7 @@ public sealed class BoardStoreTests
     [Fact]
     public void Admin_access_protects_reports_and_keeps_board_room_surfaces_open()
     {
-        Assert.True(AdminAccessGuard.IsProtectedPath("/reports.html"));
+        Assert.False(AdminAccessGuard.IsProtectedPath("/reports.html"));
         Assert.True(AdminAccessGuard.IsProtectedPath("/api/reports"));
 
         Assert.False(AdminAccessGuard.IsProtectedPath("/"));
@@ -684,6 +684,72 @@ public sealed class BoardStoreTests
         Assert.False(AdminAccessGuard.IsProtectedPath("/room-1.html"));
         Assert.False(AdminAccessGuard.IsProtectedPath("/api/board"));
         Assert.False(AdminAccessGuard.IsProtectedPath("/api/rooms/1"));
+    }
+
+    [Fact]
+    public void Room_mutation_request_validation_rejects_invalid_assignment_fields()
+    {
+        Assert.Equal("Doctor id is required.", RoomMutationRequestValidator.ValidateDoctorAndProcedure(null, "CON"));
+        Assert.Equal("Doctor id is required.", RoomMutationRequestValidator.ValidateDoctorAndProcedure(" ", "CON"));
+        Assert.Equal(
+            $"Doctor id must be {RoomMutationRequestValidator.MaxDoctorIdLength} characters or fewer.",
+            RoomMutationRequestValidator.ValidateDoctorAndProcedure(new string('d', 65), "CON"));
+        Assert.Equal("Procedure code is required.", RoomMutationRequestValidator.ValidateDoctorAndProcedure("otte", null));
+        Assert.Equal("Procedure code is required.", RoomMutationRequestValidator.ValidateDoctorAndProcedure("otte", " "));
+        Assert.Equal(
+            $"Procedure code must be {RoomMutationRequestValidator.MaxProcedureCodeLength} characters or fewer.",
+            RoomMutationRequestValidator.ValidateDoctorAndProcedure("otte", new string('p', 33)));
+        Assert.Null(RoomMutationRequestValidator.ValidateDoctorAndProcedure("otte", "CON"));
+    }
+
+    [Fact]
+    public void Room_event_history_is_capped_to_most_recent_entries()
+    {
+        using var workspace = TestWorkspace.Create();
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production);
+
+        for (var i = 0; i < 110; i++)
+        {
+            Assert.NotNull(context.Store.SeatRoom(1, "otte", "CON"));
+            Assert.NotNull(context.Store.CancelSeating(1));
+        }
+
+        var eventsField = typeof(DemoBoardStore).GetField("_events", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+        Assert.NotNull(eventsField);
+        var events = Assert.IsType<List<RoomEvent>>(eventsField.GetValue(context.Store));
+
+        Assert.Equal(200, events.Count);
+        Assert.Equal("Seated", events[0].EventType);
+        Assert.Equal("SeatingCanceled", events[^1].EventType);
+        Assert.Equal(20, context.Store.GetSnapshot().RecentEvents.Count);
+    }
+
+    [Fact]
+    public void Board_ui_demo_timer_defaults_to_development_only_and_can_be_enabled()
+    {
+        using var workspace = TestWorkspace.Create();
+
+        var development = StoreContext.Create(workspace, environmentName: Environments.Development);
+        var production = StoreContext.Create(workspace, environmentName: Environments.Production, databasePath: workspace.ProductionDatabasePath());
+        var productionEnabled = StoreContext.Create(
+            workspace,
+            environmentName: Environments.Production,
+            databasePath: Path.Combine(workspace.DataRoot, "chairside-demo-enabled.db"),
+            boardUiOptions: new BoardUiOptions { DemoTimerEnabled = true });
+
+        Assert.True(development.Store.GetSnapshot().DemoTimerEnabled);
+        Assert.False(production.Store.GetSnapshot().DemoTimerEnabled);
+        Assert.True(productionEnabled.Store.GetSnapshot().DemoTimerEnabled);
+    }
+
+    [Fact]
+    public void Client_report_metrics_escape_labels_and_values()
+    {
+        var root = FindRepositoryRoot();
+        var boardScript = File.ReadAllText(Path.Combine(root, "src", "ChairSide.Board", "wwwroot", "board.js"));
+
+        Assert.Contains("<span>${escapeHtml(label)}</span>", boardScript);
+        Assert.Contains("<strong>${escapeHtml(value)}</strong>", boardScript);
     }
 
     [Fact]
@@ -971,6 +1037,7 @@ internal sealed class StoreContext
         int roomCount = 3,
         DoctorRosterOptions? doctorRosterOptions = null,
         ProcedureRosterOptions? procedureRosterOptions = null,
+        BoardUiOptions? boardUiOptions = null,
         TimeProvider? timeProvider = null)
     {
         var resolvedDatabasePath = databasePath ?? (environmentName == Environments.Production
@@ -987,6 +1054,7 @@ internal sealed class StoreContext
                 StaleMinutes = staleMinutes
             }),
             Microsoft.Extensions.Options.Options.Create(new BoardOptions { RoomCount = roomCount }),
+            Microsoft.Extensions.Options.Options.Create(boardUiOptions ?? new BoardUiOptions()),
             Microsoft.Extensions.Options.Options.Create(doctorRosterOptions ?? new DoctorRosterOptions
             {
                 Doctors = DoctorRosterOptions.DefaultDoctors()

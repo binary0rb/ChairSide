@@ -5,11 +5,14 @@ namespace ChairSide.Board.Services;
 
 public sealed class DemoBoardStore
 {
+    private const int MaxRoomEvents = 200;
+
     private readonly object _syncRoot = new();
     private readonly IOptionsMonitor<BoardThresholdOptions> _thresholdOptions;
     private readonly SqliteBoardRepository _repository;
     private readonly TimeProvider _timeProvider;
     private readonly int _roomCount;
+    private readonly bool _demoTimerEnabled;
     private readonly List<Doctor> _doctors;
     private readonly List<Doctor> _activeDoctors;
     private readonly List<ProcedureCategory> _procedures;
@@ -22,6 +25,7 @@ public sealed class DemoBoardStore
     public DemoBoardStore(
         IOptionsMonitor<BoardThresholdOptions> thresholdOptions,
         IOptions<BoardOptions> boardOptions,
+        IOptions<BoardUiOptions> boardUiOptions,
         IOptions<DoctorRosterOptions> doctorRosterOptions,
         IOptions<ProcedureRosterOptions> procedureRosterOptions,
         SqliteBoardRepository repository,
@@ -32,6 +36,7 @@ public sealed class DemoBoardStore
         _repository = repository;
         _timeProvider = timeProvider ?? TimeProvider.System;
         _roomCount = boardOptions.Value.RoomCount;
+        _demoTimerEnabled = boardUiOptions.Value.DemoTimerEnabled ?? !environment.IsProduction();
         _doctors = BuildDoctors(doctorRosterOptions.Value).ToList();
         _activeDoctors = BuildDoctors(doctorRosterOptions.Value, activeOnly: true).ToList();
         _procedures = BuildProcedures(procedureRosterOptions.Value).ToList();
@@ -67,6 +72,7 @@ public sealed class DemoBoardStore
                 Thresholds.StaleMinutes,
                 Thresholds.AgingThreshold,
                 Thresholds.StaleThreshold,
+                _demoTimerEnabled,
                 _activeDoctors,
                 _activeProcedures,
                 _rooms.Select(room => ToRoomStatus(room, now)).ToList(),
@@ -122,7 +128,7 @@ public sealed class DemoBoardStore
             room.RoomAvailableAt = null;
             room.State = RoomStates.Seated;
             UpdateRoomState(room, now);
-            _events.Add(new RoomEvent(room.RoomId, "Seated", now, doctor.Id, procedure.Label));
+            AddEvent(new RoomEvent(room.RoomId, "Seated", now, doctor.Id, procedure.Label));
             PersistRoom(room);
 
             return ToRoomStatus(room, now);
@@ -143,7 +149,7 @@ public sealed class DemoBoardStore
 
             var now = Now;
             UpdateRoomState(room, now);
-            if (!CanMarkDoctorArrived(room) || room.SeatedAt is null)
+            if (!CanEditSeatedRoom(room) || room.SeatedAt is null)
             {
                 return null;
             }
@@ -151,7 +157,7 @@ public sealed class DemoBoardStore
             room.AssignedDoctor = doctor.Id;
             room.ProcedureCode = procedure.Label;
             UpdateRoomState(room, now);
-            _events.Add(new RoomEvent(room.RoomId, "AssignmentUpdated", now, doctor.Id, procedure.Label));
+            AddEvent(new RoomEvent(room.RoomId, "AssignmentUpdated", now, doctor.Id, procedure.Label));
             PersistRoom(room);
 
             return ToRoomStatus(room, now);
@@ -170,12 +176,12 @@ public sealed class DemoBoardStore
 
             var now = Now;
             UpdateRoomState(room, now);
-            if (!CanMarkDoctorArrived(room) || room.SeatedAt is null)
+            if (!CanEditSeatedRoom(room) || room.SeatedAt is null)
             {
                 return null;
             }
 
-            _events.Add(new RoomEvent(room.RoomId, "SeatingCanceled", now, room.AssignedDoctor, room.ProcedureCode));
+            AddEvent(new RoomEvent(room.RoomId, "SeatingCanceled", now, room.AssignedDoctor, room.ProcedureCode));
             ResetRoom(room);
             PersistRoom(room);
 
@@ -204,7 +210,7 @@ public sealed class DemoBoardStore
             var seatedToDoctorSeconds = SecondsBetween(room.SeatedAt.Value, now);
             room.DoctorArrivedAt = now;
             room.State = RoomStates.DoctorInRoom;
-            _events.Add(new RoomEvent(room.RoomId, "DoctorArrived", now, room.AssignedDoctor, room.ProcedureCode, TimeSpan.FromSeconds(seatedToDoctorSeconds)));
+            AddEvent(new RoomEvent(room.RoomId, "DoctorArrived", now, room.AssignedDoctor, room.ProcedureCode, TimeSpan.FromSeconds(seatedToDoctorSeconds)));
 
             CompletedRoomCycle? cycle = null;
             if (!HasCycleReport(room.RoomId, room.SeatedAt.Value))
@@ -252,7 +258,7 @@ public sealed class DemoBoardStore
                 cycle.DoctorCompleteAt = now;
                 cycle.DoctorInRoomSeconds = SecondsBetween(room.DoctorArrivedAt.Value, now);
             });
-            _events.Add(new RoomEvent(room.RoomId, "DoctorComplete", now, room.AssignedDoctor, room.ProcedureCode));
+            AddEvent(new RoomEvent(room.RoomId, "DoctorComplete", now, room.AssignedDoctor, room.ProcedureCode));
             PersistRoom(room);
             PersistCycleForRoom(room);
 
@@ -278,7 +284,7 @@ public sealed class DemoBoardStore
                 cycle.TurnoverSeconds = SecondsBetween(room.DoctorCompleteAt.Value, now);
                 cycle.TotalRoomCycleSeconds = SecondsBetween(room.SeatedAt.Value, now);
             });
-            _events.Add(new RoomEvent(room.RoomId, "RoomAvailable", now, room.AssignedDoctor, room.ProcedureCode));
+            AddEvent(new RoomEvent(room.RoomId, "RoomAvailable", now, room.AssignedDoctor, room.ProcedureCode));
             PersistCycleForRoom(room);
 
             ResetRoom(room);
@@ -508,8 +514,20 @@ public sealed class DemoBoardStore
 
     private static bool CanSeat(RoomState room) => room.State == RoomStates.Available && room.SeatedAt is null;
 
+    private static bool CanEditSeatedRoom(RoomState room) =>
+        room.State is RoomStates.Seated or RoomStates.Aging or RoomStates.Stale;
+
     private static bool CanMarkDoctorArrived(RoomState room) =>
         room.State is RoomStates.Seated or RoomStates.Aging or RoomStates.Stale;
+
+    private void AddEvent(RoomEvent roomEvent)
+    {
+        _events.Add(roomEvent);
+        if (_events.Count > MaxRoomEvents)
+        {
+            _events.RemoveRange(0, _events.Count - MaxRoomEvents);
+        }
+    }
 
     private bool HasCycleReport(int roomId, DateTimeOffset seatedAt) =>
         _completedCycles.Any(cycle => cycle.RoomId == roomId && cycle.SeatedAt == seatedAt);
@@ -606,6 +624,7 @@ public sealed record BoardSnapshot(
     int StaleMinutes,
     TimeSpan AgingThreshold,
     TimeSpan StaleThreshold,
+    bool DemoTimerEnabled,
     IReadOnlyList<Doctor> Doctors,
     IReadOnlyList<ProcedureCategory> Procedures,
     IReadOnlyList<RoomStatus> Rooms,

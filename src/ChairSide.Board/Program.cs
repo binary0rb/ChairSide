@@ -21,6 +21,10 @@ builder.Services
     .ValidateOnStart();
 
 builder.Services
+    .AddOptions<BoardUiOptions>()
+    .Bind(builder.Configuration.GetSection(BoardUiOptions.SectionName));
+
+builder.Services
     .AddOptions<BoardPersistenceOptions>()
     .Bind(builder.Configuration.GetSection(BoardPersistenceOptions.SectionName))
     .Validate(options => !string.IsNullOrWhiteSpace(options.DatabasePath), "DatabasePath is required.")
@@ -73,6 +77,23 @@ builder.Services.AddSingleton<AdminAccessTokenValidator>();
 var app = builder.Build();
 _ = app.Services.GetRequiredService<DemoBoardStore>();
 
+var roomDeviceBindingOptions = app.Services.GetRequiredService<IOptions<RoomDeviceBindingOptions>>().Value;
+var adminAccessOptions = app.Services.GetRequiredService<IOptions<AdminAccessOptions>>().Value;
+app.Logger.LogInformation("Room device binding enabled: {Enabled}", roomDeviceBindingOptions.Enabled);
+app.Logger.LogInformation("Admin/report access protection enabled: {Enabled}", adminAccessOptions.Enabled);
+if (app.Environment.IsProduction())
+{
+    if (!roomDeviceBindingOptions.Enabled)
+    {
+        app.Logger.LogWarning("Room device binding is disabled in Production.");
+    }
+
+    if (!adminAccessOptions.Enabled)
+    {
+        app.Logger.LogWarning("Admin/report access protection is disabled in Production.");
+    }
+}
+
 app.Use(async (context, next) =>
 {
     if (!AdminAccessGuard.IsProtectedPath(context.Request.Path))
@@ -86,16 +107,6 @@ app.Use(async (context, next) =>
     if (failure is null)
     {
         await next();
-        return;
-    }
-
-    var isReportsPage = context.Request.Path.Equals("/reports.html", StringComparison.OrdinalIgnoreCase)
-        && HttpMethods.IsGet(context.Request.Method);
-    var isMissingToken = validator.Validate(context.Request.Headers[AdminAccessTokenValidator.HeaderName].FirstOrDefault())
-        == AdminAccessTokenValidationResult.Missing;
-    if (isReportsPage && isMissingToken)
-    {
-        await AdminAccessGuard.WriteReportsAccessPromptAsync(context);
         return;
     }
 
@@ -134,13 +145,15 @@ app.MapPost("/api/rooms/{roomNumber:int}/seat", async Task<IResult> (
         return bindingFailure;
     }
 
-    var procedureCode = request.ProcedureCode ?? request.ProcedureId;
-    if (string.IsNullOrWhiteSpace(procedureCode))
+    var procedureCode = (request.ProcedureCode ?? request.ProcedureId)?.Trim();
+    var doctorId = request.DoctorId?.Trim();
+    var validationError = RoomMutationRequestValidator.ValidateDoctorAndProcedure(doctorId, procedureCode);
+    if (validationError is not null)
     {
-        return Results.BadRequest("Procedure code is required.");
+        return Results.BadRequest(validationError);
     }
 
-    var result = store.SeatRoom(roomNumber, request.DoctorId, procedureCode, request.DemoElapsedMinutes);
+    var result = store.SeatRoom(roomNumber, doctorId!, procedureCode!, request.DemoElapsedMinutes);
     if (result is null)
     {
         return store.IsConfiguredRoom(roomNumber)
@@ -169,13 +182,15 @@ app.MapPost("/api/rooms/{roomNumber:int}/assignment", async Task<IResult> (
         return bindingFailure;
     }
 
-    var procedureCode = request.ProcedureCode ?? request.ProcedureId;
-    if (string.IsNullOrWhiteSpace(procedureCode))
+    var procedureCode = (request.ProcedureCode ?? request.ProcedureId)?.Trim();
+    var doctorId = request.DoctorId?.Trim();
+    var validationError = RoomMutationRequestValidator.ValidateDoctorAndProcedure(doctorId, procedureCode);
+    if (validationError is not null)
     {
-        return Results.BadRequest("Procedure code is required.");
+        return Results.BadRequest(validationError);
     }
 
-    var result = store.UpdateAssignment(roomNumber, request.DoctorId, procedureCode);
+    var result = store.UpdateAssignment(roomNumber, doctorId!, procedureCode!);
     if (result is null)
     {
         return store.IsConfiguredRoom(roomNumber)

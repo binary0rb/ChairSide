@@ -16,7 +16,7 @@ const app = {
   pollInFlight: false,
   roomNumber: getRoomNumber(),
   roomToken: getRoomToken(),
-  doctorId: new URLSearchParams(location.search).get("doctor") || "otte",
+  doctorId: new URLSearchParams(location.search).get("doctor"),
   selectedDoctorId: null,
   selectedProcedureId: null,
   selectionContext: null
@@ -324,14 +324,28 @@ function renderRoomPanel() {
   status.innerHTML = room ? renderRoomTile(room, true) : renderInvalidRoomMessage();
   syncRoomSelection(room);
   renderSelectionTiles(room);
+  applyDemoTimerVisibility();
   populateDemoTimerSelect();
   setRoomControlsEnabled(room);
 }
 
 function renderDoctorView() {
-  const doctor = app.snapshot.doctors.find(item => item.id === app.doctorId) || app.snapshot.doctors[0];
+  const doctor = app.doctorId
+    ? app.snapshot.doctors.find(item => item.id === app.doctorId)
+    : app.snapshot.doctors[0];
   const title = document.getElementById("doctorViewTitle");
   const target = document.getElementById("doctorRoomList");
+
+  if (!doctor) {
+    const message = app.doctorId
+      ? `Doctor "${app.doctorId}" was not found.`
+      : "No doctors are configured for this board.";
+
+    title.textContent = "Doctor View";
+    target.innerHTML = `<div class="empty-message">${escapeHtml(message)}</div>`;
+    return;
+  }
+
   const rooms = app.snapshot.rooms.filter(room => room.assignedDoctor === doctor.id || (room.doctor && room.doctor.id === doctor.id));
 
   title.textContent = doctor.name;
@@ -425,8 +439,8 @@ function adminRequestHeaders() {
 function renderMetric(label, value) {
   return `
     <article class="metric-card">
-      <span>${label}</span>
-      <strong>${value}</strong>
+      <span>${escapeHtml(label)}</span>
+      <strong>${escapeHtml(value)}</strong>
     </article>
   `;
 }
@@ -588,7 +602,7 @@ function setRoomControlsEnabled(room) {
   const isEnabled = Boolean(room);
   const state = room ? normalizeState(room) : "empty";
   const canCorrect = activeSeatedStates.has(state);
-  setDisabled("demoElapsedSelect", !isEnabled || state !== "empty");
+  setDisabled("demoElapsedSelect", !isEnabled || state !== "empty" || !isDemoTimerEnabled());
   setDisabled("seatButton", !isEnabled || state !== "empty");
   setDisabled("updateAssignmentButton", !isEnabled || !canCorrect);
   setDisabled("cancelSeatingButton", !isEnabled || !canCorrect);
@@ -741,7 +755,7 @@ function canEditAssignment(room) {
 
 function populateDemoTimerSelect() {
   const demoElapsedSelect = document.getElementById("demoElapsedSelect");
-  if (!demoElapsedSelect || demoElapsedSelect.options.length) {
+  if (!demoElapsedSelect || demoElapsedSelect.options.length || !isDemoTimerEnabled()) {
     return;
   }
 
@@ -757,6 +771,17 @@ function populateDemoTimerSelect() {
   }
 
   demoElapsedSelect.innerHTML = options.join("");
+}
+
+function applyDemoTimerVisibility() {
+  const control = document.querySelector(".demo-timer-control");
+  if (control) {
+    control.hidden = !isDemoTimerEnabled();
+  }
+}
+
+function isDemoTimerEnabled() {
+  return app.snapshot?.demoTimerEnabled === true;
 }
 
 function getAgingMinutes() {
@@ -821,7 +846,9 @@ function wireRoomPanel() {
 
     const doctorId = app.selectedDoctorId;
     const procedureCode = app.selectedProcedureId;
-    const demoElapsedMinutes = Number(document.getElementById("demoElapsedSelect")?.value || "0");
+    const demoElapsedMinutes = isDemoTimerEnabled()
+      ? Number(document.getElementById("demoElapsedSelect")?.value || "0")
+      : 0;
     if (!hasAssignmentSelection()) {
       setRoomActionStatus("Choose a doctor and procedure first.", "error");
       return;
