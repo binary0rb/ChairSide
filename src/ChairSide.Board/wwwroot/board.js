@@ -303,8 +303,8 @@ function renderLegend() {
     procedureTarget.innerHTML = app.snapshot.procedures.map(procedure => `
       <span class="procedure-chip">
         <span>${renderProcedureIcon(procedure.icon)}</span>
-        <strong>${escapeHtml(procedure.label)}</strong>
-        <small>${escapeHtml(procedure.name)}</small>
+        <strong>${escapeHtml(procedure.code)}</strong>
+        <small>${escapeHtml(procedure.label)}</small>
       </span>
     `).join("");
   }
@@ -582,7 +582,7 @@ function renderRoomTile(room, large = false) {
       </div>
       <div class="procedure-lockup">
         ${procedure ? renderProcedureIcon(procedure.icon) : renderEmptyIcon()}
-        <span>${procedure ? escapeHtml(procedure.label) : "OPEN"}</span>
+        <span>${procedure ? escapeHtml(procedure.code) : "OPEN"}</span>
       </div>
       <div class="room-footer">
         <span class="room-doctor-name" title="${escapeAttribute(fullDoctorName)}">${escapeHtml(doctorDisplayName)}</span>
@@ -716,7 +716,7 @@ function procedureFromCode(procedureCode) {
   }
 
   return app.snapshot.procedures.find(procedure =>
-    procedure.label === procedureCode || procedure.id === procedureCode
+    procedure.code === procedureCode || procedure.id === procedureCode
   ) || null;
 }
 
@@ -730,8 +730,8 @@ function renderProcedureBadge(procedureCode) {
     <span class="procedure-badge">
       ${renderProcedureIcon(procedure.icon)}
       <span>
-        <strong>${escapeHtml(procedure.label)}</strong>
-        <small>${escapeHtml(procedure.name)}</small>
+        <strong>${escapeHtml(procedure.code)}</strong>
+        <small>${escapeHtml(procedure.label)}</small>
       </span>
     </span>
   `;
@@ -778,7 +778,7 @@ function syncRoomSelection(room) {
   app.selectionContext = context;
   app.selectedDoctorId = room?.assignedDoctor || room?.doctor?.id || app.snapshot.doctors[0]?.id || null;
   const procedure = room?.procedure || procedureFromCode(room?.procedureCode) || app.snapshot.procedures[0] || null;
-  app.selectedProcedureId = procedure?.id || null;
+  app.selectedProcedureId = procedure?.code || null;
 }
 
 function renderSelectionTiles(room) {
@@ -820,18 +820,18 @@ function renderProcedureTiles(room) {
   const isEnabled = canEditAssignment(room);
   target.innerHTML = app.snapshot.procedures.map(procedure => `
     <button
-      class="selection-tile procedure-tile ${procedure.id === app.selectedProcedureId ? "selected" : ""}"
+      class="selection-tile procedure-tile ${procedure.code === app.selectedProcedureId ? "selected" : ""}"
       type="button"
       role="radio"
-      aria-checked="${procedure.id === app.selectedProcedureId}"
-      data-procedure-id="${escapeAttribute(procedure.id)}"
+      aria-checked="${procedure.code === app.selectedProcedureId}"
+      data-procedure-id="${escapeAttribute(procedure.code)}"
       ${isEnabled ? "" : "disabled"}>
       ${renderProcedureIcon(procedure.icon)}
       <span class="selection-copy">
-        <strong>${escapeHtml(procedure.label)}</strong>
-        <small>${escapeHtml(procedure.name)}</small>
+        <strong>${escapeHtml(procedure.code)}</strong>
+        <small>${escapeHtml(procedure.label)}</small>
       </span>
-      ${procedure.id === app.selectedProcedureId ? `<span class="selected-indicator" aria-hidden="true">&#10003;</span>` : ""}
+      ${procedure.code === app.selectedProcedureId ? `<span class="selected-indicator" aria-hidden="true">&#10003;</span>` : ""}
     </button>
   `).join("");
 }

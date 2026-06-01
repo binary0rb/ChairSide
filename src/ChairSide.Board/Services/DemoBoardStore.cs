@@ -120,7 +120,7 @@ public sealed class DemoBoardStore
             var effectiveDemoElapsedMinutes = _demoTimerEnabled ? demoElapsedMinutes : 0;
             var simulatedElapsed = TimeSpan.FromMinutes(Math.Clamp(effectiveDemoElapsedMinutes, 0, 240));
             room.AssignedDoctor = doctor.Id;
-            room.ProcedureCode = procedure.Label;
+            room.ProcedureCode = procedure.Code;
             room.SeatedAt = now - simulatedElapsed;
             room.AgingStartedAt = null;
             room.StaleStartedAt = null;
@@ -129,7 +129,7 @@ public sealed class DemoBoardStore
             room.RoomAvailableAt = null;
             room.State = RoomStates.Seated;
             UpdateRoomState(room, now);
-            AddEvent(new RoomEvent(room.RoomId, "Seated", now, doctor.Id, procedure.Label));
+            AddEvent(new RoomEvent(room.RoomId, "Seated", now, doctor.Id, procedure.Code));
             PersistRoom(room);
 
             return ToRoomStatus(room, now);
@@ -156,9 +156,9 @@ public sealed class DemoBoardStore
             }
 
             room.AssignedDoctor = doctor.Id;
-            room.ProcedureCode = procedure.Label;
+            room.ProcedureCode = procedure.Code;
             UpdateRoomState(room, now);
-            AddEvent(new RoomEvent(room.RoomId, "AssignmentUpdated", now, doctor.Id, procedure.Label));
+            AddEvent(new RoomEvent(room.RoomId, "AssignmentUpdated", now, doctor.Id, procedure.Code));
             PersistRoom(room);
 
             return ToRoomStatus(room, now);
@@ -383,12 +383,12 @@ public sealed class DemoBoardStore
     private ProcedureCategory? FindProcedure(string procedureCode) =>
         _procedures.FirstOrDefault(item =>
             string.Equals(item.Id, procedureCode, StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(item.Label, procedureCode, StringComparison.OrdinalIgnoreCase));
+            string.Equals(item.Code, procedureCode, StringComparison.OrdinalIgnoreCase));
 
     private ProcedureCategory? FindActiveProcedure(string procedureCode) =>
         _activeProcedures.FirstOrDefault(item =>
             string.Equals(item.Id, procedureCode, StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(item.Label, procedureCode, StringComparison.OrdinalIgnoreCase));
+            string.Equals(item.Code, procedureCode, StringComparison.OrdinalIgnoreCase));
 
     private static IEnumerable<Doctor> BuildDoctors(DoctorRosterOptions options, bool activeOnly = false) =>
         options.Doctors
@@ -404,7 +404,6 @@ public sealed class DemoBoardStore
             .Where(procedure => !activeOnly || procedure.Active)
             .Select(procedure => new ProcedureCategory(
                 string.IsNullOrWhiteSpace(procedure.Id) ? procedure.Code.ToLowerInvariant() : procedure.Id,
-                // Backward-compatible DTO mapping: Label is the short code, Name is the display label.
                 procedure.Code,
                 procedure.Label,
                 procedure.Icon));
@@ -633,7 +632,7 @@ public sealed record BoardSnapshot(
 
 public sealed record Doctor(string Id, string Name, string ShortName, string Color);
 
-public sealed record ProcedureCategory(string Id, string Label, string Name, string Icon);
+public sealed record ProcedureCategory(string Id, string Code, string Label, string Icon);
 
 public sealed record RoomStatus(
     int RoomId,
