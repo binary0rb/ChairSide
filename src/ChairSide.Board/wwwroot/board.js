@@ -16,6 +16,7 @@ const app = {
   pollInFlight: false,
   roomNumber: getRoomNumber(),
   roomToken: getRoomToken(),
+  roomTokenPromptVisible: false,
   doctorId: new URLSearchParams(location.search).get("doctor"),
   selectedDoctorId: null,
   selectedProcedureId: null,
@@ -42,7 +43,7 @@ function getRoomToken() {
     return "";
   }
 
-  return document.querySelector("meta[name='chairside-room-token']")?.content || "";
+  return document.querySelector("meta[name='chairside-room-token']")?.content || getStoredRoomToken();
 }
 
 async function boot() {
@@ -324,6 +325,7 @@ function renderRoomPanel() {
   status.innerHTML = room ? renderRoomTile(room, true) : renderInvalidRoomMessage();
   syncRoomSelection(room);
   renderSelectionTiles(room);
+  renderRoomTokenPrompt();
   applyDemoTimerVisibility();
   populateDemoTimerSelect();
   setRoomControlsEnabled(room);
@@ -407,6 +409,96 @@ function renderReportsAccessPrompt(statusCode) {
   `;
   body.innerHTML = `<tr><td colspan="14">Reports are protected. Enter an internal reports token to continue.</td></tr>`;
   wireReportsAccessPrompt();
+}
+
+function renderRoomTokenPrompt() {
+  const target = document.getElementById("roomTokenPrompt");
+  if (!target) {
+    return;
+  }
+
+  const hasSavedToken = Boolean(getStoredRoomToken());
+  if (!app.roomTokenPromptVisible) {
+    target.hidden = true;
+    target.innerHTML = "";
+    return;
+  }
+
+  target.hidden = false;
+  target.innerHTML = `
+    <h2>Room access token required</h2>
+    <p>Enter the room token for Room ${escapeHtml(app.roomNumber)} on this tablet.</p>
+    <form id="roomTokenForm" class="room-token-form">
+      <label for="roomAccessToken">Room token</label>
+      <input id="roomAccessToken" name="roomAccessToken" type="password" autocomplete="off" required>
+      <button type="submit" class="primary-button utility-button">Load/Save Token</button>
+    </form>
+    <button type="button" class="secondary-button utility-button" id="clearRoomTokenButton" ${hasSavedToken ? "" : "disabled"}>Clear Token</button>
+  `;
+  wireRoomTokenPrompt();
+}
+
+function wireRoomTokenPrompt() {
+  const form = document.getElementById("roomTokenForm");
+  const clearButton = document.getElementById("clearRoomTokenButton");
+
+  form?.addEventListener("submit", event => {
+    event.preventDefault();
+    const input = document.getElementById("roomAccessToken");
+    const token = input?.value.trim() || "";
+    if (!token) {
+      return;
+    }
+
+    saveRoomToken(token);
+    app.roomTokenPromptVisible = false;
+    renderRoomTokenPrompt();
+    setRoomActionStatus("Room token saved. Try the action again.", "success");
+  });
+
+  clearButton?.addEventListener("click", () => {
+    clearStoredRoomToken();
+    app.roomToken = "";
+    app.roomTokenPromptVisible = true;
+    renderRoomTokenPrompt();
+    setRoomActionStatus("Room token cleared.", "pending");
+  });
+}
+
+function showRoomTokenPrompt(statusCode) {
+  if (statusCode === 403) {
+    clearStoredRoomToken();
+    app.roomToken = "";
+  }
+
+  app.roomTokenPromptVisible = true;
+  renderRoomTokenPrompt();
+  setRoomActionStatus(
+    statusCode === 403
+      ? "Room token was rejected. Enter the current room access token."
+      : "Room access token required.",
+    "error");
+}
+
+function roomTokenStorageKey() {
+  return `chairside-room-token-${app.roomNumber}`;
+}
+
+function getStoredRoomToken() {
+  if (document.body.dataset.view !== "room") {
+    return "";
+  }
+
+  return sessionStorage.getItem(roomTokenStorageKey()) || "";
+}
+
+function saveRoomToken(token) {
+  sessionStorage.setItem(roomTokenStorageKey(), token);
+  app.roomToken = token;
+}
+
+function clearStoredRoomToken() {
+  sessionStorage.removeItem(roomTokenStorageKey());
 }
 
 function wireReportsAccessPrompt() {
@@ -1074,6 +1166,10 @@ async function sendSeatRoom(payload) {
   });
 
   if (!response.ok) {
+    if (response.status === 401 || response.status === 403) {
+      showRoomTokenPrompt(response.status);
+    }
+
     throw new Error(await readErrorMessage(response, `Seat Room failed with HTTP ${response.status}.`));
   }
 
@@ -1093,6 +1189,10 @@ async function sendAssignmentUpdate(payload) {
   });
 
   if (!response.ok) {
+    if (response.status === 401 || response.status === 403) {
+      showRoomTokenPrompt(response.status);
+    }
+
     throw new Error(await readErrorMessage(response, `Update Assignment failed with HTTP ${response.status}.`));
   }
 
@@ -1108,6 +1208,10 @@ async function sendRoomAction(roomNumber, action, label) {
   });
 
   if (!response.ok) {
+    if (response.status === 401 || response.status === 403) {
+      showRoomTokenPrompt(response.status);
+    }
+
     throw new Error(await readErrorMessage(response, `${label} failed with HTTP ${response.status}.`));
   }
 

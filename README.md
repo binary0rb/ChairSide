@@ -171,7 +171,15 @@ Read-only board views and APIs remain open for the internal board: `/master.html
 
 Production tokens must not use the `dev-room-*-token` sample values. Supply production tokens through environment-specific configuration or deployment-time configuration, and do not commit real room tokens as source-controlled secrets.
 
-Room tokens are operational controls, not full authentication. They do not replace HTTPS and do not provide user-level access control. Before enabling room-device binding for a pilot, define a room-token delivery plan for each tablet, such as deployment-time meta tag injection or another local configuration process that does not put tokens in URLs. Full access control, CSRF protection, and stronger room-device binding remain future hardening work before broader rollout.
+Room tokens are operational controls, not full authentication. They do not replace HTTPS and do not provide user-level access control. Before enabling room-device binding for a pilot, define a room-token delivery plan for each tablet. Full access control, CSRF protection, and stronger room-device binding remain future hardening work before broader rollout.
+
+Room token delivery options:
+
+- Deployment-time meta tag injection: room pages continue to read `<meta name="chairside-room-token" content="...">` when a deployment process injects it for a specific tablet or room page.
+- Tablet prompt: if a room mutation returns `401` or `403`, the room panel shows `Room access token required` with a password field, `Load/Save Token`, and `Clear Token`. The entered token is stored in `sessionStorage` under a room-scoped key such as `chairside-room-token-1`.
+- Header-only transport: room mutation calls send the token only in the `X-ChairSide-Room-Token` header.
+
+Do not place room tokens in URLs. The app does not read room tokens from query strings, and URLs may be logged by IIS, browsers, proxies, network tools, and browser history. Production tokens must be deployment-time or environment-specific values and must not use the `dev-room-*-token` samples.
 
 Admin/report access protection is a first-pass shared-token control for report data and future admin-style APIs. When `AdminAccessOptions:Enabled` is `true`, `/api/reports` requires the shared reports token. `/reports.html` still loads as an unauthenticated shell and shows an in-page token prompt before loading report data:
 
