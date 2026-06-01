@@ -191,10 +191,49 @@ This is not full user authentication and does not provide user identity, roles, 
 Production database guidance:
 
 - Recommended path: `C:\ChairSide\Data\chairside.db`
+- Recommended backup directory: `C:\ChairSide\Backups`
 - Do not store the production database under the deployed app/content root.
 - The IIS app pool identity needs Modify permission on `C:\ChairSide\Data`.
 - SQLite WAL mode creates `chairside.db-wal` and `chairside.db-shm` beside the database, so the directory must be writable, not just the database file.
 - In Production, the app fails fast if the configured database path resolves inside the app content root or if the database directory cannot be created/written by the running process.
+
+Backup and restore:
+
+ChairSide uses SQLite WAL mode. The primary database is `chairside.db`, and SQLite may also create `chairside.db-wal` and `chairside.db-shm` while the app is running. Copying only `chairside.db` while the IIS app is running can miss recent WAL data. A safe backup should either use SQLite backup semantics or copy the full database file set while the app pool is stopped.
+
+Recommended production layout:
+
+```text
+C:\ChairSide\App
+C:\ChairSide\Data
+C:\ChairSide\Backups
+C:\ChairSide\Logs
+```
+
+PowerShell scripts are provided for first-pass operational tooling:
+
+```powershell
+.\scripts\Backup-ChairSideSqlite.ps1
+.\scripts\Backup-ChairSideSqlite.ps1 -DatabasePath "C:\ChairSide\Data\chairside.db" -BackupDirectory "C:\ChairSide\Backups"
+.\scripts\Backup-ChairSideSqlite.ps1 -AllowFileSetCopy
+
+.\scripts\Restore-ChairSideSqlite.ps1 -BackupSourcePath "C:\ChairSide\Backups\chairside-20260531-190000.db" -AppPoolName "ChairSideBoard"
+.\scripts\Restore-ChairSideSqlite.ps1 -BackupSourcePath "C:\ChairSide\Backups\chairside-20260531-190000-file-set" -Force
+```
+
+`Backup-ChairSideSqlite.ps1` defaults to `C:\ChairSide\Data\chairside.db` and `C:\ChairSide\Backups`. It creates timestamped backups and prefers the `sqlite3` CLI `.backup` command when available. Install `sqlite3.exe` on the IIS server for normal online backups.
+
+If `sqlite3` is not available, the backup script fails instead of copying raw files automatically. To use the file-set copy fallback, stop the `ChairSideBoard` IIS app pool first and pass `-AllowFileSetCopy`. That explicit fallback copies `chairside.db`, `chairside.db-wal`, and `chairside.db-shm` when present. Do not use file-set copy while the app pool is running.
+
+`Restore-ChairSideSqlite.ps1` requires an explicit `-BackupSourcePath`, creates a pre-restore safety backup of the current database file set, asks for confirmation unless `-Force` is provided, and can stop/start an IIS app pool when `-AppPoolName` is supplied. Stop the ChairSide app pool before restore unless the script is managing that app pool for you.
+
+Manual backup option:
+
+1. Stop the `ChairSideBoard` IIS app pool.
+2. Copy `C:\ChairSide\Data` to a timestamped folder under `C:\ChairSide\Backups`.
+3. Start the `ChairSideBoard` IIS app pool.
+
+Backups do not contain PHI if the app is used as intended, but they do contain operational room, doctor, procedure, and timing data. Protect backup files with appropriate NTFS permissions. Backup retention is a clinic/operations decision.
 
 ## Seed Data
 
@@ -252,10 +291,11 @@ Recommended server folder layout:
 ```text
 C:\ChairSide\App
 C:\ChairSide\Data
+C:\ChairSide\Backups
 C:\ChairSide\Logs
 ```
 
-`C:\ChairSide\App` contains the published ASP.NET Core app. `C:\ChairSide\Data` contains the SQLite database and WAL files. `C:\ChairSide\Logs` is optional for IIS/stdout or operational logs if enabled later.
+`C:\ChairSide\App` contains the published ASP.NET Core app. `C:\ChairSide\Data` contains the SQLite database and WAL files. `C:\ChairSide\Backups` contains operational database backups. `C:\ChairSide\Logs` is optional for IIS/stdout or operational logs if enabled later.
 
 Publish from the repository root:
 
