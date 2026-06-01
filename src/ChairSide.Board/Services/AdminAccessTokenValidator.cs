@@ -30,11 +30,9 @@ public sealed class AdminAccessTokenValidator(IOptionsMonitor<AdminAccessOptions
 
     private static bool FixedTimeEquals(string expected, string actual)
     {
-        var expectedBytes = Encoding.UTF8.GetBytes(expected);
-        var actualBytes = Encoding.UTF8.GetBytes(actual);
-
-        return expectedBytes.Length == actualBytes.Length
-            && CryptographicOperations.FixedTimeEquals(expectedBytes, actualBytes);
+        var expectedHash = SHA256.HashData(Encoding.UTF8.GetBytes(expected));
+        var actualHash = SHA256.HashData(Encoding.UTF8.GetBytes(actual));
+        return CryptographicOperations.FixedTimeEquals(expectedHash, actualHash);
     }
 }
 
