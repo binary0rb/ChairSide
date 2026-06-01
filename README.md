@@ -146,7 +146,7 @@ Thresholds are configured in `src/ChairSide.Board/appsettings.json`:
 
 Change those values to adjust room timing without code edits. `StaleMinutes` must be greater than `AgingMinutes`; the app validates this at startup.
 
-`RoomCount` controls how many room states are configured. The default is 12, so Room 1 through Room 12 are active. Change `BoardOptions:RoomCount` and restart the app to use a different room count.
+`RoomCount` controls how many room states are configured. The default is 12, so Room 1 through Room 12 are active. Change `BoardOptions:RoomCount` and restart the app to use a different room count. Increasing `RoomCount` is safe and creates/loads additional rooms. Decreasing `RoomCount` hides higher-numbered rooms from the board but does not delete their persisted SQLite state. If `RoomCount` is increased again later, previous higher-room state may reappear unless it was reset or cleared intentionally.
 
 `BoardPersistenceOptions:DatabasePath` controls the SQLite database location. The default development path is local to the app project, `./data/chairside-dev.db`. For staging or production, set this to an operational data location such as `C:\ChairSide\Data\chairside.db` through environment-specific configuration or command-line configuration:
 
