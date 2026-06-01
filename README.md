@@ -215,12 +215,15 @@ PowerShell scripts are provided for first-pass operational tooling:
 ```powershell
 .\scripts\Backup-ChairSideSqlite.ps1
 .\scripts\Backup-ChairSideSqlite.ps1 -DatabasePath "C:\ChairSide\Data\chairside.db" -BackupDirectory "C:\ChairSide\Backups"
+.\scripts\Backup-ChairSideSqlite.ps1 -AllowFileSetCopy
 
 .\scripts\Restore-ChairSideSqlite.ps1 -BackupSourcePath "C:\ChairSide\Backups\chairside-20260531-190000.db" -AppPoolName "ChairSideBoard"
 .\scripts\Restore-ChairSideSqlite.ps1 -BackupSourcePath "C:\ChairSide\Backups\chairside-20260531-190000-file-set" -Force
 ```
 
-`Backup-ChairSideSqlite.ps1` defaults to `C:\ChairSide\Data\chairside.db` and `C:\ChairSide\Backups`. It creates timestamped backups and prefers the `sqlite3` CLI `.backup` command when available. If `sqlite3` is not available, it falls back to a timestamped file-set copy and includes `chairside.db`, `chairside.db-wal`, and `chairside.db-shm` when present. For the safest file-set copy, stop the IIS app pool first.
+`Backup-ChairSideSqlite.ps1` defaults to `C:\ChairSide\Data\chairside.db` and `C:\ChairSide\Backups`. It creates timestamped backups and prefers the `sqlite3` CLI `.backup` command when available. Install `sqlite3.exe` on the IIS server for normal online backups.
+
+If `sqlite3` is not available, the backup script fails instead of copying raw files automatically. To use the file-set copy fallback, stop the `ChairSideBoard` IIS app pool first and pass `-AllowFileSetCopy`. That explicit fallback copies `chairside.db`, `chairside.db-wal`, and `chairside.db-shm` when present. Do not use file-set copy while the app pool is running.
 
 `Restore-ChairSideSqlite.ps1` requires an explicit `-BackupSourcePath`, creates a pre-restore safety backup of the current database file set, asks for confirmation unless `-Force` is provided, and can stop/start an IIS app pool when `-AppPoolName` is supplied. Stop the ChairSide app pool before restore unless the script is managing that app pool for you.
 

@@ -1,7 +1,8 @@
 param(
     [string]$DatabasePath = "C:\ChairSide\Data\chairside.db",
     [string]$BackupDirectory = "C:\ChairSide\Backups",
-    [string]$SqliteExe = "sqlite3"
+    [string]$SqliteExe = "sqlite3",
+    [switch]$AllowFileSetCopy
 )
 
 $ErrorActionPreference = "Stop"
@@ -57,8 +58,12 @@ try {
         exit 0
     }
 
-    Write-Warning "sqlite3 was not found. Falling back to file-set copy."
-    Write-Warning "For the safest file-copy backup, stop the ChairSide IIS app pool first so WAL sidecar files are stable."
+    if (-not $AllowFileSetCopy) {
+        throw "sqlite3 was not found. Install sqlite3.exe and use SQLite .backup for online backups. File-set copy of .db/.db-wal/.db-shm requires the ChairSide IIS app pool to be stopped and must be requested explicitly with -AllowFileSetCopy."
+    }
+
+    Write-Warning "sqlite3 was not found and -AllowFileSetCopy was provided. Falling back to file-set copy."
+    Write-Warning "Use file-set copy only after stopping the ChairSide IIS app pool so WAL sidecar files are stable."
 
     $backupSetDirectory = Join-Path $resolvedBackupDirectory "$databaseName-$timestamp-file-set"
     if (Test-Path -LiteralPath $backupSetDirectory) {
