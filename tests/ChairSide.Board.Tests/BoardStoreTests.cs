@@ -814,7 +814,8 @@ public sealed class BoardStoreTests
         var root = FindRepositoryRoot();
         var boardScript = File.ReadAllText(Path.Combine(root, "src", "ChairSide.Board", "wwwroot", "board.js"));
 
-        Assert.Contains("chairside-room-token-${app.roomNumber}", boardScript);
+        Assert.Contains("chairside-room-token-${roomNumber}", boardScript);
+	 Assert.Contains("function roomTokenStorageKey(roomNumber = getRoomNumber())", boardScript);
         Assert.Contains("sessionStorage.setItem(roomTokenStorageKey(), token)", boardScript);
         Assert.Contains("sessionStorage.removeItem(roomTokenStorageKey())", boardScript);
         Assert.Contains("headers[\"X-ChairSide-Room-Token\"] = app.roomToken", boardScript);
