@@ -185,7 +185,7 @@ public sealed class SqliteBoardRepository
     public void SaveCompletedCycle(CompletedRoomCycle cycle, IReadOnlyList<Doctor> doctors, IReadOnlyList<ProcedureCategory> procedures)
     {
         var doctor = doctors.FirstOrDefault(item => item.Id == cycle.AssignedDoctor);
-        var procedure = procedures.FirstOrDefault(item => item.Label == cycle.ProcedureCode || item.Id == cycle.ProcedureCode);
+        var procedure = procedures.FirstOrDefault(item => item.Code == cycle.ProcedureCode || item.Id == cycle.ProcedureCode);
 
         using var connection = OpenConnection();
         using var command = connection.CreateCommand();
@@ -253,7 +253,7 @@ public sealed class SqliteBoardRepository
         command.Parameters.AddWithValue("$assignedDoctorId", cycle.AssignedDoctor);
         command.Parameters.AddWithValue("$assignedDoctorDisplayName", doctor?.Name ?? cycle.AssignedDoctor);
         command.Parameters.AddWithValue("$procedureCode", cycle.ProcedureCode);
-        command.Parameters.AddWithValue("$procedureCategory", procedure?.Name ?? cycle.ProcedureCode);
+        command.Parameters.AddWithValue("$procedureCategory", procedure?.Label ?? cycle.ProcedureCode);
         command.Parameters.AddWithValue("$seatedAt", FormatDateTimeOffset(cycle.SeatedAt));
         command.Parameters.AddWithValue("$doctorArrivedAt", FormatDateTimeOffset(cycle.DoctorArrivedAt));
         command.Parameters.AddWithValue("$doctorCompleteAt", ToDbValue(cycle.DoctorCompleteAt));
@@ -331,7 +331,7 @@ public sealed class SqliteBoardRepository
             : doctors.FirstOrDefault(item => item.Id == room.AssignedDoctor);
         var procedure = room.ProcedureCode is null
             ? null
-            : procedures.FirstOrDefault(item => item.Label == room.ProcedureCode || item.Id == room.ProcedureCode);
+            : procedures.FirstOrDefault(item => item.Code == room.ProcedureCode || item.Id == room.ProcedureCode);
 
         using var command = connection.CreateCommand();
         command.Transaction = transaction;
@@ -385,7 +385,7 @@ public sealed class SqliteBoardRepository
         command.Parameters.AddWithValue("$assignedDoctorId", ToDbValue(room.AssignedDoctor));
         command.Parameters.AddWithValue("$assignedDoctorDisplayName", ToDbValue(doctor?.Name));
         command.Parameters.AddWithValue("$procedureCode", ToDbValue(room.ProcedureCode));
-        command.Parameters.AddWithValue("$procedureCategory", ToDbValue(procedure?.Name));
+        command.Parameters.AddWithValue("$procedureCategory", ToDbValue(procedure?.Label));
         command.Parameters.AddWithValue("$state", room.State);
         command.Parameters.AddWithValue("$seatedAt", ToDbValue(room.SeatedAt));
         command.Parameters.AddWithValue("$agingStartedAt", ToDbValue(room.AgingStartedAt));

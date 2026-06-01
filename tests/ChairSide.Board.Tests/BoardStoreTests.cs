@@ -273,8 +273,8 @@ public sealed class BoardStoreTests
         Assert.Equal(["otte", "pledger", "gibson", "schroeder"], snapshot.Doctors.Select(doctor => doctor.Id));
         Assert.Equal(["Dr. Otte", "Dr. Pledger", "Dr. Gibson", "Dr. Schroeder"], snapshot.Doctors.Select(doctor => doctor.Name));
         Assert.Equal(["Otte", "Pledger", "Gibson", "Schroeder"], snapshot.Doctors.Select(doctor => doctor.ShortName));
-        Assert.Equal(["CON", "EXT", "SED", "POST", "IMP", "BX"], snapshot.Procedures.Select(procedure => procedure.Label));
-        Assert.Equal(["Consult", "Extraction", "Sedation", "Post-op", "Implant", "Biopsy"], snapshot.Procedures.Select(procedure => procedure.Name));
+        Assert.Equal(["CON", "EXT", "SED", "POST", "IMP", "BX"], snapshot.Procedures.Select(procedure => procedure.Code));
+        Assert.Equal(["Consult", "Extraction", "Sedation", "Post-op", "Implant", "Biopsy"], snapshot.Procedures.Select(procedure => procedure.Label));
     }
 
     [Fact]
@@ -296,7 +296,7 @@ public sealed class BoardStoreTests
             {
                 Procedures =
                 [
-                    new() { Id = "active-procedure", Code = "ACT", Label = "Active", Icon = "speech", Active = true },
+                    new() { Id = "active-procedure", Code = "ACT", Label = "Active procedure", Icon = "speech", Active = true },
                     new() { Id = "inactive-procedure", Code = "OFF", Label = "Inactive", Icon = "vial", Active = false }
                 ]
             });
@@ -304,10 +304,14 @@ public sealed class BoardStoreTests
         var snapshot = context.Store.GetSnapshot();
 
         Assert.Equal(["active"], snapshot.Doctors.Select(doctor => doctor.Id));
-        Assert.Equal(["ACT"], snapshot.Procedures.Select(procedure => procedure.Label));
+        Assert.Equal(["ACT"], snapshot.Procedures.Select(procedure => procedure.Code));
         Assert.Null(context.Store.SeatRoom(1, "inactive", "ACT"));
         Assert.Null(context.Store.SeatRoom(1, "active", "OFF"));
-        Assert.NotNull(context.Store.SeatRoom(1, "active", "ACT"));
+        var seated = context.Store.SeatRoom(1, "active", "ACT");
+        Assert.NotNull(seated);
+        Assert.Equal("ACT", seated.ProcedureCode);
+        Assert.Equal("ACT", seated.Procedure?.Code);
+        Assert.Equal("Active procedure", seated.Procedure?.Label);
     }
 
     [Fact]
@@ -401,11 +405,11 @@ public sealed class BoardStoreTests
 
         Assert.Contains("function escapeHtml", boardJs);
         Assert.Contains("${escapeHtml(doctor.name)}", boardJs);
+        Assert.Contains("${escapeHtml(procedure.code)}", boardJs);
         Assert.Contains("${escapeHtml(procedure.label)}", boardJs);
-        Assert.Contains("${escapeHtml(procedure.name)}", boardJs);
         Assert.DoesNotContain(">${doctor.name}", boardJs);
-        Assert.DoesNotContain("<strong>${procedure.label}</strong>", boardJs);
-        Assert.DoesNotContain("<small>${procedure.name}</small>", boardJs);
+        Assert.DoesNotContain("<strong>${procedure.code}</strong>", boardJs);
+        Assert.DoesNotContain("<small>${procedure.label}</small>", boardJs);
     }
 
     [Fact]
