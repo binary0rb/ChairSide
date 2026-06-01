@@ -720,6 +720,29 @@ public sealed class BoardStoreTests
     }
 
     [Fact]
+    public void Admin_access_token_comparison_rejects_prefix_and_extended_tokens()
+    {
+        // Comparison hashes both sides with SHA-256 before calling FixedTimeEquals,
+        // so tokens that are a prefix of, or an extension of, the configured value
+        // are rejected without leaking the expected token's byte length via timing.
+        var validator = CreateAdminValidator(enabled: true);
+
+        Assert.Equal(AdminAccessTokenValidationResult.Invalid, validator.Validate("admin-toke"));
+        Assert.Equal(AdminAccessTokenValidationResult.Invalid, validator.Validate("admin-token-extra"));
+    }
+
+    [Fact]
+    public void Room_device_token_comparison_rejects_prefix_and_extended_tokens()
+    {
+        // Same SHA-256 hash normalisation as admin tokens — length of the submitted
+        // value never gates acceptance.
+        var validator = CreateBindingValidator(enabled: true);
+
+        Assert.Equal(RoomDeviceTokenValidationResult.Invalid, validator.Validate(1, "room-1-toke"));
+        Assert.Equal(RoomDeviceTokenValidationResult.Invalid, validator.Validate(1, "room-1-token-extra"));
+    }
+
+    [Fact]
     public void Admin_access_protects_reports_and_keeps_board_room_surfaces_open()
     {
         Assert.False(AdminAccessGuard.IsProtectedPath("/reports.html"));
