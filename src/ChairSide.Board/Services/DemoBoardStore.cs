@@ -117,7 +117,8 @@ public sealed class DemoBoardStore
             }
 
             var now = Now;
-            var simulatedElapsed = TimeSpan.FromMinutes(Math.Clamp(demoElapsedMinutes, 0, 240));
+            var effectiveDemoElapsedMinutes = _demoTimerEnabled ? demoElapsedMinutes : 0;
+            var simulatedElapsed = TimeSpan.FromMinutes(Math.Clamp(effectiveDemoElapsedMinutes, 0, 240));
             room.AssignedDoctor = doctor.Id;
             room.ProcedureCode = procedure.Label;
             room.SeatedAt = now - simulatedElapsed;
