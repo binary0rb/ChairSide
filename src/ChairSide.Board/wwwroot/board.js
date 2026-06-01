@@ -659,6 +659,13 @@ function seatedToDoctorLabel(room) {
     return { label: "Available", value: "--:--" };
   }
 
+  if (room.doctorCompleteAt) {
+    return {
+      label: "Turnover",
+      value: formatElapsed(room.doctorCompleteAt)
+    };
+  }
+
   if (room.doctorArrivedAt) {
     return {
       label: "To doctor",
