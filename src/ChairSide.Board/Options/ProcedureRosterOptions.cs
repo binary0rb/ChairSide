@@ -57,6 +57,62 @@ public sealed class ProcedureRosterOptions
             Label = "Biopsy",
             Icon = "vial",
             Active = true
+        },
+        new()
+        {
+            Id = "misc",
+            Code = "MISC",
+            Label = "Misc",
+            Icon = "check",
+            Active = true
+        },
+        new()
+        {
+            Id = "periodic-exam",
+            Code = "POE",
+            Label = "Periodic Exam",
+            Icon = "speech",
+            Active = true
+        },
+        new()
+        {
+            Id = "impressions",
+            Code = "IMPRES",
+            Label = "Impressions",
+            Icon = "teeth",
+            Active = true
+        },
+        new()
+        {
+            Id = "integration-check",
+            Code = "INTCK",
+            Label = "Integration Check",
+            Icon = "sync",
+            Active = true
+        },
+        new()
+        {
+            Id = "biopsy-post-op",
+            Code = "BXPOST",
+            Label = "Biopsy Post-op",
+            Icon = "vial",
+            Active = true
+        },
+        new()
+        {
+            Id = "implant-removal",
+            Code = "IMPRM",
+            Label = "Implant Removal",
+            Icon = "wrench",
+            Active = true
+        },
+        new()
+        {
+            Id = "phone-office-consult",
+            Code = "PCOC",
+            Label = "Phone → Office Consult",
+            Icon = "phone",
+            Active = true
         }
     ];
 }
