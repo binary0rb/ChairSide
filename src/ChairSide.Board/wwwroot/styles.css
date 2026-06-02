@@ -417,7 +417,7 @@ select {
 
 .panel-shell {
   display: grid;
-  grid-template-columns: minmax(280px, 1fr) minmax(360px, 540px);
+  grid-template-columns: minmax(200px, 280px) 1fr;
   gap: 18px;
   align-items: start;
   padding-top: 18px;
@@ -465,7 +465,8 @@ label,
 }
 
 .procedure-selection-grid {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
 }
 
 .selection-tile {
@@ -564,6 +565,48 @@ label,
   font-size: 14px;
   font-weight: 800;
   line-height: 1.1;
+}
+
+/* ------------------------------------------------------------------
+   Compact vertical tiles for the 5-column procedure grid.
+   Scoped to .procedure-selection-grid so doctor tiles and any other
+   .selection-tile usage are unaffected. Master board has no
+   .procedure-selection-grid element, so these rules never apply there.
+   ------------------------------------------------------------------ */
+
+.procedure-selection-grid .selection-tile {
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  min-height: 64px;
+  padding: 8px 6px;
+  gap: 4px;
+}
+
+.procedure-selection-grid .selection-tile svg {
+  width: 26px;
+  height: 26px;
+}
+
+.procedure-selection-grid .selection-tile .selection-copy {
+  padding-right: 0;
+}
+
+.procedure-selection-grid .selection-tile strong {
+  font-size: 13px;
+}
+
+.procedure-selection-grid .selection-tile small {
+  font-size: 11px;
+}
+
+.procedure-selection-grid .selected-indicator {
+  width: 20px;
+  height: 20px;
+  top: 4px;
+  right: 4px;
+  font-size: 12px;
 }
 
 .primary-workflow-panel,
