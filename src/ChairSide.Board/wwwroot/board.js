@@ -737,7 +737,11 @@ function renderProcedureIcon(icon) {
     moon: `<svg class="procedure-icon" viewBox="0 0 24 24" aria-hidden="true"><path class="icon-stroke" d="M18.8 15.2A7.5 7.5 0 0 1 8.8 5.2 8.4 8.4 0 1 0 18.8 15.2z"/></svg>`,
     check: `<svg class="procedure-icon" viewBox="0 0 24 24" aria-hidden="true"><path class="icon-stroke" d="M5 5h14v14H5z"/><path class="icon-stroke check-mark" d="M8.2 12.5l3 3 5-6"/></svg>`,
     bolt: `<svg class="procedure-icon implant-icon" viewBox="0 0 24 24" aria-hidden="true"><path class="icon-stroke" d="M9 3.5h6M10 6h4v4l-1.4 1.4v7.1L12 20.5l-.6-2v-7.1L10 10V6z"/><path class="icon-stroke" d="M8.5 12h7M8.8 14.3h6.4M9.2 16.6h5.6"/></svg>`,
-    vial: `<svg class="procedure-icon" viewBox="0 0 24 24" aria-hidden="true"><path class="icon-stroke" d="M9 3.5h6M10 3.5v5.8l-4.1 7.9A2.6 2.6 0 0 0 8.2 21h7.6a2.6 2.6 0 0 0 2.3-3.8L14 9.3V3.5"/><path class="icon-stroke" d="M7.4 16h9.2"/></svg>`
+    vial: `<svg class="procedure-icon" viewBox="0 0 24 24" aria-hidden="true"><path class="icon-stroke" d="M9 3.5h6M10 3.5v5.8l-4.1 7.9A2.6 2.6 0 0 0 8.2 21h7.6a2.6 2.6 0 0 0 2.3-3.8L14 9.3V3.5"/><path class="icon-stroke" d="M7.4 16h9.2"/></svg>`,
+    teeth: `<svg class="procedure-icon" viewBox="0 0 24 24" aria-hidden="true"><path class="icon-stroke" d="M4 12Q12 8 20 12v6H4z"/><path class="icon-stroke" d="M8 12v6M12 12v6M16 12v6"/></svg>`,
+    sync: `<svg class="procedure-icon" viewBox="0 0 24 24" aria-hidden="true"><path class="icon-stroke" d="M17.7 6.3A8 8 0 1 0 20 12"/><path class="icon-stroke" d="M20 7v5h-5"/></svg>`,
+    wrench: `<svg class="procedure-icon" viewBox="0 0 24 24" aria-hidden="true"><path class="icon-stroke" d="M14.7 6.3a4 4 0 0 1-5.4 5.4L4 17l3 3 5.3-5.3a4 4 0 0 1 5.4-5.4l-2.3 2.3 1.4 1.4 2.3-2.3z"/></svg>`,
+    phone: `<svg class="procedure-icon" viewBox="0 0 24 24" aria-hidden="true"><path class="icon-stroke" d="M6.5 10.5c1.5 3 4 5.5 7 7l2-2a1 1 0 0 1 1.1-.2c1 .5 2.1.8 3.2.9a1 1 0 0 1 .9 1v3a1 1 0 0 1-1 1C10 22 2 14 2 4.3a1 1 0 0 1 1-1H6a1 1 0 0 1 1 .9c.1 1.1.4 2.2.9 3.2a1 1 0 0 1-.2 1.1L6.5 10.5z"/></svg>`
   };
 
   return icons[icon] || renderEmptyIcon();

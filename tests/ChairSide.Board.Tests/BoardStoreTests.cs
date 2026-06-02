@@ -317,8 +317,14 @@ public sealed class BoardStoreTests
         Assert.Equal(["otte", "pledger", "gibson", "schroeder"], snapshot.Doctors.Select(doctor => doctor.Id));
         Assert.Equal(["Dr. Otte", "Dr. Pledger", "Dr. Gibson", "Dr. Schroeder"], snapshot.Doctors.Select(doctor => doctor.Name));
         Assert.Equal(["Otte", "Pledger", "Gibson", "Schroeder"], snapshot.Doctors.Select(doctor => doctor.ShortName));
-        Assert.Equal(["CON", "EXT", "SED", "POST", "IMP", "BX"], snapshot.Procedures.Select(procedure => procedure.Code));
-        Assert.Equal(["Consult", "Extraction", "Sedation", "Post-op", "Implant", "Biopsy"], snapshot.Procedures.Select(procedure => procedure.Label));
+        Assert.Equal(
+            ["CON", "EXT", "SED", "POST", "IMP", "BX", "MISC", "POE", "IMPRES", "INTCK", "BXPOST", "IMPRM", "PCOC"],
+            snapshot.Procedures.Select(procedure => procedure.Code));
+        Assert.Equal(
+            ["Consult", "Extraction", "Sedation", "Post-op", "Implant", "Biopsy",
+             "Misc", "Periodic Exam", "Impressions", "Integration Check",
+             "Biopsy Post-op", "Implant Removal", "Phone → Office Consult"],
+            snapshot.Procedures.Select(procedure => procedure.Label));
     }
 
     [Fact]
@@ -454,6 +460,26 @@ public sealed class BoardStoreTests
         Assert.DoesNotContain(">${doctor.name}", boardJs);
         Assert.DoesNotContain("<strong>${procedure.code}</strong>", boardJs);
         Assert.DoesNotContain("<small>${procedure.label}</small>", boardJs);
+    }
+
+    [Fact]
+    public void Procedure_icon_renderer_supports_all_icons_used_by_default_roster()
+    {
+        var boardJs = File.ReadAllText(Path.Combine(
+            FindRepositoryRoot(),
+            "src",
+            "ChairSide.Board",
+            "wwwroot",
+            "board.js"));
+
+        // Every icon name referenced by DefaultProcedures() must have an entry
+        // in the renderProcedureIcon icons map so tiles never fall back to the
+        // empty placeholder icon.
+        var requiredIcons = new[] { "speech", "forceps", "moon", "check", "bolt", "vial", "teeth", "sync", "wrench", "phone" };
+        foreach (var icon in requiredIcons)
+        {
+            Assert.Contains($"{icon}:", boardJs);
+        }
     }
 
     [Fact]
