@@ -1096,3 +1096,38 @@ button:disabled {
     grid-template-columns: 1fr;
   }
 }
+
+.brand-lockup {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+}
+
+.brand-lockup h1 {
+  margin: 0;
+}
+
+.brand-logo {
+  display: block;
+  width: auto;
+  height: 46px;
+  max-width: 220px;
+  object-fit: contain;
+}
+
+.compact-brand .brand-logo {
+  height: 34px;
+  max-width: 170px;
+}
+
+@media (max-width: 720px) {
+  .brand-logo {
+    height: 38px;
+    max-width: 180px;
+  }
+
+  .compact-brand .brand-logo {
+    height: 30px;
+    max-width: 140px;
+  }
+}
