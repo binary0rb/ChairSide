@@ -89,30 +89,34 @@ select {
   gap: 8px;
   min-height: 36px;
   padding: 8px 11px;
-  border: 1px solid var(--line);
+  border: 1.5px solid var(--line);
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.86);
   color: var(--muted);
   font-size: 14px;
   font-weight: 900;
   white-space: nowrap;
+  cursor: default;
 }
 
 .connection-status i {
-  width: 10px;
-  height: 10px;
+  width: 11px;
+  height: 11px;
+  flex-shrink: 0;
   border-radius: 999px;
   background: currentColor;
 }
 
 .connection-status.live {
-  border-color: #86efac;
-  color: #166534;
+  border-color: #16a34a;
+  background: #f0fdf4;
+  color: #15803d;
 }
 
 .connection-status.reconnecting {
-  border-color: #fde68a;
-  color: #854d0e;
+  border-color: #d97706;
+  background: #fffbeb;
+  color: #92400e;
 }
 
 .connection-status.reconnecting i {
@@ -120,8 +124,9 @@ select {
 }
 
 .connection-status.stale {
-  border-color: #fecaca;
-  color: #991b1b;
+  border-color: #dc2626;
+  background: #fef2f2;
+  color: #b91c1c;
 }
 
 .master-shell,
@@ -1113,6 +1118,48 @@ button:disabled {
   .secondary-action-grid {
     grid-template-columns: 1fr;
   }
+}
+
+/* Master-board room tile links — display:contents makes the <a> invisible to
+   the grid, so the .room-tile article remains the effective grid item. */
+.room-tile-link {
+  display: contents;
+  text-decoration: none;
+}
+
+.room-tile-link .room-tile {
+  cursor: pointer;
+}
+
+.room-tile-link:focus-visible .room-tile {
+  outline: 3px solid #2563eb;
+  outline-offset: 2px;
+}
+
+/* PNG procedure icons — mirrors SVG sizing rules for each context */
+img.procedure-icon {
+  object-fit: contain;
+  flex: 0 0 auto;
+}
+
+.procedure-tile img.procedure-icon {
+  width: 40px;
+  height: 40px;
+}
+
+.procedure-lockup img.procedure-icon {
+  width: clamp(38px, 5vw, 72px);
+  height: clamp(38px, 5vw, 72px);
+}
+
+.room-tile.large .procedure-lockup img.procedure-icon {
+  width: clamp(24px, 2.8vw, 40px);
+  height: clamp(24px, 2.8vw, 40px);
+}
+
+.procedure-badge img.procedure-icon {
+  width: 22px;
+  height: 22px;
 }
 
 .brand-lockup {

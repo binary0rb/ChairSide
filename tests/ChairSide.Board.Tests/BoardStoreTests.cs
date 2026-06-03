@@ -527,8 +527,9 @@ public sealed class BoardStoreTests
 
         // Every icon name referenced by DefaultProcedures() must have an entry
         // in the renderProcedureIcon icons map so tiles never fall back to the
-        // empty placeholder icon.
-        var requiredIcons = new[] { "speech", "forceps", "moon", "check", "bolt", "vial", "teeth", "sync", "wrench", "phone" };
+        // empty placeholder icon. INTCK uses "interlock" (PNG); sync remains in
+        // the map for backward compat but is no longer a default-roster icon.
+        var requiredIcons = new[] { "speech", "forceps", "moon", "check", "bolt", "vial", "teeth", "interlock", "wrench", "phone" };
         foreach (var icon in requiredIcons)
         {
             Assert.Contains($"{icon}:", boardJs);
