@@ -194,7 +194,7 @@ app.MapPost("/api/rooms/{roomNumber:int}/assignment", async Task<IResult> (
     if (result is null)
     {
         return store.IsConfiguredRoom(roomNumber)
-            ? Results.BadRequest("Update Assignment is only available for seated, aging, or stale rooms with a valid doctor and procedure.")
+            ? Results.BadRequest("Update Assignment is only available for seated, aging, stale, or ready-for-doctor rooms with a valid doctor and procedure.")
             : Results.NotFound("Room is not configured.");
     }
 
@@ -222,7 +222,35 @@ app.MapPost("/api/rooms/{roomNumber:int}/cancel-seating", async Task<IResult> (
     if (result is null)
     {
         return store.IsConfiguredRoom(roomNumber)
-            ? Results.BadRequest("Cancel Seating is only available for seated, aging, or stale rooms.")
+            ? Results.BadRequest("Cancel Seating is only available for seated, aging, stale, or ready-for-doctor rooms.")
+            : Results.NotFound("Room is not configured.");
+    }
+
+    await hubContext.Clients.All.SendAsync("boardUpdated", store.GetSnapshot());
+    return Results.Ok(result);
+});
+
+app.MapPost("/api/rooms/{roomNumber:int}/ready-for-doctor", async Task<IResult> (
+    int roomNumber,
+    HttpContext httpContext,
+    RoomDeviceTokenValidator roomDeviceTokenValidator,
+    DemoBoardStore store,
+    Microsoft.AspNetCore.SignalR.IHubContext<BoardHub> hubContext) =>
+{
+    var bindingFailure = RoomDeviceBindingGuard.ValidateMutationRequest(
+        roomNumber,
+        httpContext.Request,
+        roomDeviceTokenValidator);
+    if (bindingFailure is not null)
+    {
+        return bindingFailure;
+    }
+
+    var result = store.MarkReadyForDoctor(roomNumber);
+    if (result is null)
+    {
+        return store.IsConfiguredRoom(roomNumber)
+            ? Results.BadRequest("Ready for Doctor is only available for seated, aging, or stale rooms.")
             : Results.NotFound("Room is not configured.");
     }
 
@@ -250,7 +278,7 @@ app.MapPost("/api/rooms/{roomNumber:int}/doctor-arrived", async Task<IResult> (
     if (result is null)
     {
         return store.IsConfiguredRoom(roomNumber)
-            ? Results.BadRequest("Doctor Arrived is only available for seated, aging, or stale rooms.")
+            ? Results.BadRequest("Doctor Arrived is only available when the room is marked ready for doctor.")
             : Results.NotFound("Room is not configured.");
     }
 

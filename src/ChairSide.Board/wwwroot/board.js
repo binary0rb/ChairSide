@@ -23,8 +23,13 @@ const app = {
   selectionContext: null
 };
 
-const stateNames = ["empty", "seated", "aging", "stale", "doctor-in-room", "turnover"];
-const activeSeatedStates = new Set(["seated", "aging", "stale"]);
+const stateNames = ["empty", "seated", "aging", "stale", "ready-for-doctor", "doctor-in-room", "turnover"];
+// States where "Ready for Doctor" button is enabled (only the neutral In Prep state).
+const activeSeatedStates = new Set(["seated"]);
+// States where corrections (cancel/update) are available — all states before Doctor Arrived.
+const cancelableStates = new Set(["seated", "ready-for-doctor", "aging", "stale"]);
+// States where "Doctor Arrived" is enabled — all ready-for-doctor phase states.
+const doctorArrivedStates = new Set(["ready-for-doctor", "aging", "stale"]);
 const adminAccess = {
   storageKey: "chairside-admin-token",
   headerName: "X-ChairSide-Admin-Token"
@@ -369,8 +374,12 @@ function renderReports() {
 
   summary.innerHTML = [
     renderMetric("Completed Cycles", app.reports.completedRoomCyclesCount),
-    renderMetric("Avg Seated-to-Doctor", formatDuration(app.reports.averageSeatedToDoctorSeconds)),
-    renderMetric("Median Seated-to-Doctor", formatDuration(app.reports.medianSeatedToDoctorSeconds)),
+    renderMetric("Avg Prep Time", formatDuration(app.reports.averagePrepSeconds)),
+    renderMetric("Median Prep Time", formatDuration(app.reports.medianPrepSeconds)),
+    renderMetric("Avg Ready-to-Doctor", formatDuration(app.reports.averageReadyToDoctorSeconds)),
+    renderMetric("Median Ready-to-Doctor", formatDuration(app.reports.medianReadyToDoctorSeconds)),
+    renderMetric("Avg Total to Doctor", formatDuration(app.reports.averageSeatedToDoctorSeconds)),
+    renderMetric("Median Total to Doctor", formatDuration(app.reports.medianSeatedToDoctorSeconds)),
     renderMetric("Avg In Room", formatDuration(app.reports.averageDoctorInRoomSeconds)),
     renderMetric("Median In Room", formatDuration(app.reports.medianDoctorInRoomSeconds)),
     renderMetric("Avg Turnover", formatDuration(app.reports.averageTurnoverSeconds)),
@@ -381,7 +390,7 @@ function renderReports() {
 
   body.innerHTML = cycles.length
     ? cycles.map(renderCycleRow).join("")
-    : `<tr><td colspan="14">No completed room cycles yet.</td></tr>`;
+    : `<tr><td colspan="17">No completed room cycles yet.</td></tr>`;
 }
 
 function renderReportsAccessPrompt(statusCode) {
@@ -545,9 +554,12 @@ function renderCycleRow(cycle) {
       <td>${escapeHtml(doctor)}</td>
       <td>${renderProcedureBadge(cycle.procedureCode)}</td>
       <td>${formatDateTime(cycle.seatedAt)}</td>
+      <td>${formatDateTime(cycle.readyForDoctorAt)}</td>
       <td>${formatDateTime(cycle.doctorArrivedAt)}</td>
       <td>${formatDateTime(cycle.doctorCompleteAt)}</td>
       <td>${formatDateTime(cycle.roomAvailableAt)}</td>
+      <td>${formatDuration(cycle.prepSeconds)}</td>
+      <td>${formatDuration(cycle.readyToDoctorSeconds)}</td>
       <td>${formatDuration(cycle.seatedToDoctorSeconds)}</td>
       <td>${formatDuration(cycle.doctorInRoomSeconds)}</td>
       <td>${formatDuration(cycle.turnoverSeconds)}</td>
@@ -615,6 +627,12 @@ function normalizeState(room) {
     return "doctor-in-room";
   }
 
+  // aging and stale are server-authoritative states in the Ready for Doctor phase.
+  // Return them directly; do NOT re-compute from seatedAt (which never escalates).
+  if (raw === "aging" || raw === "stale") {
+    return raw;
+  }
+
   if (raw === "turnover" || !room.seatedAt || room.clearedAt) {
     return raw;
   }
@@ -623,26 +641,37 @@ function normalizeState(room) {
     return "doctor-in-room";
   }
 
-  const seatedAtMs = Date.parse(room.seatedAt);
-  if (Number.isNaN(seatedAtMs)) {
-    return raw;
+  // Ready for Doctor: client-side aging/stale fallback computed from readyForDoctorAt,
+  // so the tile escalates smoothly between server polls.
+  if (raw === "readyfordoctor" || raw === "ready-for-doctor") {
+    const readyAtMs = room.readyForDoctorAt ? Date.parse(room.readyForDoctorAt) : NaN;
+    if (!Number.isNaN(readyAtMs)) {
+      const elapsedMinutes = Math.max(0, (boardNowMs() - readyAtMs) / 60000);
+      const agingMinutes = getAgingMinutes();
+      const staleMinutes = getStaleMinutes();
+      if (staleMinutes !== null && elapsedMinutes >= staleMinutes) {
+        return "stale";
+      }
+      if (agingMinutes !== null && elapsedMinutes >= agingMinutes) {
+        return "aging";
+      }
+    }
+    return "ready-for-doctor";
   }
 
-  const elapsedMinutes = Math.max(0, (boardNowMs() - seatedAtMs) / 60000);
-  const agingMinutes = getAgingMinutes();
-  const staleMinutes = getStaleMinutes();
-  if (staleMinutes !== null && elapsedMinutes >= staleMinutes) {
-    return "stale";
-  }
-
-  if (agingMinutes !== null && elapsedMinutes >= agingMinutes) {
-    return "aging";
-  }
-
+  // Patient Seated / In Prep: never escalates to aging or stale from seatedAt.
   return "seated";
 }
 
 function stateBadge(state) {
+  if (state === "seated") {
+    return "IN PREP";
+  }
+
+  if (state === "ready-for-doctor") {
+    return "READY";
+  }
+
   if (state === "doctor-in-room") {
     return "IN ROOM";
   }
@@ -686,12 +715,14 @@ function renderInvalidRoomMessage() {
 function setRoomControlsEnabled(room) {
   const isEnabled = Boolean(room);
   const state = room ? normalizeState(room) : "empty";
-  const canCorrect = activeSeatedStates.has(state);
+  const canCorrect = cancelableStates.has(state);
+  const isPrep = activeSeatedStates.has(state); // only "seated" — not aging/stale anymore
   setDisabled("demoElapsedSelect", !isEnabled || state !== "empty" || !isDemoTimerEnabled());
   setDisabled("seatButton", !isEnabled || state !== "empty");
+  setDisabled("readyForDoctorButton", !isEnabled || !isPrep);
   setDisabled("updateAssignmentButton", !isEnabled || !canCorrect);
   setDisabled("cancelSeatingButton", !isEnabled || !canCorrect);
-  setDisabled("doctorArrivedButton", !isEnabled || !activeSeatedStates.has(state));
+  setDisabled("doctorArrivedButton", !isEnabled || !doctorArrivedStates.has(state));
   setDisabled("doctorCompleteButton", !isEnabled || state !== "doctor-in-room");
   setDisabled("roomAvailableButton", !isEnabled || state !== "turnover");
 }
@@ -839,7 +870,7 @@ function canEditAssignment(room) {
   }
 
   const state = normalizeState(room);
-  return state === "empty" || activeSeatedStates.has(state);
+  return state === "empty" || cancelableStates.has(state);
 }
 
 function populateDemoTimerSelect() {
@@ -901,15 +932,17 @@ function thresholdMinutes(value) {
 
 function wireRoomPanel() {
   const seatButton = document.getElementById("seatButton");
+  const readyForDoctorButton = document.getElementById("readyForDoctorButton");
   const updateAssignmentButton = document.getElementById("updateAssignmentButton");
   const cancelSeatingButton = document.getElementById("cancelSeatingButton");
   const doctorArrivedButton = document.getElementById("doctorArrivedButton");
   const doctorCompleteButton = document.getElementById("doctorCompleteButton");
   const roomAvailableButton = document.getElementById("roomAvailableButton");
 
-  if (!seatButton || !updateAssignmentButton || !cancelSeatingButton || !doctorArrivedButton || !doctorCompleteButton || !roomAvailableButton) {
+  if (!seatButton || !readyForDoctorButton || !updateAssignmentButton || !cancelSeatingButton || !doctorArrivedButton || !doctorCompleteButton || !roomAvailableButton) {
     console.error("[ChairSide] Room panel buttons were not found.", {
       seatButton,
+      readyForDoctorButton,
       updateAssignmentButton,
       cancelSeatingButton,
       doctorArrivedButton,
@@ -964,13 +997,37 @@ function wireRoomPanel() {
     }
   });
 
-  updateAssignmentButton.addEventListener("click", async () => {
+  readyForDoctorButton.addEventListener("click", async () => {
     if (!isConfiguredRoom(app.roomNumber)) {
       setRoomActionStatus("This room is not configured.", "error");
       return;
     }
 
     if (!activeSeatedStates.has(currentRoomState())) {
+      setRoomActionStatus("Ready for Doctor is only available while the room is in prep (Patient Seated).", "error");
+      return;
+    }
+
+    console.log("[ChairSide] Ready for Doctor clicked.", { roomNumber: app.roomNumber });
+    setRoomActionStatus("Marking ready for doctor...", "pending");
+
+    try {
+      await sendRoomAction(app.roomNumber, "ready-for-doctor", "Ready for Doctor");
+      console.log("[ChairSide] Ready for Doctor succeeded.", { roomNumber: app.roomNumber });
+      setRoomActionStatus("Ready for doctor.", "success");
+    } catch (error) {
+      console.error("[ChairSide] Ready for Doctor failed.", { roomNumber: app.roomNumber, error });
+      setRoomActionStatus(error.message || "Failed to mark ready for doctor.", "error");
+    }
+  });
+
+  updateAssignmentButton.addEventListener("click", async () => {
+    if (!isConfiguredRoom(app.roomNumber)) {
+      setRoomActionStatus("This room is not configured.", "error");
+      return;
+    }
+
+    if (!cancelableStates.has(currentRoomState())) {
       setRoomActionStatus("Update Assignment is only available before Doctor Arrived.", "error");
       return;
     }
@@ -1006,7 +1063,7 @@ function wireRoomPanel() {
       return;
     }
 
-    if (!activeSeatedStates.has(currentRoomState())) {
+    if (!cancelableStates.has(currentRoomState())) {
       setRoomActionStatus("Cancel Seating is only available before Doctor Arrived.", "error");
       return;
     }
@@ -1036,8 +1093,8 @@ function wireRoomPanel() {
       return;
     }
 
-    if (!activeSeatedStates.has(currentRoomState())) {
-      setRoomActionStatus("Doctor Arrived is only available for seated, aging, or stale rooms.", "error");
+    if (!doctorArrivedStates.has(currentRoomState())) {
+      setRoomActionStatus("Doctor Arrived is only available after Ready for Doctor.", "error");
       return;
     }
 

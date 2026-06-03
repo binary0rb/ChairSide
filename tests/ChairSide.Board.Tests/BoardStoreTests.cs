@@ -40,6 +40,13 @@ public sealed class BoardStoreTests
         var reseated = context.Store.SeatRoom(1, "otte", "CON");
         Assert.NotNull(reseated);
 
+        // Doctor Arrived must be blocked until Ready for Doctor is called
+        Assert.Null(context.Store.MarkDoctorArrived(1));
+
+        var ready = context.Store.MarkReadyForDoctor(1);
+        Assert.NotNull(ready);
+        Assert.Equal(RoomStates.ReadyForDoctor, ready.State);
+
         var arrived = context.Store.MarkDoctorArrived(1);
         Assert.NotNull(arrived);
         Assert.Equal(RoomStates.DoctorInRoom, arrived.State);
@@ -88,6 +95,7 @@ public sealed class BoardStoreTests
 
         var first = StoreContext.Create(workspace, environmentName: Environments.Production, databasePath: databasePath);
         Assert.NotNull(first.Store.SeatRoom(1, "otte", "CON"));
+        Assert.NotNull(first.Store.MarkReadyForDoctor(1));
         Assert.NotNull(first.Store.MarkDoctorArrived(1));
         Assert.NotNull(first.Store.MarkDoctorComplete(1));
         Assert.NotNull(first.Store.MarkRoomAvailable(1));
@@ -101,8 +109,11 @@ public sealed class BoardStoreTests
     }
 
     [Fact]
-    public void Stale_elapsed_seated_room_reloads_as_stale_before_doctor_arrived_report()
+    public void Stale_elapsed_ready_for_doctor_room_reloads_as_stale()
     {
+        // Stale escalation is now based on ReadyForDoctorAt. A room that has been seated for a
+        // long time but has NOT clicked Ready for Doctor stays Seated. Only after Ready for Doctor
+        // can the room escalate to Aging/Stale based on elapsed time from ReadyForDoctorAt.
         using var workspace = TestWorkspace.Create();
         var databasePath = workspace.ProductionDatabasePath();
 
@@ -114,20 +125,25 @@ public sealed class BoardStoreTests
             staleMinutes: 2,
             boardUiOptions: new BoardUiOptions { DemoTimerEnabled = true });
         Assert.NotNull(first.Store.SeatRoom(1, "otte", "CON"));
+        Assert.NotNull(first.Store.MarkReadyForDoctor(1));
 
-        var staleSeatedAt = DateTimeOffset.UtcNow.AddMinutes(-3);
+        // Patch the DB to simulate a stale-elapsed ready_for_doctor_at.
+        var staleReadyAt = DateTimeOffset.UtcNow.AddMinutes(-3);
+        var seatedAt = staleReadyAt.AddMinutes(-5);
         using (var connection = OpenConnection(databasePath))
         using (var command = connection.CreateCommand())
         {
             command.CommandText = """
                 UPDATE active_rooms
-                SET state = 'seated',
+                SET state = 'readyForDoctor',
                     seated_at = $seatedAt,
+                    ready_for_doctor_at = $readyAt,
                     aging_started_at = NULL,
                     stale_started_at = NULL
                 WHERE room_id = 1;
                 """;
-            command.Parameters.AddWithValue("$seatedAt", FormatDateTimeOffset(staleSeatedAt));
+            command.Parameters.AddWithValue("$seatedAt", FormatDateTimeOffset(seatedAt));
+            command.Parameters.AddWithValue("$readyAt", FormatDateTimeOffset(staleReadyAt));
             command.ExecuteNonQuery();
         }
 
@@ -167,6 +183,7 @@ public sealed class BoardStoreTests
             agingMinutes: 1,
             staleMinutes: 2);
         Assert.NotNull(first.Store.SeatRoom(1, "otte", "CON", demoElapsedMinutes: 3));
+        Assert.NotNull(first.Store.MarkReadyForDoctor(1));
         Assert.NotNull(first.Store.MarkDoctorArrived(1));
 
         var afterArrivedReload = StoreContext.Create(
@@ -197,6 +214,7 @@ public sealed class BoardStoreTests
 
         Assert.NotNull(context.Store.SeatRoom(1, "otte", "CON"));
         clock.SetUtcNow(now.AddMinutes(5));
+        Assert.NotNull(context.Store.MarkReadyForDoctor(1));
         Assert.NotNull(context.Store.MarkDoctorArrived(1));
         clock.SetUtcNow(now.AddMinutes(10));
         Assert.NotNull(context.Store.MarkDoctorComplete(1));
@@ -219,6 +237,8 @@ public sealed class BoardStoreTests
         Assert.NotNull(seated);
         Assert.NotNull(seated.SeatedAt);
 
+        Assert.NotNull(context.Store.MarkReadyForDoctor(1));
+
         var arrived = context.Store.MarkDoctorArrived(1);
         Assert.NotNull(arrived);
         Assert.Equal(RoomStates.DoctorInRoom, arrived.State);
@@ -231,17 +251,15 @@ public sealed class BoardStoreTests
     }
 
     [Theory]
-    [InlineData(6, 59, RoomStates.Seated, false, false)]
-    [InlineData(7, 0, RoomStates.Aging, true, false)]
-    [InlineData(11, 59, RoomStates.Aging, true, false)]
-    [InlineData(12, 0, RoomStates.Stale, true, true)]
-    public void Threshold_boundaries_resolve_deterministically(
+    [InlineData(6, 59)]
+    [InlineData(7, 0)]
+    [InlineData(11, 59)]
+    [InlineData(12, 0)]
+    public void Seated_room_does_not_escalate_to_aging_or_stale_regardless_of_elapsed_time(
         int elapsedMinutes,
-        int elapsedSeconds,
-        string expectedState,
-        bool expectedAgingStarted,
-        bool expectedStaleStarted)
+        int elapsedSeconds)
     {
+        // Patient Seated / In Prep: aging/stale thresholds are irrelevant until Ready for Doctor.
         using var workspace = TestWorkspace.Create();
         var now = new DateTimeOffset(2026, 5, 29, 18, 0, 0, TimeSpan.Zero);
         var clock = new ManualTimeProvider(now);
@@ -253,6 +271,41 @@ public sealed class BoardStoreTests
             timeProvider: clock);
 
         Assert.NotNull(context.Store.SeatRoom(1, "otte", "CON"));
+        clock.SetUtcNow(now.AddMinutes(elapsedMinutes).AddSeconds(elapsedSeconds));
+
+        var room = context.Store.GetRoom(1);
+
+        Assert.NotNull(room);
+        Assert.Equal(RoomStates.Seated, room.State);
+        Assert.Null(room.AgingStartedAt);
+        Assert.Null(room.StaleStartedAt);
+    }
+
+    [Theory]
+    [InlineData(6, 59, RoomStates.ReadyForDoctor, false, false)]
+    [InlineData(7, 0, RoomStates.Aging, true, false)]
+    [InlineData(11, 59, RoomStates.Aging, true, false)]
+    [InlineData(12, 0, RoomStates.Stale, true, true)]
+    public void Ready_for_doctor_threshold_boundaries_resolve_deterministically(
+        int elapsedMinutes,
+        int elapsedSeconds,
+        string expectedState,
+        bool expectedAgingStarted,
+        bool expectedStaleStarted)
+    {
+        // Aging/stale escalation begins from ReadyForDoctorAt, not SeatedAt.
+        using var workspace = TestWorkspace.Create();
+        var now = new DateTimeOffset(2026, 5, 29, 18, 0, 0, TimeSpan.Zero);
+        var clock = new ManualTimeProvider(now);
+        var context = StoreContext.Create(
+            workspace,
+            environmentName: Environments.Production,
+            agingMinutes: 7,
+            staleMinutes: 12,
+            timeProvider: clock);
+
+        Assert.NotNull(context.Store.SeatRoom(1, "otte", "CON"));
+        Assert.NotNull(context.Store.MarkReadyForDoctor(1));
         clock.SetUtcNow(now.AddMinutes(elapsedMinutes).AddSeconds(elapsedSeconds));
 
         var room = context.Store.GetRoom(1);
@@ -488,6 +541,7 @@ public sealed class BoardStoreTests
         using var workspace = TestWorkspace.Create();
         var context = StoreContext.Create(workspace, environmentName: Environments.Production);
         Assert.NotNull(context.Store.SeatRoom(1, "otte", "CON"));
+        Assert.NotNull(context.Store.MarkReadyForDoctor(1));
         Assert.NotNull(context.Store.MarkDoctorArrived(1));
         Assert.NotNull(context.Store.MarkDoctorComplete(1));
         Assert.NotNull(context.Store.MarkRoomAvailable(1));
@@ -508,6 +562,7 @@ public sealed class BoardStoreTests
         var context = StoreContext.Create(workspace, environmentName: Environments.Production);
         var seated = context.Store.SeatRoom(1, "otte", "CON");
         Assert.NotNull(seated);
+        Assert.NotNull(context.Store.MarkReadyForDoctor(1));
         Assert.NotNull(context.Store.MarkDoctorArrived(1));
 
         var loadedCycle = Assert.Single(context.Repository.LoadCompletedCycles());
@@ -800,6 +855,112 @@ public sealed class BoardStoreTests
     }
 
     [Fact]
+    public void Ready_for_doctor_blocks_doctor_arrived_until_called()
+    {
+        using var workspace = TestWorkspace.Create();
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production);
+
+        var seated = context.Store.SeatRoom(1, "otte", "CON");
+        Assert.NotNull(seated);
+        Assert.Equal(RoomStates.Seated, seated.State);
+
+        // Doctor Arrived must be blocked until Ready for Doctor is explicitly called
+        Assert.Null(context.Store.MarkDoctorArrived(1));
+        Assert.Equal(0, context.Store.GetReports().CompletedRoomCyclesCount);
+
+        var ready = context.Store.MarkReadyForDoctor(1);
+        Assert.NotNull(ready);
+        Assert.Equal(RoomStates.ReadyForDoctor, ready.State);
+        Assert.NotNull(ready.ReadyForDoctorAt);
+        Assert.NotNull(ready.SeatedAt);
+
+        // Cancel Seating must still be available from ReadyForDoctor state
+        var canceled = context.Store.CancelSeating(1);
+        Assert.NotNull(canceled);
+        Assert.Equal(RoomStates.Available, canceled.State);
+
+        // Re-seat and go through to DoctorInRoom
+        Assert.NotNull(context.Store.SeatRoom(1, "otte", "CON"));
+        Assert.NotNull(context.Store.MarkReadyForDoctor(1));
+
+        var arrived = context.Store.MarkDoctorArrived(1);
+        Assert.NotNull(arrived);
+        Assert.Equal(RoomStates.DoctorInRoom, arrived.State);
+        Assert.Single(context.Store.GetReports().DoctorSummaries);
+    }
+
+    [Fact]
+    public void Ready_for_doctor_aging_and_stale_allow_doctor_arrived()
+    {
+        // Aging/stale are now part of the Ready for Doctor phase (doctor requested too long).
+        // Doctor Arrived must be accepted from any of: ready-for-doctor, aging, stale.
+        using var workspace = TestWorkspace.Create();
+        var now = new DateTimeOffset(2026, 6, 1, 10, 0, 0, TimeSpan.Zero);
+        var clock = new ManualTimeProvider(now);
+        var context = StoreContext.Create(
+            workspace,
+            environmentName: Environments.Production,
+            agingMinutes: 7,
+            staleMinutes: 12,
+            timeProvider: clock);
+
+        // Seat and mark ready, then advance past aging threshold
+        Assert.NotNull(context.Store.SeatRoom(1, "otte", "CON"));
+        Assert.NotNull(context.Store.MarkReadyForDoctor(1));
+        clock.SetUtcNow(now.AddMinutes(8)); // past aging (7) but before stale (12)
+
+        var aging = context.Store.GetRoom(1);
+        Assert.NotNull(aging);
+        Assert.Equal(RoomStates.Aging, aging.State);
+        Assert.NotNull(aging.AgingStartedAt);
+        Assert.Null(aging.StaleStartedAt);
+
+        var arrived = context.Store.MarkDoctorArrived(1);
+        Assert.NotNull(arrived);
+        Assert.Equal(RoomStates.DoctorInRoom, arrived.State);
+
+        Assert.NotNull(context.Store.MarkDoctorComplete(1));
+        Assert.NotNull(context.Store.MarkRoomAvailable(1));
+
+        var cycle = Assert.Single(context.Store.GetReports().RecentCompletedCycles);
+        Assert.Equal(RoomStates.Aging, cycle.FinalWaitState);
+        Assert.True(cycle.AgingThresholdReached);
+        Assert.False(cycle.StaleThresholdReached);
+    }
+
+    [Fact]
+    public void Reports_split_prep_and_ready_to_doctor_seconds()
+    {
+        using var workspace = TestWorkspace.Create();
+        var now = new DateTimeOffset(2026, 6, 1, 10, 0, 0, TimeSpan.Zero);
+        var clock = new ManualTimeProvider(now);
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production, timeProvider: clock);
+
+        Assert.NotNull(context.Store.SeatRoom(1, "otte", "CON"));
+        clock.SetUtcNow(now.AddMinutes(15)); // 15 min prep
+        Assert.NotNull(context.Store.MarkReadyForDoctor(1));
+        clock.SetUtcNow(now.AddMinutes(20)); // 5 min doctor response
+        Assert.NotNull(context.Store.MarkDoctorArrived(1));
+        clock.SetUtcNow(now.AddMinutes(30)); // 10 min doctor in room
+        Assert.NotNull(context.Store.MarkDoctorComplete(1));
+        clock.SetUtcNow(now.AddMinutes(35)); // 5 min turnover
+        Assert.NotNull(context.Store.MarkRoomAvailable(1));
+
+        var cycle = Assert.Single(context.Store.GetReports().RecentCompletedCycles);
+        Assert.Equal(15 * 60, cycle.PrepSeconds);
+        Assert.Equal(5 * 60, cycle.ReadyToDoctorSeconds);
+        Assert.Equal(20 * 60, cycle.SeatedToDoctorSeconds); // total = prep + ready-to-doctor
+        Assert.Equal(10 * 60, cycle.DoctorInRoomSeconds);
+        Assert.Equal(5 * 60, cycle.TurnoverSeconds);
+        Assert.Equal(35 * 60, cycle.TotalRoomCycleSeconds);
+
+        var reports = context.Store.GetReports();
+        Assert.Equal(15 * 60, reports.AveragePrepSeconds);
+        Assert.Equal(5 * 60, reports.AverageReadyToDoctorSeconds);
+        Assert.Equal(20 * 60, reports.AverageSeatedToDoctorSeconds);
+    }
+
+    [Fact]
     public void Room_event_history_is_capped_to_most_recent_entries()
     {
         using var workspace = TestWorkspace.Create();
@@ -865,7 +1026,9 @@ public sealed class BoardStoreTests
         Assert.NotNull(enabledRoom);
         Assert.NotNull(disabledRoom);
         Assert.Equal(now.AddMinutes(-15), enabledRoom.SeatedAt);
-        Assert.Equal(RoomStates.Stale, enabledRoom.State);
+        // Patient Seated / In Prep no longer escalates to aging/stale regardless of elapsed time.
+        // demoElapsedMinutes only back-dates SeatedAt; state remains Seated until Ready for Doctor.
+        Assert.Equal(RoomStates.Seated, enabledRoom.State);
         Assert.Equal(now, disabledRoom.SeatedAt);
         Assert.Equal(RoomStates.Seated, disabledRoom.State);
     }
@@ -951,6 +1114,7 @@ public sealed class BoardStoreTests
         "seated_at",
         "aging_started_at",
         "stale_started_at",
+        "ready_for_doctor_at",
         "doctor_arrived_at",
         "doctor_complete_at",
         "room_available_at",
@@ -966,10 +1130,13 @@ public sealed class BoardStoreTests
         "procedure_code",
         "procedure_category",
         "seated_at",
+        "ready_for_doctor_at",
         "doctor_arrived_at",
         "doctor_complete_at",
         "room_available_at",
         "seated_to_doctor_seconds",
+        "prep_seconds",
+        "ready_to_doctor_seconds",
         "doctor_in_room_seconds",
         "turnover_seconds",
         "total_room_cycle_seconds",

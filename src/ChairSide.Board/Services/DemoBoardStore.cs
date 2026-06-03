@@ -190,6 +190,32 @@ public sealed class DemoBoardStore
         }
     }
 
+    public RoomStatus? MarkReadyForDoctor(int roomNumber)
+    {
+        lock (_syncRoot)
+        {
+            var room = _rooms.FirstOrDefault(item => item.RoomId == roomNumber);
+            if (room is null)
+            {
+                return null;
+            }
+
+            var now = Now;
+            UpdateRoomState(room, now);
+            if (!CanMarkReadyForDoctor(room) || room.SeatedAt is null)
+            {
+                return null;
+            }
+
+            room.ReadyForDoctorAt = now;
+            room.State = RoomStates.ReadyForDoctor;
+            AddEvent(new RoomEvent(room.RoomId, "ReadyForDoctor", now, room.AssignedDoctor, room.ProcedureCode));
+            PersistRoom(room);
+
+            return ToRoomStatus(room, now);
+        }
+    }
+
     public RoomStatus? MarkDoctorArrived(int roomNumber)
     {
         lock (_syncRoot)
@@ -209,6 +235,13 @@ public sealed class DemoBoardStore
 
             var finalWaitState = room.State;
             var seatedToDoctorSeconds = SecondsBetween(room.SeatedAt.Value, now);
+            var prepSeconds = room.ReadyForDoctorAt.HasValue
+                ? SecondsBetween(room.SeatedAt.Value, room.ReadyForDoctorAt.Value)
+                : (int?)null;
+            var readyToDoctorSeconds = room.ReadyForDoctorAt.HasValue
+                ? SecondsBetween(room.ReadyForDoctorAt.Value, now)
+                : (int?)null;
+
             room.DoctorArrivedAt = now;
             room.State = RoomStates.DoctorInRoom;
             AddEvent(new RoomEvent(room.RoomId, "DoctorArrived", now, room.AssignedDoctor, room.ProcedureCode, TimeSpan.FromSeconds(seatedToDoctorSeconds)));
@@ -222,8 +255,11 @@ public sealed class DemoBoardStore
                     AssignedDoctor = room.AssignedDoctor,
                     ProcedureCode = room.ProcedureCode,
                     SeatedAt = room.SeatedAt.Value,
+                    ReadyForDoctorAt = room.ReadyForDoctorAt,
                     DoctorArrivedAt = now,
                     SeatedToDoctorSeconds = seatedToDoctorSeconds,
+                    PrepSeconds = prepSeconds,
+                    ReadyToDoctorSeconds = readyToDoctorSeconds,
                     FinalWaitState = finalWaitState,
                     AgingThresholdReached = room.AgingStartedAt is not null,
                     StaleThresholdReached = room.StaleStartedAt is not null
@@ -310,6 +346,10 @@ public sealed class DemoBoardStore
                 completedCycles.Count,
                 AverageSeconds(cycles.Select(cycle => (int?)cycle.SeatedToDoctorSeconds)),
                 MedianSeconds(cycles.Select(cycle => (int?)cycle.SeatedToDoctorSeconds)),
+                AverageSeconds(cycles.Select(cycle => cycle.PrepSeconds)),
+                MedianSeconds(cycles.Select(cycle => cycle.PrepSeconds)),
+                AverageSeconds(cycles.Select(cycle => cycle.ReadyToDoctorSeconds)),
+                MedianSeconds(cycles.Select(cycle => cycle.ReadyToDoctorSeconds)),
                 AverageSeconds(cycles.Select(cycle => cycle.DoctorInRoomSeconds)),
                 MedianSeconds(cycles.Select(cycle => cycle.DoctorInRoomSeconds)),
                 AverageSeconds(cycles.Select(cycle => cycle.TurnoverSeconds)),
@@ -338,6 +378,7 @@ public sealed class DemoBoardStore
             room.SeatedAt,
             room.AgingStartedAt,
             room.StaleStartedAt,
+            room.ReadyForDoctorAt,
             room.DoctorArrivedAt,
             room.DoctorCompleteAt,
             room.RoomAvailableAt,
@@ -346,6 +387,7 @@ public sealed class DemoBoardStore
 
     private void UpdateRoomState(RoomState room, DateTimeOffset now)
     {
+        // Doctor In Room and Turnover are terminal — no further automatic transitions.
         if (room.State is RoomStates.DoctorInRoom or RoomStates.Turnover)
         {
             return;
@@ -357,19 +399,37 @@ public sealed class DemoBoardStore
             return;
         }
 
-        var elapsed = now - room.SeatedAt.Value;
+        // Patient Seated / In Prep: aging/stale thresholds do NOT apply here.
+        // This state is a neutral prep limbo; it stays Seated until staff clicks Ready for Doctor.
+        if (room.State is RoomStates.Available or RoomStates.Seated)
+        {
+            room.AgingStartedAt = null;
+            room.StaleStartedAt = null;
+            room.State = RoomStates.Seated;
+            return;
+        }
+
+        // Ready for Doctor phase (ReadyForDoctor, Aging, Stale): escalate based on elapsed
+        // time from ReadyForDoctorAt. These states all mean "doctor has been requested."
+        if (room.ReadyForDoctorAt is null)
+        {
+            // Defensive: state is in the ready-for-doctor phase but the timestamp is missing.
+            return;
+        }
+
+        var elapsed = now - room.ReadyForDoctorAt.Value;
         var thresholds = Thresholds;
         if (elapsed >= thresholds.StaleThreshold)
         {
-            room.AgingStartedAt = room.SeatedAt.Value.Add(thresholds.AgingThreshold);
-            room.StaleStartedAt = room.SeatedAt.Value.Add(thresholds.StaleThreshold);
+            room.AgingStartedAt = room.ReadyForDoctorAt.Value.Add(thresholds.AgingThreshold);
+            room.StaleStartedAt = room.ReadyForDoctorAt.Value.Add(thresholds.StaleThreshold);
             room.State = RoomStates.Stale;
             return;
         }
 
         if (elapsed >= thresholds.AgingThreshold)
         {
-            room.AgingStartedAt = room.SeatedAt.Value.Add(thresholds.AgingThreshold);
+            room.AgingStartedAt = room.ReadyForDoctorAt.Value.Add(thresholds.AgingThreshold);
             room.StaleStartedAt = null;
             room.State = RoomStates.Aging;
             return;
@@ -377,7 +437,7 @@ public sealed class DemoBoardStore
 
         room.AgingStartedAt = null;
         room.StaleStartedAt = null;
-        room.State = RoomStates.Seated;
+        room.State = RoomStates.ReadyForDoctor;
     }
 
     private ProcedureCategory? FindProcedure(string procedureCode) =>
@@ -441,24 +501,39 @@ public sealed class DemoBoardStore
 
         foreach (var seed in seededRooms)
         {
+            var readyForDoctorAt = seed.Pattern.ReadyForDoctorElapsed is not null
+                ? now - seed.Pattern.ReadyForDoctorElapsed(thresholds)
+                : (DateTimeOffset?)null;
             SeedDemoRoom(
                 seed.RoomId,
                 seed.Pattern.DoctorId,
                 seed.Pattern.ProcedureCode,
-                now - seed.Pattern.Elapsed(thresholds));
+                now - seed.Pattern.Elapsed(thresholds),
+                readyForDoctorAt);
         }
     }
 
     private static IEnumerable<DemoSeedPattern> DemoSeedPatterns()
     {
+        // Rooms in Patient Seated / In Prep (no ReadyForDoctor yet)
         yield return new("otte", "CON", thresholds => BeforeAging(thresholds));
-        yield return new("pledger", "EXT", thresholds => StaleSample(thresholds));
-        yield return new("gibson", "SED", thresholds => StaleSample(thresholds, TimeSpan.FromMinutes(11)));
         yield return new("schroeder", "IMP", thresholds => AgingSample(thresholds));
-        yield return new("otte", "POST", thresholds => StaleSample(thresholds, TimeSpan.FromMinutes(5)));
-        yield return new("pledger", "BX", thresholds => StaleSample(thresholds, TimeSpan.FromMinutes(15)));
         yield return new("gibson", "CON", thresholds => EarlySeatedSample(thresholds));
         yield return new("schroeder", "EXT", thresholds => StaleSample(thresholds, TimeSpan.FromMinutes(4)));
+
+        // Rooms in Ready for Doctor phase — ReadyForDoctorAt triggers aging/stale escalation
+        yield return new("pledger", "EXT",
+            thresholds => StaleSample(thresholds),
+            thresholds => StaleSample(thresholds));
+        yield return new("gibson", "SED",
+            thresholds => StaleSample(thresholds, TimeSpan.FromMinutes(11)),
+            thresholds => StaleSample(thresholds, TimeSpan.FromMinutes(11)));
+        yield return new("otte", "POST",
+            thresholds => StaleSample(thresholds, TimeSpan.FromMinutes(5)),
+            thresholds => AgingSample(thresholds));
+        yield return new("pledger", "BX",
+            thresholds => StaleSample(thresholds, TimeSpan.FromMinutes(15)),
+            thresholds => StaleSample(thresholds, TimeSpan.FromMinutes(15)));
     }
 
     private static TimeSpan EarlySeatedSample(BoardThresholdOptions thresholds) =>
@@ -484,17 +559,20 @@ public sealed class DemoBoardStore
         room.SeatedAt = null;
         room.AgingStartedAt = null;
         room.StaleStartedAt = null;
+        room.ReadyForDoctorAt = null;
         room.DoctorArrivedAt = null;
         room.DoctorCompleteAt = null;
         room.RoomAvailableAt = null;
     }
 
-    private void SeedDemoRoom(int roomId, string doctorId, string procedureCode, DateTimeOffset seatedAt)
+    private void SeedDemoRoom(int roomId, string doctorId, string procedureCode, DateTimeOffset seatedAt, DateTimeOffset? readyForDoctorAt = null)
     {
         var index = _rooms.FindIndex(room => room.RoomId == roomId);
         if (index >= 0)
         {
-            _rooms[index] = Seated(roomId, doctorId, procedureCode, seatedAt);
+            _rooms[index] = readyForDoctorAt.HasValue
+                ? ReadyForDoctorRoom(roomId, doctorId, procedureCode, seatedAt, readyForDoctorAt.Value)
+                : Seated(roomId, doctorId, procedureCode, seatedAt);
         }
     }
 
@@ -512,13 +590,31 @@ public sealed class DemoBoardStore
         return room;
     }
 
+    private RoomState ReadyForDoctorRoom(int roomId, string doctorId, string procedureCode, DateTimeOffset seatedAt, DateTimeOffset readyForDoctorAt)
+    {
+        var room = new RoomState(roomId)
+        {
+            AssignedDoctor = doctorId,
+            ProcedureCode = procedureCode,
+            State = RoomStates.ReadyForDoctor,
+            SeatedAt = seatedAt,
+            ReadyForDoctorAt = readyForDoctorAt
+        };
+
+        UpdateRoomState(room, Now);
+        return room;
+    }
+
     private static bool CanSeat(RoomState room) => room.State == RoomStates.Available && room.SeatedAt is null;
 
     private static bool CanEditSeatedRoom(RoomState room) =>
-        room.State is RoomStates.Seated or RoomStates.Aging or RoomStates.Stale;
+        room.State is RoomStates.Seated or RoomStates.Aging or RoomStates.Stale or RoomStates.ReadyForDoctor;
+
+    private static bool CanMarkReadyForDoctor(RoomState room) =>
+        room.State is RoomStates.Seated;
 
     private static bool CanMarkDoctorArrived(RoomState room) =>
-        room.State is RoomStates.Seated or RoomStates.Aging or RoomStates.Stale;
+        room.State is RoomStates.ReadyForDoctor or RoomStates.Aging or RoomStates.Stale;
 
     private void AddEvent(RoomEvent roomEvent)
     {
@@ -606,6 +702,10 @@ public sealed class DemoBoardStore
                 group.Count(),
                 AverageSeconds(group.Select(cycle => (int?)cycle.SeatedToDoctorSeconds)),
                 MedianSeconds(group.Select(cycle => (int?)cycle.SeatedToDoctorSeconds)),
+                AverageSeconds(group.Select(cycle => cycle.PrepSeconds)),
+                MedianSeconds(group.Select(cycle => cycle.PrepSeconds)),
+                AverageSeconds(group.Select(cycle => cycle.ReadyToDoctorSeconds)),
+                MedianSeconds(group.Select(cycle => cycle.ReadyToDoctorSeconds)),
                 AverageSeconds(group.Select(cycle => cycle.DoctorInRoomSeconds)),
                 MedianSeconds(group.Select(cycle => cycle.DoctorInRoomSeconds)),
                 AverageSeconds(group.Select(cycle => cycle.TurnoverSeconds)),
@@ -645,6 +745,7 @@ public sealed record RoomStatus(
     DateTimeOffset? SeatedAt,
     DateTimeOffset? AgingStartedAt,
     DateTimeOffset? StaleStartedAt,
+    DateTimeOffset? ReadyForDoctorAt,
     DateTimeOffset? DoctorArrivedAt,
     DateTimeOffset? DoctorCompleteAt,
     DateTimeOffset? RoomAvailableAt,
@@ -662,6 +763,10 @@ public sealed record ReportsSnapshot(
     int CompletedRoomCyclesCount,
     double AverageSeatedToDoctorSeconds,
     double MedianSeatedToDoctorSeconds,
+    double AveragePrepSeconds,
+    double MedianPrepSeconds,
+    double AverageReadyToDoctorSeconds,
+    double MedianReadyToDoctorSeconds,
     double AverageDoctorInRoomSeconds,
     double MedianDoctorInRoomSeconds,
     double AverageTurnoverSeconds,
@@ -677,10 +782,13 @@ public sealed class CompletedRoomCycle
     public string AssignedDoctor { get; set; } = "";
     public string ProcedureCode { get; set; } = "";
     public DateTimeOffset SeatedAt { get; set; }
+    public DateTimeOffset? ReadyForDoctorAt { get; set; }
     public DateTimeOffset DoctorArrivedAt { get; set; }
     public DateTimeOffset? DoctorCompleteAt { get; set; }
     public DateTimeOffset? RoomAvailableAt { get; set; }
     public int SeatedToDoctorSeconds { get; set; }
+    public int? PrepSeconds { get; set; }
+    public int? ReadyToDoctorSeconds { get; set; }
     public int? DoctorInRoomSeconds { get; set; }
     public int? TurnoverSeconds { get; set; }
     public int? TotalRoomCycleSeconds { get; set; }
@@ -695,6 +803,10 @@ public sealed record DoctorCycleSummary(
     int CompletedRoomCyclesCount,
     double AverageSeatedToDoctorSeconds,
     double MedianSeatedToDoctorSeconds,
+    double AveragePrepSeconds,
+    double MedianPrepSeconds,
+    double AverageReadyToDoctorSeconds,
+    double MedianReadyToDoctorSeconds,
     double AverageDoctorInRoomSeconds,
     double MedianDoctorInRoomSeconds,
     double AverageTurnoverSeconds,
@@ -705,7 +817,8 @@ public sealed record DoctorCycleSummary(
 public sealed record DemoSeedPattern(
     string DoctorId,
     string ProcedureCode,
-    Func<BoardThresholdOptions, TimeSpan> Elapsed);
+    Func<BoardThresholdOptions, TimeSpan> Elapsed,
+    Func<BoardThresholdOptions, TimeSpan>? ReadyForDoctorElapsed = null);
 
 public sealed class RoomState(int roomId)
 {
@@ -716,6 +829,7 @@ public sealed class RoomState(int roomId)
     public DateTimeOffset? SeatedAt { get; set; }
     public DateTimeOffset? AgingStartedAt { get; set; }
     public DateTimeOffset? StaleStartedAt { get; set; }
+    public DateTimeOffset? ReadyForDoctorAt { get; set; }
     public DateTimeOffset? DoctorArrivedAt { get; set; }
     public DateTimeOffset? DoctorCompleteAt { get; set; }
     public DateTimeOffset? RoomAvailableAt { get; set; }
@@ -727,6 +841,7 @@ public static class RoomStates
     public const string Seated = "seated";
     public const string Aging = "aging";
     public const string Stale = "stale";
+    public const string ReadyForDoctor = "readyForDoctor";
     public const string DoctorInRoom = "doctorInRoom";
     public const string Turnover = "turnover";
 }

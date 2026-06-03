@@ -53,6 +53,7 @@ public sealed class SqliteBoardRepository
                 seated_at,
                 aging_started_at,
                 stale_started_at,
+                ready_for_doctor_at,
                 doctor_arrived_at,
                 doctor_complete_at,
                 room_available_at
@@ -74,9 +75,10 @@ public sealed class SqliteBoardRepository
                 SeatedAt = ReadNullableDateTimeOffset(reader, 4),
                 AgingStartedAt = ReadNullableDateTimeOffset(reader, 5),
                 StaleStartedAt = ReadNullableDateTimeOffset(reader, 6),
-                DoctorArrivedAt = ReadNullableDateTimeOffset(reader, 7),
-                DoctorCompleteAt = ReadNullableDateTimeOffset(reader, 8),
-                RoomAvailableAt = ReadNullableDateTimeOffset(reader, 9)
+                ReadyForDoctorAt = ReadNullableDateTimeOffset(reader, 7),
+                DoctorArrivedAt = ReadNullableDateTimeOffset(reader, 8),
+                DoctorCompleteAt = ReadNullableDateTimeOffset(reader, 9),
+                RoomAvailableAt = ReadNullableDateTimeOffset(reader, 10)
             });
         }
 
@@ -151,7 +153,10 @@ public sealed class SqliteBoardRepository
                 total_room_cycle_seconds,
                 final_wait_state,
                 aging_threshold_reached,
-                stale_threshold_reached
+                stale_threshold_reached,
+                ready_for_doctor_at,
+                prep_seconds,
+                ready_to_doctor_seconds
             FROM completed_room_cycles
             ORDER BY doctor_arrived_at DESC;
             """;
@@ -175,7 +180,10 @@ public sealed class SqliteBoardRepository
                 TotalRoomCycleSeconds = ReadNullableInt32(reader, 10),
                 FinalWaitState = reader.GetString(11),
                 AgingThresholdReached = reader.GetInt32(12) == 1,
-                StaleThresholdReached = reader.GetInt32(13) == 1
+                StaleThresholdReached = reader.GetInt32(13) == 1,
+                ReadyForDoctorAt = ReadNullableDateTimeOffset(reader, 14),
+                PrepSeconds = ReadNullableInt32(reader, 15),
+                ReadyToDoctorSeconds = ReadNullableInt32(reader, 16)
             });
         }
 
@@ -197,10 +205,13 @@ public sealed class SqliteBoardRepository
                 procedure_code,
                 procedure_category,
                 seated_at,
+                ready_for_doctor_at,
                 doctor_arrived_at,
                 doctor_complete_at,
                 room_available_at,
                 seated_to_doctor_seconds,
+                prep_seconds,
+                ready_to_doctor_seconds,
                 doctor_in_room_seconds,
                 turnover_seconds,
                 total_room_cycle_seconds,
@@ -217,10 +228,13 @@ public sealed class SqliteBoardRepository
                 $procedureCode,
                 $procedureCategory,
                 $seatedAt,
+                $readyForDoctorAt,
                 $doctorArrivedAt,
                 $doctorCompleteAt,
                 $roomAvailableAt,
                 $seatedToDoctorSeconds,
+                $prepSeconds,
+                $readyToDoctorSeconds,
                 $doctorInRoomSeconds,
                 $turnoverSeconds,
                 $totalRoomCycleSeconds,
@@ -235,10 +249,13 @@ public sealed class SqliteBoardRepository
                 assigned_doctor_display_name = excluded.assigned_doctor_display_name,
                 procedure_code = excluded.procedure_code,
                 procedure_category = excluded.procedure_category,
+                ready_for_doctor_at = excluded.ready_for_doctor_at,
                 doctor_arrived_at = excluded.doctor_arrived_at,
                 doctor_complete_at = excluded.doctor_complete_at,
                 room_available_at = excluded.room_available_at,
                 seated_to_doctor_seconds = excluded.seated_to_doctor_seconds,
+                prep_seconds = excluded.prep_seconds,
+                ready_to_doctor_seconds = excluded.ready_to_doctor_seconds,
                 doctor_in_room_seconds = excluded.doctor_in_room_seconds,
                 turnover_seconds = excluded.turnover_seconds,
                 total_room_cycle_seconds = excluded.total_room_cycle_seconds,
@@ -255,10 +272,13 @@ public sealed class SqliteBoardRepository
         command.Parameters.AddWithValue("$procedureCode", cycle.ProcedureCode);
         command.Parameters.AddWithValue("$procedureCategory", procedure?.Label ?? cycle.ProcedureCode);
         command.Parameters.AddWithValue("$seatedAt", FormatDateTimeOffset(cycle.SeatedAt));
+        command.Parameters.AddWithValue("$readyForDoctorAt", ToDbValue(cycle.ReadyForDoctorAt));
         command.Parameters.AddWithValue("$doctorArrivedAt", FormatDateTimeOffset(cycle.DoctorArrivedAt));
         command.Parameters.AddWithValue("$doctorCompleteAt", ToDbValue(cycle.DoctorCompleteAt));
         command.Parameters.AddWithValue("$roomAvailableAt", ToDbValue(cycle.RoomAvailableAt));
         command.Parameters.AddWithValue("$seatedToDoctorSeconds", cycle.SeatedToDoctorSeconds);
+        command.Parameters.AddWithValue("$prepSeconds", ToDbValue(cycle.PrepSeconds));
+        command.Parameters.AddWithValue("$readyToDoctorSeconds", ToDbValue(cycle.ReadyToDoctorSeconds));
         command.Parameters.AddWithValue("$doctorInRoomSeconds", ToDbValue(cycle.DoctorInRoomSeconds));
         command.Parameters.AddWithValue("$turnoverSeconds", ToDbValue(cycle.TurnoverSeconds));
         command.Parameters.AddWithValue("$totalRoomCycleSeconds", ToDbValue(cycle.TotalRoomCycleSeconds));
@@ -272,51 +292,80 @@ public sealed class SqliteBoardRepository
     private void Initialize()
     {
         using var connection = OpenConnection();
-        using var command = connection.CreateCommand();
-        command.CommandText = """
-            PRAGMA journal_mode = WAL;
-            PRAGMA busy_timeout = 5000;
 
-            CREATE TABLE IF NOT EXISTS active_rooms (
-                room_id INTEGER PRIMARY KEY,
-                assigned_doctor_id TEXT NULL,
-                assigned_doctor_display_name TEXT NULL,
-                procedure_code TEXT NULL,
-                procedure_category TEXT NULL,
-                state TEXT NOT NULL,
-                seated_at TEXT NULL,
-                aging_started_at TEXT NULL,
-                stale_started_at TEXT NULL,
-                doctor_arrived_at TEXT NULL,
-                doctor_complete_at TEXT NULL,
-                room_available_at TEXT NULL,
-                updated_at TEXT NOT NULL
-            );
+        // Create tables (or no-op if they already exist).
+        using (var command = connection.CreateCommand())
+        {
+            command.CommandText = """
+                PRAGMA journal_mode = WAL;
+                PRAGMA busy_timeout = 5000;
 
-            CREATE TABLE IF NOT EXISTS completed_room_cycles (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                room_id INTEGER NOT NULL,
-                assigned_doctor_id TEXT NOT NULL,
-                assigned_doctor_display_name TEXT NOT NULL,
-                procedure_code TEXT NOT NULL,
-                procedure_category TEXT NOT NULL,
-                seated_at TEXT NOT NULL,
-                doctor_arrived_at TEXT NOT NULL,
-                doctor_complete_at TEXT NULL,
-                room_available_at TEXT NULL,
-                seated_to_doctor_seconds INTEGER NOT NULL,
-                doctor_in_room_seconds INTEGER NULL,
-                turnover_seconds INTEGER NULL,
-                total_room_cycle_seconds INTEGER NULL,
-                final_wait_state TEXT NOT NULL,
-                aging_threshold_reached INTEGER NOT NULL DEFAULT 0,
-                stale_threshold_reached INTEGER NOT NULL DEFAULT 0,
-                created_at TEXT NOT NULL,
-                updated_at TEXT NOT NULL,
-                UNIQUE(room_id, seated_at)
-            );
-            """;
-        command.ExecuteNonQuery();
+                CREATE TABLE IF NOT EXISTS active_rooms (
+                    room_id INTEGER PRIMARY KEY,
+                    assigned_doctor_id TEXT NULL,
+                    assigned_doctor_display_name TEXT NULL,
+                    procedure_code TEXT NULL,
+                    procedure_category TEXT NULL,
+                    state TEXT NOT NULL,
+                    seated_at TEXT NULL,
+                    aging_started_at TEXT NULL,
+                    stale_started_at TEXT NULL,
+                    ready_for_doctor_at TEXT NULL,
+                    doctor_arrived_at TEXT NULL,
+                    doctor_complete_at TEXT NULL,
+                    room_available_at TEXT NULL,
+                    updated_at TEXT NOT NULL
+                );
+
+                CREATE TABLE IF NOT EXISTS completed_room_cycles (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    room_id INTEGER NOT NULL,
+                    assigned_doctor_id TEXT NOT NULL,
+                    assigned_doctor_display_name TEXT NOT NULL,
+                    procedure_code TEXT NOT NULL,
+                    procedure_category TEXT NOT NULL,
+                    seated_at TEXT NOT NULL,
+                    ready_for_doctor_at TEXT NULL,
+                    doctor_arrived_at TEXT NOT NULL,
+                    doctor_complete_at TEXT NULL,
+                    room_available_at TEXT NULL,
+                    seated_to_doctor_seconds INTEGER NOT NULL,
+                    prep_seconds INTEGER NULL,
+                    ready_to_doctor_seconds INTEGER NULL,
+                    doctor_in_room_seconds INTEGER NULL,
+                    turnover_seconds INTEGER NULL,
+                    total_room_cycle_seconds INTEGER NULL,
+                    final_wait_state TEXT NOT NULL,
+                    aging_threshold_reached INTEGER NOT NULL DEFAULT 0,
+                    stale_threshold_reached INTEGER NOT NULL DEFAULT 0,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL,
+                    UNIQUE(room_id, seated_at)
+                );
+                """;
+            command.ExecuteNonQuery();
+        }
+
+        // Migration: add new columns to existing databases that predate this schema version.
+        // Each ALTER TABLE is attempted independently; failure means the column already exists.
+        TryAddColumn(connection, "ALTER TABLE active_rooms ADD COLUMN ready_for_doctor_at TEXT NULL");
+        TryAddColumn(connection, "ALTER TABLE completed_room_cycles ADD COLUMN ready_for_doctor_at TEXT NULL");
+        TryAddColumn(connection, "ALTER TABLE completed_room_cycles ADD COLUMN prep_seconds INTEGER NULL");
+        TryAddColumn(connection, "ALTER TABLE completed_room_cycles ADD COLUMN ready_to_doctor_seconds INTEGER NULL");
+    }
+
+    private static void TryAddColumn(SqliteConnection connection, string alterTableSql)
+    {
+        try
+        {
+            using var command = connection.CreateCommand();
+            command.CommandText = alterTableSql;
+            command.ExecuteNonQuery();
+        }
+        catch (SqliteException)
+        {
+            // Column already exists on fresh databases — no action needed.
+        }
     }
 
     private void SaveRoom(
@@ -346,6 +395,7 @@ public sealed class SqliteBoardRepository
                 seated_at,
                 aging_started_at,
                 stale_started_at,
+                ready_for_doctor_at,
                 doctor_arrived_at,
                 doctor_complete_at,
                 room_available_at,
@@ -361,6 +411,7 @@ public sealed class SqliteBoardRepository
                 $seatedAt,
                 $agingStartedAt,
                 $staleStartedAt,
+                $readyForDoctorAt,
                 $doctorArrivedAt,
                 $doctorCompleteAt,
                 $roomAvailableAt,
@@ -375,6 +426,7 @@ public sealed class SqliteBoardRepository
                 seated_at = excluded.seated_at,
                 aging_started_at = excluded.aging_started_at,
                 stale_started_at = excluded.stale_started_at,
+                ready_for_doctor_at = excluded.ready_for_doctor_at,
                 doctor_arrived_at = excluded.doctor_arrived_at,
                 doctor_complete_at = excluded.doctor_complete_at,
                 room_available_at = excluded.room_available_at,
@@ -390,6 +442,7 @@ public sealed class SqliteBoardRepository
         command.Parameters.AddWithValue("$seatedAt", ToDbValue(room.SeatedAt));
         command.Parameters.AddWithValue("$agingStartedAt", ToDbValue(room.AgingStartedAt));
         command.Parameters.AddWithValue("$staleStartedAt", ToDbValue(room.StaleStartedAt));
+        command.Parameters.AddWithValue("$readyForDoctorAt", ToDbValue(room.ReadyForDoctorAt));
         command.Parameters.AddWithValue("$doctorArrivedAt", ToDbValue(room.DoctorArrivedAt));
         command.Parameters.AddWithValue("$doctorCompleteAt", ToDbValue(room.DoctorCompleteAt));
         command.Parameters.AddWithValue("$roomAvailableAt", ToDbValue(room.RoomAvailableAt));
