@@ -268,14 +268,38 @@ const connectionStatusDescriptions = {
   stale: "No fresh board update in over 15 seconds. Refresh or check the network/server."
 };
 
+function formatSnapshotAge(ageMs) {
+  if (ageMs < 1000) {
+    return `${Math.round(ageMs)} ms ago`;
+  }
+
+  return `${(ageMs / 1000).toFixed(1)} seconds ago`;
+}
+
+function getConnectionStatusDetails(status) {
+  const description = connectionStatusDescriptions[status] || "";
+  if (!app.lastSnapshotAt) {
+    return `${description}\n\nLast updated: never\nAge: unavailable`;
+  }
+
+  const ageMs = Math.max(0, Date.now() - app.lastSnapshotAt);
+  const lastUpdated = new Date(app.lastSnapshotAt).toLocaleTimeString([], {
+    hour: "numeric",
+    minute: "2-digit",
+    second: "2-digit"
+  });
+
+  return `${description}\n\nLast updated: ${lastUpdated}\nAge: ${formatSnapshotAge(ageMs)}`;
+}
+
 function setConnectionStatus(status) {
   app.connectionStatus = status;
   const target = ensureConnectionStatusIndicator();
   const label = status === "live" ? "Live" : status === "reconnecting" ? "Reconnecting" : "Stale";
-  const description = connectionStatusDescriptions[status] || "";
+  const details = getConnectionStatusDetails(status);
   target.className = `connection-status ${status}`;
-  target.title = description;
-  target.setAttribute("aria-label", `${label}: ${description}`);
+  target.title = details;
+  target.setAttribute("aria-label", `${label}: ${details}`);
   target.querySelector("span").textContent = label;
 }
 
