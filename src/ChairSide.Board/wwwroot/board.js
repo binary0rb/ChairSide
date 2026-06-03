@@ -30,6 +30,7 @@ const activeSeatedStates = new Set(["seated"]);
 const cancelableStates = new Set(["seated", "ready-for-doctor", "aging", "stale"]);
 // States where "Doctor Arrived" is enabled — all ready-for-doctor phase states.
 const doctorArrivedStates = new Set(["ready-for-doctor", "aging", "stale"]);
+const staffLoungeRoomNumber = 99;
 const adminAccess = {
   storageKey: "chairside-admin-token",
   headerName: "X-ChairSide-Admin-Token"
@@ -355,6 +356,11 @@ function renderMaster() {
 }
 
 function renderRoomPanel() {
+  if (isStaffLoungeRoom()) {
+    renderStaffLoungePanel();
+    return;
+  }
+
   const title = document.getElementById("roomPanelTitle");
   const status = document.getElementById("roomPanelStatus");
   const room = app.snapshot.rooms.find(item => getRoomId(item) === app.roomNumber);
@@ -367,6 +373,70 @@ function renderRoomPanel() {
   applyDemoTimerVisibility();
   populateDemoTimerSelect();
   setRoomControlsEnabled(room);
+}
+
+function isStaffLoungeRoom() {
+  return document.body.dataset.view === "room" && app.roomNumber === staffLoungeRoomNumber;
+}
+
+function renderStaffLoungePanel() {
+  const title = document.getElementById("roomPanelTitle");
+  const shell = document.querySelector(".panel-shell");
+  if (title) {
+    title.textContent = "Room 99";
+  }
+
+  if (!shell || shell.dataset.staffLounge === "true") {
+    return;
+  }
+
+  shell.dataset.staffLounge = "true";
+  shell.classList.add("staff-lounge-shell");
+  shell.innerHTML = `
+    <section class="staff-lounge-card" aria-labelledby="staffLoungeTitle">
+      <div class="room-topline">
+        <strong id="staffLoungeTitle">Room 99</strong>
+        <span>STAFF LOUNGE</span>
+      </div>
+      <div class="staff-lounge-mark" aria-hidden="true">99</div>
+      <p class="staff-lounge-subtitle">Staff Lounge</p>
+      <ul class="staff-lounge-lines">
+        <li><strong>Containment level:</strong> snack-adjacent</li>
+        <li><strong>Snack condition:</strong> hydraulically unstable</li>
+        <li>No PHI. No dignity was harmed in this simulation.</li>
+      </ul>
+      <div class="action-status" id="staffLoungeStatus" role="status" aria-live="polite" data-tone="pending">
+        Awaiting lounge protocol.
+      </div>
+    </section>
+    <section class="staff-lounge-actions" aria-labelledby="staffLoungeActionsTitle">
+      <span class="control-label primary-workflow-label" id="staffLoungeActionsTitle">Local lounge controls</span>
+      <div class="staff-lounge-action-grid">
+        <button class="secondary-button" type="button" data-staff-lounge-response="Towel deployed. Morale partially restored.">Deploy towel</button>
+        <button class="secondary-button" type="button" data-staff-lounge-response="Suction unavailable. Try emotional support.">Summon suction</button>
+        <button class="secondary-button" type="button" data-staff-lounge-response="Basin offered. Crisis downgraded.">Offer emesis basin</button>
+        <button class="secondary-button" type="button" data-staff-lounge-response="Dignity reset attempted. Results pending.">Reset dignity</button>
+        <button class="primary-button" id="returnToCivilizationButton" type="button">Return to civilization</button>
+      </div>
+    </section>
+  `;
+  wireStaffLoungePanel(shell);
+}
+
+function wireStaffLoungePanel(shell) {
+  const status = document.getElementById("staffLoungeStatus");
+  shell.querySelectorAll("[data-staff-lounge-response]").forEach(button => {
+    button.addEventListener("click", () => {
+      if (status) {
+        status.textContent = button.dataset.staffLoungeResponse;
+        status.dataset.tone = "success";
+      }
+    });
+  });
+
+  document.getElementById("returnToCivilizationButton")?.addEventListener("click", () => {
+    window.location.href = "/master.html";
+  });
 }
 
 function renderDoctorView() {
@@ -965,6 +1035,10 @@ function thresholdMinutes(value) {
 }
 
 function wireRoomPanel() {
+  if (isStaffLoungeRoom()) {
+    return;
+  }
+
   const seatButton = document.getElementById("seatButton");
   const readyForDoctorButton = document.getElementById("readyForDoctorButton");
   const updateAssignmentButton = document.getElementById("updateAssignmentButton");

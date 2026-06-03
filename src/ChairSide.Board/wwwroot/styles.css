@@ -686,6 +686,76 @@ label,
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.staff-lounge-shell {
+  grid-template-columns: minmax(260px, 360px) minmax(280px, 1fr);
+}
+
+.staff-lounge-card,
+.staff-lounge-actions {
+  display: grid;
+  gap: 16px;
+  padding: 18px;
+  border-radius: 8px;
+}
+
+.staff-lounge-card {
+  overflow: hidden;
+  border: 1px solid rgba(23, 32, 51, 0.2);
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.12), transparent 42%),
+    #172033;
+  color: #ffffff;
+}
+
+.staff-lounge-card .room-topline span {
+  border-color: rgba(255, 255, 255, 0.34);
+  background: rgba(255, 255, 255, 0.14);
+  color: #ffffff;
+}
+
+.staff-lounge-mark {
+  display: grid;
+  place-items: center;
+  width: min(100%, 180px);
+  aspect-ratio: 1;
+  margin: 4px auto;
+  border: 6px solid rgba(255, 255, 255, 0.28);
+  border-radius: 999px;
+  color: rgba(255, 255, 255, 0.92);
+  font-size: 68px;
+  font-weight: 950;
+  line-height: 1;
+}
+
+.staff-lounge-subtitle {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 950;
+}
+
+.staff-lounge-lines {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding-left: 18px;
+  line-height: 1.35;
+}
+
+.staff-lounge-actions {
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.86);
+}
+
+.staff-lounge-action-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.staff-lounge-action-grid .primary-button {
+  grid-column: 1 / -1;
+}
+
 .utility-button {
   min-height: 52px;
   font-size: 16px;
@@ -1115,7 +1185,8 @@ button:disabled {
   .doctor-selection-grid,
   .procedure-selection-grid,
   .primary-action-grid,
-  .secondary-action-grid {
+  .secondary-action-grid,
+  .staff-lounge-action-grid {
     grid-template-columns: 1fr;
   }
 }
