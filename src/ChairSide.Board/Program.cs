@@ -68,11 +68,16 @@ builder.Services.PostConfigure<ProcedureRosterOptions>(options =>
 });
 builder.Services.AddSingleton<IValidateOptions<ProcedureRosterOptions>, ProcedureRosterOptionsValidator>();
 
+builder.Services
+    .AddOptions<DiagnosticOptions>()
+    .Bind(builder.Configuration.GetSection(DiagnosticOptions.SectionName));
+
 builder.Services.AddSignalR();
 builder.Services.AddSingleton<SqliteBoardRepository>();
 builder.Services.AddSingleton<DemoBoardStore>();
 builder.Services.AddSingleton<RoomDeviceTokenValidator>();
 builder.Services.AddSingleton<AdminAccessTokenValidator>();
+builder.Services.AddSingleton<DiagnosticLogger>();
 
 var app = builder.Build();
 _ = app.Services.GetRequiredService<DemoBoardStore>();
@@ -128,39 +133,85 @@ app.MapGet("/api/rooms/{roomNumber:int}", IResult (int roomNumber, DemoBoardStor
     return room is null ? Results.NotFound("Room is not configured.") : Results.Ok(room);
 });
 
+// Client-side JavaScript error reporting. Not admin-protected so normal clients can post.
+app.MapPost("/api/client-errors", async (
+    ClientErrorRequest request,
+    HttpContext httpContext,
+    DiagnosticLogger diagnosticLogger) =>
+{
+    // Truncate free-text fields to prevent abuse; no PHI is expected in these fields.
+    var entry = new ClientErrorEntry
+    {
+        ServerTimestamp = DateTimeOffset.UtcNow.ToString("O"),
+        ClientTimestamp = request.Timestamp,
+        Url = Truncate(request.Url, 500),
+        RoomId = Truncate(request.RoomId, 20),
+        View = Truncate(request.View, 50),
+        Message = Truncate(request.Message, 500),
+        Source = Truncate(request.Source, 300),
+        Line = request.Line,
+        Column = request.Column,
+        Stack = Truncate(request.Stack, 2000),
+        UserAgent = Truncate(request.UserAgent, 300),
+        ConnectionStatus = Truncate(request.ConnectionStatus, 30),
+        LastSnapshotAt = request.LastSnapshotAt,
+        SnapshotAgeMs = request.SnapshotAgeMs,
+        ClientIp = httpContext.Connection.RemoteIpAddress?.ToString()
+    };
+    await diagnosticLogger.LogClientErrorAsync(entry);
+    return Results.NoContent();
+});
+
 app.MapPost("/api/rooms/{roomNumber:int}/seat", async Task<IResult> (
     int roomNumber,
     SeatRoomRequest request,
     HttpContext httpContext,
     RoomDeviceTokenValidator roomDeviceTokenValidator,
     DemoBoardStore store,
+    DiagnosticLogger diagnosticLogger,
     Microsoft.AspNetCore.SignalR.IHubContext<BoardHub> hubContext) =>
 {
+    var auditCtx = AuditRequestContext.From(httpContext);
+    var previousRoom = store.GetRoom(roomNumber);
+    var procedureCode = (request.ProcedureCode ?? request.ProcedureId)?.Trim();
+    var doctorId = request.DoctorId?.Trim();
+
     var bindingFailure = RoomDeviceBindingGuard.ValidateMutationRequest(
         roomNumber,
         httpContext.Request,
         roomDeviceTokenValidator);
     if (bindingFailure is not null)
     {
+        await diagnosticLogger.LogRoomAuditAsync(auditCtx.Build(
+            "seat", roomNumber, previousRoom, null, false, "binding-rejected",
+            previousRoom?.AssignedDoctor, previousRoom?.ProcedureCode));
         return bindingFailure;
     }
 
-    var procedureCode = (request.ProcedureCode ?? request.ProcedureId)?.Trim();
-    var doctorId = request.DoctorId?.Trim();
     var validationError = RoomMutationRequestValidator.ValidateDoctorAndProcedure(doctorId, procedureCode);
     if (validationError is not null)
     {
+        await diagnosticLogger.LogRoomAuditAsync(auditCtx.Build(
+            "seat", roomNumber, previousRoom, null, false, "validation-failed",
+            doctorId, procedureCode));
         return Results.BadRequest(validationError);
     }
 
     var result = store.SeatRoom(roomNumber, doctorId!, procedureCode!, request.DemoElapsedMinutes);
     if (result is null)
     {
+        var reason = store.IsConfiguredRoom(roomNumber) ? "state-rejected" : "room-not-found";
+        await diagnosticLogger.LogRoomAuditAsync(auditCtx.Build(
+            "seat", roomNumber, previousRoom, null, false, reason,
+            doctorId, procedureCode));
         return store.IsConfiguredRoom(roomNumber)
             ? Results.BadRequest("Seat Room is only available when the room is available and the selected doctor and procedure are valid.")
             : Results.NotFound("Room is not configured.");
     }
 
+    await diagnosticLogger.LogRoomAuditAsync(auditCtx.Build(
+        "seat", roomNumber, previousRoom, result, true, null,
+        result.AssignedDoctor, result.ProcedureCode));
     await hubContext.Clients.All.SendAsync("boardUpdated", store.GetSnapshot());
     return Results.Ok(result);
 });
@@ -171,33 +222,50 @@ app.MapPost("/api/rooms/{roomNumber:int}/assignment", async Task<IResult> (
     HttpContext httpContext,
     RoomDeviceTokenValidator roomDeviceTokenValidator,
     DemoBoardStore store,
+    DiagnosticLogger diagnosticLogger,
     Microsoft.AspNetCore.SignalR.IHubContext<BoardHub> hubContext) =>
 {
+    var auditCtx = AuditRequestContext.From(httpContext);
+    var previousRoom = store.GetRoom(roomNumber);
+    var procedureCode = (request.ProcedureCode ?? request.ProcedureId)?.Trim();
+    var doctorId = request.DoctorId?.Trim();
+
     var bindingFailure = RoomDeviceBindingGuard.ValidateMutationRequest(
         roomNumber,
         httpContext.Request,
         roomDeviceTokenValidator);
     if (bindingFailure is not null)
     {
+        await diagnosticLogger.LogRoomAuditAsync(auditCtx.Build(
+            "update-assignment", roomNumber, previousRoom, null, false, "binding-rejected",
+            previousRoom?.AssignedDoctor, previousRoom?.ProcedureCode));
         return bindingFailure;
     }
 
-    var procedureCode = (request.ProcedureCode ?? request.ProcedureId)?.Trim();
-    var doctorId = request.DoctorId?.Trim();
     var validationError = RoomMutationRequestValidator.ValidateDoctorAndProcedure(doctorId, procedureCode);
     if (validationError is not null)
     {
+        await diagnosticLogger.LogRoomAuditAsync(auditCtx.Build(
+            "update-assignment", roomNumber, previousRoom, null, false, "validation-failed",
+            doctorId, procedureCode));
         return Results.BadRequest(validationError);
     }
 
     var result = store.UpdateAssignment(roomNumber, doctorId!, procedureCode!);
     if (result is null)
     {
+        var reason = store.IsConfiguredRoom(roomNumber) ? "state-rejected" : "room-not-found";
+        await diagnosticLogger.LogRoomAuditAsync(auditCtx.Build(
+            "update-assignment", roomNumber, previousRoom, null, false, reason,
+            doctorId, procedureCode));
         return store.IsConfiguredRoom(roomNumber)
             ? Results.BadRequest("Update Assignment is only available for seated, aging, stale, or ready-for-doctor rooms with a valid doctor and procedure.")
             : Results.NotFound("Room is not configured.");
     }
 
+    await diagnosticLogger.LogRoomAuditAsync(auditCtx.Build(
+        "update-assignment", roomNumber, previousRoom, result, true, null,
+        result.AssignedDoctor, result.ProcedureCode));
     await hubContext.Clients.All.SendAsync("boardUpdated", store.GetSnapshot());
     return Results.Ok(result);
 });
@@ -207,25 +275,39 @@ app.MapPost("/api/rooms/{roomNumber:int}/cancel-seating", async Task<IResult> (
     HttpContext httpContext,
     RoomDeviceTokenValidator roomDeviceTokenValidator,
     DemoBoardStore store,
+    DiagnosticLogger diagnosticLogger,
     Microsoft.AspNetCore.SignalR.IHubContext<BoardHub> hubContext) =>
 {
+    var auditCtx = AuditRequestContext.From(httpContext);
+    var previousRoom = store.GetRoom(roomNumber);
+
     var bindingFailure = RoomDeviceBindingGuard.ValidateMutationRequest(
         roomNumber,
         httpContext.Request,
         roomDeviceTokenValidator);
     if (bindingFailure is not null)
     {
+        await diagnosticLogger.LogRoomAuditAsync(auditCtx.Build(
+            "cancel-seating", roomNumber, previousRoom, null, false, "binding-rejected",
+            previousRoom?.AssignedDoctor, previousRoom?.ProcedureCode));
         return bindingFailure;
     }
 
     var result = store.CancelSeating(roomNumber);
     if (result is null)
     {
+        var reason = store.IsConfiguredRoom(roomNumber) ? "state-rejected" : "room-not-found";
+        await diagnosticLogger.LogRoomAuditAsync(auditCtx.Build(
+            "cancel-seating", roomNumber, previousRoom, null, false, reason,
+            previousRoom?.AssignedDoctor, previousRoom?.ProcedureCode));
         return store.IsConfiguredRoom(roomNumber)
             ? Results.BadRequest("Cancel Seating is only available for seated, aging, stale, or ready-for-doctor rooms.")
             : Results.NotFound("Room is not configured.");
     }
 
+    await diagnosticLogger.LogRoomAuditAsync(auditCtx.Build(
+        "cancel-seating", roomNumber, previousRoom, result, true, null,
+        previousRoom?.AssignedDoctor, previousRoom?.ProcedureCode));
     await hubContext.Clients.All.SendAsync("boardUpdated", store.GetSnapshot());
     return Results.Ok(result);
 });
@@ -235,25 +317,39 @@ app.MapPost("/api/rooms/{roomNumber:int}/ready-for-doctor", async Task<IResult> 
     HttpContext httpContext,
     RoomDeviceTokenValidator roomDeviceTokenValidator,
     DemoBoardStore store,
+    DiagnosticLogger diagnosticLogger,
     Microsoft.AspNetCore.SignalR.IHubContext<BoardHub> hubContext) =>
 {
+    var auditCtx = AuditRequestContext.From(httpContext);
+    var previousRoom = store.GetRoom(roomNumber);
+
     var bindingFailure = RoomDeviceBindingGuard.ValidateMutationRequest(
         roomNumber,
         httpContext.Request,
         roomDeviceTokenValidator);
     if (bindingFailure is not null)
     {
+        await diagnosticLogger.LogRoomAuditAsync(auditCtx.Build(
+            "ready-for-doctor", roomNumber, previousRoom, null, false, "binding-rejected",
+            previousRoom?.AssignedDoctor, previousRoom?.ProcedureCode));
         return bindingFailure;
     }
 
     var result = store.MarkReadyForDoctor(roomNumber);
     if (result is null)
     {
+        var reason = store.IsConfiguredRoom(roomNumber) ? "state-rejected" : "room-not-found";
+        await diagnosticLogger.LogRoomAuditAsync(auditCtx.Build(
+            "ready-for-doctor", roomNumber, previousRoom, null, false, reason,
+            previousRoom?.AssignedDoctor, previousRoom?.ProcedureCode));
         return store.IsConfiguredRoom(roomNumber)
             ? Results.BadRequest("Ready for Doctor is only available for seated, aging, or stale rooms.")
             : Results.NotFound("Room is not configured.");
     }
 
+    await diagnosticLogger.LogRoomAuditAsync(auditCtx.Build(
+        "ready-for-doctor", roomNumber, previousRoom, result, true, null,
+        result.AssignedDoctor, result.ProcedureCode));
     await hubContext.Clients.All.SendAsync("boardUpdated", store.GetSnapshot());
     return Results.Ok(result);
 });
@@ -263,25 +359,39 @@ app.MapPost("/api/rooms/{roomNumber:int}/doctor-arrived", async Task<IResult> (
     HttpContext httpContext,
     RoomDeviceTokenValidator roomDeviceTokenValidator,
     DemoBoardStore store,
+    DiagnosticLogger diagnosticLogger,
     Microsoft.AspNetCore.SignalR.IHubContext<BoardHub> hubContext) =>
 {
+    var auditCtx = AuditRequestContext.From(httpContext);
+    var previousRoom = store.GetRoom(roomNumber);
+
     var bindingFailure = RoomDeviceBindingGuard.ValidateMutationRequest(
         roomNumber,
         httpContext.Request,
         roomDeviceTokenValidator);
     if (bindingFailure is not null)
     {
+        await diagnosticLogger.LogRoomAuditAsync(auditCtx.Build(
+            "doctor-arrived", roomNumber, previousRoom, null, false, "binding-rejected",
+            previousRoom?.AssignedDoctor, previousRoom?.ProcedureCode));
         return bindingFailure;
     }
 
     var result = store.MarkDoctorArrived(roomNumber);
     if (result is null)
     {
+        var reason = store.IsConfiguredRoom(roomNumber) ? "state-rejected" : "room-not-found";
+        await diagnosticLogger.LogRoomAuditAsync(auditCtx.Build(
+            "doctor-arrived", roomNumber, previousRoom, null, false, reason,
+            previousRoom?.AssignedDoctor, previousRoom?.ProcedureCode));
         return store.IsConfiguredRoom(roomNumber)
             ? Results.BadRequest("Doctor Arrived is only available when the room is marked ready for doctor.")
             : Results.NotFound("Room is not configured.");
     }
 
+    await diagnosticLogger.LogRoomAuditAsync(auditCtx.Build(
+        "doctor-arrived", roomNumber, previousRoom, result, true, null,
+        result.AssignedDoctor, result.ProcedureCode));
     await hubContext.Clients.All.SendAsync("boardUpdated", store.GetSnapshot());
     return Results.Ok(result);
 });
@@ -291,25 +401,39 @@ app.MapPost("/api/rooms/{roomNumber:int}/doctor-complete", async Task<IResult> (
     HttpContext httpContext,
     RoomDeviceTokenValidator roomDeviceTokenValidator,
     DemoBoardStore store,
+    DiagnosticLogger diagnosticLogger,
     Microsoft.AspNetCore.SignalR.IHubContext<BoardHub> hubContext) =>
 {
+    var auditCtx = AuditRequestContext.From(httpContext);
+    var previousRoom = store.GetRoom(roomNumber);
+
     var bindingFailure = RoomDeviceBindingGuard.ValidateMutationRequest(
         roomNumber,
         httpContext.Request,
         roomDeviceTokenValidator);
     if (bindingFailure is not null)
     {
+        await diagnosticLogger.LogRoomAuditAsync(auditCtx.Build(
+            "doctor-complete", roomNumber, previousRoom, null, false, "binding-rejected",
+            previousRoom?.AssignedDoctor, previousRoom?.ProcedureCode));
         return bindingFailure;
     }
 
     var result = store.MarkDoctorComplete(roomNumber);
     if (result is null)
     {
+        var reason = store.IsConfiguredRoom(roomNumber) ? "state-rejected" : "room-not-found";
+        await diagnosticLogger.LogRoomAuditAsync(auditCtx.Build(
+            "doctor-complete", roomNumber, previousRoom, null, false, reason,
+            previousRoom?.AssignedDoctor, previousRoom?.ProcedureCode));
         return store.IsConfiguredRoom(roomNumber)
             ? Results.BadRequest("Doctor Complete is only available when the doctor is in the room.")
             : Results.NotFound("Room is not configured.");
     }
 
+    await diagnosticLogger.LogRoomAuditAsync(auditCtx.Build(
+        "doctor-complete", roomNumber, previousRoom, result, true, null,
+        result.AssignedDoctor, result.ProcedureCode));
     await hubContext.Clients.All.SendAsync("boardUpdated", store.GetSnapshot());
     return Results.Ok(result);
 });
@@ -319,30 +443,55 @@ app.MapPost("/api/rooms/{roomNumber:int}/available", async Task<IResult> (
     HttpContext httpContext,
     RoomDeviceTokenValidator roomDeviceTokenValidator,
     DemoBoardStore store,
+    DiagnosticLogger diagnosticLogger,
     Microsoft.AspNetCore.SignalR.IHubContext<BoardHub> hubContext) =>
 {
+    var auditCtx = AuditRequestContext.From(httpContext);
+    var previousRoom = store.GetRoom(roomNumber);
+
     var bindingFailure = RoomDeviceBindingGuard.ValidateMutationRequest(
         roomNumber,
         httpContext.Request,
         roomDeviceTokenValidator);
     if (bindingFailure is not null)
     {
+        await diagnosticLogger.LogRoomAuditAsync(auditCtx.Build(
+            "room-available", roomNumber, previousRoom, null, false, "binding-rejected",
+            previousRoom?.AssignedDoctor, previousRoom?.ProcedureCode));
         return bindingFailure;
     }
 
     var result = store.MarkRoomAvailable(roomNumber);
     if (result is null)
     {
+        var reason = store.IsConfiguredRoom(roomNumber) ? "state-rejected" : "room-not-found";
+        await diagnosticLogger.LogRoomAuditAsync(auditCtx.Build(
+            "room-available", roomNumber, previousRoom, null, false, reason,
+            previousRoom?.AssignedDoctor, previousRoom?.ProcedureCode));
         return store.IsConfiguredRoom(roomNumber)
             ? Results.BadRequest("Room Available is only available during turnover.")
             : Results.NotFound("Room is not configured.");
     }
 
+    await diagnosticLogger.LogRoomAuditAsync(auditCtx.Build(
+        "room-available", roomNumber, previousRoom, result, true, null,
+        previousRoom?.AssignedDoctor, previousRoom?.ProcedureCode));
     await hubContext.Clients.All.SendAsync("boardUpdated", store.GetSnapshot());
     return Results.Ok(result);
 });
 
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+static string? Truncate(string? value, int maxLength) =>
+    value is null ? null : value.Length <= maxLength ? value : value[..maxLength];
+
 app.Run();
+
+// ---------------------------------------------------------------------------
+// Request / response types
+// ---------------------------------------------------------------------------
 
 public sealed record SeatRoomRequest(
     string DoctorId,
@@ -354,3 +503,72 @@ public sealed record UpdateAssignmentRequest(
     string DoctorId,
     string? ProcedureCode = null,
     string? ProcedureId = null);
+
+/// <summary>
+/// Body posted by the browser error capture in board.js.
+/// Contains only technical diagnostics — no PHI.
+/// </summary>
+public sealed record ClientErrorRequest(
+    string? Timestamp = null,
+    string? Url = null,
+    string? RoomId = null,
+    string? View = null,
+    string? Message = null,
+    string? Source = null,
+    int? Line = null,
+    int? Column = null,
+    string? Stack = null,
+    string? UserAgent = null,
+    string? ConnectionStatus = null,
+    long? LastSnapshotAt = null,
+    long? SnapshotAgeMs = null);
+
+// ---------------------------------------------------------------------------
+// Audit logging helpers
+// ---------------------------------------------------------------------------
+
+/// <summary>
+/// Captures per-request metadata for audit log entries.
+/// </summary>
+internal sealed class AuditRequestContext
+{
+    private readonly string? _clientIp;
+    private readonly string? _userAgent;
+    private readonly string _requestPath;
+    private readonly string? _referrer;
+
+    private AuditRequestContext(HttpContext ctx)
+    {
+        _clientIp = ctx.Connection.RemoteIpAddress?.ToString();
+        _userAgent = ctx.Request.Headers["User-Agent"].FirstOrDefault();
+        _requestPath = ctx.Request.Path.ToString();
+        _referrer = ctx.Request.Headers["Referer"].FirstOrDefault();
+    }
+
+    public static AuditRequestContext From(HttpContext ctx) => new(ctx);
+
+    public RoomAuditEntry Build(
+        string action,
+        int roomNumber,
+        RoomStatus? previousRoom,
+        RoomStatus? result,
+        bool success,
+        string? reason,
+        string? doctorId,
+        string? procedureCode) => new()
+    {
+        Timestamp = DateTimeOffset.UtcNow.ToString("O"),
+        Action = action,
+        RoomNumber = roomNumber,
+        PreviousState = previousRoom?.State,
+        NewState = result?.State,
+        DoctorId = doctorId,
+        ProcedureCode = procedureCode,
+        Success = success,
+        Reason = reason,
+        ClientIp = _clientIp,
+        UserAgent = _userAgent,
+        RequestPath = _requestPath,
+        Referrer = _referrer
+    };
+}

@@ -837,6 +837,104 @@ public sealed class BoardStoreTests
         Assert.False(AdminAccessGuard.IsProtectedPath("/room-1.html"));
         Assert.False(AdminAccessGuard.IsProtectedPath("/api/board"));
         Assert.False(AdminAccessGuard.IsProtectedPath("/api/rooms/1"));
+        // Client error reporting must be unprotected so normal clients can post.
+        Assert.False(AdminAccessGuard.IsProtectedPath("/api/client-errors"));
+    }
+
+    [Fact]
+    public async Task Diagnostic_logger_appends_client_error_entry_to_log_file()
+    {
+        using var workspace = TestWorkspace.Create();
+        var logDir = Path.Combine(workspace.DataRoot, "logs");
+        var logger = CreateDiagnosticLogger(logDir, workspace.ContentRoot);
+
+        await logger.LogClientErrorAsync(new ClientErrorEntry
+        {
+            ServerTimestamp = "2026-06-04T10:00:00Z",
+            Message = "TypeError: Cannot read properties of null",
+            View = "room",
+            RoomId = "1",
+            ConnectionStatus = "live"
+        });
+
+        var logPath = Path.Combine(logDir, "client-errors.log");
+        Assert.True(File.Exists(logPath));
+        var content = await File.ReadAllTextAsync(logPath);
+        Assert.Contains("TypeError: Cannot read properties of null", content);
+        Assert.Contains("room", content);
+        Assert.Contains("serverTimestamp", content);
+        Assert.Contains("2026-06-04", content);
+    }
+
+    [Fact]
+    public async Task Diagnostic_logger_appends_room_audit_entry_to_log_file()
+    {
+        using var workspace = TestWorkspace.Create();
+        var logDir = Path.Combine(workspace.DataRoot, "logs");
+        var logger = CreateDiagnosticLogger(logDir, workspace.ContentRoot);
+
+        await logger.LogRoomAuditAsync(new RoomAuditEntry
+        {
+            Timestamp = "2026-06-04T10:05:00Z",
+            Action = "seat",
+            RoomNumber = 2,
+            PreviousState = "available",
+            NewState = "seated",
+            DoctorId = "otte",
+            ProcedureCode = "CON",
+            Success = true
+        });
+
+        var logPath = Path.Combine(logDir, "room-audit.log");
+        Assert.True(File.Exists(logPath));
+        var content = await File.ReadAllTextAsync(logPath);
+        Assert.Contains("seat", content);
+        Assert.Contains("available", content);
+        Assert.Contains("seated", content);
+        Assert.Contains("action", content);
+        Assert.Contains("roomNumber", content);
+    }
+
+    [Fact]
+    public async Task Diagnostic_logger_creates_log_directory_if_missing()
+    {
+        using var workspace = TestWorkspace.Create();
+        var logDir = Path.Combine(workspace.DataRoot, "deep", "nested", "logs");
+        // Directory does not exist yet — logger must create it.
+        Assert.False(Directory.Exists(logDir));
+
+        var logger = CreateDiagnosticLogger(logDir, workspace.ContentRoot);
+
+        await logger.LogRoomAuditAsync(new RoomAuditEntry
+        {
+            Timestamp = DateTimeOffset.UtcNow.ToString("O"),
+            Action = "seat",
+            RoomNumber = 1,
+            Success = true
+        });
+
+        Assert.True(File.Exists(Path.Combine(logDir, "room-audit.log")));
+    }
+
+    [Fact]
+    public async Task Diagnostic_logger_multiple_entries_are_each_on_their_own_line()
+    {
+        using var workspace = TestWorkspace.Create();
+        var logDir = Path.Combine(workspace.DataRoot, "logs");
+        var logger = CreateDiagnosticLogger(logDir, workspace.ContentRoot);
+
+        await logger.LogRoomAuditAsync(new RoomAuditEntry { Action = "seat", RoomNumber = 1, Success = true });
+        await logger.LogRoomAuditAsync(new RoomAuditEntry { Action = "ready-for-doctor", RoomNumber = 1, Success = true });
+        await logger.LogRoomAuditAsync(new RoomAuditEntry { Action = "doctor-arrived", RoomNumber = 1, Success = true });
+
+        var lines = (await File.ReadAllLinesAsync(Path.Combine(logDir, "room-audit.log")))
+            .Where(l => !string.IsNullOrWhiteSpace(l))
+            .ToList();
+
+        Assert.Equal(3, lines.Count);
+        Assert.Contains("seat", lines[0]);
+        Assert.Contains("ready-for-doctor", lines[1]);
+        Assert.Contains("doctor-arrived", lines[2]);
     }
 
     [Fact]
@@ -1224,6 +1322,11 @@ public sealed class BoardStoreTests
         string environmentName = "Development") =>
         new AdminAccessOptionsValidator(new TestWebHostEnvironment(Path.GetTempPath(), environmentName))
             .Validate(null, options);
+
+    private static DiagnosticLogger CreateDiagnosticLogger(string logDirectory, string contentRoot) =>
+        new(
+            Microsoft.Extensions.Options.Options.Create(new DiagnosticOptions { LogDirectory = logDirectory }),
+            new TestWebHostEnvironment(contentRoot, Environments.Production));
 
     private static ValidateOptionsResult ValidateDoctorRoster(DoctorRosterOptions options) =>
         new DoctorRosterOptionsValidator().Validate(null, options);

@@ -1439,4 +1439,79 @@ function formatDateTime(value) {
   }).format(new Date(value));
 }
 
+// ---------------------------------------------------------------------------
+// Client-side diagnostic error capture.
+// Posts technical details to /api/client-errors.
+// Never logs PHI, form values, or patient data.
+// ---------------------------------------------------------------------------
+(function wireClientErrorCapture() {
+  // Guard against recursive reports (e.g. if the fetch itself errors).
+  let _pending = false;
+
+  function reportError(payload) {
+    if (_pending) {
+      return;
+    }
+    _pending = true;
+    fetch("/api/client-errors", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+      keepalive: true
+    }).catch(function(err) {
+      console.warn("[ChairSide] Client error reporting failed.", err);
+    }).finally(function() {
+      _pending = false;
+    });
+  }
+
+  function buildPayload(message, source, line, column, stack) {
+    var roomId = null;
+    var view = null;
+    var connectionStatus = null;
+    var lastSnapshotAt = null;
+    var snapshotAgeMs = null;
+    try {
+      roomId = app.roomNumber ? String(app.roomNumber) : null;
+      view = document.body?.dataset?.view || null;
+      connectionStatus = app.connectionStatus || null;
+      lastSnapshotAt = app.lastSnapshotAt || null;
+      snapshotAgeMs = app.lastSnapshotAt ? Date.now() - app.lastSnapshotAt : null;
+    } catch (_) { /* app may not be initialised yet */ }
+
+    return {
+      timestamp: new Date().toISOString(),
+      url: location.href,
+      roomId: roomId,
+      view: view,
+      message: message || null,
+      source: source || null,
+      line: line || null,
+      column: column || null,
+      stack: stack || null,
+      userAgent: navigator.userAgent,
+      connectionStatus: connectionStatus,
+      lastSnapshotAt: lastSnapshotAt,
+      snapshotAgeMs: snapshotAgeMs
+    };
+  }
+
+  window.addEventListener("error", function(event) {
+    reportError(buildPayload(
+      event.message,
+      event.filename,
+      event.lineno,
+      event.colno,
+      event.error && event.error.stack ? event.error.stack : null
+    ));
+  });
+
+  window.addEventListener("unhandledrejection", function(event) {
+    var reason = event.reason;
+    var message = reason instanceof Error ? reason.message : String(reason || "Unhandled promise rejection");
+    var stack = reason instanceof Error ? reason.stack : null;
+    reportError(buildPayload(message, null, null, null, stack));
+  });
+})();
+
 boot();
