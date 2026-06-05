@@ -34,8 +34,8 @@
         <span><i class="state-dot empty"></i> Available</span>
         <span><i class="state-dot seated"></i> In Prep: patient preparing, not yet ready</span>
         <span><i class="state-dot ready-for-doctor"></i> Ready: doctor requested</span>
-        <span><i class="state-dot aging"></i> Aging: doctor requested too long</span>
-        <span><i class="state-dot stale"></i> Stale: doctor requested very long</span>
+        <span id="agingLegendLabel"><i class="state-dot aging"></i> Aging: doctor requested too long</span>
+        <span id="staleLegendLabel"><i class="state-dot stale"></i> Stale: doctor requested very long</span>
         <span><i class="state-dot doctor-in-room"></i> Doctor In Room</span>
         <span><i class="state-dot turnover"></i> Turnover</span>
       </div>
@@ -45,6 +45,6 @@
   </main>
 
   <script src="/signalr-lite.js"></script>
-  <script src="/board.js?v=20260603-ready-for-doctor"></script>
+  <script src="/board.js?v=20260605-threshold-labels"></script>
 </body>
 </html>

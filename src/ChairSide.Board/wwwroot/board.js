@@ -344,6 +344,22 @@ function renderLegend() {
       </span>
     `).join("");
   }
+
+  const agingLabel = document.getElementById("agingLegendLabel");
+  if (agingLabel) {
+    const agingMinutes = getAgingMinutes();
+    if (agingMinutes !== null) {
+      agingLabel.innerHTML = `<i class="state-dot aging"></i> Aging: doctor requested &gt; ${Math.round(agingMinutes)} min`;
+    }
+  }
+
+  const staleLabel = document.getElementById("staleLegendLabel");
+  if (staleLabel) {
+    const staleMinutes = getStaleMinutes();
+    if (staleMinutes !== null) {
+      staleLabel.innerHTML = `<i class="state-dot stale"></i> Stale: doctor requested &gt; ${Math.round(staleMinutes)} min`;
+    }
+  }
 }
 
 function renderMaster() {
