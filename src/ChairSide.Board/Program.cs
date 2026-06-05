@@ -78,6 +78,7 @@ builder.Services.AddSingleton<DemoBoardStore>();
 builder.Services.AddSingleton<RoomDeviceTokenValidator>();
 builder.Services.AddSingleton<AdminAccessTokenValidator>();
 builder.Services.AddSingleton<DiagnosticLogger>();
+builder.Services.AddSingleton<ClientErrorRateLimiter>();
 
 var app = builder.Build();
 _ = app.Services.GetRequiredService<DemoBoardStore>();
@@ -137,8 +138,15 @@ app.MapGet("/api/rooms/{roomNumber:int}", IResult (int roomNumber, DemoBoardStor
 app.MapPost("/api/client-errors", async (
     ClientErrorRequest request,
     HttpContext httpContext,
+    ClientErrorRateLimiter rateLimiter,
     DiagnosticLogger diagnosticLogger) =>
 {
+    var clientIp = httpContext.Connection.RemoteIpAddress?.ToString();
+    if (!rateLimiter.IsAllowed(clientIp))
+    {
+        return Results.StatusCode(StatusCodes.Status429TooManyRequests);
+    }
+
     // Truncate free-text fields to prevent abuse; no PHI is expected in these fields.
     var entry = new ClientErrorEntry
     {
@@ -156,7 +164,7 @@ app.MapPost("/api/client-errors", async (
         ConnectionStatus = Truncate(request.ConnectionStatus, 30),
         LastSnapshotAt = request.LastSnapshotAt,
         SnapshotAgeMs = request.SnapshotAgeMs,
-        ClientIp = httpContext.Connection.RemoteIpAddress?.ToString()
+        ClientIp = clientIp
     };
     await diagnosticLogger.LogClientErrorAsync(entry);
     return Results.NoContent();

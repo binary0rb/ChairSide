@@ -938,6 +938,105 @@ public sealed class BoardStoreTests
     }
 
     [Fact]
+    public void Client_error_rate_limiter_allows_up_to_limit_then_rejects()
+    {
+        var now = new DateTimeOffset(2026, 6, 5, 10, 0, 0, TimeSpan.Zero);
+        var clock = new ManualTimeProvider(now);
+        var limiter = new ClientErrorRateLimiter(
+            new TestOptionsMonitor<DiagnosticOptions>(new DiagnosticOptions { ClientErrorRateLimitPerMinute = 3 }),
+            clock);
+
+        // First 3 requests from the same IP are allowed.
+        Assert.True(limiter.IsAllowed("10.0.0.1"));
+        Assert.True(limiter.IsAllowed("10.0.0.1"));
+        Assert.True(limiter.IsAllowed("10.0.0.1"));
+
+        // 4th request in the same window is blocked.
+        Assert.False(limiter.IsAllowed("10.0.0.1"));
+        Assert.False(limiter.IsAllowed("10.0.0.1"));
+
+        // A different IP is not affected by the first IP's counter.
+        Assert.True(limiter.IsAllowed("10.0.0.2"));
+
+        // After the one-minute window expires, the first IP is allowed again.
+        clock.SetUtcNow(now.AddMinutes(1).AddSeconds(1));
+        Assert.True(limiter.IsAllowed("10.0.0.1"));
+        Assert.True(limiter.IsAllowed("10.0.0.1"));
+        Assert.True(limiter.IsAllowed("10.0.0.1"));
+        Assert.False(limiter.IsAllowed("10.0.0.1")); // new window, same limit
+    }
+
+    [Fact]
+    public void Client_error_rate_limiter_null_or_empty_ip_is_always_allowed()
+    {
+        // Unknown/proxied source IPs must never be blocked — they cannot be rate-limited
+        // by address and the limiter must not throw on null input.
+        var limiter = new ClientErrorRateLimiter(
+            new TestOptionsMonitor<DiagnosticOptions>(new DiagnosticOptions { ClientErrorRateLimitPerMinute = 1 }));
+
+        Assert.True(limiter.IsAllowed(null));
+        Assert.True(limiter.IsAllowed(null));
+        Assert.True(limiter.IsAllowed(""));
+        Assert.True(limiter.IsAllowed(""));
+    }
+
+    [Fact]
+    public async Task Diagnostic_logger_rotates_when_max_file_size_exceeded()
+    {
+        using var workspace = TestWorkspace.Create();
+        var logDir = Path.Combine(workspace.DataRoot, "logs");
+
+        // Set a tiny cap (10 bytes) so the very first write already exceeds the limit
+        // and rotation triggers on the second write.
+        var logger = CreateDiagnosticLogger(logDir, workspace.ContentRoot, maxFileSizeBytes: 10);
+
+        var logPath = Path.Combine(logDir, "room-audit.log");
+        var rotatedPath = logPath + ".1";
+
+        // First write creates the file; no rotation yet (file didn't exist before).
+        await logger.LogRoomAuditAsync(new RoomAuditEntry { Action = "seat", RoomNumber = 1, Success = true });
+        Assert.True(File.Exists(logPath));
+        Assert.False(File.Exists(rotatedPath));
+
+        // Second write: file already exceeds 10 bytes, so rotation fires first.
+        await logger.LogRoomAuditAsync(new RoomAuditEntry { Action = "ready-for-doctor", RoomNumber = 1, Success = true });
+        Assert.True(File.Exists(logPath));
+        Assert.True(File.Exists(rotatedPath));
+
+        // The rotated file holds the first entry; the new file holds the second.
+        var rotatedContent = await File.ReadAllTextAsync(rotatedPath);
+        var currentContent = await File.ReadAllTextAsync(logPath);
+        Assert.Contains("seat", rotatedContent);
+        Assert.Contains("ready-for-doctor", currentContent);
+    }
+
+    [Fact]
+    public async Task Diagnostic_logger_rotation_failure_does_not_block_logging()
+    {
+        // If the .1 path is occupied by a directory, File.Move will fail.
+        // The logger must catch that, write a message to stderr, and still append
+        // to the original file so room workflow is never disrupted.
+        using var workspace = TestWorkspace.Create();
+        var logDir = Path.Combine(workspace.DataRoot, "logs");
+        var logger = CreateDiagnosticLogger(logDir, workspace.ContentRoot, maxFileSizeBytes: 10);
+
+        var logPath = Path.Combine(logDir, "room-audit.log");
+        var rotatedPath = logPath + ".1";
+
+        // First write creates the file.
+        await logger.LogRoomAuditAsync(new RoomAuditEntry { Action = "seat", RoomNumber = 1, Success = true });
+
+        // Block the rotation target so File.Move cannot succeed.
+        Directory.CreateDirectory(rotatedPath);
+
+        // Second write: rotation fails silently, but the entry must still be written.
+        await logger.LogRoomAuditAsync(new RoomAuditEntry { Action = "ready-for-doctor", RoomNumber = 1, Success = true });
+
+        var content = await File.ReadAllTextAsync(logPath);
+        Assert.Contains("ready-for-doctor", content);
+    }
+
+    [Fact]
     public void Room_mutation_request_validation_rejects_invalid_assignment_fields()
     {
         Assert.Equal("Doctor id is required.", RoomMutationRequestValidator.ValidateDoctorAndProcedure(null, "CON"));
@@ -1323,9 +1422,16 @@ public sealed class BoardStoreTests
         new AdminAccessOptionsValidator(new TestWebHostEnvironment(Path.GetTempPath(), environmentName))
             .Validate(null, options);
 
-    private static DiagnosticLogger CreateDiagnosticLogger(string logDirectory, string contentRoot) =>
+    private static DiagnosticLogger CreateDiagnosticLogger(
+        string logDirectory,
+        string contentRoot,
+        long maxFileSizeBytes = 50_000_000) =>
         new(
-            Microsoft.Extensions.Options.Options.Create(new DiagnosticOptions { LogDirectory = logDirectory }),
+            Microsoft.Extensions.Options.Options.Create(new DiagnosticOptions
+            {
+                LogDirectory = logDirectory,
+                MaxFileSizeBytes = maxFileSizeBytes
+            }),
             new TestWebHostEnvironment(contentRoot, Environments.Production));
 
     private static ValidateOptionsResult ValidateDoctorRoster(DoctorRosterOptions options) =>

@@ -23,28 +23,32 @@ public sealed class DiagnosticLogger
 
     private readonly string _clientErrorLogPath;
     private readonly string _roomAuditLogPath;
+    private readonly long _maxFileSizeBytes;
     private readonly SemaphoreSlim _clientLock = new(1, 1);
     private readonly SemaphoreSlim _auditLock = new(1, 1);
 
     public DiagnosticLogger(IOptions<DiagnosticOptions> options, IWebHostEnvironment environment)
     {
-        var directory = ResolveLogDirectory(options.Value.LogDirectory, environment.ContentRootPath);
+        var opts = options.Value;
+        var directory = ResolveLogDirectory(opts.LogDirectory, environment.ContentRootPath);
         TryCreateDirectory(directory);
         _clientErrorLogPath = Path.Combine(directory, "client-errors.log");
         _roomAuditLogPath = Path.Combine(directory, "room-audit.log");
+        _maxFileSizeBytes = opts.MaxFileSizeBytes;
     }
 
     public async Task LogClientErrorAsync(ClientErrorEntry entry)
     {
-        await AppendJsonLineAsync(_clientErrorLogPath, entry, _clientLock);
+        await AppendJsonLineAsync(_clientErrorLogPath, entry, _clientLock, _maxFileSizeBytes);
     }
 
     public async Task LogRoomAuditAsync(RoomAuditEntry entry)
     {
-        await AppendJsonLineAsync(_roomAuditLogPath, entry, _auditLock);
+        await AppendJsonLineAsync(_roomAuditLogPath, entry, _auditLock, _maxFileSizeBytes);
     }
 
-    private static async Task AppendJsonLineAsync<T>(string filePath, T entry, SemaphoreSlim semaphore)
+    private static async Task AppendJsonLineAsync<T>(
+        string filePath, T entry, SemaphoreSlim semaphore, long maxFileSizeBytes)
     {
         try
         {
@@ -52,6 +56,7 @@ public sealed class DiagnosticLogger
             await semaphore.WaitAsync();
             try
             {
+                TryRotate(filePath, maxFileSizeBytes);
                 await File.AppendAllTextAsync(filePath, line);
             }
             finally
@@ -63,6 +68,45 @@ public sealed class DiagnosticLogger
         {
             // Logging must never disrupt the application.
             Console.Error.WriteLine($"[ChairSide] DiagnosticLogger write failed ({filePath}): {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Rotates <paramref name="filePath"/> to <c>.log.1</c> when it meets or exceeds
+    /// <paramref name="maxFileSizeBytes"/>. Must be called while the per-file semaphore
+    /// is held. Any I/O failure is caught and written to stderr so it never blocks writes.
+    /// </summary>
+    private static void TryRotate(string filePath, long maxFileSizeBytes)
+    {
+        if (maxFileSizeBytes <= 0)
+        {
+            return; // rotation disabled
+        }
+
+        try
+        {
+            if (!File.Exists(filePath))
+            {
+                return;
+            }
+
+            if (new FileInfo(filePath).Length < maxFileSizeBytes)
+            {
+                return;
+            }
+
+            var rotatedPath = filePath + ".1";
+            if (File.Exists(rotatedPath))
+            {
+                File.Delete(rotatedPath);
+            }
+
+            File.Move(filePath, rotatedPath);
+        }
+        catch (Exception ex)
+        {
+            // Rotation failure must not block room workflow — log to stderr and continue.
+            Console.Error.WriteLine($"[ChairSide] DiagnosticLogger rotation failed ({filePath}): {ex.Message}");
         }
     }
 
