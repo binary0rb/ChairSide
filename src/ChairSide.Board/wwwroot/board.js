@@ -14,6 +14,7 @@ const app = {
   realtimeDegraded: false,
   realtimeLostAt: 0,
   pollInFlight: false,
+  reportsInFlight: false,
   roomNumber: getRoomNumber(),
   roomToken: getRoomToken(),
   roomTokenPromptVisible: false,
@@ -53,6 +54,14 @@ function getRoomToken() {
 }
 
 async function boot() {
+  // Guard: intervals must never be registered more than once.
+  // boot() is called once at page load, but this explicit check prevents a
+  // future accidental double-boot from leaking orphaned intervals.
+  if (app.pollHandle || app.tickHandle || app.statusHandle) {
+    console.error("[ChairSide] boot() called more than once — skipping duplicate interval registration.");
+    return;
+  }
+
   await loadBoard();
   if (document.body.dataset.view === "reports") {
     await loadReports();
@@ -96,27 +105,36 @@ async function loadBoard() {
 }
 
 async function loadReports() {
-  const response = await fetch("/api/reports", {
-    cache: "no-store",
-    headers: adminRequestHeaders()
-  });
-
-  if (response.status === 401 || response.status === 403) {
-    if (response.status === 403) {
-      sessionStorage.removeItem(adminAccess.storageKey);
-    }
-
-    app.reports = null;
-    renderReportsAccessPrompt(response.status);
+  if (app.reportsInFlight) {
     return;
   }
 
-  if (!response.ok) {
-    throw new Error(`Reports failed with HTTP ${response.status}.`);
-  }
+  app.reportsInFlight = true;
+  try {
+    const response = await fetch("/api/reports", {
+      cache: "no-store",
+      headers: adminRequestHeaders()
+    });
 
-  app.reports = await response.json();
-  render();
+    if (response.status === 401 || response.status === 403) {
+      if (response.status === 403) {
+        sessionStorage.removeItem(adminAccess.storageKey);
+      }
+
+      app.reports = null;
+      renderReportsAccessPrompt(response.status);
+      return;
+    }
+
+    if (!response.ok) {
+      throw new Error(`Reports failed with HTTP ${response.status}.`);
+    }
+
+    app.reports = await response.json();
+    render();
+  } finally {
+    app.reportsInFlight = false;
+  }
 }
 
 function connectRealtime() {
@@ -126,7 +144,7 @@ function connectRealtime() {
     return;
   }
 
-  if (app.hubReady || app.connection?.state === "Connecting" || app.connection?.state === "Reconnecting") {
+  if (app.hubReady || app.connection?.state === "Connected" || app.connection?.state === "Connecting" || app.connection?.state === "Reconnecting") {
     return;
   }
 
@@ -137,10 +155,12 @@ function connectRealtime() {
 
   app.connection = connection;
 
-  connection.on("boardUpdated", snapshot => {
+  connection.on("boardUpdated", async snapshot => {
     applySnapshot(snapshot);
     if (document.body.dataset.view === "reports") {
-      loadReports();
+      await loadReports().catch(error => {
+        console.warn("[ChairSide] Reports refresh after board update failed.", error);
+      });
     }
     render();
     updateConnectionStatus();
