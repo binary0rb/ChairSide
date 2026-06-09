@@ -29,6 +29,29 @@
   <main class="reports-shell">
     <section class="report-summary" id="reportSummary" aria-label="Room flow summary"></section>
     <section class="report-table-section">
+      <h2>Exceptions Requiring Review</h2>
+      <div class="report-table-wrap">
+        <table class="report-table">
+          <thead>
+            <tr>
+              <th>Started</th>
+              <th>Room</th>
+              <th>Doctor</th>
+              <th>Procedure</th>
+              <th>Doctor Arrived</th>
+              <th>Doctor Complete</th>
+              <th>Available</th>
+              <th>Last State</th>
+              <th>Reason</th>
+              <th>Suggested Action</th>
+              <th>Review Status</th>
+            </tr>
+          </thead>
+          <tbody id="exceptionCyclesBody"></tbody>
+        </table>
+      </div>
+    </section>
+    <section class="report-table-section">
       <h2>Recent Completed Cycles</h2>
       <div class="report-table-wrap">
         <table class="report-table">
@@ -57,32 +80,9 @@
         </table>
       </div>
     </section>
-    <section class="report-table-section">
-      <h2>Exceptions Requiring Review</h2>
-      <div class="report-table-wrap">
-        <table class="report-table">
-          <thead>
-            <tr>
-              <th>Started</th>
-              <th>Room</th>
-              <th>Doctor</th>
-              <th>Procedure</th>
-              <th>Doctor Arrived</th>
-              <th>Doctor Complete</th>
-              <th>Available</th>
-              <th>Last State</th>
-              <th>Reason</th>
-              <th>Suggested Action</th>
-              <th>Review Status</th>
-            </tr>
-          </thead>
-          <tbody id="exceptionCyclesBody"></tbody>
-        </table>
-      </div>
-    </section>
   </main>
 
   <script src="/signalr-lite.js"></script>
-  <script src="/board.js?v=20260609-exception-review"></script>
+  <script src="/board.js?v=20260609-exceptions-first"></script>
 </body>
 </html>

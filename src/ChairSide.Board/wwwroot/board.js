@@ -513,6 +513,7 @@ function renderReports() {
 
   summary.innerHTML = [
     renderMetric("Completed Cycles", app.reports.completedRoomCyclesCount),
+    renderMetric("Exceptions Requiring Review", (app.reports.exceptionCycles || []).length),
     renderMetric("Avg Prep Time", formatDuration(app.reports.averagePrepSeconds)),
     renderMetric("Median Prep Time", formatDuration(app.reports.medianPrepSeconds)),
     renderMetric("Avg Ready-to-Doctor", formatDuration(app.reports.averageReadyToDoctorSeconds)),
