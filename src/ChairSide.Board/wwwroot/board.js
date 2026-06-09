@@ -530,6 +530,38 @@ function renderReports() {
   body.innerHTML = cycles.length
     ? cycles.map(renderCycleRow).join("")
     : `<tr><td colspan="17">No completed room cycles yet.</td></tr>`;
+
+  renderExceptionCycles(app.reports.exceptionCycles || []);
+}
+
+function renderExceptionCycles(exceptions) {
+  const body = document.getElementById("exceptionCyclesBody");
+  if (!body) {
+    return;
+  }
+
+  body.innerHTML = exceptions.length
+    ? exceptions.map(renderExceptionRow).join("")
+    : `<tr><td colspan="11">No exceptions requiring review.</td></tr>`;
+}
+
+function renderExceptionRow(cycle) {
+  const doctor = doctorName(cycle.assignedDoctor);
+  return `
+    <tr>
+      <td>${formatDateTime(cycle.seatedAt)}</td>
+      <td>Room ${cycle.roomId}</td>
+      <td>${escapeHtml(doctor)}</td>
+      <td>${renderProcedureBadge(cycle.procedureCode)}</td>
+      <td>${formatDateTime(cycle.doctorArrivedAt)}</td>
+      <td>${formatDateTime(cycle.doctorCompleteAt)}</td>
+      <td>${formatDateTime(cycle.roomAvailableAt)}</td>
+      <td>${escapeHtml(String(cycle.finalWaitState || "--").toUpperCase())}</td>
+      <td>${escapeHtml(cycle.exceptionReason || "--")}</td>
+      <td>${escapeHtml(cycle.suggestedAction || "--")}</td>
+      <td>${escapeHtml(cycle.reviewStatus || "--")}</td>
+    </tr>
+  `;
 }
 
 function renderReportsAccessPrompt(statusCode) {

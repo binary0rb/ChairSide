@@ -335,29 +335,64 @@ public sealed class DemoBoardStore
     {
         lock (_syncRoot)
         {
-            var cycles = _completedCycles
+            var allCycles = _completedCycles
                 .OrderByDescending(cycle => cycle.DoctorArrivedAt)
                 .ToList();
-            var completedCycles = cycles
+
+            // Exception cycles are excluded from normal operational metrics by default.
+            var normalCycles = allCycles.Where(cycle => !cycle.IsException).ToList();
+            var normalCompletedCycles = normalCycles
                 .Where(cycle => cycle.RoomAvailableAt is not null)
                 .ToList();
 
+            var exceptionCycles = allCycles
+                .Where(cycle => cycle.IsException)
+                .OrderByDescending(cycle => cycle.SeatedAt)
+                .ToList();
+
             return new ReportsSnapshot(
-                completedCycles.Count,
-                AverageSeconds(cycles.Select(cycle => (int?)cycle.SeatedToDoctorSeconds)),
-                MedianSeconds(cycles.Select(cycle => (int?)cycle.SeatedToDoctorSeconds)),
-                AverageSeconds(cycles.Select(cycle => cycle.PrepSeconds)),
-                MedianSeconds(cycles.Select(cycle => cycle.PrepSeconds)),
-                AverageSeconds(cycles.Select(cycle => cycle.ReadyToDoctorSeconds)),
-                MedianSeconds(cycles.Select(cycle => cycle.ReadyToDoctorSeconds)),
-                AverageSeconds(cycles.Select(cycle => cycle.DoctorInRoomSeconds)),
-                MedianSeconds(cycles.Select(cycle => cycle.DoctorInRoomSeconds)),
-                AverageSeconds(cycles.Select(cycle => cycle.TurnoverSeconds)),
-                MedianSeconds(cycles.Select(cycle => cycle.TurnoverSeconds)),
-                cycles.Count(cycle => cycle.AgingThresholdReached),
-                cycles.Count(cycle => cycle.StaleThresholdReached),
-                BuildDoctorSummaries(cycles),
-                completedCycles.Take(25).ToList());
+                normalCompletedCycles.Count,
+                AverageSeconds(normalCycles.Select(cycle => (int?)cycle.SeatedToDoctorSeconds)),
+                MedianSeconds(normalCycles.Select(cycle => (int?)cycle.SeatedToDoctorSeconds)),
+                AverageSeconds(normalCycles.Select(cycle => cycle.PrepSeconds)),
+                MedianSeconds(normalCycles.Select(cycle => cycle.PrepSeconds)),
+                AverageSeconds(normalCycles.Select(cycle => cycle.ReadyToDoctorSeconds)),
+                MedianSeconds(normalCycles.Select(cycle => cycle.ReadyToDoctorSeconds)),
+                AverageSeconds(normalCycles.Select(cycle => cycle.DoctorInRoomSeconds)),
+                MedianSeconds(normalCycles.Select(cycle => cycle.DoctorInRoomSeconds)),
+                AverageSeconds(normalCycles.Select(cycle => cycle.TurnoverSeconds)),
+                MedianSeconds(normalCycles.Select(cycle => cycle.TurnoverSeconds)),
+                normalCycles.Count(cycle => cycle.AgingThresholdReached),
+                normalCycles.Count(cycle => cycle.StaleThresholdReached),
+                BuildDoctorSummaries(normalCycles),
+                normalCompletedCycles.Take(25).ToList(),
+                exceptionCycles);
+        }
+    }
+
+    /// <summary>
+    /// Marks an existing completed cycle as an exception, removing it from normal
+    /// reporting metrics and surfacing it in the Exceptions Requiring Review section.
+    /// Returns false if no matching cycle is found.
+    /// No PHI is stored — reason and suggested action are operational notes only.
+    /// </summary>
+    public bool MarkCycleAsException(int roomId, DateTimeOffset seatedAt, string reason, string suggestedAction)
+    {
+        lock (_syncRoot)
+        {
+            var cycle = _completedCycles.FirstOrDefault(item => item.RoomId == roomId && item.SeatedAt == seatedAt);
+            if (cycle is null)
+            {
+                return false;
+            }
+
+            cycle.IsException = true;
+            cycle.RequiresReview = true;
+            cycle.ExceptionReason = reason;
+            cycle.SuggestedAction = suggestedAction;
+            cycle.ReviewStatus = ReviewStatuses.PendingReview;
+            PersistCycle(cycle);
+            return true;
         }
     }
 
@@ -774,7 +809,8 @@ public sealed record ReportsSnapshot(
     int AgingEventCount,
     int StaleEventCount,
     IReadOnlyList<DoctorCycleSummary> DoctorSummaries,
-    IReadOnlyList<CompletedRoomCycle> RecentCompletedCycles);
+    IReadOnlyList<CompletedRoomCycle> RecentCompletedCycles,
+    IReadOnlyList<CompletedRoomCycle> ExceptionCycles);
 
 public sealed class CompletedRoomCycle
 {
@@ -795,6 +831,17 @@ public sealed class CompletedRoomCycle
     public string FinalWaitState { get; set; } = "";
     public bool AgingThresholdReached { get; set; }
     public bool StaleThresholdReached { get; set; }
+
+    // Exception classification - set by admin or future exception policy.
+    // When IsException is true this cycle is excluded from normal metrics
+    // and surfaced in the Exceptions Requiring Review section.
+    public bool IsException { get; set; }
+    public bool RequiresReview { get; set; }
+    public string? ExceptionReason { get; set; }
+    public string ReviewStatus { get; set; } = ReviewStatuses.PendingReview;
+    public string? SuggestedAction { get; set; }
+    public DateTimeOffset? ReviewedAt { get; set; }
+    public string? ReviewedBy { get; set; }
 }
 
 public sealed record DoctorCycleSummary(
@@ -844,4 +891,13 @@ public static class RoomStates
     public const string ReadyForDoctor = "readyForDoctor";
     public const string DoctorInRoom = "doctorInRoom";
     public const string Turnover = "turnover";
+}
+
+public static class ReviewStatuses
+{
+    /// <summary>Cycle has been flagged as an exception but not yet reviewed.</summary>
+    public const string PendingReview = "PendingReview";
+
+    /// <summary>Cycle has been acknowledged by an admin reviewer.</summary>
+    public const string Reviewed = "Reviewed";
 }

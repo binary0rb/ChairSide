@@ -1301,6 +1301,148 @@ public sealed class BoardStoreTests
         Assert.Contains("Restore-ChairSideSqlite.ps1", readme);
     }
 
+    [Fact]
+    public void Normal_completed_cycles_appear_in_normal_reporting_metrics()
+    {
+        // A standard full-lifecycle cycle must appear in CompletedRoomCyclesCount
+        // and in RecentCompletedCycles; exception flag must default to false.
+        using var workspace = TestWorkspace.Create();
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production);
+
+        Assert.NotNull(context.Store.SeatRoom(1, "otte", "CON"));
+        Assert.NotNull(context.Store.MarkReadyForDoctor(1));
+        Assert.NotNull(context.Store.MarkDoctorArrived(1));
+        Assert.NotNull(context.Store.MarkDoctorComplete(1));
+        Assert.NotNull(context.Store.MarkRoomAvailable(1));
+
+        var reports = context.Store.GetReports();
+
+        Assert.Equal(1, reports.CompletedRoomCyclesCount);
+        Assert.Single(reports.RecentCompletedCycles);
+        Assert.Empty(reports.ExceptionCycles);
+
+        // The loaded cycle must carry IsException = false.
+        var cycle = Assert.Single(context.Repository.LoadCompletedCycles());
+        Assert.False(cycle.IsException);
+        Assert.False(cycle.RequiresReview);
+        Assert.Equal(ReviewStatuses.PendingReview, cycle.ReviewStatus);
+    }
+
+    [Fact]
+    public void Exception_cycles_are_excluded_from_normal_metrics_and_count()
+    {
+        // After a cycle is marked as an exception it must not appear in
+        // CompletedRoomCyclesCount, averages, or RecentCompletedCycles.
+        using var workspace = TestWorkspace.Create();
+        var now = new DateTimeOffset(2026, 6, 9, 10, 0, 0, TimeSpan.Zero);
+        var clock = new ManualTimeProvider(now);
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production, timeProvider: clock);
+
+        // Cycle A: full lifecycle on room 1 — should appear in normal metrics.
+        Assert.NotNull(context.Store.SeatRoom(1, "otte", "CON"));
+        Assert.NotNull(context.Store.MarkReadyForDoctor(1));
+        Assert.NotNull(context.Store.MarkDoctorArrived(1));
+        Assert.NotNull(context.Store.MarkDoctorComplete(1));
+        Assert.NotNull(context.Store.MarkRoomAvailable(1));
+
+        // Cycle B: only reached DoctorArrived on room 2 — will be marked exception.
+        clock.SetUtcNow(now.AddMinutes(30));
+        Assert.NotNull(context.Store.SeatRoom(2, "pledger", "EXT"));
+        Assert.NotNull(context.Store.MarkReadyForDoctor(2));
+        var exceptionArrived = context.Store.MarkDoctorArrived(2);
+        Assert.NotNull(exceptionArrived);
+        // SeatedAt is still set on the DoctorInRoom RoomStatus (room has not been reset).
+        Assert.NotNull(exceptionArrived.SeatedAt);
+        var exceptionSeatedAt = exceptionArrived.SeatedAt!.Value;
+
+        // Mark cycle B as an exception.
+        var marked = context.Store.MarkCycleAsException(2, exceptionSeatedAt, "Abnormal wait time", "Manual review required");
+        Assert.True(marked);
+
+        var reports = context.Store.GetReports();
+
+        // Only cycle A (normal, completed) is counted.
+        Assert.Equal(1, reports.CompletedRoomCyclesCount);
+        Assert.Single(reports.RecentCompletedCycles);
+        Assert.Equal(1, reports.RecentCompletedCycles[0].RoomId);
+
+        // Cycle B is surfaced as an exception.
+        var exception = Assert.Single(reports.ExceptionCycles);
+        Assert.Equal(2, exception.RoomId);
+        Assert.Equal("Abnormal wait time", exception.ExceptionReason);
+        Assert.Equal("Manual review required", exception.SuggestedAction);
+        Assert.Equal(ReviewStatuses.PendingReview, exception.ReviewStatus);
+        Assert.True(exception.IsException);
+        Assert.True(exception.RequiresReview);
+    }
+
+    [Fact]
+    public void Exception_cycles_appear_in_exceptions_requiring_review_section()
+    {
+        // GetReports().ExceptionCycles contains exactly the cycles with IsException = true,
+        // regardless of whether they have a RoomAvailableAt timestamp.
+        using var workspace = TestWorkspace.Create();
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production);
+
+        // Cycle A: complete lifecycle → normal.
+        Assert.NotNull(context.Store.SeatRoom(1, "otte", "CON"));
+        Assert.NotNull(context.Store.MarkReadyForDoctor(1));
+        var arrivedA = context.Store.MarkDoctorArrived(1);
+        Assert.NotNull(arrivedA);
+
+        // Cycle B: only reached DoctorArrived — will be marked exception.
+        Assert.NotNull(context.Store.SeatRoom(2, "pledger", "EXT"));
+        Assert.NotNull(context.Store.MarkReadyForDoctor(2));
+        var arrivedB = context.Store.MarkDoctorArrived(2);
+        Assert.NotNull(arrivedB);
+        var seatedAtB = arrivedB.SeatedAt!.Value;
+
+        context.Store.MarkCycleAsException(2, seatedAtB, "Timed out", "Investigate");
+
+        var reports = context.Store.GetReports();
+
+        // Normal cycle: Cycle A is in both DoctorSummaries (arrived) and RecentCompletedCycles is empty (no RoomAvailableAt yet).
+        // Exception cycle: Cycle B is in ExceptionCycles only.
+        Assert.Single(reports.ExceptionCycles);
+        Assert.Equal(2, reports.ExceptionCycles[0].RoomId);
+        Assert.Equal("Timed out", reports.ExceptionCycles[0].ExceptionReason);
+        Assert.DoesNotContain(reports.ExceptionCycles, cycle => cycle.RoomId == 1);
+    }
+
+    [Fact]
+    public void Exception_pending_review_status_survives_store_restart()
+    {
+        // ReviewStatus = PendingReview and exception fields must round-trip through
+        // SQLite and be present after a store reload.
+        using var workspace = TestWorkspace.Create();
+        var databasePath = workspace.ProductionDatabasePath();
+
+        var first = StoreContext.Create(workspace, environmentName: Environments.Production, databasePath: databasePath);
+        Assert.NotNull(first.Store.SeatRoom(1, "otte", "CON"));
+        Assert.NotNull(first.Store.MarkReadyForDoctor(1));
+        var arrived = first.Store.MarkDoctorArrived(1);
+        Assert.NotNull(arrived);
+        var seatedAt = arrived.SeatedAt!.Value;
+
+        var marked = first.Store.MarkCycleAsException(1, seatedAt, "Extended wait", "Review with doctor");
+        Assert.True(marked);
+
+        // Reload the store — simulates a server restart.
+        var second = StoreContext.Create(workspace, environmentName: Environments.Production, databasePath: databasePath);
+        var reports = second.Store.GetReports();
+
+        Assert.Empty(reports.RecentCompletedCycles); // excluded from normal
+        var exception = Assert.Single(reports.ExceptionCycles);
+        Assert.Equal(1, exception.RoomId);
+        Assert.True(exception.IsException);
+        Assert.True(exception.RequiresReview);
+        Assert.Equal("Extended wait", exception.ExceptionReason);
+        Assert.Equal("Review with doctor", exception.SuggestedAction);
+        Assert.Equal(ReviewStatuses.PendingReview, exception.ReviewStatus);
+        Assert.Null(exception.ReviewedAt);
+        Assert.Null(exception.ReviewedBy);
+    }
+
     private static readonly HashSet<string> AllowedActiveRoomColumns =
     [
         "room_id",
@@ -1341,6 +1483,13 @@ public sealed class BoardStoreTests
         "final_wait_state",
         "aging_threshold_reached",
         "stale_threshold_reached",
+        "is_exception",
+        "requires_review",
+        "exception_reason",
+        "review_status",
+        "suggested_action",
+        "reviewed_at",
+        "reviewed_by",
         "created_at",
         "updated_at"
     ];

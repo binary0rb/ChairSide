@@ -156,7 +156,14 @@ public sealed class SqliteBoardRepository
                 stale_threshold_reached,
                 ready_for_doctor_at,
                 prep_seconds,
-                ready_to_doctor_seconds
+                ready_to_doctor_seconds,
+                is_exception,
+                requires_review,
+                exception_reason,
+                review_status,
+                suggested_action,
+                reviewed_at,
+                reviewed_by
             FROM completed_room_cycles
             ORDER BY doctor_arrived_at DESC;
             """;
@@ -183,7 +190,14 @@ public sealed class SqliteBoardRepository
                 StaleThresholdReached = reader.GetInt32(13) == 1,
                 ReadyForDoctorAt = ReadNullableDateTimeOffset(reader, 14),
                 PrepSeconds = ReadNullableInt32(reader, 15),
-                ReadyToDoctorSeconds = ReadNullableInt32(reader, 16)
+                ReadyToDoctorSeconds = ReadNullableInt32(reader, 16),
+                IsException = reader.GetInt32(17) == 1,
+                RequiresReview = reader.GetInt32(18) == 1,
+                ExceptionReason = ReadNullableString(reader, 19),
+                ReviewStatus = ReadNullableString(reader, 20) ?? ReviewStatuses.PendingReview,
+                SuggestedAction = ReadNullableString(reader, 21),
+                ReviewedAt = ReadNullableDateTimeOffset(reader, 22),
+                ReviewedBy = ReadNullableString(reader, 23)
             });
         }
 
@@ -218,6 +232,13 @@ public sealed class SqliteBoardRepository
                 final_wait_state,
                 aging_threshold_reached,
                 stale_threshold_reached,
+                is_exception,
+                requires_review,
+                exception_reason,
+                review_status,
+                suggested_action,
+                reviewed_at,
+                reviewed_by,
                 created_at,
                 updated_at
             )
@@ -241,6 +262,13 @@ public sealed class SqliteBoardRepository
                 $finalWaitState,
                 $agingThresholdReached,
                 $staleThresholdReached,
+                $isException,
+                $requiresReview,
+                $exceptionReason,
+                $reviewStatus,
+                $suggestedAction,
+                $reviewedAt,
+                $reviewedBy,
                 $now,
                 $now
             )
@@ -262,6 +290,13 @@ public sealed class SqliteBoardRepository
                 final_wait_state = excluded.final_wait_state,
                 aging_threshold_reached = excluded.aging_threshold_reached,
                 stale_threshold_reached = excluded.stale_threshold_reached,
+                is_exception = excluded.is_exception,
+                requires_review = excluded.requires_review,
+                exception_reason = excluded.exception_reason,
+                review_status = excluded.review_status,
+                suggested_action = excluded.suggested_action,
+                reviewed_at = excluded.reviewed_at,
+                reviewed_by = excluded.reviewed_by,
                 updated_at = excluded.updated_at;
             """;
 
@@ -285,6 +320,13 @@ public sealed class SqliteBoardRepository
         command.Parameters.AddWithValue("$finalWaitState", cycle.FinalWaitState);
         command.Parameters.AddWithValue("$agingThresholdReached", cycle.AgingThresholdReached ? 1 : 0);
         command.Parameters.AddWithValue("$staleThresholdReached", cycle.StaleThresholdReached ? 1 : 0);
+        command.Parameters.AddWithValue("$isException", cycle.IsException ? 1 : 0);
+        command.Parameters.AddWithValue("$requiresReview", cycle.RequiresReview ? 1 : 0);
+        command.Parameters.AddWithValue("$exceptionReason", ToDbValue(cycle.ExceptionReason));
+        command.Parameters.AddWithValue("$reviewStatus", cycle.ReviewStatus);
+        command.Parameters.AddWithValue("$suggestedAction", ToDbValue(cycle.SuggestedAction));
+        command.Parameters.AddWithValue("$reviewedAt", ToDbValue(cycle.ReviewedAt));
+        command.Parameters.AddWithValue("$reviewedBy", ToDbValue(cycle.ReviewedBy));
         command.Parameters.AddWithValue("$now", now);
         command.ExecuteNonQuery();
     }
@@ -338,6 +380,13 @@ public sealed class SqliteBoardRepository
                     final_wait_state TEXT NOT NULL,
                     aging_threshold_reached INTEGER NOT NULL DEFAULT 0,
                     stale_threshold_reached INTEGER NOT NULL DEFAULT 0,
+                    is_exception INTEGER NOT NULL DEFAULT 0,
+                    requires_review INTEGER NOT NULL DEFAULT 0,
+                    exception_reason TEXT NULL,
+                    review_status TEXT NOT NULL DEFAULT 'PendingReview',
+                    suggested_action TEXT NULL,
+                    reviewed_at TEXT NULL,
+                    reviewed_by TEXT NULL,
                     created_at TEXT NOT NULL,
                     updated_at TEXT NOT NULL,
                     UNIQUE(room_id, seated_at)
@@ -352,6 +401,13 @@ public sealed class SqliteBoardRepository
         TryAddColumn(connection, "ALTER TABLE completed_room_cycles ADD COLUMN ready_for_doctor_at TEXT NULL");
         TryAddColumn(connection, "ALTER TABLE completed_room_cycles ADD COLUMN prep_seconds INTEGER NULL");
         TryAddColumn(connection, "ALTER TABLE completed_room_cycles ADD COLUMN ready_to_doctor_seconds INTEGER NULL");
+        TryAddColumn(connection, "ALTER TABLE completed_room_cycles ADD COLUMN is_exception INTEGER NOT NULL DEFAULT 0");
+        TryAddColumn(connection, "ALTER TABLE completed_room_cycles ADD COLUMN requires_review INTEGER NOT NULL DEFAULT 0");
+        TryAddColumn(connection, "ALTER TABLE completed_room_cycles ADD COLUMN exception_reason TEXT NULL");
+        TryAddColumn(connection, "ALTER TABLE completed_room_cycles ADD COLUMN review_status TEXT NOT NULL DEFAULT 'PendingReview'");
+        TryAddColumn(connection, "ALTER TABLE completed_room_cycles ADD COLUMN suggested_action TEXT NULL");
+        TryAddColumn(connection, "ALTER TABLE completed_room_cycles ADD COLUMN reviewed_at TEXT NULL");
+        TryAddColumn(connection, "ALTER TABLE completed_room_cycles ADD COLUMN reviewed_by TEXT NULL");
     }
 
     private static void TryAddColumn(SqliteConnection connection, string alterTableSql)
