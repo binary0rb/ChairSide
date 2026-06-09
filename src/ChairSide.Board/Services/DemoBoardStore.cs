@@ -3,12 +3,26 @@ using Microsoft.Extensions.Options;
 
 namespace ChairSide.Board.Services;
 
+/// <summary>Operational (non-PHI) reasons a cycle may be classified as an exception.</summary>
+public static class ExceptionReasons
+{
+    /// <summary>Manually flagged for review via the reports UI.</summary>
+    public const string ManualReview = "ManualReview";
+
+    /// <summary>Active cycle exceeded the configured maximum active duration.</summary>
+    public const string ExceededMaxActiveDuration = "ExceededMaxActiveDuration";
+
+    /// <summary>Active cycle was terminated by the configured after-hours sweep.</summary>
+    public const string AfterHoursSweep = "AfterHoursSweep";
+}
+
 public sealed class DemoBoardStore
 {
     private const int MaxRoomEvents = 200;
 
     private readonly object _syncRoot = new();
     private readonly IOptionsMonitor<BoardThresholdOptions> _thresholdOptions;
+    private readonly IOptionsMonitor<RoomExpirationOptions> _expirationOptions;
     private readonly SqliteBoardRepository _repository;
     private readonly TimeProvider _timeProvider;
     private readonly int _roomCount;
@@ -22,8 +36,13 @@ public sealed class DemoBoardStore
     private readonly List<RoomEvent> _events = [];
     private readonly List<CompletedRoomCycle> _completedCycles = [];
 
+    // After-hours sweep: track the last clinic day the sweep ran to ensure at-most-once per day.
+    // Volatile - intentionally resets on app restart; available rooms are unaffected by re-check.
+    private DateOnly _lastSweepDate = DateOnly.MinValue;
+
     public DemoBoardStore(
         IOptionsMonitor<BoardThresholdOptions> thresholdOptions,
+        IOptionsMonitor<RoomExpirationOptions> expirationOptions,
         IOptions<BoardOptions> boardOptions,
         IOptions<BoardUiOptions> boardUiOptions,
         IOptions<DoctorRosterOptions> doctorRosterOptions,
@@ -33,6 +52,7 @@ public sealed class DemoBoardStore
         TimeProvider? timeProvider = null)
     {
         _thresholdOptions = thresholdOptions;
+        _expirationOptions = expirationOptions;
         _repository = repository;
         _timeProvider = timeProvider ?? TimeProvider.System;
         _roomCount = boardOptions.Value.RoomCount;
@@ -374,7 +394,7 @@ public sealed class DemoBoardStore
     /// Marks an existing completed cycle as an exception, removing it from normal
     /// reporting metrics and surfacing it in the Exceptions Requiring Review section.
     /// Returns false if no matching cycle is found.
-    /// No PHI is stored — reason and suggested action are operational notes only.
+    /// No PHI is stored - reason and suggested action are operational notes only.
     /// </summary>
     public bool MarkCycleAsException(int roomId, DateTimeOffset seatedAt, string reason, string suggestedAction)
     {
@@ -395,6 +415,204 @@ public sealed class DemoBoardStore
             return true;
         }
     }
+
+    /// <summary>
+    /// Checks all active room cycles for exceeding MaxActiveDurationHours and expires any
+    /// that do. Each expired room is archived as an exception cycle, reset to Available,
+    /// and logged with reason ExceededMaxActiveDuration.
+    /// Returns the room IDs that were expired.
+    /// </summary>
+    public IReadOnlyList<int> CheckAndExpireActiveCycles()
+    {
+        lock (_syncRoot)
+        {
+            var options = ExpirationOptions;
+            if (!options.Enabled)
+            {
+                return [];
+            }
+
+            var now = Now;
+            var maxDuration = TimeSpan.FromHours(options.MaxActiveDurationHours);
+            var expired = new List<int>();
+
+            foreach (var room in _rooms)
+            {
+                if (room.State == RoomStates.Available || room.SeatedAt is null)
+                {
+                    continue;
+                }
+
+                if (now - room.SeatedAt.Value <= maxDuration)
+                {
+                    continue;
+                }
+
+                ExpireRoom(room, now, ExceptionReasons.ExceededMaxActiveDuration);
+                expired.Add(room.RoomId);
+            }
+
+            return expired;
+        }
+    }
+
+    /// <summary>
+    /// Checks whether the after-hours sweep should fire for the current clinic day and,
+    /// if so, expires all still-active room cycles as AfterHoursSweep exceptions.
+    /// Runs at most once per clinic day; skips Available rooms.
+    /// Returns the room IDs that were expired.
+    /// </summary>
+    public IReadOnlyList<int> TryRunAfterHoursSweep()
+    {
+        lock (_syncRoot)
+        {
+            var options = ExpirationOptions;
+            if (!options.Enabled || !options.AfterHoursSweepEnabled)
+            {
+                return [];
+            }
+
+            var clinicZone = ResolveTimeZone(options.TimeZone);
+            if (clinicZone is null)
+            {
+                // Invalid or unresolvable timezone - suppress the sweep entirely.
+                // A misconfigured zone must not silently become UTC and fire at the wrong local time.
+                return [];
+            }
+
+            var now = Now;
+            var clinicNow = TimeZoneInfo.ConvertTime(now, clinicZone);
+            var today = DateOnly.FromDateTime(clinicNow.DateTime);
+
+            // At-most-once per clinic day.
+            if (_lastSweepDate >= today)
+            {
+                return [];
+            }
+
+            // Only fire at or after the configured sweep time.
+            if (!TryParseSweepTime(options.AfterHoursSweepTime, out var sweepTime))
+            {
+                return [];
+            }
+
+            var clinicTimeOfDay = TimeOnly.FromDateTime(clinicNow.DateTime);
+            if (clinicTimeOfDay < sweepTime)
+            {
+                return [];
+            }
+
+            _lastSweepDate = today;
+
+            var expired = new List<int>();
+            foreach (var room in _rooms)
+            {
+                if (room.State == RoomStates.Available || room.SeatedAt is null)
+                {
+                    continue;
+                }
+
+                ExpireRoom(room, now, ExceptionReasons.AfterHoursSweep);
+                expired.Add(room.RoomId);
+            }
+
+            return expired;
+        }
+    }
+
+    /// <summary>
+    /// Archives an active room as an exception cycle and resets it to Available.
+    /// Does not manufacture DoctorCompleteAt. Must be called inside _syncRoot.
+    /// </summary>
+    private void ExpireRoom(RoomState room, DateTimeOffset now, string reason)
+    {
+        // SuggestedAction depends on whether the doctor had arrived at the time of expiry.
+        var suggestedAction = room.DoctorArrivedAt.HasValue
+            ? "Review timing"
+            : "Exclude abandoned cycle";
+
+        // For rooms where DoctorArrived was never called, no cycle exists yet - create one.
+        // For rooms already past DoctorArrived, a cycle was created at MarkDoctorArrived.
+        var cycle = _completedCycles.FirstOrDefault(c => c.RoomId == room.RoomId && c.SeatedAt == room.SeatedAt!.Value);
+
+        if (cycle is null)
+        {
+            cycle = new CompletedRoomCycle
+            {
+                RoomId = room.RoomId,
+                AssignedDoctor = room.AssignedDoctor ?? "",
+                ProcedureCode = room.ProcedureCode ?? "",
+                SeatedAt = room.SeatedAt!.Value,
+                ReadyForDoctorAt = room.ReadyForDoctorAt,
+                DoctorArrivedAt = null,  // doctor never arrived
+                SeatedToDoctorSeconds = SecondsBetween(room.SeatedAt.Value, now),
+                PrepSeconds = room.ReadyForDoctorAt.HasValue
+                    ? SecondsBetween(room.SeatedAt.Value, room.ReadyForDoctorAt.Value)
+                    : null,
+                ReadyToDoctorSeconds = null,
+                FinalWaitState = room.State,
+                AgingThresholdReached = room.AgingStartedAt is not null,
+                StaleThresholdReached = room.StaleStartedAt is not null
+            };
+            _completedCycles.Add(cycle);
+        }
+
+        cycle.IsException = true;
+        cycle.RequiresReview = true;
+        cycle.ExceptionReason = reason;
+        cycle.SuggestedAction = suggestedAction;
+        cycle.ReviewStatus = ReviewStatuses.PendingReview;
+        PersistCycle(cycle);
+
+        AddEvent(new RoomEvent(room.RoomId, "ForceExpired", now, room.AssignedDoctor, room.ProcedureCode));
+
+        ResetRoom(room);
+        PersistRoom(room);
+    }
+
+    // Returns null if timeZone is a non-blank, non-UTC value that cannot be resolved.
+    // Callers must treat null as "fail closed" - do not substitute UTC silently.
+    private static TimeZoneInfo? ResolveTimeZone(string timeZone)
+    {
+        if (string.IsNullOrWhiteSpace(timeZone) ||
+            string.Equals(timeZone, "UTC", StringComparison.OrdinalIgnoreCase))
+        {
+            return TimeZoneInfo.Utc;
+        }
+
+        try
+        {
+            return TimeZoneInfo.FindSystemTimeZoneById(timeZone);
+        }
+        catch
+        {
+            return null;  // unresolvable - caller must not fall back to UTC
+        }
+    }
+
+    private static bool TryParseSweepTime(string sweepTime, out TimeOnly result)
+    {
+        result = default;
+        if (string.IsNullOrWhiteSpace(sweepTime))
+        {
+            return false;
+        }
+
+        var parts = sweepTime.Split(':');
+        if (parts.Length != 2 ||
+            !int.TryParse(parts[0], out var hour) ||
+            !int.TryParse(parts[1], out var minute) ||
+            hour < 0 || hour > 23 ||
+            minute < 0 || minute > 59)
+        {
+            return false;
+        }
+
+        result = new TimeOnly(hour, minute);
+        return true;
+    }
+
+    private RoomExpirationOptions ExpirationOptions => _expirationOptions.CurrentValue;
 
     private RoomStatus ToRoomStatus(RoomState room, DateTimeOffset now)
     {
@@ -422,7 +640,7 @@ public sealed class DemoBoardStore
 
     private void UpdateRoomState(RoomState room, DateTimeOffset now)
     {
-        // Doctor In Room and Turnover are terminal — no further automatic transitions.
+        // Doctor In Room and Turnover are terminal - no further automatic transitions.
         if (room.State is RoomStates.DoctorInRoom or RoomStates.Turnover)
         {
             return;
@@ -556,7 +774,7 @@ public sealed class DemoBoardStore
         yield return new("gibson", "CON", thresholds => EarlySeatedSample(thresholds));
         yield return new("schroeder", "EXT", thresholds => StaleSample(thresholds, TimeSpan.FromMinutes(4)));
 
-        // Rooms in Ready for Doctor phase — ReadyForDoctorAt triggers aging/stale escalation
+        // Rooms in Ready for Doctor phase - ReadyForDoctorAt triggers aging/stale escalation
         yield return new("pledger", "EXT",
             thresholds => StaleSample(thresholds),
             thresholds => StaleSample(thresholds));
@@ -730,7 +948,8 @@ public sealed class DemoBoardStore
 
     private static IReadOnlyList<DoctorCycleSummary> BuildDoctorSummaries(IReadOnlyList<CompletedRoomCycle> cycles) =>
         cycles
-            .GroupBy(cycle => new { cycle.AssignedDoctor, Month = new DateOnly(cycle.DoctorArrivedAt.Year, cycle.DoctorArrivedAt.Month, 1) })
+            .Where(cycle => cycle.DoctorArrivedAt.HasValue)
+            .GroupBy(cycle => new { cycle.AssignedDoctor, Month = new DateOnly(cycle.DoctorArrivedAt!.Value.Year, cycle.DoctorArrivedAt.Value.Month, 1) })
             .Select(group => new DoctorCycleSummary(
                 group.Key.AssignedDoctor,
                 group.Key.Month,
@@ -819,7 +1038,10 @@ public sealed class CompletedRoomCycle
     public string ProcedureCode { get; set; } = "";
     public DateTimeOffset SeatedAt { get; set; }
     public DateTimeOffset? ReadyForDoctorAt { get; set; }
-    public DateTimeOffset DoctorArrivedAt { get; set; }
+    /// <summary>
+    /// Null when the cycle was force-expired before the doctor arrived (e.g. abandoned or after-hours sweep).
+    /// </summary>
+    public DateTimeOffset? DoctorArrivedAt { get; set; }
     public DateTimeOffset? DoctorCompleteAt { get; set; }
     public DateTimeOffset? RoomAvailableAt { get; set; }
     public int SeatedToDoctorSeconds { get; set; }

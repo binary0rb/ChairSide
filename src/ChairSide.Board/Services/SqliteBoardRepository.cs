@@ -178,7 +178,7 @@ public sealed class SqliteBoardRepository
                 AssignedDoctor = reader.GetString(1),
                 ProcedureCode = reader.GetString(2),
                 SeatedAt = ReadRequiredDateTimeOffset(reader, 3),
-                DoctorArrivedAt = ReadRequiredDateTimeOffset(reader, 4),
+                DoctorArrivedAt = ReadNullableDateTimeOffset(reader, 4),
                 DoctorCompleteAt = ReadNullableDateTimeOffset(reader, 5),
                 RoomAvailableAt = ReadNullableDateTimeOffset(reader, 6),
                 SeatedToDoctorSeconds = reader.GetInt32(7),
@@ -308,7 +308,7 @@ public sealed class SqliteBoardRepository
         command.Parameters.AddWithValue("$procedureCategory", procedure?.Label ?? cycle.ProcedureCode);
         command.Parameters.AddWithValue("$seatedAt", FormatDateTimeOffset(cycle.SeatedAt));
         command.Parameters.AddWithValue("$readyForDoctorAt", ToDbValue(cycle.ReadyForDoctorAt));
-        command.Parameters.AddWithValue("$doctorArrivedAt", FormatDateTimeOffset(cycle.DoctorArrivedAt));
+        command.Parameters.AddWithValue("$doctorArrivedAt", ToDbValue(cycle.DoctorArrivedAt));
         command.Parameters.AddWithValue("$doctorCompleteAt", ToDbValue(cycle.DoctorCompleteAt));
         command.Parameters.AddWithValue("$roomAvailableAt", ToDbValue(cycle.RoomAvailableAt));
         command.Parameters.AddWithValue("$seatedToDoctorSeconds", cycle.SeatedToDoctorSeconds);
@@ -368,7 +368,7 @@ public sealed class SqliteBoardRepository
                     procedure_category TEXT NOT NULL,
                     seated_at TEXT NOT NULL,
                     ready_for_doctor_at TEXT NULL,
-                    doctor_arrived_at TEXT NOT NULL,
+                    doctor_arrived_at TEXT NULL,
                     doctor_complete_at TEXT NULL,
                     room_available_at TEXT NULL,
                     seated_to_doctor_seconds INTEGER NOT NULL,
@@ -408,6 +408,168 @@ public sealed class SqliteBoardRepository
         TryAddColumn(connection, "ALTER TABLE completed_room_cycles ADD COLUMN suggested_action TEXT NULL");
         TryAddColumn(connection, "ALTER TABLE completed_room_cycles ADD COLUMN reviewed_at TEXT NULL");
         TryAddColumn(connection, "ALTER TABLE completed_room_cycles ADD COLUMN reviewed_by TEXT NULL");
+
+        // Migration: make doctor_arrived_at nullable to support force-expired cycles where
+        // the doctor never arrived. ALTER TABLE cannot change NOT NULL in SQLite, so we recreate
+        // the table if needed. Wrapped in a transaction - safe to retry on restart.
+        MigrateNullableDoctorArrivedAt(connection);
+    }
+
+    /// <summary>
+    /// Recreates completed_room_cycles with a nullable doctor_arrived_at column if the existing
+    /// schema has it as NOT NULL. Idempotent - no-op if the column is already nullable or if
+    /// the table does not exist yet.
+    /// </summary>
+    private static void MigrateNullableDoctorArrivedAt(SqliteConnection connection)
+    {
+        if (!TableExists(connection, "completed_room_cycles"))
+        {
+            return;
+        }
+
+        // Check whether doctor_arrived_at currently has a NOT NULL constraint.
+        var needsMigration = false;
+        using (var pragma = connection.CreateCommand())
+        {
+            pragma.CommandText = "PRAGMA table_info(completed_room_cycles);";
+            using var reader = pragma.ExecuteReader();
+            while (reader.Read())
+            {
+                if (string.Equals(reader.GetString(1), "doctor_arrived_at", StringComparison.Ordinal) &&
+                    reader.GetInt32(3) == 1)
+                {
+                    needsMigration = true;
+                }
+            }
+        }
+
+        if (!needsMigration)
+        {
+            return;
+        }
+
+        // Recreate the table allowing NULL for doctor_arrived_at.
+        // All steps are inside one transaction - SQLite rolls DDL back on failure.
+        using var transaction = connection.BeginTransaction();
+
+        Execute(connection, transaction, "ALTER TABLE completed_room_cycles RENAME TO completed_room_cycles_v1;");
+        Execute(connection, transaction, """
+            CREATE TABLE completed_room_cycles (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                room_id INTEGER NOT NULL,
+                assigned_doctor_id TEXT NOT NULL,
+                assigned_doctor_display_name TEXT NOT NULL,
+                procedure_code TEXT NOT NULL,
+                procedure_category TEXT NOT NULL,
+                seated_at TEXT NOT NULL,
+                ready_for_doctor_at TEXT NULL,
+                doctor_arrived_at TEXT NULL,
+                doctor_complete_at TEXT NULL,
+                room_available_at TEXT NULL,
+                seated_to_doctor_seconds INTEGER NOT NULL,
+                prep_seconds INTEGER NULL,
+                ready_to_doctor_seconds INTEGER NULL,
+                doctor_in_room_seconds INTEGER NULL,
+                turnover_seconds INTEGER NULL,
+                total_room_cycle_seconds INTEGER NULL,
+                final_wait_state TEXT NOT NULL,
+                aging_threshold_reached INTEGER NOT NULL DEFAULT 0,
+                stale_threshold_reached INTEGER NOT NULL DEFAULT 0,
+                is_exception INTEGER NOT NULL DEFAULT 0,
+                requires_review INTEGER NOT NULL DEFAULT 0,
+                exception_reason TEXT NULL,
+                review_status TEXT NOT NULL DEFAULT 'PendingReview',
+                suggested_action TEXT NULL,
+                reviewed_at TEXT NULL,
+                reviewed_by TEXT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                UNIQUE(room_id, seated_at)
+            );
+            """);
+        Execute(connection, transaction, """
+            INSERT INTO completed_room_cycles (
+                id,
+                room_id,
+                assigned_doctor_id,
+                assigned_doctor_display_name,
+                procedure_code,
+                procedure_category,
+                seated_at,
+                ready_for_doctor_at,
+                doctor_arrived_at,
+                doctor_complete_at,
+                room_available_at,
+                seated_to_doctor_seconds,
+                prep_seconds,
+                ready_to_doctor_seconds,
+                doctor_in_room_seconds,
+                turnover_seconds,
+                total_room_cycle_seconds,
+                final_wait_state,
+                aging_threshold_reached,
+                stale_threshold_reached,
+                is_exception,
+                requires_review,
+                exception_reason,
+                review_status,
+                suggested_action,
+                reviewed_at,
+                reviewed_by,
+                created_at,
+                updated_at
+            )
+            SELECT
+                id,
+                room_id,
+                assigned_doctor_id,
+                assigned_doctor_display_name,
+                procedure_code,
+                procedure_category,
+                seated_at,
+                ready_for_doctor_at,
+                doctor_arrived_at,
+                doctor_complete_at,
+                room_available_at,
+                seated_to_doctor_seconds,
+                prep_seconds,
+                ready_to_doctor_seconds,
+                doctor_in_room_seconds,
+                turnover_seconds,
+                total_room_cycle_seconds,
+                final_wait_state,
+                aging_threshold_reached,
+                stale_threshold_reached,
+                is_exception,
+                requires_review,
+                exception_reason,
+                review_status,
+                suggested_action,
+                reviewed_at,
+                reviewed_by,
+                created_at,
+                updated_at
+            FROM completed_room_cycles_v1;
+            """);
+        Execute(connection, transaction, "DROP TABLE completed_room_cycles_v1;");
+
+        transaction.Commit();
+    }
+
+    private static bool TableExists(SqliteConnection connection, string tableName)
+    {
+        using var cmd = connection.CreateCommand();
+        cmd.CommandText = "SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type='table' AND name=$name);";
+        cmd.Parameters.AddWithValue("$name", tableName);
+        return Convert.ToInt32(cmd.ExecuteScalar()) == 1;
+    }
+
+    private static void Execute(SqliteConnection connection, SqliteTransaction transaction, string sql)
+    {
+        using var cmd = connection.CreateCommand();
+        cmd.Transaction = transaction;
+        cmd.CommandText = sql;
+        cmd.ExecuteNonQuery();
     }
 
     private static void TryAddColumn(SqliteConnection connection, string alterTableSql)
@@ -420,7 +582,7 @@ public sealed class SqliteBoardRepository
         }
         catch (SqliteException)
         {
-            // Column already exists on fresh databases — no action needed.
+            // Column already exists on fresh databases - no action needed.
         }
     }
 

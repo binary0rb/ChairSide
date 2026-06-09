@@ -27,9 +27,9 @@ const app = {
 const stateNames = ["empty", "seated", "aging", "stale", "ready-for-doctor", "doctor-in-room", "turnover"];
 // States where "Ready for Doctor" button is enabled (only the neutral In Prep state).
 const activeSeatedStates = new Set(["seated"]);
-// States where corrections (cancel/update) are available — all states before Doctor Arrived.
+// States where corrections (cancel/update) are available - all states before Doctor Arrived.
 const cancelableStates = new Set(["seated", "ready-for-doctor", "aging", "stale"]);
-// States where "Doctor Arrived" is enabled — all ready-for-doctor phase states.
+// States where "Doctor Arrived" is enabled - all ready-for-doctor phase states.
 const doctorArrivedStates = new Set(["ready-for-doctor", "aging", "stale"]);
 const staffLoungeRoomNumber = 99;
 const adminAccess = {
@@ -58,13 +58,14 @@ async function boot() {
   // boot() is called once at page load, but this explicit check prevents a
   // future accidental double-boot from leaking orphaned intervals.
   if (app.pollHandle || app.tickHandle || app.statusHandle) {
-    console.error("[ChairSide] boot() called more than once — skipping duplicate interval registration.");
+    console.error("[ChairSide] boot() called more than once - skipping duplicate interval registration.");
     return;
   }
 
   await loadBoard();
   if (document.body.dataset.view === "reports") {
     await loadReports();
+    wireReportsActions();
   }
 
   connectRealtime();
@@ -530,7 +531,7 @@ function renderReports() {
 
   body.innerHTML = cycles.length
     ? cycles.map(renderCycleRow).join("")
-    : `<tr><td colspan="17">No completed room cycles yet.</td></tr>`;
+    : `<tr><td colspan="18">No completed room cycles yet.</td></tr>`;
 
   renderExceptionCycles(app.reports.exceptionCycles || []);
 }
@@ -563,6 +564,57 @@ function renderExceptionRow(cycle) {
       <td>${escapeHtml(cycle.reviewStatus || "--")}</td>
     </tr>
   `;
+}
+
+// ---------------------------------------------------------------------------
+// Reports admin actions (mark-as-exception)
+// ---------------------------------------------------------------------------
+
+function wireReportsActions() {
+  // One-time delegated listener on the document. The completed cycles tbody is
+  // re-rendered on every poll, so we cannot attach to individual buttons.
+  document.addEventListener("click", handleReportsActionClick);
+}
+
+async function handleReportsActionClick(event) {
+  const button = event.target.closest("[data-action='mark-exception']");
+  if (!button) {
+    return;
+  }
+
+  const roomId = Number(button.dataset.roomId);
+  const seatedAt = button.dataset.seatedAt;
+  if (!roomId || !seatedAt) {
+    return;
+  }
+
+  const label = `Room ${roomId} (started ${formatDateTime(seatedAt)})`;
+  if (!confirm(`Mark ${label} as an exception?\n\nIt will be removed from normal metrics and appear in Exceptions Requiring Review.`)) {
+    return;
+  }
+
+  button.disabled = true;
+  try {
+    const response = await fetch("/api/reports/cycles/mark-exception", {
+      method: "POST",
+      cache: "no-store",
+      headers: {
+        "Content-Type": "application/json",
+        ...adminRequestHeaders()
+      },
+      body: JSON.stringify({ roomId, seatedAt })
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+
+    await loadReports();
+  } catch (error) {
+    console.error("[ChairSide] Mark as exception failed.", error);
+    alert("Mark as exception failed. Please try again.");
+    button.disabled = false;
+  }
 }
 
 function renderReportsAccessPrompt(statusCode) {
@@ -739,6 +791,14 @@ function renderCycleRow(cycle) {
       <td>${escapeHtml(String(cycle.finalWaitState || "--").toUpperCase())}</td>
       <td>${cycle.agingThresholdReached ? "Yes" : "No"}</td>
       <td>${cycle.staleThresholdReached ? "Yes" : "No"}</td>
+      <td>
+        <button class="secondary-button utility-button"
+                data-action="mark-exception"
+                data-room-id="${cycle.roomId}"
+                data-seated-at="${escapeAttribute(cycle.seatedAt || "")}">
+          Mark Exception
+        </button>
+      </td>
     </tr>
   `;
 }
@@ -888,7 +948,7 @@ function setRoomControlsEnabled(room) {
   const isEnabled = Boolean(room);
   const state = room ? normalizeState(room) : "empty";
   const canCorrect = cancelableStates.has(state);
-  const isPrep = activeSeatedStates.has(state); // only "seated" — not aging/stale anymore
+  const isPrep = activeSeatedStates.has(state); // only "seated" - not aging/stale anymore
   setDisabled("demoElapsedSelect", !isEnabled || state !== "empty" || !isDemoTimerEnabled());
   setDisabled("seatButton", !isEnabled || state !== "empty");
   setDisabled("readyForDoctorButton", !isEnabled || !isPrep);

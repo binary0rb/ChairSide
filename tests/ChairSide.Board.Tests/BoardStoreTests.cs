@@ -376,7 +376,7 @@ public sealed class BoardStoreTests
         Assert.Equal(
             ["Consult", "Extraction", "Sedation", "Post-op", "Implant", "Biopsy",
              "Misc", "Periodic Exam", "Impressions", "Integration Check",
-             "Biopsy Post-op", "Implant Removal", "Phone → Office Consult"],
+             "Biopsy Post-op", "Implant Removal", "Phone -> Office Consult"],
             snapshot.Procedures.Select(procedure => procedure.Label));
     }
 
@@ -816,7 +816,7 @@ public sealed class BoardStoreTests
     [Fact]
     public void Room_device_token_comparison_rejects_prefix_and_extended_tokens()
     {
-        // Same SHA-256 hash normalisation as admin tokens — length of the submitted
+        // Same SHA-256 hash normalisation as admin tokens - length of the submitted
         // value never gates acceptance.
         var validator = CreateBindingValidator(enabled: true);
 
@@ -829,6 +829,8 @@ public sealed class BoardStoreTests
     {
         Assert.False(AdminAccessGuard.IsProtectedPath("/reports.html"));
         Assert.True(AdminAccessGuard.IsProtectedPath("/api/reports"));
+        // Admin mutation endpoints nested under /api/reports are also protected.
+        Assert.True(AdminAccessGuard.IsProtectedPath("/api/reports/cycles/mark-exception"));
 
         Assert.False(AdminAccessGuard.IsProtectedPath("/"));
         Assert.False(AdminAccessGuard.IsProtectedPath("/master.html"));
@@ -900,7 +902,7 @@ public sealed class BoardStoreTests
     {
         using var workspace = TestWorkspace.Create();
         var logDir = Path.Combine(workspace.DataRoot, "deep", "nested", "logs");
-        // Directory does not exist yet — logger must create it.
+        // Directory does not exist yet - logger must create it.
         Assert.False(Directory.Exists(logDir));
 
         var logger = CreateDiagnosticLogger(logDir, workspace.ContentRoot);
@@ -969,7 +971,7 @@ public sealed class BoardStoreTests
     [Fact]
     public void Client_error_rate_limiter_null_or_empty_ip_is_always_allowed()
     {
-        // Unknown/proxied source IPs must never be blocked — they cannot be rate-limited
+        // Unknown/proxied source IPs must never be blocked - they cannot be rate-limited
         // by address and the limiter must not throw on null input.
         var limiter = new ClientErrorRateLimiter(
             new TestOptionsMonitor<DiagnosticOptions>(new DiagnosticOptions { ClientErrorRateLimitPerMinute = 1 }));
@@ -1338,14 +1340,14 @@ public sealed class BoardStoreTests
         var clock = new ManualTimeProvider(now);
         var context = StoreContext.Create(workspace, environmentName: Environments.Production, timeProvider: clock);
 
-        // Cycle A: full lifecycle on room 1 — should appear in normal metrics.
+        // Cycle A: full lifecycle on room 1 - should appear in normal metrics.
         Assert.NotNull(context.Store.SeatRoom(1, "otte", "CON"));
         Assert.NotNull(context.Store.MarkReadyForDoctor(1));
         Assert.NotNull(context.Store.MarkDoctorArrived(1));
         Assert.NotNull(context.Store.MarkDoctorComplete(1));
         Assert.NotNull(context.Store.MarkRoomAvailable(1));
 
-        // Cycle B: only reached DoctorArrived on room 2 — will be marked exception.
+        // Cycle B: only reached DoctorArrived on room 2 - will be marked exception.
         clock.SetUtcNow(now.AddMinutes(30));
         Assert.NotNull(context.Store.SeatRoom(2, "pledger", "EXT"));
         Assert.NotNull(context.Store.MarkReadyForDoctor(2));
@@ -1384,13 +1386,13 @@ public sealed class BoardStoreTests
         using var workspace = TestWorkspace.Create();
         var context = StoreContext.Create(workspace, environmentName: Environments.Production);
 
-        // Cycle A: complete lifecycle → normal.
+        // Cycle A: complete lifecycle - normal.
         Assert.NotNull(context.Store.SeatRoom(1, "otte", "CON"));
         Assert.NotNull(context.Store.MarkReadyForDoctor(1));
         var arrivedA = context.Store.MarkDoctorArrived(1);
         Assert.NotNull(arrivedA);
 
-        // Cycle B: only reached DoctorArrived — will be marked exception.
+        // Cycle B: only reached DoctorArrived - will be marked exception.
         Assert.NotNull(context.Store.SeatRoom(2, "pledger", "EXT"));
         Assert.NotNull(context.Store.MarkReadyForDoctor(2));
         var arrivedB = context.Store.MarkDoctorArrived(2);
@@ -1427,7 +1429,7 @@ public sealed class BoardStoreTests
         var marked = first.Store.MarkCycleAsException(1, seatedAt, "Extended wait", "Review with doctor");
         Assert.True(marked);
 
-        // Reload the store — simulates a server restart.
+        // Reload the store - simulates a server restart.
         var second = StoreContext.Create(workspace, environmentName: Environments.Production, databasePath: databasePath);
         var reports = second.Store.GetReports();
 
@@ -1441,6 +1443,515 @@ public sealed class BoardStoreTests
         Assert.Equal(ReviewStatuses.PendingReview, exception.ReviewStatus);
         Assert.Null(exception.ReviewedAt);
         Assert.Null(exception.ReviewedBy);
+    }
+
+    // -----------------------------------------------------------------------
+    // Exception cycle handling - manual + automatic expiration
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public void Manual_mark_as_exception_moves_cycle_from_normal_to_exceptions()
+    {
+        // The admin marks a completed cycle as ManualReview - it should disappear from
+        // normal metrics and appear in ExceptionCycles with the default reason/action.
+        using var workspace = TestWorkspace.Create();
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production);
+
+        Assert.NotNull(context.Store.SeatRoom(1, "otte", "CON"));
+        Assert.NotNull(context.Store.MarkReadyForDoctor(1));
+        var arrived = context.Store.MarkDoctorArrived(1);
+        Assert.NotNull(arrived);
+        var seatedAt = arrived.SeatedAt!.Value;
+
+        // Before marking: appears in normal metrics.
+        Assert.Single(context.Store.GetReports().DoctorSummaries);
+        Assert.Empty(context.Store.GetReports().ExceptionCycles);
+
+        var marked = context.Store.MarkCycleAsException(1, seatedAt, ExceptionReasons.ManualReview, "Exclude from normal metrics");
+        Assert.True(marked);
+
+        var reports = context.Store.GetReports();
+        Assert.Equal(0, reports.CompletedRoomCyclesCount);
+        Assert.Empty(reports.RecentCompletedCycles);
+        Assert.Empty(reports.DoctorSummaries);
+
+        var exception = Assert.Single(reports.ExceptionCycles);
+        Assert.Equal(1, exception.RoomId);
+        Assert.Equal(ExceptionReasons.ManualReview, exception.ExceptionReason);
+        Assert.Equal("Exclude from normal metrics", exception.SuggestedAction);
+        Assert.Equal(ReviewStatuses.PendingReview, exception.ReviewStatus);
+    }
+
+    [Fact]
+    public void Active_room_under_max_duration_is_not_expired()
+    {
+        using var workspace = TestWorkspace.Create();
+        var now = new DateTimeOffset(2026, 6, 9, 10, 0, 0, TimeSpan.Zero);
+        var clock = new ManualTimeProvider(now);
+        var context = StoreContext.Create(
+            workspace,
+            environmentName: Environments.Production,
+            timeProvider: clock,
+            expirationOptions: new RoomExpirationOptions
+            {
+                Enabled = true,
+                MaxActiveDurationHours = 8
+            });
+
+        Assert.NotNull(context.Store.SeatRoom(1, "otte", "CON"));
+
+        // Advance 7.5 hours - still under the 8-hour limit.
+        clock.SetUtcNow(now.AddHours(7).AddMinutes(30));
+        var expired = context.Store.CheckAndExpireActiveCycles();
+
+        Assert.Empty(expired);
+        Assert.Equal(RoomStates.Seated, context.Store.GetRoom(1)?.State);
+        Assert.Equal(0, context.Store.GetReports().CompletedRoomCyclesCount);
+        Assert.Empty(context.Store.GetReports().ExceptionCycles);
+    }
+
+    [Fact]
+    public void Active_room_over_max_duration_without_doctor_arrived_is_expired_as_ExceededMaxActiveDuration()
+    {
+        // Room never reached DoctorArrived - should produce SuggestedAction "Exclude abandoned cycle"
+        // and DoctorArrivedAt should be null on the resulting exception cycle.
+        using var workspace = TestWorkspace.Create();
+        var now = new DateTimeOffset(2026, 6, 9, 10, 0, 0, TimeSpan.Zero);
+        var clock = new ManualTimeProvider(now);
+        var context = StoreContext.Create(
+            workspace,
+            environmentName: Environments.Production,
+            timeProvider: clock,
+            expirationOptions: new RoomExpirationOptions
+            {
+                Enabled = true,
+                MaxActiveDurationHours = 8
+            });
+
+        Assert.NotNull(context.Store.SeatRoom(1, "otte", "CON"));
+        Assert.NotNull(context.Store.MarkReadyForDoctor(1));
+
+        // Advance past 8-hour limit.
+        clock.SetUtcNow(now.AddHours(8).AddSeconds(1));
+        var expired = context.Store.CheckAndExpireActiveCycles();
+
+        Assert.Equal([1], expired);
+        Assert.Equal(RoomStates.Available, context.Store.GetRoom(1)?.State);
+
+        var exception = Assert.Single(context.Store.GetReports().ExceptionCycles);
+        Assert.Equal(1, exception.RoomId);
+        Assert.Equal(ExceptionReasons.ExceededMaxActiveDuration, exception.ExceptionReason);
+        Assert.Equal("Exclude abandoned cycle", exception.SuggestedAction);
+        Assert.Null(exception.DoctorArrivedAt);
+        Assert.Null(exception.DoctorCompleteAt);
+        Assert.Equal(ReviewStatuses.PendingReview, exception.ReviewStatus);
+        Assert.True(exception.IsException);
+        Assert.True(exception.RequiresReview);
+        Assert.Equal(0, context.Store.GetReports().CompletedRoomCyclesCount);
+    }
+
+    [Fact]
+    public void Active_room_over_max_duration_with_doctor_arrived_is_expired_with_review_timing_suggestion()
+    {
+        // Room reached DoctorArrived - should produce SuggestedAction "Review timing".
+        using var workspace = TestWorkspace.Create();
+        var now = new DateTimeOffset(2026, 6, 9, 10, 0, 0, TimeSpan.Zero);
+        var clock = new ManualTimeProvider(now);
+        var context = StoreContext.Create(
+            workspace,
+            environmentName: Environments.Production,
+            timeProvider: clock,
+            expirationOptions: new RoomExpirationOptions
+            {
+                Enabled = true,
+                MaxActiveDurationHours = 8
+            });
+
+        Assert.NotNull(context.Store.SeatRoom(1, "otte", "CON"));
+        Assert.NotNull(context.Store.MarkReadyForDoctor(1));
+        Assert.NotNull(context.Store.MarkDoctorArrived(1));
+
+        // Advance past 8-hour limit.
+        clock.SetUtcNow(now.AddHours(8).AddSeconds(1));
+        var expired = context.Store.CheckAndExpireActiveCycles();
+
+        Assert.Equal([1], expired);
+        Assert.Equal(RoomStates.Available, context.Store.GetRoom(1)?.State);
+
+        var exception = Assert.Single(context.Store.GetReports().ExceptionCycles);
+        Assert.Equal(1, exception.RoomId);
+        Assert.Equal(ExceptionReasons.ExceededMaxActiveDuration, exception.ExceptionReason);
+        Assert.Equal("Review timing", exception.SuggestedAction);
+        Assert.NotNull(exception.DoctorArrivedAt);
+        Assert.Null(exception.DoctorCompleteAt);   // Doctor Complete was never called.
+        Assert.True(exception.IsException);
+    }
+
+    [Fact]
+    public void After_hours_sweep_expires_active_rooms_as_AfterHoursSweep()
+    {
+        using var workspace = TestWorkspace.Create();
+        // Use UTC timezone and a clock set to exactly 19:00 UTC.
+        var now = new DateTimeOffset(2026, 6, 9, 19, 0, 0, TimeSpan.Zero);
+        var clock = new ManualTimeProvider(now);
+        var context = StoreContext.Create(
+            workspace,
+            environmentName: Environments.Production,
+            timeProvider: clock,
+            expirationOptions: new RoomExpirationOptions
+            {
+                Enabled = true,
+                AfterHoursSweepEnabled = true,
+                AfterHoursSweepTime = "19:00",
+                TimeZone = "UTC"
+            });
+
+        Assert.NotNull(context.Store.SeatRoom(1, "otte", "CON"));
+        Assert.NotNull(context.Store.SeatRoom(2, "pledger", "EXT"));
+
+        var expired = context.Store.TryRunAfterHoursSweep();
+
+        Assert.Equal(2, expired.Count);
+        Assert.Contains(1, expired);
+        Assert.Contains(2, expired);
+
+        Assert.Equal(RoomStates.Available, context.Store.GetRoom(1)?.State);
+        Assert.Equal(RoomStates.Available, context.Store.GetRoom(2)?.State);
+
+        var exceptions = context.Store.GetReports().ExceptionCycles;
+        Assert.Equal(2, exceptions.Count);
+        Assert.All(exceptions, ex =>
+        {
+            Assert.Equal(ExceptionReasons.AfterHoursSweep, ex.ExceptionReason);
+            Assert.True(ex.IsException);
+            Assert.True(ex.RequiresReview);
+        });
+        Assert.Equal(0, context.Store.GetReports().CompletedRoomCyclesCount);
+    }
+
+    [Fact]
+    public void Sweep_runs_once_per_clinic_day_and_does_not_create_duplicate_exceptions()
+    {
+        using var workspace = TestWorkspace.Create();
+        var now = new DateTimeOffset(2026, 6, 9, 19, 0, 0, TimeSpan.Zero);
+        var clock = new ManualTimeProvider(now);
+        var expirationOptions = new RoomExpirationOptions
+        {
+            Enabled = true,
+            AfterHoursSweepEnabled = true,
+            AfterHoursSweepTime = "19:00",
+            TimeZone = "UTC"
+        };
+        var context = StoreContext.Create(
+            workspace,
+            environmentName: Environments.Production,
+            timeProvider: clock,
+            expirationOptions: expirationOptions);
+
+        Assert.NotNull(context.Store.SeatRoom(1, "otte", "CON"));
+
+        // First sweep: expires room 1.
+        var firstSweep = context.Store.TryRunAfterHoursSweep();
+        Assert.Equal([1], firstSweep);
+
+        // Re-seat room 1 (simulate activity resuming).
+        Assert.NotNull(context.Store.SeatRoom(1, "otte", "CON"));
+
+        // Second sweep on the same clinic day (even 10 minutes later): should not fire.
+        clock.SetUtcNow(now.AddMinutes(10));
+        var secondSweep = context.Store.TryRunAfterHoursSweep();
+        Assert.Empty(secondSweep);
+
+        // Only the one exception from the first sweep should exist.
+        var exceptions = context.Store.GetReports().ExceptionCycles;
+        Assert.Single(exceptions);
+        Assert.Equal(ExceptionReasons.AfterHoursSweep, exceptions[0].ExceptionReason);
+    }
+
+    [Fact]
+    public void Invalid_timezone_does_not_run_after_hours_sweep()
+    {
+        // A misconfigured timezone must not silently become UTC and fire the sweep
+        // at the wrong local time. The sweep must be suppressed entirely (fail closed).
+        using var workspace = TestWorkspace.Create();
+        var now = new DateTimeOffset(2026, 6, 9, 23, 0, 0, TimeSpan.Zero);
+        var clock = new ManualTimeProvider(now);
+        var context = StoreContext.Create(
+            workspace,
+            environmentName: Environments.Production,
+            timeProvider: clock,
+            expirationOptions: new RoomExpirationOptions
+            {
+                Enabled = true,
+                AfterHoursSweepEnabled = true,
+                AfterHoursSweepTime = "19:00",
+                TimeZone = "Not/A/Valid/TimeZone"
+            });
+
+        Assert.NotNull(context.Store.SeatRoom(1, "otte", "CON"));
+
+        var expired = context.Store.TryRunAfterHoursSweep();
+
+        Assert.Empty(expired);
+        Assert.Equal(RoomStates.Seated, context.Store.GetRoom(1)?.State);
+        Assert.Empty(context.Store.GetReports().ExceptionCycles);
+    }
+
+    [Fact]
+    public void Invalid_timezone_does_not_throw()
+    {
+        // TryRunAfterHoursSweep must silently no-op on a bad timezone - never throw.
+        using var workspace = TestWorkspace.Create();
+        var now = new DateTimeOffset(2026, 6, 9, 23, 0, 0, TimeSpan.Zero);
+        var clock = new ManualTimeProvider(now);
+        var context = StoreContext.Create(
+            workspace,
+            environmentName: Environments.Production,
+            timeProvider: clock,
+            expirationOptions: new RoomExpirationOptions
+            {
+                Enabled = true,
+                AfterHoursSweepEnabled = true,
+                AfterHoursSweepTime = "19:00",
+                TimeZone = "Not/A/Valid/TimeZone"
+            });
+
+        var ex = Record.Exception(() => context.Store.TryRunAfterHoursSweep());
+        Assert.Null(ex);
+    }
+
+    [Fact]
+    public void Max_active_duration_expiration_still_works_with_invalid_timezone()
+    {
+        // CheckAndExpireActiveCycles uses UTC wall-clock only - invalid TimeZone must not affect it.
+        using var workspace = TestWorkspace.Create();
+        var now = new DateTimeOffset(2026, 6, 9, 10, 0, 0, TimeSpan.Zero);
+        var clock = new ManualTimeProvider(now);
+        var context = StoreContext.Create(
+            workspace,
+            environmentName: Environments.Production,
+            timeProvider: clock,
+            expirationOptions: new RoomExpirationOptions
+            {
+                Enabled = true,
+                MaxActiveDurationHours = 8,
+                AfterHoursSweepEnabled = true,
+                AfterHoursSweepTime = "19:00",
+                TimeZone = "Not/A/Valid/TimeZone"
+            });
+
+        Assert.NotNull(context.Store.SeatRoom(1, "otte", "CON"));
+
+        clock.SetUtcNow(now.AddHours(8).AddSeconds(1));
+        var expired = context.Store.CheckAndExpireActiveCycles();
+
+        Assert.Equal([1], expired);
+        Assert.Equal(RoomStates.Available, context.Store.GetRoom(1)?.State);
+        var exception = Assert.Single(context.Store.GetReports().ExceptionCycles);
+        Assert.Equal(ExceptionReasons.ExceededMaxActiveDuration, exception.ExceptionReason);
+    }
+
+    [Fact]
+    public void After_hours_sweep_runs_with_valid_IANA_timezone()
+    {
+        // "America/Chicago" is CDT (UTC-5) in June. Setting the clock to
+        // 2026-06-10 00:30 UTC places clinic local time at 2026-06-09 19:30 CDT,
+        // which is past the 19:00 sweep threshold on clinic day June 9.
+        using var workspace = TestWorkspace.Create();
+        var now = new DateTimeOffset(2026, 6, 10, 0, 30, 0, TimeSpan.Zero); // 19:30 CDT
+        var clock = new ManualTimeProvider(now);
+        var context = StoreContext.Create(
+            workspace,
+            environmentName: Environments.Production,
+            timeProvider: clock,
+            expirationOptions: new RoomExpirationOptions
+            {
+                Enabled = true,
+                AfterHoursSweepEnabled = true,
+                AfterHoursSweepTime = "19:00",
+                TimeZone = "America/Chicago"
+            });
+
+        Assert.NotNull(context.Store.SeatRoom(1, "otte", "CON"));
+
+        var expired = context.Store.TryRunAfterHoursSweep();
+
+        Assert.Equal([1], expired);
+        Assert.Equal(RoomStates.Available, context.Store.GetRoom(1)?.State);
+        var exception = Assert.Single(context.Store.GetReports().ExceptionCycles);
+        Assert.Equal(ExceptionReasons.AfterHoursSweep, exception.ExceptionReason);
+    }
+
+    [Fact]
+    public void Available_rooms_are_not_affected_by_sweep_or_max_duration_check()
+    {
+        using var workspace = TestWorkspace.Create();
+        var now = new DateTimeOffset(2026, 6, 9, 19, 5, 0, TimeSpan.Zero);
+        var clock = new ManualTimeProvider(now);
+        var context = StoreContext.Create(
+            workspace,
+            environmentName: Environments.Production,
+            timeProvider: clock,
+            expirationOptions: new RoomExpirationOptions
+            {
+                Enabled = true,
+                MaxActiveDurationHours = 1,
+                AfterHoursSweepEnabled = true,
+                AfterHoursSweepTime = "19:00",
+                TimeZone = "UTC"
+            });
+
+        // All rooms start Available - nothing to expire.
+        var sweepExpired = context.Store.TryRunAfterHoursSweep();
+        var maxExpired = context.Store.CheckAndExpireActiveCycles();
+
+        Assert.Empty(sweepExpired);
+        Assert.Empty(maxExpired);
+        Assert.Equal(0, context.Store.GetReports().CompletedRoomCyclesCount);
+        Assert.Empty(context.Store.GetReports().ExceptionCycles);
+
+        // Rooms remain available.
+        Assert.All(context.Store.GetSnapshot().Rooms, room =>
+            Assert.Equal(RoomStates.Available, room.State));
+    }
+
+    [Fact]
+    public void Expired_active_cycles_do_not_manufacture_doctor_complete_at()
+    {
+        // Force-expiring a DoctorInRoom room must NOT set DoctorCompleteAt.
+        using var workspace = TestWorkspace.Create();
+        var now = new DateTimeOffset(2026, 6, 9, 10, 0, 0, TimeSpan.Zero);
+        var clock = new ManualTimeProvider(now);
+        var context = StoreContext.Create(
+            workspace,
+            environmentName: Environments.Production,
+            timeProvider: clock,
+            expirationOptions: new RoomExpirationOptions
+            {
+                Enabled = true,
+                MaxActiveDurationHours = 8
+            });
+
+        Assert.NotNull(context.Store.SeatRoom(1, "otte", "CON"));
+        Assert.NotNull(context.Store.MarkReadyForDoctor(1));
+        Assert.NotNull(context.Store.MarkDoctorArrived(1));
+        // Note: MarkDoctorComplete is intentionally NOT called.
+
+        clock.SetUtcNow(now.AddHours(8).AddSeconds(1));
+        context.Store.CheckAndExpireActiveCycles();
+
+        var exception = Assert.Single(context.Store.GetReports().ExceptionCycles);
+        Assert.Null(exception.DoctorCompleteAt);
+    }
+
+    [Fact]
+    public void Expired_exception_cycles_are_excluded_from_normal_metrics()
+    {
+        // Normal cycle + force-expired cycle: only the normal cycle contributes to metrics.
+        using var workspace = TestWorkspace.Create();
+        var now = new DateTimeOffset(2026, 6, 9, 10, 0, 0, TimeSpan.Zero);
+        var clock = new ManualTimeProvider(now);
+        var context = StoreContext.Create(
+            workspace,
+            environmentName: Environments.Production,
+            timeProvider: clock,
+            expirationOptions: new RoomExpirationOptions
+            {
+                Enabled = true,
+                MaxActiveDurationHours = 8
+            });
+
+        // Room 1: completes the full lifecycle - normal cycle.
+        Assert.NotNull(context.Store.SeatRoom(1, "otte", "CON"));
+        Assert.NotNull(context.Store.MarkReadyForDoctor(1));
+        Assert.NotNull(context.Store.MarkDoctorArrived(1));
+        Assert.NotNull(context.Store.MarkDoctorComplete(1));
+        Assert.NotNull(context.Store.MarkRoomAvailable(1));
+
+        // Room 2: gets force-expired - exception cycle.
+        Assert.NotNull(context.Store.SeatRoom(2, "pledger", "EXT"));
+        clock.SetUtcNow(now.AddHours(8).AddSeconds(1));
+        context.Store.CheckAndExpireActiveCycles();
+
+        var reports = context.Store.GetReports();
+        Assert.Equal(1, reports.CompletedRoomCyclesCount);
+        Assert.Single(reports.RecentCompletedCycles);
+        Assert.Equal(1, reports.RecentCompletedCycles[0].RoomId);
+        Assert.Single(reports.ExceptionCycles);
+        Assert.Equal(2, reports.ExceptionCycles[0].RoomId);
+    }
+
+    [Fact]
+    public void Expired_exception_cycles_appear_in_exceptions_requiring_review()
+    {
+        using var workspace = TestWorkspace.Create();
+        var now = new DateTimeOffset(2026, 6, 9, 10, 0, 0, TimeSpan.Zero);
+        var clock = new ManualTimeProvider(now);
+        var context = StoreContext.Create(
+            workspace,
+            environmentName: Environments.Production,
+            timeProvider: clock,
+            expirationOptions: new RoomExpirationOptions
+            {
+                Enabled = true,
+                MaxActiveDurationHours = 8
+            });
+
+        Assert.NotNull(context.Store.SeatRoom(1, "otte", "CON"));
+        clock.SetUtcNow(now.AddHours(8).AddSeconds(1));
+        context.Store.CheckAndExpireActiveCycles();
+
+        var reports = context.Store.GetReports();
+        Assert.Empty(reports.RecentCompletedCycles);
+        var exception = Assert.Single(reports.ExceptionCycles);
+        Assert.Equal(1, exception.RoomId);
+        Assert.Equal(ExceptionReasons.ExceededMaxActiveDuration, exception.ExceptionReason);
+        Assert.True(exception.RequiresReview);
+        Assert.Equal(ReviewStatuses.PendingReview, exception.ReviewStatus);
+    }
+
+    [Fact]
+    public void Persistence_restart_does_not_resurrect_expired_active_rooms()
+    {
+        // After force-expiry the room must persist as Available; a fresh store reload
+        // must not re-activate it.
+        using var workspace = TestWorkspace.Create();
+        var databasePath = workspace.ProductionDatabasePath();
+        var now = new DateTimeOffset(2026, 6, 9, 10, 0, 0, TimeSpan.Zero);
+        var clock = new ManualTimeProvider(now);
+
+        var first = StoreContext.Create(
+            workspace,
+            environmentName: Environments.Production,
+            databasePath: databasePath,
+            timeProvider: clock,
+            expirationOptions: new RoomExpirationOptions
+            {
+                Enabled = true,
+                MaxActiveDurationHours = 8
+            });
+
+        Assert.NotNull(first.Store.SeatRoom(1, "otte", "CON"));
+
+        clock.SetUtcNow(now.AddHours(8).AddSeconds(1));
+        var expired = first.Store.CheckAndExpireActiveCycles();
+        Assert.Equal([1], expired);
+
+        // Verify in-memory: room available, exception cycle recorded.
+        Assert.Equal(RoomStates.Available, first.Store.GetRoom(1)?.State);
+        Assert.Single(first.Store.GetReports().ExceptionCycles);
+
+        // Reload from DB: room must still be Available, exception cycle preserved.
+        var second = StoreContext.Create(
+            workspace,
+            environmentName: Environments.Production,
+            databasePath: databasePath);
+
+        Assert.Equal(RoomStates.Available, second.Store.GetRoom(1)?.State);
+        var exception = Assert.Single(second.Store.GetReports().ExceptionCycles);
+        Assert.Equal(1, exception.RoomId);
+        Assert.Equal(ExceptionReasons.ExceededMaxActiveDuration, exception.ExceptionReason);
+        Assert.True(exception.IsException);
     }
 
     private static readonly HashSet<string> AllowedActiveRoomColumns =
@@ -1707,7 +2218,8 @@ internal sealed class StoreContext
         DoctorRosterOptions? doctorRosterOptions = null,
         ProcedureRosterOptions? procedureRosterOptions = null,
         BoardUiOptions? boardUiOptions = null,
-        TimeProvider? timeProvider = null)
+        TimeProvider? timeProvider = null,
+        RoomExpirationOptions? expirationOptions = null)
     {
         var resolvedDatabasePath = databasePath ?? (environmentName == Environments.Production
             ? workspace.ProductionDatabasePath()
@@ -1722,6 +2234,7 @@ internal sealed class StoreContext
                 AgingMinutes = agingMinutes,
                 StaleMinutes = staleMinutes
             }),
+            new TestOptionsMonitor<RoomExpirationOptions>(expirationOptions ?? new RoomExpirationOptions { Enabled = false }),
             Microsoft.Extensions.Options.Options.Create(new BoardOptions { RoomCount = roomCount }),
             Microsoft.Extensions.Options.Options.Create(boardUiOptions ?? new BoardUiOptions()),
             Microsoft.Extensions.Options.Options.Create(doctorRosterOptions ?? new DoctorRosterOptions
