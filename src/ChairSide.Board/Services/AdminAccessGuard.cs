@@ -5,7 +5,7 @@ namespace ChairSide.Board.Services;
 public static class AdminAccessGuard
 {
     public static bool IsProtectedPath(PathString path) =>
-        path.Equals("/api/reports", StringComparison.OrdinalIgnoreCase);
+        path.StartsWithSegments("/api/reports", StringComparison.OrdinalIgnoreCase);
 
     public static IResult? ValidateRequest(
         HttpRequest request,

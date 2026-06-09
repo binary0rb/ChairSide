@@ -72,6 +72,10 @@ builder.Services
     .AddOptions<DiagnosticOptions>()
     .Bind(builder.Configuration.GetSection(DiagnosticOptions.SectionName));
 
+builder.Services
+    .AddOptions<RoomExpirationOptions>()
+    .Bind(builder.Configuration.GetSection(RoomExpirationOptions.SectionName));
+
 builder.Services.AddSignalR();
 builder.Services.AddSingleton<SqliteBoardRepository>();
 builder.Services.AddSingleton<DemoBoardStore>();
@@ -79,6 +83,7 @@ builder.Services.AddSingleton<RoomDeviceTokenValidator>();
 builder.Services.AddSingleton<AdminAccessTokenValidator>();
 builder.Services.AddSingleton<DiagnosticLogger>();
 builder.Services.AddSingleton<ClientErrorRateLimiter>();
+builder.Services.AddHostedService<RoomExpirationService>();
 
 var app = builder.Build();
 _ = app.Services.GetRequiredService<DemoBoardStore>();
@@ -127,6 +132,43 @@ app.MapHub<BoardHub>("/boardHub");
 app.MapGet("/api/board", (DemoBoardStore store) => store.GetSnapshot());
 
 app.MapGet("/api/reports", (DemoBoardStore store) => store.GetReports());
+
+// Admin-protected: mark a completed cycle as an exception, removing it from normal metrics.
+// Protected by AdminAccessGuard via the /api/reports/* path prefix.
+app.MapPost("/api/reports/cycles/mark-exception", async Task<IResult> (
+    MarkExceptionRequest request,
+    DemoBoardStore store,
+    DiagnosticLogger diagnosticLogger,
+    Microsoft.AspNetCore.SignalR.IHubContext<BoardHub> hubContext) =>
+{
+    if (request.RoomId <= 0)
+    {
+        return Results.BadRequest("RoomId must be a positive integer.");
+    }
+
+    var success = store.MarkCycleAsException(
+        request.RoomId,
+        request.SeatedAt,
+        ExceptionReasons.ManualReview,
+        "Exclude from normal metrics");
+
+    if (!success)
+    {
+        return Results.NotFound("No matching completed cycle found for the given room and seatedAt.");
+    }
+
+    await diagnosticLogger.LogRoomAuditAsync(new RoomAuditEntry
+    {
+        Timestamp = DateTimeOffset.UtcNow.ToString("O"),
+        Action = "mark-exception",
+        RoomNumber = request.RoomId,
+        Success = true,
+        Reason = ExceptionReasons.ManualReview
+    });
+
+    await hubContext.Clients.All.SendAsync("boardUpdated", store.GetSnapshot());
+    return Results.NoContent();
+});
 
 app.MapGet("/api/rooms/{roomNumber:int}", IResult (int roomNumber, DemoBoardStore store) =>
 {
@@ -513,8 +555,15 @@ public sealed record UpdateAssignmentRequest(
     string? ProcedureId = null);
 
 /// <summary>
+/// Body for POST /api/reports/cycles/mark-exception.
+/// Identifies a completed cycle by its natural dedup key.
+/// No PHI - room ID and timestamp only.
+/// </summary>
+public sealed record MarkExceptionRequest(int RoomId, DateTimeOffset SeatedAt);
+
+/// <summary>
 /// Body posted by the browser error capture in board.js.
-/// Contains only technical diagnostics — no PHI.
+/// Contains only technical diagnostics - no PHI.
 /// </summary>
 public sealed record ClientErrorRequest(
     string? Timestamp = null,

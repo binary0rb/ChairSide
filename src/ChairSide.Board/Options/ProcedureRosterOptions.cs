@@ -110,7 +110,7 @@ public sealed class ProcedureRosterOptions
         {
             Id = "phone-office-consult",
             Code = "PCOC",
-            Label = "Phone → Office Consult",
+            Label = "Phone -> Office Consult",
             Icon = "phone",
             Active = true
         }
