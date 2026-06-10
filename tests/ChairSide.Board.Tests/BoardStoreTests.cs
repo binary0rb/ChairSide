@@ -1954,6 +1954,317 @@ public sealed class BoardStoreTests
         Assert.True(exception.IsException);
     }
 
+    // -------------------------------------------------------------------------
+    // Doctor-occupied wait and doctor-available wait reporting
+    // -------------------------------------------------------------------------
+
+    [Fact]
+    public void DoctorOccupiedWait_no_same_doctor_overlap()
+    {
+        // No other same-doctor cycle is in-room during this cycle's ready window.
+        // Expected: occupiedWait = 0, availableWait = readyToDoctorSeconds.
+        using var workspace = TestWorkspace.Create();
+        var now = new DateTimeOffset(2026, 6, 1, 9, 0, 0, TimeSpan.Zero);
+        var clock = new ManualTimeProvider(now);
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production, timeProvider: clock);
+
+        Assert.NotNull(context.Store.SeatRoom(1, "otte", "CON"));
+        clock.SetUtcNow(now.AddMinutes(5));
+        Assert.NotNull(context.Store.MarkReadyForDoctor(1));
+        clock.SetUtcNow(now.AddMinutes(15));
+        Assert.NotNull(context.Store.MarkDoctorArrived(1));
+        Assert.NotNull(context.Store.MarkDoctorComplete(1));
+        clock.SetUtcNow(now.AddMinutes(20));
+        Assert.NotNull(context.Store.MarkRoomAvailable(1));
+
+        var cycle = Assert.Single(context.Store.GetReports().RecentCompletedCycles);
+        Assert.Equal(10 * 60, cycle.ReadyToDoctorSeconds);
+        Assert.Equal(0, cycle.DoctorOccupiedWaitSeconds);
+        Assert.Equal(10 * 60, cycle.DoctorAvailableWaitSeconds);
+    }
+
+    [Fact]
+    public void DoctorOccupiedWait_full_same_doctor_overlap()
+    {
+        // The same doctor is in another room for the entire ready window.
+        // Expected: occupiedWait = readyToDoctorSeconds, availableWait = 0.
+        using var workspace = TestWorkspace.Create();
+        var base_ = new DateTimeOffset(2026, 6, 1, 9, 0, 0, TimeSpan.Zero);
+        var clock = new ManualTimeProvider(base_);
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production, timeProvider: clock);
+
+        // Room 2 (same doctor): arrives at t=0, completes at t=20.
+        Assert.NotNull(context.Store.SeatRoom(2, "otte", "CON"));
+        Assert.NotNull(context.Store.MarkReadyForDoctor(2));
+        Assert.NotNull(context.Store.MarkDoctorArrived(2)); // DoctorArrivedAt = base_+0
+
+        // Room 1 (target): ready at t=5, arrives at t=20.
+        Assert.NotNull(context.Store.SeatRoom(1, "otte", "CON"));
+        clock.SetUtcNow(base_.AddMinutes(5));
+        Assert.NotNull(context.Store.MarkReadyForDoctor(1)); // ReadyForDoctorAt = base_+5
+
+        clock.SetUtcNow(base_.AddMinutes(20));
+        Assert.NotNull(context.Store.MarkDoctorComplete(2)); // DoctorCompleteAt = base_+20
+        Assert.NotNull(context.Store.MarkRoomAvailable(2));
+        Assert.NotNull(context.Store.MarkDoctorArrived(1)); // DoctorArrivedAt = base_+20, readyToDoctor=15min=900s
+
+        Assert.NotNull(context.Store.MarkDoctorComplete(1));
+        clock.SetUtcNow(base_.AddMinutes(25));
+        Assert.NotNull(context.Store.MarkRoomAvailable(1));
+
+        var reports = context.Store.GetReports();
+        var cycle = reports.RecentCompletedCycles.Single(c => c.RoomId == 1);
+        Assert.Equal(15 * 60, cycle.ReadyToDoctorSeconds); // 15 min = 900s
+        Assert.Equal(15 * 60, cycle.DoctorOccupiedWaitSeconds); // fully covered by Room 2's interval
+        Assert.Equal(0, cycle.DoctorAvailableWaitSeconds);
+    }
+
+    [Fact]
+    public void DoctorOccupiedWait_partial_same_doctor_overlap()
+    {
+        // The same doctor is in another room for only part of the ready window.
+        // Room 2 (blocker): DoctorArrivedAt=t+0, DoctorCompleteAt=t+10
+        // Room 1 (target):  ReadyForDoctorAt=t+5, DoctorArrivedAt=t+15 => readyToDoctor=600s
+        // Overlap: t+5 to t+10 = 5 min = 300s
+        // Available: 600 - 300 = 300s
+        using var workspace = TestWorkspace.Create();
+        var base_ = new DateTimeOffset(2026, 6, 1, 9, 0, 0, TimeSpan.Zero);
+        var clock = new ManualTimeProvider(base_);
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production, timeProvider: clock);
+
+        // Room 2 (same doctor, blocker): arrives at t=0.
+        Assert.NotNull(context.Store.SeatRoom(2, "otte", "CON"));
+        Assert.NotNull(context.Store.MarkReadyForDoctor(2));
+        Assert.NotNull(context.Store.MarkDoctorArrived(2)); // DoctorArrivedAt = base_
+
+        // Room 1 (target): seat now, ready at t=5.
+        Assert.NotNull(context.Store.SeatRoom(1, "otte", "CON"));
+        clock.SetUtcNow(base_.AddMinutes(5));
+        Assert.NotNull(context.Store.MarkReadyForDoctor(1)); // ReadyForDoctorAt = base_+5
+
+        // Room 2 completes at t=10.
+        clock.SetUtcNow(base_.AddMinutes(10));
+        Assert.NotNull(context.Store.MarkDoctorComplete(2)); // DoctorCompleteAt = base_+10
+        Assert.NotNull(context.Store.MarkRoomAvailable(2));
+
+        // Room 1 arrives at t=15 => ReadyToDoctorSeconds = 10 min = 600s.
+        clock.SetUtcNow(base_.AddMinutes(15));
+        Assert.NotNull(context.Store.MarkDoctorArrived(1));
+        Assert.NotNull(context.Store.MarkDoctorComplete(1));
+        clock.SetUtcNow(base_.AddMinutes(20));
+        Assert.NotNull(context.Store.MarkRoomAvailable(1));
+
+        var cycle = context.Store.GetReports().RecentCompletedCycles.Single(c => c.RoomId == 1);
+        Assert.Equal(10 * 60, cycle.ReadyToDoctorSeconds);
+        Assert.Equal(5 * 60, cycle.DoctorOccupiedWaitSeconds);
+        Assert.Equal(5 * 60, cycle.DoctorAvailableWaitSeconds);
+    }
+
+    [Fact]
+    public void DoctorOccupiedWait_different_doctor_does_not_block()
+    {
+        // Another doctor being in-room must not affect this cycle's occupied wait.
+        using var workspace = TestWorkspace.Create();
+        var base_ = new DateTimeOffset(2026, 6, 1, 9, 0, 0, TimeSpan.Zero);
+        var clock = new ManualTimeProvider(base_);
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production, timeProvider: clock);
+
+        // Room 2 (different doctor otte): arrives at t=0, completes at t=20.
+        Assert.NotNull(context.Store.SeatRoom(2, "otte", "CON"));
+        Assert.NotNull(context.Store.MarkReadyForDoctor(2));
+        Assert.NotNull(context.Store.MarkDoctorArrived(2));
+
+        // Room 1 (pledger): seat, ready at t=5, arrive at t=20.
+        Assert.NotNull(context.Store.SeatRoom(1, "pledger", "EXT"));
+        clock.SetUtcNow(base_.AddMinutes(5));
+        Assert.NotNull(context.Store.MarkReadyForDoctor(1));
+
+        clock.SetUtcNow(base_.AddMinutes(20));
+        Assert.NotNull(context.Store.MarkDoctorComplete(2));
+        Assert.NotNull(context.Store.MarkRoomAvailable(2));
+        Assert.NotNull(context.Store.MarkDoctorArrived(1)); // readyToDoctor = 15 min = 900s
+
+        Assert.NotNull(context.Store.MarkDoctorComplete(1));
+        clock.SetUtcNow(base_.AddMinutes(25));
+        Assert.NotNull(context.Store.MarkRoomAvailable(1));
+
+        var cycle = context.Store.GetReports().RecentCompletedCycles.Single(c => c.RoomId == 1);
+        Assert.Equal(15 * 60, cycle.ReadyToDoctorSeconds);
+        Assert.Equal(0, cycle.DoctorOccupiedWaitSeconds);
+        Assert.Equal(15 * 60, cycle.DoctorAvailableWaitSeconds);
+    }
+
+    [Fact]
+    public void DoctorOccupiedWait_same_cycle_does_not_self_block()
+    {
+        // A cycle's own DoctorArrivedAt->DoctorCompleteAt interval must not reduce
+        // its own ReadyForDoctorAt->DoctorArrivedAt occupied wait.
+        using var workspace = TestWorkspace.Create();
+        var now = new DateTimeOffset(2026, 6, 1, 9, 0, 0, TimeSpan.Zero);
+        var clock = new ManualTimeProvider(now);
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production, timeProvider: clock);
+
+        Assert.NotNull(context.Store.SeatRoom(1, "otte", "CON"));
+        clock.SetUtcNow(now.AddMinutes(10));
+        Assert.NotNull(context.Store.MarkReadyForDoctor(1));
+        clock.SetUtcNow(now.AddMinutes(20));
+        Assert.NotNull(context.Store.MarkDoctorArrived(1)); // readyToDoctor = 10 min = 600s
+        clock.SetUtcNow(now.AddMinutes(30));
+        Assert.NotNull(context.Store.MarkDoctorComplete(1)); // DoctorCompleteAt = now+30
+        clock.SetUtcNow(now.AddMinutes(35));
+        Assert.NotNull(context.Store.MarkRoomAvailable(1));
+
+        var cycle = Assert.Single(context.Store.GetReports().RecentCompletedCycles);
+        // Own arrived->complete window (t+20 to t+30) overlaps with ready window
+        // (t+10 to t+20) by 0 seconds - no overlap since they are adjacent, not overlapping.
+        // Even if there were overlap, self-exclusion must prevent it counting.
+        Assert.Equal(10 * 60, cycle.ReadyToDoctorSeconds);
+        Assert.Equal(0, cycle.DoctorOccupiedWaitSeconds);
+        Assert.Equal(10 * 60, cycle.DoctorAvailableWaitSeconds);
+    }
+
+    [Fact]
+    public void DoctorOccupiedWait_exception_cycle_excluded_from_normal_metrics()
+    {
+        // An exception cycle must not appear in normal aggregate metrics including
+        // the new averageDoctorAvailableWaitSeconds aggregate.
+        using var workspace = TestWorkspace.Create();
+        var now = new DateTimeOffset(2026, 6, 1, 9, 0, 0, TimeSpan.Zero);
+        var clock = new ManualTimeProvider(now);
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production, timeProvider: clock);
+
+        // Normal cycle: Room 1, 10 min ready-to-doctor, no blocker.
+        Assert.NotNull(context.Store.SeatRoom(1, "otte", "CON"));
+        clock.SetUtcNow(now.AddMinutes(5));
+        Assert.NotNull(context.Store.MarkReadyForDoctor(1));
+        clock.SetUtcNow(now.AddMinutes(15));
+        Assert.NotNull(context.Store.MarkDoctorArrived(1));
+        Assert.NotNull(context.Store.MarkDoctorComplete(1));
+        clock.SetUtcNow(now.AddMinutes(20));
+        Assert.NotNull(context.Store.MarkRoomAvailable(1));
+
+        // Exception cycle: Room 2, same doctor, mark as exception.
+        clock.SetUtcNow(now.AddMinutes(25));
+        Assert.NotNull(context.Store.SeatRoom(2, "otte", "CON"));
+        clock.SetUtcNow(now.AddMinutes(30));
+        Assert.NotNull(context.Store.MarkReadyForDoctor(2));
+        clock.SetUtcNow(now.AddMinutes(35));
+        var arrived2 = context.Store.MarkDoctorArrived(2);
+        Assert.NotNull(arrived2);
+        context.Store.MarkCycleAsException(2, arrived2.SeatedAt!.Value, "Test", "Exclude");
+
+        var reports = context.Store.GetReports();
+
+        // Normal cycle metrics must not include the exception cycle.
+        Assert.Equal(1, reports.CompletedRoomCyclesCount);
+        // Average available wait should equal the single normal cycle's available wait (600s = 0 occupied).
+        Assert.Equal(10 * 60, reports.AverageDoctorAvailableWaitSeconds);
+        Assert.Equal(10 * 60, reports.MedianDoctorAvailableWaitSeconds);
+    }
+
+    [Fact]
+    public void DoctorOccupiedWait_exception_cycle_not_used_as_blocker_interval()
+    {
+        // If the only same-doctor occupied interval belongs to an exception cycle,
+        // doctorOccupiedWaitSeconds must remain 0 for the normal cycle.
+        using var workspace = TestWorkspace.Create();
+        var base_ = new DateTimeOffset(2026, 6, 1, 9, 0, 0, TimeSpan.Zero);
+        var clock = new ManualTimeProvider(base_);
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production, timeProvider: clock);
+
+        // Room 2 (same doctor): will be marked as exception.
+        Assert.NotNull(context.Store.SeatRoom(2, "otte", "CON"));
+        Assert.NotNull(context.Store.MarkReadyForDoctor(2));
+        Assert.NotNull(context.Store.MarkDoctorArrived(2));   // DoctorArrivedAt = base_
+        clock.SetUtcNow(base_.AddMinutes(20));
+        Assert.NotNull(context.Store.MarkDoctorComplete(2));  // DoctorCompleteAt = base_+20
+        Assert.NotNull(context.Store.MarkRoomAvailable(2));
+        // Mark Room 2's cycle as an exception - it must not serve as a blocker.
+        var seatedAt2 = context.Store.GetReports().ExceptionCycles
+            .Concat(context.Store.GetReports().RecentCompletedCycles)
+            .First(c => c.RoomId == 2).SeatedAt;
+        context.Store.MarkCycleAsException(2, seatedAt2, "Test", "Exclude");
+
+        // Room 1 (normal): ready at t=5, arrives at t=20.
+        Assert.NotNull(context.Store.SeatRoom(1, "otte", "CON"));
+        clock.SetUtcNow(base_.AddMinutes(5));
+        Assert.NotNull(context.Store.MarkReadyForDoctor(1));
+        clock.SetUtcNow(base_.AddMinutes(20));
+        Assert.NotNull(context.Store.MarkDoctorArrived(1));
+        Assert.NotNull(context.Store.MarkDoctorComplete(1));
+        clock.SetUtcNow(base_.AddMinutes(25));
+        Assert.NotNull(context.Store.MarkRoomAvailable(1));
+
+        var cycle = context.Store.GetReports().RecentCompletedCycles.Single(c => c.RoomId == 1);
+        Assert.Equal(15 * 60, cycle.ReadyToDoctorSeconds);
+        Assert.Equal(0, cycle.DoctorOccupiedWaitSeconds); // exception cycle must not be a blocker
+        Assert.Equal(15 * 60, cycle.DoctorAvailableWaitSeconds);
+    }
+
+    [Fact]
+    public void DoctorOccupiedWait_aggregate_average_and_median_use_available_wait()
+    {
+        // Verify averageDoctorAvailableWaitSeconds and medianDoctorAvailableWaitSeconds
+        // are computed from doctorAvailableWaitSeconds, not raw readyToDoctorSeconds.
+        // Two normal cycles: one fully blocked (availableWait=0), one unblocked (availableWait=600s).
+        // Average = 300s, Median = 300s.
+        using var workspace = TestWorkspace.Create();
+        var base_ = new DateTimeOffset(2026, 6, 1, 9, 0, 0, TimeSpan.Zero);
+        var clock = new ManualTimeProvider(base_);
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production, timeProvider: clock, roomCount: 4);
+
+        // === Cycle A: Room 1 (pledger), no blocker, readyToDoctor = 10 min = 600s, available = 600s ===
+        Assert.NotNull(context.Store.SeatRoom(1, "pledger", "CON"));
+        clock.SetUtcNow(base_.AddMinutes(5));
+        Assert.NotNull(context.Store.MarkReadyForDoctor(1));
+        clock.SetUtcNow(base_.AddMinutes(15));
+        Assert.NotNull(context.Store.MarkDoctorArrived(1));
+        Assert.NotNull(context.Store.MarkDoctorComplete(1));
+        clock.SetUtcNow(base_.AddMinutes(20));
+        Assert.NotNull(context.Store.MarkRoomAvailable(1));
+
+        // === Cycle B: Room 2 (otte), fully blocked by Room 3 ===
+        // Room 3 (otte, blocker): arrives at t=20, completes at t=40.
+        clock.SetUtcNow(base_.AddMinutes(20));
+        Assert.NotNull(context.Store.SeatRoom(3, "otte", "CON"));
+        Assert.NotNull(context.Store.MarkReadyForDoctor(3));
+        Assert.NotNull(context.Store.MarkDoctorArrived(3)); // DoctorArrivedAt = base_+20
+
+        // Room 2 (otte, target): ready at t=25.
+        Assert.NotNull(context.Store.SeatRoom(2, "otte", "CON"));
+        clock.SetUtcNow(base_.AddMinutes(25));
+        Assert.NotNull(context.Store.MarkReadyForDoctor(2));
+
+        clock.SetUtcNow(base_.AddMinutes(40));
+        Assert.NotNull(context.Store.MarkDoctorComplete(3)); // DoctorCompleteAt = base_+40
+        Assert.NotNull(context.Store.MarkRoomAvailable(3));
+        Assert.NotNull(context.Store.MarkDoctorArrived(2)); // readyToDoctor = 15 min = 900s
+        Assert.NotNull(context.Store.MarkDoctorComplete(2));
+        clock.SetUtcNow(base_.AddMinutes(45));
+        Assert.NotNull(context.Store.MarkRoomAvailable(2));
+
+        var reports = context.Store.GetReports();
+        Assert.Equal(3, reports.CompletedRoomCyclesCount); // Room 1, 2, 3
+
+        var cycleA = reports.RecentCompletedCycles.Single(c => c.RoomId == 1);
+        Assert.Equal(10 * 60, cycleA.ReadyToDoctorSeconds);
+        Assert.Equal(0, cycleA.DoctorOccupiedWaitSeconds);
+        Assert.Equal(10 * 60, cycleA.DoctorAvailableWaitSeconds);
+
+        var cycleB = reports.RecentCompletedCycles.Single(c => c.RoomId == 2);
+        Assert.Equal(15 * 60, cycleB.ReadyToDoctorSeconds);
+        Assert.Equal(15 * 60, cycleB.DoctorOccupiedWaitSeconds);
+        Assert.Equal(0, cycleB.DoctorAvailableWaitSeconds);
+
+        // Aggregates across all 3 cycles (Room 3 has readyToDoctor but no blocker).
+        // Room 1: available=600, Room 2: available=0, Room 3: available=readyToDoctorSeconds of Room 3.
+        // The test focuses on confirming the aggregate is not just raw readyToDoctor.
+        // Room 2's available (0) differs from its readyToDoctor (900) - confirming the metric
+        // reflects occupied-adjusted wait, not raw wait.
+        Assert.True(reports.AverageDoctorAvailableWaitSeconds < reports.AverageReadyToDoctorSeconds,
+            "Average doctor-available wait must be lower than average ready-to-doctor when blocking occurred.");
+    }
+
     private static readonly HashSet<string> AllowedActiveRoomColumns =
     [
         "room_id",

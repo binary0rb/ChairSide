@@ -370,6 +370,10 @@ public sealed class DemoBoardStore
                 .OrderByDescending(cycle => cycle.SeatedAt)
                 .ToList();
 
+            // Annotate normal cycles with doctor-occupied and doctor-available wait.
+            // Exception cycles are excluded from the blocker pool per spec.
+            AnnotateOccupiedWait(normalCycles, normalCycles);
+
             return new ReportsSnapshot(
                 normalCompletedCycles.Count,
                 AverageSeconds(normalCycles.Select(cycle => (int?)cycle.SeatedToDoctorSeconds)),
@@ -384,6 +388,10 @@ public sealed class DemoBoardStore
                 MedianSeconds(normalCycles.Select(cycle => cycle.TurnoverSeconds)),
                 normalCycles.Count(cycle => cycle.AgingThresholdReached),
                 normalCycles.Count(cycle => cycle.StaleThresholdReached),
+                AverageSeconds(normalCycles.Select(cycle => cycle.DoctorOccupiedWaitSeconds)),
+                MedianSeconds(normalCycles.Select(cycle => cycle.DoctorOccupiedWaitSeconds)),
+                AverageSeconds(normalCycles.Select(cycle => cycle.DoctorAvailableWaitSeconds)),
+                MedianSeconds(normalCycles.Select(cycle => cycle.DoctorAvailableWaitSeconds)),
                 BuildDoctorSummaries(normalCycles),
                 normalCompletedCycles.Take(25).ToList(),
                 exceptionCycles);
@@ -965,10 +973,107 @@ public sealed class DemoBoardStore
                 AverageSeconds(group.Select(cycle => cycle.TurnoverSeconds)),
                 MedianSeconds(group.Select(cycle => cycle.TurnoverSeconds)),
                 group.Count(cycle => cycle.AgingThresholdReached),
-                group.Count(cycle => cycle.StaleThresholdReached)))
+                group.Count(cycle => cycle.StaleThresholdReached),
+                AverageSeconds(group.Select(cycle => cycle.DoctorOccupiedWaitSeconds)),
+                MedianSeconds(group.Select(cycle => cycle.DoctorOccupiedWaitSeconds)),
+                AverageSeconds(group.Select(cycle => cycle.DoctorAvailableWaitSeconds)),
+                MedianSeconds(group.Select(cycle => cycle.DoctorAvailableWaitSeconds))))
             .OrderByDescending(summary => summary.Month)
             .ThenBy(summary => summary.AssignedDoctor)
             .ToList();
+
+    // Sets DoctorOccupiedWaitSeconds and DoctorAvailableWaitSeconds on each cycle in
+    // cyclesToAnnotate. Occupied time is the portion of each cycle's
+    // ReadyForDoctorAt -> DoctorArrivedAt window where the same assigned doctor was
+    // physically in another room. Blockers come from blockerPool; exception cycles in
+    // that pool are excluded per spec.
+    private static void AnnotateOccupiedWait(
+        IReadOnlyList<CompletedRoomCycle> cyclesToAnnotate,
+        IReadOnlyList<CompletedRoomCycle> blockerPool)
+    {
+        var eligibleBlockers = blockerPool
+            .Where(c =>
+                !c.IsException &&
+                c.DoctorArrivedAt.HasValue &&
+                c.DoctorCompleteAt.HasValue &&
+                c.DoctorCompleteAt.Value > c.DoctorArrivedAt.Value)
+            .ToList();
+
+        foreach (var cycle in cyclesToAnnotate)
+        {
+            if (!cycle.ReadyForDoctorAt.HasValue || !cycle.DoctorArrivedAt.HasValue || cycle.ReadyToDoctorSeconds is null)
+            {
+                cycle.DoctorOccupiedWaitSeconds = null;
+                cycle.DoctorAvailableWaitSeconds = null;
+                continue;
+            }
+
+            var sameDocOtherIntervals = eligibleBlockers
+                .Where(other =>
+                    other.AssignedDoctor == cycle.AssignedDoctor &&
+                    !(other.RoomId == cycle.RoomId && other.SeatedAt == cycle.SeatedAt))
+                .Select(other => (Start: other.DoctorArrivedAt!.Value, End: other.DoctorCompleteAt!.Value))
+                .ToList();
+
+            var occupied = ComputeOverlapSeconds(
+                cycle.ReadyForDoctorAt.Value,
+                cycle.DoctorArrivedAt.Value,
+                sameDocOtherIntervals);
+
+            var readyToDoctor = cycle.ReadyToDoctorSeconds.Value;
+            var clamped = Math.Min(occupied, readyToDoctor);
+            cycle.DoctorOccupiedWaitSeconds = clamped;
+            cycle.DoctorAvailableWaitSeconds = readyToDoctor - clamped;
+        }
+    }
+
+    // Returns the total seconds that the union of intervals overlaps with [windowStart, windowEnd].
+    private static int ComputeOverlapSeconds(
+        DateTimeOffset windowStart,
+        DateTimeOffset windowEnd,
+        List<(DateTimeOffset Start, DateTimeOffset End)> intervals)
+    {
+        if (intervals.Count == 0 || windowEnd <= windowStart)
+        {
+            return 0;
+        }
+
+        long totalTicks = 0;
+        foreach (var (start, end) in MergeIntervals(intervals))
+        {
+            var overlapStart = start > windowStart ? start : windowStart;
+            var overlapEnd = end < windowEnd ? end : windowEnd;
+            if (overlapEnd > overlapStart)
+            {
+                totalTicks += (overlapEnd - overlapStart).Ticks;
+            }
+        }
+
+        return (int)Math.Round(totalTicks / (double)TimeSpan.TicksPerSecond);
+    }
+
+    // Returns a new list of intervals with overlapping/adjacent entries merged,
+    // sorted ascending by start time.
+    private static IReadOnlyList<(DateTimeOffset Start, DateTimeOffset End)> MergeIntervals(
+        IEnumerable<(DateTimeOffset Start, DateTimeOffset End)> intervals)
+    {
+        var sorted = intervals.OrderBy(i => i.Start).ToList();
+        var result = new List<(DateTimeOffset Start, DateTimeOffset End)>();
+
+        foreach (var (start, end) in sorted)
+        {
+            if (result.Count == 0 || start >= result[^1].End)
+            {
+                result.Add((start, end));
+            }
+            else if (end > result[^1].End)
+            {
+                result[^1] = (result[^1].Start, end);
+            }
+        }
+
+        return result;
+    }
 }
 
 public sealed record BoardSnapshot(
@@ -1027,6 +1132,10 @@ public sealed record ReportsSnapshot(
     double MedianTurnoverSeconds,
     int AgingEventCount,
     int StaleEventCount,
+    double AverageDoctorOccupiedWaitSeconds,
+    double MedianDoctorOccupiedWaitSeconds,
+    double AverageDoctorAvailableWaitSeconds,
+    double MedianDoctorAvailableWaitSeconds,
     IReadOnlyList<DoctorCycleSummary> DoctorSummaries,
     IReadOnlyList<CompletedRoomCycle> RecentCompletedCycles,
     IReadOnlyList<CompletedRoomCycle> ExceptionCycles);
@@ -1050,6 +1159,9 @@ public sealed class CompletedRoomCycle
     public int? DoctorInRoomSeconds { get; set; }
     public int? TurnoverSeconds { get; set; }
     public int? TotalRoomCycleSeconds { get; set; }
+    // Computed at report time from cross-cycle doctor-occupied intervals. Not persisted to storage.
+    public int? DoctorOccupiedWaitSeconds { get; set; }
+    public int? DoctorAvailableWaitSeconds { get; set; }
     public string FinalWaitState { get; set; } = "";
     public bool AgingThresholdReached { get; set; }
     public bool StaleThresholdReached { get; set; }
@@ -1081,7 +1193,11 @@ public sealed record DoctorCycleSummary(
     double AverageTurnoverSeconds,
     double MedianTurnoverSeconds,
     int AgingEventCount,
-    int StaleEventCount);
+    int StaleEventCount,
+    double AverageDoctorOccupiedWaitSeconds,
+    double MedianDoctorOccupiedWaitSeconds,
+    double AverageDoctorAvailableWaitSeconds,
+    double MedianDoctorAvailableWaitSeconds);
 
 public sealed record DemoSeedPattern(
     string DoctorId,
