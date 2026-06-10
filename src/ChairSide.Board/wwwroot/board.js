@@ -568,8 +568,12 @@ function renderReports() {
     renderMetric("Exceptions Requiring Review", (app.reports.exceptionCycles || []).length),
     renderMetric("Avg Prep Time", formatDuration(app.reports.averagePrepSeconds)),
     renderMetric("Median Prep Time", formatDuration(app.reports.medianPrepSeconds)),
-    renderMetric("Avg Ready-to-Doctor", formatDuration(app.reports.averageReadyToDoctorSeconds)),
-    renderMetric("Median Ready-to-Doctor", formatDuration(app.reports.medianReadyToDoctorSeconds)),
+    renderMetric("Avg Ready-to-Doctor Wait", formatDuration(app.reports.averageReadyToDoctorSeconds)),
+    renderMetric("Median Ready-to-Doctor Wait", formatDuration(app.reports.medianReadyToDoctorSeconds)),
+    renderMetric("Avg Doctor Occupied Wait", formatDuration(app.reports.averageDoctorOccupiedWaitSeconds)),
+    renderMetric("Median Doctor Occupied Wait", formatDuration(app.reports.medianDoctorOccupiedWaitSeconds)),
+    renderMetric("Avg Doctor Available Wait", formatDuration(app.reports.averageDoctorAvailableWaitSeconds)),
+    renderMetric("Median Doctor Available Wait", formatDuration(app.reports.medianDoctorAvailableWaitSeconds)),
     renderMetric("Avg Total to Doctor", formatDuration(app.reports.averageSeatedToDoctorSeconds)),
     renderMetric("Median Total to Doctor", formatDuration(app.reports.medianSeatedToDoctorSeconds)),
     renderMetric("Avg In Room", formatDuration(app.reports.averageDoctorInRoomSeconds)),
@@ -582,7 +586,7 @@ function renderReports() {
 
   body.innerHTML = cycles.length
     ? cycles.map(renderCycleRow).join("")
-    : `<tr><td colspan="18">No completed room cycles yet.</td></tr>`;
+    : `<tr><td colspan="20">No completed room cycles yet.</td></tr>`;
 
   renderExceptionCycles(app.reports.exceptionCycles || []);
 }
@@ -835,6 +839,8 @@ function renderCycleRow(cycle) {
       <td>${formatDateTime(cycle.roomAvailableAt)}</td>
       <td>${formatDuration(cycle.prepSeconds)}</td>
       <td>${formatDuration(cycle.readyToDoctorSeconds)}</td>
+      <td>${formatDuration(cycle.doctorOccupiedWaitSeconds)}</td>
+      <td>${formatDuration(cycle.doctorAvailableWaitSeconds)}</td>
       <td>${formatDuration(cycle.seatedToDoctorSeconds)}</td>
       <td>${formatDuration(cycle.doctorInRoomSeconds)}</td>
       <td>${formatDuration(cycle.turnoverSeconds)}</td>
