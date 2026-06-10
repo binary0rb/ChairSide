@@ -2265,6 +2265,235 @@ public sealed class BoardStoreTests
             "Average doctor-available wait must be lower than average ready-to-doctor when blocking occurred.");
     }
 
+    // -------------------------------------------------------------------------
+    // CompletedCycleId stable identity
+    // -------------------------------------------------------------------------
+
+    [Fact]
+    public void Completed_cycle_receives_nonzero_completed_cycle_id()
+    {
+        // A newly persisted cycle must carry a positive CompletedCycleId assigned by SQLite.
+        using var workspace = TestWorkspace.Create();
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production);
+
+        Assert.NotNull(context.Store.SeatRoom(1, "otte", "CON"));
+        Assert.NotNull(context.Store.MarkReadyForDoctor(1));
+        Assert.NotNull(context.Store.MarkDoctorArrived(1));
+        Assert.NotNull(context.Store.MarkDoctorComplete(1));
+        Assert.NotNull(context.Store.MarkRoomAvailable(1));
+
+        var cycle = Assert.Single(context.Store.GetReports().RecentCompletedCycles);
+        Assert.True(cycle.CompletedCycleId > 0, "CompletedCycleId must be a positive value.");
+    }
+
+    [Fact]
+    public void Reports_expose_completed_cycle_id_for_normal_and_exception_cycles()
+    {
+        // Both RecentCompletedCycles and ExceptionCycles must expose a positive CompletedCycleId.
+        // Also confirms available-wait math is untouched: an unblocked cycle keeps
+        // doctorAvailableWaitSeconds == readyToDoctorSeconds and doctorOccupiedWaitSeconds == 0.
+        using var workspace = TestWorkspace.Create();
+        var now = new DateTimeOffset(2026, 6, 1, 9, 0, 0, TimeSpan.Zero);
+        var clock = new ManualTimeProvider(now);
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production, timeProvider: clock);
+
+        // Normal cycle on room 1.
+        Assert.NotNull(context.Store.SeatRoom(1, "otte", "CON"));
+        clock.SetUtcNow(now.AddMinutes(5));
+        Assert.NotNull(context.Store.MarkReadyForDoctor(1));
+        clock.SetUtcNow(now.AddMinutes(15));
+        Assert.NotNull(context.Store.MarkDoctorArrived(1));
+        Assert.NotNull(context.Store.MarkDoctorComplete(1));
+        clock.SetUtcNow(now.AddMinutes(20));
+        Assert.NotNull(context.Store.MarkRoomAvailable(1));
+
+        // Exception cycle on room 2.
+        clock.SetUtcNow(now.AddMinutes(25));
+        Assert.NotNull(context.Store.SeatRoom(2, "pledger", "EXT"));
+        clock.SetUtcNow(now.AddMinutes(30));
+        Assert.NotNull(context.Store.MarkReadyForDoctor(2));
+        clock.SetUtcNow(now.AddMinutes(35));
+        var arrived2 = context.Store.MarkDoctorArrived(2);
+        Assert.NotNull(arrived2);
+        context.Store.MarkCycleAsException(2, arrived2.SeatedAt!.Value, "Test", "Exclude");
+
+        var reports = context.Store.GetReports();
+
+        var normal = Assert.Single(reports.RecentCompletedCycles);
+        Assert.True(normal.CompletedCycleId > 0);
+        // Available-wait math unchanged: no same-doctor blocker for this cycle.
+        Assert.Equal(10 * 60, normal.ReadyToDoctorSeconds);
+        Assert.Equal(0, normal.DoctorOccupiedWaitSeconds);
+        Assert.Equal(10 * 60, normal.DoctorAvailableWaitSeconds);
+
+        var exception = Assert.Single(reports.ExceptionCycles);
+        Assert.True(exception.CompletedCycleId > 0);
+        Assert.NotEqual(normal.CompletedCycleId, exception.CompletedCycleId);
+    }
+
+    [Fact]
+    public void Mark_exception_by_completed_cycle_id_succeeds()
+    {
+        // The preferred targeting path: mark a cycle as an exception by its stable id.
+        using var workspace = TestWorkspace.Create();
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production);
+
+        Assert.NotNull(context.Store.SeatRoom(1, "otte", "CON"));
+        Assert.NotNull(context.Store.MarkReadyForDoctor(1));
+        Assert.NotNull(context.Store.MarkDoctorArrived(1));
+        Assert.NotNull(context.Store.MarkDoctorComplete(1));
+        Assert.NotNull(context.Store.MarkRoomAvailable(1));
+
+        var cycleId = Assert.Single(context.Store.GetReports().RecentCompletedCycles).CompletedCycleId;
+        Assert.True(cycleId > 0);
+
+        var marked = context.Store.MarkCycleAsExceptionById(cycleId, ExceptionReasons.ManualReview, "Exclude from normal metrics");
+        Assert.True(marked);
+
+        var reports = context.Store.GetReports();
+        Assert.Empty(reports.RecentCompletedCycles);
+        var exception = Assert.Single(reports.ExceptionCycles);
+        Assert.Equal(cycleId, exception.CompletedCycleId);
+        Assert.True(exception.IsException);
+        Assert.Equal(ExceptionReasons.ManualReview, exception.ExceptionReason);
+
+        // Targeting a non-existent id returns false.
+        Assert.False(context.Store.MarkCycleAsExceptionById(999999, ExceptionReasons.ManualReview, "noop"));
+        // A non-positive id is rejected.
+        Assert.False(context.Store.MarkCycleAsExceptionById(0, ExceptionReasons.ManualReview, "noop"));
+    }
+
+    [Fact]
+    public void Mark_exception_by_legacy_room_and_seated_at_still_works()
+    {
+        // Backward compatibility: the legacy (roomId, seatedAt) targeting path must still work.
+        using var workspace = TestWorkspace.Create();
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production);
+
+        Assert.NotNull(context.Store.SeatRoom(1, "otte", "CON"));
+        Assert.NotNull(context.Store.MarkReadyForDoctor(1));
+        Assert.NotNull(context.Store.MarkDoctorArrived(1));
+        Assert.NotNull(context.Store.MarkDoctorComplete(1));
+        Assert.NotNull(context.Store.MarkRoomAvailable(1));
+
+        var cycle = Assert.Single(context.Store.GetReports().RecentCompletedCycles);
+        var marked = context.Store.MarkCycleAsException(cycle.RoomId, cycle.SeatedAt, ExceptionReasons.ManualReview, "Exclude from normal metrics");
+        Assert.True(marked);
+
+        var reports = context.Store.GetReports();
+        Assert.Empty(reports.RecentCompletedCycles);
+        Assert.Equal(cycle.CompletedCycleId, Assert.Single(reports.ExceptionCycles).CompletedCycleId);
+    }
+
+    [Fact]
+    public void Completed_cycle_id_is_stable_across_store_reload()
+    {
+        // The id assigned on first persist must survive a store restart unchanged.
+        using var workspace = TestWorkspace.Create();
+        var databasePath = workspace.ProductionDatabasePath();
+
+        var first = StoreContext.Create(workspace, environmentName: Environments.Production, databasePath: databasePath);
+        Assert.NotNull(first.Store.SeatRoom(1, "otte", "CON"));
+        Assert.NotNull(first.Store.MarkReadyForDoctor(1));
+        Assert.NotNull(first.Store.MarkDoctorArrived(1));
+        Assert.NotNull(first.Store.MarkDoctorComplete(1));
+        Assert.NotNull(first.Store.MarkRoomAvailable(1));
+
+        var originalId = Assert.Single(first.Store.GetReports().RecentCompletedCycles).CompletedCycleId;
+        Assert.True(originalId > 0);
+
+        // Reload from the same database file.
+        var second = StoreContext.Create(workspace, environmentName: Environments.Production, databasePath: databasePath);
+        var reloaded = Assert.Single(second.Store.GetReports().RecentCompletedCycles);
+        Assert.Equal(originalId, reloaded.CompletedCycleId);
+    }
+
+    [Fact]
+    public void Legacy_completed_cycles_table_without_id_is_migrated_and_backfilled()
+    {
+        // Defensive migration: a legacy table that predates the explicit id column must be
+        // rebuilt with id INTEGER PRIMARY KEY AUTOINCREMENT, preserving all existing data and
+        // assigning a unique positive id to every row (backfill).
+        using var workspace = TestWorkspace.Create();
+        var databasePath = Path.Combine(workspace.DataRoot, "legacy-no-id.db");
+
+        using (var seed = new SqliteConnection(new SqliteConnectionStringBuilder { DataSource = databasePath }.ToString()))
+        {
+            seed.Open();
+            using (var create = seed.CreateCommand())
+            {
+                create.CommandText = """
+                    CREATE TABLE completed_room_cycles (
+                        room_id INTEGER NOT NULL,
+                        assigned_doctor_id TEXT NOT NULL,
+                        assigned_doctor_display_name TEXT NOT NULL,
+                        procedure_code TEXT NOT NULL,
+                        procedure_category TEXT NOT NULL,
+                        seated_at TEXT NOT NULL,
+                        doctor_arrived_at TEXT NULL,
+                        doctor_complete_at TEXT NULL,
+                        room_available_at TEXT NULL,
+                        seated_to_doctor_seconds INTEGER NOT NULL,
+                        doctor_in_room_seconds INTEGER NULL,
+                        turnover_seconds INTEGER NULL,
+                        total_room_cycle_seconds INTEGER NULL,
+                        final_wait_state TEXT NOT NULL,
+                        aging_threshold_reached INTEGER NOT NULL DEFAULT 0,
+                        stale_threshold_reached INTEGER NOT NULL DEFAULT 0,
+                        created_at TEXT NOT NULL,
+                        updated_at TEXT NOT NULL,
+                        UNIQUE(room_id, seated_at)
+                    );
+                    """;
+                create.ExecuteNonQuery();
+            }
+
+            InsertLegacyCompletedCycleRow(seed, 1, "2026-06-01T10:00:00.0000000+00:00");
+            InsertLegacyCompletedCycleRow(seed, 2, "2026-06-01T11:00:00.0000000+00:00");
+        }
+
+        // Constructing the repository runs Initialize() including the id-backfill migration.
+        var environment = new TestWebHostEnvironment(workspace.ContentRoot, Environments.Development);
+        var repository = new SqliteBoardRepository(
+            Microsoft.Extensions.Options.Options.Create(new BoardPersistenceOptions { DatabasePath = databasePath }),
+            environment);
+
+        var cycles = repository.LoadCompletedCycles();
+
+        // All data preserved.
+        Assert.Equal(2, cycles.Count);
+        Assert.Contains(cycles, c => c.RoomId == 1);
+        Assert.Contains(cycles, c => c.RoomId == 2);
+
+        // Every row backfilled with a unique positive id.
+        Assert.All(cycles, c => Assert.True(c.CompletedCycleId > 0));
+        Assert.Equal(2, cycles.Select(c => c.CompletedCycleId).Distinct().Count());
+
+        // The id column now exists in the schema.
+        using var verify = new SqliteConnection(new SqliteConnectionStringBuilder { DataSource = databasePath }.ToString());
+        verify.Open();
+        Assert.Contains("id", GetColumnNames(verify, "completed_room_cycles"));
+    }
+
+    private static void InsertLegacyCompletedCycleRow(SqliteConnection connection, int roomId, string seatedAt)
+    {
+        using var cmd = connection.CreateCommand();
+        cmd.CommandText = """
+            INSERT INTO completed_room_cycles (
+                room_id, assigned_doctor_id, assigned_doctor_display_name,
+                procedure_code, procedure_category, seated_at,
+                seated_to_doctor_seconds, final_wait_state, created_at, updated_at
+            ) VALUES (
+                $roomId, 'otte', 'Dr. Otte', 'CON', 'Consult', $seatedAt,
+                300, 'ReadyForDoctor', $now, $now
+            );
+            """;
+        cmd.Parameters.AddWithValue("$roomId", roomId);
+        cmd.Parameters.AddWithValue("$seatedAt", seatedAt);
+        cmd.Parameters.AddWithValue("$now", "2026-06-01T12:00:00.0000000+00:00");
+        cmd.ExecuteNonQuery();
+    }
+
     private static readonly HashSet<string> AllowedActiveRoomColumns =
     [
         "room_id",

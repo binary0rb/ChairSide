@@ -141,27 +141,42 @@ app.MapPost("/api/reports/cycles/mark-exception", async Task<IResult> (
     DiagnosticLogger diagnosticLogger,
     Microsoft.AspNetCore.SignalR.IHubContext<BoardHub> hubContext) =>
 {
-    if (request.RoomId <= 0)
+    // Prefer the stable CompletedCycleId when supplied; otherwise fall back to the legacy
+    // (RoomId, SeatedAt) compound key so existing UI and older clients keep working.
+    bool success;
+    int auditRoomNumber;
+    if (request.CompletedCycleId is > 0)
     {
-        return Results.BadRequest("RoomId must be a positive integer.");
+        success = store.MarkCycleAsExceptionById(
+            request.CompletedCycleId.Value,
+            ExceptionReasons.ManualReview,
+            "Exclude from normal metrics");
+        auditRoomNumber = request.RoomId ?? 0;
     }
-
-    var success = store.MarkCycleAsException(
-        request.RoomId,
-        request.SeatedAt,
-        ExceptionReasons.ManualReview,
-        "Exclude from normal metrics");
+    else if (request.RoomId is > 0 && request.SeatedAt.HasValue)
+    {
+        success = store.MarkCycleAsException(
+            request.RoomId.Value,
+            request.SeatedAt.Value,
+            ExceptionReasons.ManualReview,
+            "Exclude from normal metrics");
+        auditRoomNumber = request.RoomId.Value;
+    }
+    else
+    {
+        return Results.BadRequest("Provide a positive completedCycleId, or both a positive roomId and seatedAt.");
+    }
 
     if (!success)
     {
-        return Results.NotFound("No matching completed cycle found for the given room and seatedAt.");
+        return Results.NotFound("No matching completed cycle found for the supplied identity.");
     }
 
     await diagnosticLogger.LogRoomAuditAsync(new RoomAuditEntry
     {
         Timestamp = DateTimeOffset.UtcNow.ToString("O"),
         Action = "mark-exception",
-        RoomNumber = request.RoomId,
+        RoomNumber = auditRoomNumber,
         Success = true,
         Reason = ExceptionReasons.ManualReview
     });
@@ -556,10 +571,14 @@ public sealed record UpdateAssignmentRequest(
 
 /// <summary>
 /// Body for POST /api/reports/cycles/mark-exception.
-/// Identifies a completed cycle by its natural dedup key.
-/// No PHI - room ID and timestamp only.
+/// Preferred targeting is the stable CompletedCycleId. The legacy (RoomId, SeatedAt) compound
+/// key remains supported for backward compatibility with older clients.
+/// No PHI - identity, room ID, and timestamp only.
 /// </summary>
-public sealed record MarkExceptionRequest(int RoomId, DateTimeOffset SeatedAt);
+public sealed record MarkExceptionRequest(
+    long? CompletedCycleId = null,
+    int? RoomId = null,
+    DateTimeOffset? SeatedAt = null);
 
 /// <summary>
 /// Body posted by the browser error capture in board.js.
