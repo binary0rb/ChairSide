@@ -140,6 +140,7 @@ public sealed class SqliteBoardRepository
         using var command = connection.CreateCommand();
         command.CommandText = """
             SELECT
+                id,
                 room_id,
                 assigned_doctor_id,
                 procedure_code,
@@ -174,30 +175,31 @@ public sealed class SqliteBoardRepository
         {
             cycles.Add(new CompletedRoomCycle
             {
-                RoomId = reader.GetInt32(0),
-                AssignedDoctor = reader.GetString(1),
-                ProcedureCode = reader.GetString(2),
-                SeatedAt = ReadRequiredDateTimeOffset(reader, 3),
-                DoctorArrivedAt = ReadNullableDateTimeOffset(reader, 4),
-                DoctorCompleteAt = ReadNullableDateTimeOffset(reader, 5),
-                RoomAvailableAt = ReadNullableDateTimeOffset(reader, 6),
-                SeatedToDoctorSeconds = reader.GetInt32(7),
-                DoctorInRoomSeconds = ReadNullableInt32(reader, 8),
-                TurnoverSeconds = ReadNullableInt32(reader, 9),
-                TotalRoomCycleSeconds = ReadNullableInt32(reader, 10),
-                FinalWaitState = reader.GetString(11),
-                AgingThresholdReached = reader.GetInt32(12) == 1,
-                StaleThresholdReached = reader.GetInt32(13) == 1,
-                ReadyForDoctorAt = ReadNullableDateTimeOffset(reader, 14),
-                PrepSeconds = ReadNullableInt32(reader, 15),
-                ReadyToDoctorSeconds = ReadNullableInt32(reader, 16),
-                IsException = reader.GetInt32(17) == 1,
-                RequiresReview = reader.GetInt32(18) == 1,
-                ExceptionReason = ReadNullableString(reader, 19),
-                ReviewStatus = ReadNullableString(reader, 20) ?? ReviewStatuses.PendingReview,
-                SuggestedAction = ReadNullableString(reader, 21),
-                ReviewedAt = ReadNullableDateTimeOffset(reader, 22),
-                ReviewedBy = ReadNullableString(reader, 23)
+                CompletedCycleId = reader.GetInt64(0),
+                RoomId = reader.GetInt32(1),
+                AssignedDoctor = reader.GetString(2),
+                ProcedureCode = reader.GetString(3),
+                SeatedAt = ReadRequiredDateTimeOffset(reader, 4),
+                DoctorArrivedAt = ReadNullableDateTimeOffset(reader, 5),
+                DoctorCompleteAt = ReadNullableDateTimeOffset(reader, 6),
+                RoomAvailableAt = ReadNullableDateTimeOffset(reader, 7),
+                SeatedToDoctorSeconds = reader.GetInt32(8),
+                DoctorInRoomSeconds = ReadNullableInt32(reader, 9),
+                TurnoverSeconds = ReadNullableInt32(reader, 10),
+                TotalRoomCycleSeconds = ReadNullableInt32(reader, 11),
+                FinalWaitState = reader.GetString(12),
+                AgingThresholdReached = reader.GetInt32(13) == 1,
+                StaleThresholdReached = reader.GetInt32(14) == 1,
+                ReadyForDoctorAt = ReadNullableDateTimeOffset(reader, 15),
+                PrepSeconds = ReadNullableInt32(reader, 16),
+                ReadyToDoctorSeconds = ReadNullableInt32(reader, 17),
+                IsException = reader.GetInt32(18) == 1,
+                RequiresReview = reader.GetInt32(19) == 1,
+                ExceptionReason = ReadNullableString(reader, 20),
+                ReviewStatus = ReadNullableString(reader, 21) ?? ReviewStatuses.PendingReview,
+                SuggestedAction = ReadNullableString(reader, 22),
+                ReviewedAt = ReadNullableDateTimeOffset(reader, 23),
+                ReviewedBy = ReadNullableString(reader, 24)
             });
         }
 
@@ -329,6 +331,22 @@ public sealed class SqliteBoardRepository
         command.Parameters.AddWithValue("$reviewedBy", ToDbValue(cycle.ReviewedBy));
         command.Parameters.AddWithValue("$now", now);
         command.ExecuteNonQuery();
+
+        // Capture the stable identity assigned by SQLite. The upsert may either insert a new
+        // row or update an existing one, so we read the id back by the natural (room_id, seated_at)
+        // key rather than relying on last_insert_rowid(), which is not meaningful on the update path.
+        using var idCommand = connection.CreateCommand();
+        idCommand.CommandText = """
+            SELECT id FROM completed_room_cycles
+            WHERE room_id = $roomId AND seated_at = $seatedAt;
+            """;
+        idCommand.Parameters.AddWithValue("$roomId", cycle.RoomId);
+        idCommand.Parameters.AddWithValue("$seatedAt", FormatDateTimeOffset(cycle.SeatedAt));
+        var idResult = idCommand.ExecuteScalar();
+        if (idResult is not null and not DBNull)
+        {
+            cycle.CompletedCycleId = Convert.ToInt64(idResult);
+        }
     }
 
     private void Initialize()
@@ -409,10 +427,134 @@ public sealed class SqliteBoardRepository
         TryAddColumn(connection, "ALTER TABLE completed_room_cycles ADD COLUMN reviewed_at TEXT NULL");
         TryAddColumn(connection, "ALTER TABLE completed_room_cycles ADD COLUMN reviewed_by TEXT NULL");
 
+        // Migration: ensure completed_room_cycles has an explicit id primary key column.
+        // The table has declared "id INTEGER PRIMARY KEY AUTOINCREMENT" since its first version,
+        // so this is a defensive no-op for all known databases. It exists to safely backfill a
+        // stable identity onto any legacy table that somehow predates the explicit id column.
+        // Runs before the nullable migration so that migration's "SELECT id" remains valid.
+        EnsureCompletedCycleIdColumn(connection);
+
         // Migration: make doctor_arrived_at nullable to support force-expired cycles where
         // the doctor never arrived. ALTER TABLE cannot change NOT NULL in SQLite, so we recreate
         // the table if needed. Wrapped in a transaction - safe to retry on restart.
         MigrateNullableDoctorArrivedAt(connection);
+    }
+
+    // Canonical CREATE for completed_room_cycles (current schema: explicit id primary key,
+    // nullable doctor_arrived_at). Used by the id-backfill rebuild. Not "IF NOT EXISTS" because
+    // the rebuild always creates a fresh table after renaming the legacy one out of the way.
+    private const string CanonicalCompletedCycleCreateSql = """
+        CREATE TABLE completed_room_cycles (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            room_id INTEGER NOT NULL,
+            assigned_doctor_id TEXT NOT NULL,
+            assigned_doctor_display_name TEXT NOT NULL,
+            procedure_code TEXT NOT NULL,
+            procedure_category TEXT NOT NULL,
+            seated_at TEXT NOT NULL,
+            ready_for_doctor_at TEXT NULL,
+            doctor_arrived_at TEXT NULL,
+            doctor_complete_at TEXT NULL,
+            room_available_at TEXT NULL,
+            seated_to_doctor_seconds INTEGER NOT NULL,
+            prep_seconds INTEGER NULL,
+            ready_to_doctor_seconds INTEGER NULL,
+            doctor_in_room_seconds INTEGER NULL,
+            turnover_seconds INTEGER NULL,
+            total_room_cycle_seconds INTEGER NULL,
+            final_wait_state TEXT NOT NULL,
+            aging_threshold_reached INTEGER NOT NULL DEFAULT 0,
+            stale_threshold_reached INTEGER NOT NULL DEFAULT 0,
+            is_exception INTEGER NOT NULL DEFAULT 0,
+            requires_review INTEGER NOT NULL DEFAULT 0,
+            exception_reason TEXT NULL,
+            review_status TEXT NOT NULL DEFAULT 'PendingReview',
+            suggested_action TEXT NULL,
+            reviewed_at TEXT NULL,
+            reviewed_by TEXT NULL,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            UNIQUE(room_id, seated_at)
+        );
+        """;
+
+    // Canonical non-id columns in CanonicalCompletedCycleCreateSql order. Used to copy the
+    // intersection of old and new columns during the id-backfill rebuild.
+    private static readonly string[] CanonicalCompletedCycleColumns =
+    [
+        "room_id",
+        "assigned_doctor_id",
+        "assigned_doctor_display_name",
+        "procedure_code",
+        "procedure_category",
+        "seated_at",
+        "ready_for_doctor_at",
+        "doctor_arrived_at",
+        "doctor_complete_at",
+        "room_available_at",
+        "seated_to_doctor_seconds",
+        "prep_seconds",
+        "ready_to_doctor_seconds",
+        "doctor_in_room_seconds",
+        "turnover_seconds",
+        "total_room_cycle_seconds",
+        "final_wait_state",
+        "aging_threshold_reached",
+        "stale_threshold_reached",
+        "is_exception",
+        "requires_review",
+        "exception_reason",
+        "review_status",
+        "suggested_action",
+        "reviewed_at",
+        "reviewed_by",
+        "created_at",
+        "updated_at"
+    ];
+
+    /// <summary>
+    /// Ensures completed_room_cycles has an explicit id INTEGER PRIMARY KEY AUTOINCREMENT column.
+    /// Idempotent. No-op when the table does not exist yet or already has an id column (the case
+    /// for every known database). When an id column is somehow missing, the table is recreated
+    /// preserving all existing columns and data; SQLite assigns a fresh autoincrement id to every
+    /// row, which backfills a unique stable identity. Only columns shared between the old and new
+    /// schema are copied, so the rebuild is safe even if the legacy table predates newer columns.
+    /// </summary>
+    private static void EnsureCompletedCycleIdColumn(SqliteConnection connection)
+    {
+        if (!TableExists(connection, "completed_room_cycles"))
+        {
+            return;
+        }
+
+        var existingColumns = GetColumnNames(connection, "completed_room_cycles");
+        if (existingColumns.Contains("id"))
+        {
+            return;
+        }
+
+        // Columns common to both the legacy table and the canonical schema, in canonical order.
+        // The id column is intentionally excluded so SQLite assigns fresh autoincrement values.
+        var sharedColumns = CanonicalCompletedCycleColumns
+            .Where(column => existingColumns.Contains(column))
+            .ToList();
+        var columnList = string.Join(",\n                ", sharedColumns);
+
+        using var transaction = connection.BeginTransaction();
+
+        Execute(connection, transaction, "ALTER TABLE completed_room_cycles RENAME TO completed_room_cycles_preid;");
+        Execute(connection, transaction, CanonicalCompletedCycleCreateSql);
+        Execute(connection, transaction, $"""
+            INSERT INTO completed_room_cycles (
+                {columnList}
+            )
+            SELECT
+                {columnList}
+            FROM completed_room_cycles_preid;
+            """);
+        Execute(connection, transaction, "DROP TABLE completed_room_cycles_preid;");
+
+        transaction.Commit();
     }
 
     /// <summary>
@@ -562,6 +704,20 @@ public sealed class SqliteBoardRepository
         cmd.CommandText = "SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type='table' AND name=$name);";
         cmd.Parameters.AddWithValue("$name", tableName);
         return Convert.ToInt32(cmd.ExecuteScalar()) == 1;
+    }
+
+    private static HashSet<string> GetColumnNames(SqliteConnection connection, string tableName)
+    {
+        using var cmd = connection.CreateCommand();
+        cmd.CommandText = $"PRAGMA table_info({tableName});";
+        var columns = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        using var reader = cmd.ExecuteReader();
+        while (reader.Read())
+        {
+            columns.Add(reader.GetString(1));
+        }
+
+        return columns;
     }
 
     private static void Execute(SqliteConnection connection, SqliteTransaction transaction, string sql)

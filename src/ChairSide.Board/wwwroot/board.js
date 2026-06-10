@@ -639,7 +639,10 @@ async function handleReportsActionClick(event) {
 
   const roomId = Number(button.dataset.roomId);
   const seatedAt = button.dataset.seatedAt;
-  if (!roomId || !seatedAt) {
+  const completedCycleId = Number(button.dataset.completedCycleId);
+  // Prefer the stable cycle id; fall back to the legacy roomId + seatedAt key when it is absent.
+  const hasCycleId = Number.isInteger(completedCycleId) && completedCycleId > 0;
+  if (!hasCycleId && (!roomId || !seatedAt)) {
     return;
   }
 
@@ -647,6 +650,10 @@ async function handleReportsActionClick(event) {
   if (!confirm(`Mark ${label} as an exception?\n\nIt will be removed from normal metrics and appear in Exceptions Requiring Review.`)) {
     return;
   }
+
+  // When the stable id is present the server targets by it; roomId is included only so the
+  // server-side audit log keeps room context. Otherwise fall back to the legacy compound key.
+  const requestBody = hasCycleId ? { completedCycleId, roomId } : { roomId, seatedAt };
 
   button.disabled = true;
   try {
@@ -657,7 +664,7 @@ async function handleReportsActionClick(event) {
         "Content-Type": "application/json",
         ...adminRequestHeaders()
       },
-      body: JSON.stringify({ roomId, seatedAt })
+      body: JSON.stringify(requestBody)
     });
 
     if (!response.ok) {
@@ -851,6 +858,7 @@ function renderCycleRow(cycle) {
       <td>
         <button class="secondary-button utility-button"
                 data-action="mark-exception"
+                data-completed-cycle-id="${escapeAttribute(String(cycle.completedCycleId || ""))}"
                 data-room-id="${cycle.roomId}"
                 data-seated-at="${escapeAttribute(cycle.seatedAt || "")}">
           Mark Exception

@@ -409,19 +409,46 @@ public sealed class DemoBoardStore
         lock (_syncRoot)
         {
             var cycle = _completedCycles.FirstOrDefault(item => item.RoomId == roomId && item.SeatedAt == seatedAt);
-            if (cycle is null)
+            return MarkCycleAsException(cycle, reason, suggestedAction);
+        }
+    }
+
+    /// <summary>
+    /// Marks a completed cycle as an exception by its stable CompletedCycleId. This is the
+    /// preferred targeting path; the (roomId, seatedAt) overload remains for backward compatibility.
+    /// Returns false if no matching cycle is found or the id is not a positive value.
+    /// No PHI is stored - reason and suggested action are operational notes only.
+    /// </summary>
+    public bool MarkCycleAsExceptionById(long completedCycleId, string reason, string suggestedAction)
+    {
+        lock (_syncRoot)
+        {
+            if (completedCycleId <= 0)
             {
                 return false;
             }
 
-            cycle.IsException = true;
-            cycle.RequiresReview = true;
-            cycle.ExceptionReason = reason;
-            cycle.SuggestedAction = suggestedAction;
-            cycle.ReviewStatus = ReviewStatuses.PendingReview;
-            PersistCycle(cycle);
-            return true;
+            var cycle = _completedCycles.FirstOrDefault(item => item.CompletedCycleId == completedCycleId);
+            return MarkCycleAsException(cycle, reason, suggestedAction);
         }
+    }
+
+    // Shared mutation for both the id-based and legacy (roomId, seatedAt) targeting paths.
+    // Must be called inside _syncRoot.
+    private bool MarkCycleAsException(CompletedRoomCycle? cycle, string reason, string suggestedAction)
+    {
+        if (cycle is null)
+        {
+            return false;
+        }
+
+        cycle.IsException = true;
+        cycle.RequiresReview = true;
+        cycle.ExceptionReason = reason;
+        cycle.SuggestedAction = suggestedAction;
+        cycle.ReviewStatus = ReviewStatuses.PendingReview;
+        PersistCycle(cycle);
+        return true;
     }
 
     /// <summary>
@@ -1142,6 +1169,11 @@ public sealed record ReportsSnapshot(
 
 public sealed class CompletedRoomCycle
 {
+    // Stable unique identity for this completed cycle, assigned by SQLite and mapped from
+    // the completed_room_cycles.id column. Zero until the cycle has been persisted at least
+    // once. Reporting and exception actions can target a single cycle by this value without
+    // relying on the legacy (RoomId, SeatedAt) compound key.
+    public long CompletedCycleId { get; set; }
     public int RoomId { get; set; }
     public string AssignedDoctor { get; set; } = "";
     public string ProcedureCode { get; set; } = "";
