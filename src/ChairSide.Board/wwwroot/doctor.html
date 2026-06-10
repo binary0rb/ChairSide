@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>ChairSide Board - Doctor View</title>
-  <link rel="stylesheet" href="/styles.css?v=20260610-icon-correction">
+  <link rel="stylesheet" href="/styles.css?v=20260610-doctor-selector">
 </head>
 <body data-view="doctor">
   <header class="app-header compact">
@@ -20,9 +20,13 @@
     </div>
     <nav class="view-links" aria-label="Views">
       <a href="/master.html">Master</a>
-      <a href="/doctor.html">Doctor</a>
+      <label class="doctor-view-select">
+        <span>Doctor View</span>
+        <select id="doctorViewSelect" aria-label="Open the board for a doctor">
+          <option value="">Choose doctor...</option>
+        </select>
+      </label>
       <a href="/reports.html">Reports</a>
-      <a href="/room.html?roomId=1">Room 1</a>
     </nav>
   </header>
 
@@ -31,6 +35,6 @@
   </main>
 
   <script src="/signalr-lite.js"></script>
-  <script src="/board.js?v=20260610-icon-correction"></script>
+  <script src="/board.js?v=20260610-doctor-selector"></script>
 </body>
 </html>

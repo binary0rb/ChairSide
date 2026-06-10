@@ -81,6 +81,43 @@ select {
   text-decoration: none;
 }
 
+/* Nav doctor selector: a labeled control styled to sit beside the view
+   links. Overrides the full-width touch sizing that the global label and
+   select rules apply elsewhere. */
+.doctor-view-select {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 0;
+  padding: 4px 6px 4px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--ink);
+  font-size: 16px;
+  font-weight: 800;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.doctor-view-select span {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.doctor-view-select select {
+  width: auto;
+  min-height: 36px;
+  padding: 0 8px;
+  border-radius: 6px;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
 .connection-status {
   display: inline-flex;
   align-items: center;

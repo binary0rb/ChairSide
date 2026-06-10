@@ -18,7 +18,8 @@ const app = {
   roomNumber: getRoomNumber(),
   roomToken: getRoomToken(),
   roomTokenPromptVisible: false,
-  doctorId: new URLSearchParams(location.search).get("doctor"),
+  doctorId: new URLSearchParams(location.search).get("doctorId")
+    || new URLSearchParams(location.search).get("doctor"),
   selectedDoctorId: null,
   selectedProcedureId: null,
   selectionContext: null
@@ -68,6 +69,7 @@ async function boot() {
     wireReportsActions();
   }
 
+  wireDoctorViewSelect();
   connectRealtime();
   app.pollHandle = window.setInterval(loadBoard, 5000);
   app.tickHandle = window.setInterval(render, 1000);
@@ -235,6 +237,7 @@ function render() {
   const view = document.body.dataset.view;
   updateConnectionStatus();
   renderLegend();
+  populateDoctorViewSelect();
 
   if (view === "master") {
     renderMaster();
@@ -383,6 +386,52 @@ function renderLegend() {
   }
 }
 
+// Display-only initials for compact labels. Doctors missing from this map
+// fall back to their configured short name alone.
+const doctorInitialsById = {
+  otte: "LDO",
+  pledger: "JWP",
+  gibson: "JEG",
+  schroeder: "NDS"
+};
+
+function doctorSelectorLabel(doctor) {
+  const shortName = doctor.shortName || cardDoctorName(doctor.name);
+  const initials = doctorInitialsById[doctor.id];
+  return initials ? `${initials} - ${shortName}` : shortName;
+}
+
+// Fills the nav doctor selector from the live roster snapshot. Runs once per
+// page load; render() calls it every tick but the populated guard makes the
+// repeat calls no-ops so an open dropdown is never rebuilt mid-interaction.
+function populateDoctorViewSelect() {
+  const select = document.getElementById("doctorViewSelect");
+  if (!select || select.dataset.populated === "true" || !app.snapshot) {
+    return;
+  }
+
+  const options = [`<option value="">Choose doctor...</option>`];
+  for (const doctor of app.snapshot.doctors) {
+    options.push(`<option value="${escapeAttribute(doctor.id)}">${escapeHtml(doctorSelectorLabel(doctor))}</option>`);
+  }
+
+  select.innerHTML = options.join("");
+  if (document.body.dataset.view === "doctor" && app.doctorId) {
+    select.value = app.doctorId;
+  }
+
+  select.dataset.populated = "true";
+}
+
+function wireDoctorViewSelect() {
+  document.getElementById("doctorViewSelect")?.addEventListener("change", event => {
+    const doctorId = event.target.value;
+    if (doctorId) {
+      window.location.href = `/doctor.html?doctorId=${encodeURIComponent(doctorId)}`;
+    }
+  });
+}
+
 function renderMaster() {
   const target = document.getElementById("roomGrid");
   target.innerHTML = app.snapshot.rooms.map(room => {
@@ -477,17 +526,19 @@ function wireStaffLoungePanel(shell) {
 }
 
 function renderDoctorView() {
-  const doctor = app.doctorId
-    ? app.snapshot.doctors.find(item => item.id === app.doctorId)
-    : app.snapshot.doctors[0];
   const title = document.getElementById("doctorViewTitle");
   const target = document.getElementById("doctorRoomList");
 
-  if (!doctor) {
-    const message = app.doctorId
-      ? `Doctor "${app.doctorId}" was not found.`
-      : "No doctors are configured for this board.";
+  // No implicit default doctor: the view is explicit about who is selected.
+  if (!app.doctorId) {
+    title.textContent = "Doctor View";
+    target.innerHTML = `<div class="empty-message">Choose a doctor from the Doctor View selector above to see their rooms.</div>`;
+    return;
+  }
 
+  const doctor = app.snapshot.doctors.find(item => item.id === app.doctorId);
+  if (!doctor) {
+    const message = `Doctor "${app.doctorId}" was not found.`;
     title.textContent = "Doctor View";
     target.innerHTML = `<div class="empty-message">${escapeHtml(message)}</div>`;
     return;
