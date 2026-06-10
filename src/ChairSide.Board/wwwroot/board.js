@@ -349,8 +349,8 @@ function renderLegend() {
   const doctorTarget = document.getElementById("doctorLegend");
   if (doctorTarget) {
     doctorTarget.innerHTML = app.snapshot.doctors.map(doctor => `
-      <span class="doctor-chip">
-        <i style="--doctor-color: ${escapeAttribute(doctor.color)}"></i>${escapeHtml(doctor.name)}
+      <span class="doctor-chip" style="--doctor-color: ${escapeAttribute(doctor.color)}">
+        <i></i>${escapeHtml(doctor.name)}
       </span>
     `).join("");
   }
@@ -359,7 +359,7 @@ function renderLegend() {
   if (procedureTarget) {
     procedureTarget.innerHTML = app.snapshot.procedures.map(procedure => `
       <span class="procedure-chip">
-        <span>${renderProcedureIcon(procedure.icon)}</span>
+        <span>${renderProcedureIcon(procedure)}</span>
         <strong>${escapeHtml(procedure.code)}</strong>
         <small>${escapeHtml(procedure.label)}</small>
       </span>
@@ -825,7 +825,7 @@ function renderRoomTile(room, large = false) {
         <span>${badge}</span>
       </div>
       <div class="procedure-lockup">
-        ${procedure ? renderProcedureIcon(procedure.icon) : renderEmptyIcon()}
+        ${procedure ? renderProcedureIcon(procedure) : renderEmptyIcon()}
         <span>${procedure ? escapeHtml(procedure.code) : "OPEN"}</span>
       </div>
       <div class="room-footer">
@@ -896,6 +896,10 @@ function normalizeState(room) {
 }
 
 function stateBadge(state) {
+  if (state === "empty") {
+    return "AVAILABLE";
+  }
+
   if (state === "seated") {
     return "IN PREP";
   }
@@ -984,7 +988,7 @@ function renderProcedureBadge(procedureCode) {
 
   return `
     <span class="procedure-badge">
-      ${renderProcedureIcon(procedure.icon)}
+      ${renderProcedureIcon(procedure)}
       <span>
         <strong>${escapeHtml(procedure.code)}</strong>
         <small>${escapeHtml(procedure.label)}</small>
@@ -993,22 +997,60 @@ function renderProcedureBadge(procedureCode) {
   `;
 }
 
-function renderProcedureIcon(icon) {
-  const icons = {
-    speech: `<svg class="procedure-icon" viewBox="0 0 24 24" aria-hidden="true"><path class="icon-stroke" d="M5 5.5h14v10H9l-4 3v-13z"/><path class="icon-stroke" d="M8.5 9h7M8.5 12h5"/></svg>`,
-    forceps: `<svg class="procedure-icon tooth-icon" viewBox="0 0 24 24" aria-hidden="true"><path class="icon-stroke" d="M12 5.5C10.9 4.8 9.5 4 8 4 5.7 4 4 5.7 4 9.2 4 14 6.3 21 8.4 21c1.2 0 1.5-3.2 3.6-3.2S14.4 21 15.6 21C17.7 21 20 14 20 9.2 20 5.7 18.3 4 16 4c-1.5 0-2.9.8-4 1.5z"/><path class="icon-stroke" d="M10 8.2h4"/></svg>`,
-    moon: `<svg class="procedure-icon" viewBox="0 0 24 24" aria-hidden="true"><path class="icon-stroke" d="M18.8 15.2A7.5 7.5 0 0 1 8.8 5.2 8.4 8.4 0 1 0 18.8 15.2z"/></svg>`,
-    check: `<svg class="procedure-icon" viewBox="0 0 24 24" aria-hidden="true"><path class="icon-stroke" d="M5 5h14v14H5z"/><path class="icon-stroke check-mark" d="M8.2 12.5l3 3 5-6"/></svg>`,
-    bolt: `<svg class="procedure-icon implant-icon" viewBox="0 0 24 24" aria-hidden="true"><path class="icon-stroke" d="M9 3.5h6M10 6h4v4l-1.4 1.4v7.1L12 20.5l-.6-2v-7.1L10 10V6z"/><path class="icon-stroke" d="M8.5 12h7M8.8 14.3h6.4M9.2 16.6h5.6"/></svg>`,
-    vial: `<svg class="procedure-icon" viewBox="0 0 24 24" aria-hidden="true"><path class="icon-stroke" d="M9 3.5h6M10 3.5v5.8l-4.1 7.9A2.6 2.6 0 0 0 8.2 21h7.6a2.6 2.6 0 0 0 2.3-3.8L14 9.3V3.5"/><path class="icon-stroke" d="M7.4 16h9.2"/></svg>`,
-    teeth: `<svg class="procedure-icon" viewBox="0 0 24 24" aria-hidden="true"><path class="icon-stroke" d="M4 12Q12 8 20 12v6H4z"/><path class="icon-stroke" d="M8 12v6M12 12v6M16 12v6"/></svg>`,
-    sync: `<svg class="procedure-icon" viewBox="0 0 24 24" aria-hidden="true"><path class="icon-stroke" d="M17.7 6.3A8 8 0 1 0 20 12"/><path class="icon-stroke" d="M20 7v5h-5"/></svg>`,
-    interlock: `<img class="procedure-icon" src="/assets/icons/interlock.png" alt="" aria-hidden="true">`,
-    wrench: `<svg class="procedure-icon" viewBox="0 0 24 24" aria-hidden="true"><path class="icon-stroke" d="M14.7 6.3a4 4 0 0 1-5.4 5.4L4 17l3 3 5.3-5.3a4 4 0 0 1 5.4-5.4l-2.3 2.3 1.4 1.4 2.3-2.3z"/></svg>`,
-    phone: `<svg class="procedure-icon" viewBox="0 0 24 24" aria-hidden="true"><path class="icon-stroke" d="M6.5 10.5c1.5 3 4 5.5 7 7l2-2a1 1 0 0 1 1.1-.2c1 .5 2.1.8 3.2.9a1 1 0 0 1 .9 1v3a1 1 0 0 1-1 1C10 22 2 14 2 4.3a1 1 0 0 1 1-1H6a1 1 0 0 1 1 .9c.1 1.1.4 2.2.9 3.2a1 1 0 0 1-.2 1.1L6.5 10.5z"/></svg>`
-  };
+// One outline icon per default-roster procedure code. Codes that share an
+// icon name in the roster (CON/POE, POST/MISC, BX/BXPOST) get distinct icons
+// here without touching roster semantics.
+const procedureIconsByCode = {
+  CON: "magnifier",
+  EXT: "forceps",
+  SED: "moon",
+  POST: "thumbsup",
+  IMP: "bolt",
+  BX: "microscope",
+  MISC: "ellipsis",
+  POE: "calendar",
+  IMPRES: "mold",
+  INTCK: "links",
+  BXPOST: "eye",
+  IMPRM: "jackhammer",
+  PCOC: "phone"
+};
 
-  return icons[icon] || renderEmptyIcon();
+// Legacy roster icon names map to the nearest icon in the current set so a
+// customized roster never falls back to the empty placeholder.
+const legacyIconAliases = {
+  speech: "magnifier",
+  check: "thumbsup",
+  vial: "microscope",
+  teeth: "mold",
+  sync: "links",
+  interlock: "links",
+  wrench: "jackhammer"
+};
+
+// All icons share viewBox 0 0 24 24, currentColor strokes, and rounded
+// caps/joins (applied by the .procedure-icon CSS rules).
+const procedureIconSvgs = {
+  magnifier: `<svg class="procedure-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6"/><path d="M15 15l5.5 5.5"/></svg>`,
+  forceps: `<svg class="procedure-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8.5 3c-1.2 4.2-.3 7.6 3.5 10.5"/><path d="M15.5 3c1.2 4.2.3 7.6-3.5 10.5"/><path d="M12 13.5 9 21"/><path d="M12 13.5 15 21"/><circle cx="12" cy="13.5" r="1.1" fill="currentColor" stroke="none"/></svg>`,
+  moon: `<svg class="procedure-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M16.8 16.6A6.8 6.8 0 0 1 7.6 7.4 7.4 7.4 0 1 0 16.8 16.6z"/><path d="M14.5 3.5h4l-4 4h4"/></svg>`,
+  thumbsup: `<svg class="procedure-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6.5 11.5V20"/><path d="M3.5 11.5h3l3.7-7.3a2 2 0 0 1 1.9 2.5L11.3 10h6.2a2 2 0 0 1 2 2.4l-1.2 5.6a2.5 2.5 0 0 1-2.4 2H6.5"/></svg>`,
+  bolt: `<svg class="procedure-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3.5h6M10 6h4v4l-1.4 1.4v7.1L12 20.5l-.6-2v-7.1L10 10V6z"/><path d="M8.5 12h7M8.8 14.3h6.4M9.2 16.6h5.6"/></svg>`,
+  microscope: `<svg class="procedure-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M13 3.5 16.5 7 12 11.5 8.5 8z"/><path d="M10.2 10.2c-2 1.6-2.4 4.1-1 6"/><path d="M15.5 8.5c2 1.3 3 3.3 3 5.5 0 1.3-.4 2.5-1 3.5"/><path d="M8.5 17.5h7"/><path d="M6 21h12"/></svg>`,
+  ellipsis: `<svg class="procedure-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.6" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none"/><circle cx="19" cy="12" r="1.6" fill="currentColor" stroke="none"/></svg>`,
+  calendar: `<svg class="procedure-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17"/><path d="M8 3v4M16 3v4"/></svg>`,
+  mold: `<svg class="procedure-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 18c0-7 3-12 7.5-12s7.5 5 7.5 12"/><path d="M8.5 18c0-4.5 1.5-7.5 3.5-7.5s3.5 3 3.5 7.5"/><path d="M4.5 18h15"/></svg>`,
+  links: `<svg class="procedure-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9.8 14.2l4.4-4.4"/><path d="M10.5 7.2l2.1-2.1a3.6 3.6 0 0 1 5.1 5.1l-2.1 2.1"/><path d="M13.5 16.8l-2.1 2.1a3.6 3.6 0 0 1-5.1-5.1l2.1-2.1"/></svg>`,
+  eye: `<svg class="procedure-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M2.5 12c2.2-4.3 5.4-6.5 9.5-6.5s7.3 2.2 9.5 6.5c-2.2 4.3-5.4 6.5-9.5 6.5S4.7 16.3 2.5 12z"/><circle cx="12" cy="12" r="2.8"/></svg>`,
+  jackhammer: `<svg class="procedure-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 4.5h12"/><path d="M8.5 4.5V7M15.5 4.5V7"/><path d="M9.5 7h5v6h-5z"/><path d="M12 13v4.5"/><path d="M10.2 17.5h3.6L12 21z"/></svg>`,
+  phone: `<svg class="procedure-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6.5 10.5c1.5 3 4 5.5 7 7l2-2a1 1 0 0 1 1.1-.2c1 .5 2.1.8 3.2.9a1 1 0 0 1 .9 1v3a1 1 0 0 1-1 1C10 22 2 14 2 4.3a1 1 0 0 1 1-1H6a1 1 0 0 1 1 .9c.1 1.1.4 2.2.9 3.2a1 1 0 0 1-.2 1.1L6.5 10.5z"/></svg>`
+};
+
+function renderProcedureIcon(procedure) {
+  const iconName = typeof procedure === "string" ? procedure : procedure?.icon;
+  const code = typeof procedure === "string" ? "" : String(procedure?.code || "").toUpperCase();
+  const key = procedureIconsByCode[code] || legacyIconAliases[iconName] || iconName;
+  return procedureIconSvgs[key] || renderEmptyIcon();
 }
 
 function renderEmptyIcon() {
@@ -1087,7 +1129,7 @@ function renderProcedureTiles(room) {
       aria-checked="${procedure.code === app.selectedProcedureId}"
       data-procedure-id="${escapeAttribute(procedure.code)}"
       ${isEnabled ? "" : "disabled"}>
-      ${renderProcedureIcon(procedure.icon)}
+      ${renderProcedureIcon(procedure)}
       <span class="selection-copy">
         <strong>${escapeHtml(procedure.code)}</strong>
         <small>${escapeHtml(procedure.label)}</small>

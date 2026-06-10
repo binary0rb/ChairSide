@@ -15,11 +15,7 @@
 body {
   margin: 0;
   min-height: 100vh;
-  background:
-    linear-gradient(90deg, rgba(23, 32, 51, 0.05) 1px, transparent 1px),
-    linear-gradient(0deg, rgba(23, 32, 51, 0.05) 1px, transparent 1px),
-    var(--bg);
-  background-size: 44px 44px;
+  background: var(--bg);
   color: var(--ink);
   font-family: Segoe UI, system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
 }
@@ -30,6 +26,8 @@ body {
   justify-content: space-between;
   gap: 24px;
   padding: 24px clamp(18px, 4vw, 48px) 16px;
+  border-bottom: 2px solid var(--line);
+  background: var(--panel);
 }
 
 .app-header.compact {
@@ -168,6 +166,15 @@ select {
   line-height: 1.25;
 }
 
+/* Doctor chips mirror the room card identity language: pastel tint plus a
+   colored swatch. State dots stay saturated circles so the two legends
+   cannot be confused even when a doctor hue matches a state hue. */
+.doctor-chip {
+  background: #ffffff;
+  background: color-mix(in srgb, var(--doctor-color) 10%, #ffffff);
+  border-color: color-mix(in srgb, var(--doctor-color) 38%, var(--line));
+}
+
 .procedure-chip strong,
 .procedure-chip small {
   line-height: 1.1;
@@ -179,12 +186,21 @@ select {
   font-weight: 800;
 }
 
-.doctor-chip i,
 .state-dot {
   width: 14px;
   height: 14px;
   border-radius: 50%;
   background: var(--doctor-color);
+}
+
+.doctor-chip i {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  border: 3px solid var(--doctor-color);
+  border-radius: 4px;
+  background: #ffffff;
+  background: color-mix(in srgb, var(--doctor-color) 18%, #ffffff);
 }
 
 .procedure-chip > span {
@@ -204,32 +220,18 @@ select {
   overflow: visible;
 }
 
-.tooth-icon,
-.implant-icon {
-  stroke-width: 2.35;
-}
-
-.procedure-icon .icon-fill {
-  fill: none;
-  stroke: currentColor;
-}
-
 .procedure-icon .icon-stroke {
   fill: none;
   stroke: currentColor;
 }
 
-.procedure-icon .check-mark {
-  stroke-width: 2.6;
-}
-
 .state-dot.empty {
-  background: #8b949e;
+  background: #94a3b8;
 }
 
 .state-dot.seated {
-  background: #e2e8f0;
-  border: 3px solid #64748b;
+  background: #dbeafe;
+  border: 3px solid #2563eb;
 }
 
 .state-dot.aging {
@@ -243,26 +245,29 @@ select {
 }
 
 .state-dot.ready-for-doctor {
-  background: #2563eb;
+  background: #eab308;
 }
 
 .state-dot.doctor-in-room {
-  background: #172033;
+  background: #16a34a;
 }
 
 .state-dot.turnover {
-  background: #f8fafc;
-  border: 3px solid #64748b;
+  background: #ede9fe;
+  border: 3px solid #7c3aed;
 }
 
 .room-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 12px;
+  gap: 14px;
   align-items: stretch;
   padding-bottom: 28px;
 }
 
+/* Card color roles: the pastel background tint and the left rail carry
+   doctor identity; the badge, border emphasis, and timer carry state and
+   urgency. The two never compete for the same surface. */
 .room-tile {
   position: relative;
   display: flex;
@@ -270,40 +275,45 @@ select {
   flex-direction: column;
   justify-content: space-between;
   overflow: hidden;
-  border: 2px solid rgba(23, 32, 51, 0.16);
-  border-radius: 8px;
-  padding: 14px;
-  background: var(--empty);
-  color: #ffffff;
-  box-shadow: 0 12px 28px rgba(23, 32, 51, 0.12);
+  border: 2px solid rgba(23, 32, 51, 0.14);
+  border-radius: 10px;
+  padding: 14px 14px 14px 22px;
+  background: #f1f4f8;
+  background: color-mix(in srgb, var(--doctor-color) 12%, #ffffff);
+  color: var(--ink);
+  box-shadow: 0 3px 10px rgba(23, 32, 51, 0.1);
 }
 
-/* Patient Seated / In Prep: neutral diagonal stripe — prep limbo, not yet doctor-actionable */
-.room-tile.seated {
+/* Doctor identity rail. Sits inside the border so state borders stay free. */
+.room-tile::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 7px;
+  background: var(--doctor-color);
+}
+
+/* Patient Seated / In Prep and Turnover keep the diagonal stripe texture:
+   both are non-doctor-actionable states, and texture keeps that cue
+   independent of color. The doctor tint stays visible underneath. */
+.room-tile.seated,
+.room-tile.turnover {
   background: repeating-linear-gradient(
     135deg,
-    #f8fafc,
-    #f8fafc 12px,
-    #e2e8f0 12px,
-    #e2e8f0 24px
-  );
-  color: #172033;
-}
-
-/* Badge in the stripe state needs a dark pill to stay readable */
-.room-tile.seated .room-topline span {
-  background: #172033;
-  color: #ffffff;
-}
-
-/* Ready for Doctor, Aging, Stale, and Doctor In Room: doctor color is dominant.
-   Aging and stale mean the doctor has been requested too long — they are doctor-actionable
-   states, not prep states — so doctor color applies throughout this entire phase. */
-.room-tile.ready-for-doctor,
-.room-tile.aging,
-.room-tile.stale,
-.room-tile.doctor-in-room {
-  background: var(--doctor-color);
+    rgba(255, 255, 255, 0),
+    rgba(255, 255, 255, 0) 12px,
+    rgba(255, 255, 255, 0.55) 12px,
+    rgba(255, 255, 255, 0.55) 24px
+  ), #f1f4f8;
+  background: repeating-linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0),
+    rgba(255, 255, 255, 0) 12px,
+    rgba(255, 255, 255, 0.55) 12px,
+    rgba(255, 255, 255, 0.55) 24px
+  ), color-mix(in srgb, var(--doctor-color) 12%, #ffffff);
 }
 
 .room-tile.aging {
@@ -317,30 +327,66 @@ select {
 }
 
 .room-tile.empty {
-  color: #ffffff;
-  background: #8b949e;
+  background: #eef1f5;
+}
+
+.room-tile.empty .procedure-lockup,
+.room-tile.empty .room-footer {
+  color: var(--empty);
 }
 
 .room-tile.turnover {
-  border-color: #94a3b8;
-  background: repeating-linear-gradient(
-    135deg,
-    #f8fafc,
-    #f8fafc 12px,
-    #e2e8f0 12px,
-    #e2e8f0 24px
-  );
-  color: #172033;
+  border-color: #c4b5fd;
+}
+
+/* State badge tones. Explicit text plus a dedicated state color per badge. */
+.room-tile.empty .room-topline span {
+  background: #e2e8f0;
+  color: #334155;
+}
+
+.room-tile.seated .room-topline span {
+  background: #dbeafe;
+  color: #1e3a8a;
+}
+
+.room-tile.ready-for-doctor .room-topline span {
+  background: #facc15;
+  color: #422006;
+}
+
+.room-tile.aging .room-topline span {
+  background: #ea580c;
+  color: #ffffff;
+}
+
+.room-tile.stale .room-topline span {
+  background: #dc2626;
+  color: #ffffff;
+}
+
+.room-tile.doctor-in-room .room-topline span {
+  background: #15803d;
+  color: #ffffff;
 }
 
 .room-tile.turnover .room-topline span {
-  background: #172033;
+  background: #6d28d9;
   color: #ffffff;
+}
+
+/* Urgency lands on the timer as well as the border. */
+.room-tile.aging .room-timer {
+  color: #9a3412;
+}
+
+.room-tile.stale .room-timer {
+  color: #b91c1c;
 }
 
 .room-tile.large {
   min-height: 180px;
-  padding: 10px 12px;
+  padding: 10px 12px 10px 20px;
 }
 
 /* ------------------------------------------------------------------
@@ -380,14 +426,18 @@ select {
 }
 
 .room-topline strong {
-  font-size: clamp(20px, 2.2vw, 34px);
+  font-size: clamp(22px, 2.4vw, 38px);
+  font-weight: 900;
 }
 
 .room-topline span {
-  padding: 4px 8px;
+  padding: 5px 9px;
   border-radius: 6px;
-  background: rgba(0, 0, 0, 0.22);
-  font-size: 12px;
+  background: rgba(23, 32, 51, 0.1);
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
 }
 
 .procedure-lockup {
@@ -413,7 +463,7 @@ select {
 }
 
 .room-footer {
-  font-size: clamp(15px, 1.6vw, 24px);
+  font-size: clamp(16px, 1.6vw, 24px);
 }
 
 .room-footer {
@@ -440,10 +490,13 @@ select {
 .room-timer span {
   font-size: 0.72em;
   text-transform: uppercase;
+  opacity: 0.78;
 }
 
 .room-timer strong {
   white-space: nowrap;
+  font-size: 1.28em;
+  font-weight: 900;
 }
 
 .panel-shell {
@@ -772,24 +825,42 @@ button {
 button {
   cursor: pointer;
   font-weight: 900;
+  border-width: 1.5px;
+}
+
+button:not(:disabled):hover {
+  border-color: #94a3b8;
+}
+
+button:not(:disabled):active {
+  filter: brightness(0.93);
 }
 
 .primary-button {
+  border-color: #172033;
   background: #172033;
   color: #ffffff;
 }
 
+.primary-button:not(:disabled):hover {
+  border-color: #0c1320;
+  background: #0c1320;
+}
+
 .secondary-button {
+  border-color: #cbd5e1;
   background: #ffffff;
   color: #172033;
 }
 
 .available-button {
+  border-color: #cbd5e1;
   background: #e2e8f0;
   color: #172033;
 }
 
 .danger-button {
+  border-color: #fca5a5;
   background: #fee2e2;
   color: #7f1d1d;
 }
@@ -1080,14 +1151,14 @@ button:disabled {
   100% {
     border-color: #fde68a;
     box-shadow:
-      0 12px 28px rgba(23, 32, 51, 0.12),
+      0 3px 10px rgba(23, 32, 51, 0.1),
       0 0 0 0 rgba(250, 204, 21, 0);
   }
 
   50% {
     border-color: #facc15;
     box-shadow:
-      0 12px 28px rgba(23, 32, 51, 0.12),
+      0 3px 10px rgba(23, 32, 51, 0.1),
       0 0 0 10px rgba(250, 204, 21, 0.42);
   }
 }
@@ -1097,14 +1168,14 @@ button:disabled {
   100% {
     border-color: #fecaca;
     box-shadow:
-      0 12px 28px rgba(23, 32, 51, 0.12),
+      0 3px 10px rgba(23, 32, 51, 0.1),
       0 0 0 0 rgba(239, 68, 68, 0);
   }
 
   50% {
     border-color: #ef4444;
     box-shadow:
-      0 12px 28px rgba(23, 32, 51, 0.12),
+      0 3px 10px rgba(23, 32, 51, 0.1),
       0 0 0 12px rgba(239, 68, 68, 0.42);
   }
 }
@@ -1191,7 +1262,7 @@ button:disabled {
   }
 }
 
-/* Master-board room tile links — display:contents makes the <a> invisible to
+/* Master-board room tile links - display:contents makes the <a> invisible to
    the grid, so the .room-tile article remains the effective grid item. */
 .room-tile-link {
   display: contents;
@@ -1205,32 +1276,6 @@ button:disabled {
 .room-tile-link:focus-visible .room-tile {
   outline: 3px solid #2563eb;
   outline-offset: 2px;
-}
-
-/* PNG procedure icons — mirrors SVG sizing rules for each context */
-img.procedure-icon {
-  object-fit: contain;
-  flex: 0 0 auto;
-}
-
-.procedure-tile img.procedure-icon {
-  width: 40px;
-  height: 40px;
-}
-
-.procedure-lockup img.procedure-icon {
-  width: clamp(38px, 5vw, 72px);
-  height: clamp(38px, 5vw, 72px);
-}
-
-.room-tile.large .procedure-lockup img.procedure-icon {
-  width: clamp(24px, 2.8vw, 40px);
-  height: clamp(24px, 2.8vw, 40px);
-}
-
-.procedure-badge img.procedure-icon {
-  width: 22px;
-  height: 22px;
 }
 
 .brand-lockup {
