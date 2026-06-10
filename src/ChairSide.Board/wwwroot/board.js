@@ -1028,22 +1028,26 @@ const legacyIconAliases = {
   wrench: "jackhammer"
 };
 
-// All icons share viewBox 0 0 24 24, currentColor strokes, and rounded
-// caps/joins (applied by the .procedure-icon CSS rules).
+// Icon paths are taken from Tabler Icons (MIT licensed, see
+// assets/icons/README.md) where an equivalent exists. forceps, mold, and
+// jackhammer have no Tabler equivalent and are custom drawings in the same
+// 24x24 stroke-2 outline language. All icons render through currentColor.
+const tablerIconAttrs = `class="procedure-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"`;
+
 const procedureIconSvgs = {
-  magnifier: `<svg class="procedure-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6"/><path d="M15 15l5.5 5.5"/></svg>`,
-  forceps: `<svg class="procedure-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8.5 3c-1.2 4.2-.3 7.6 3.5 10.5"/><path d="M15.5 3c1.2 4.2.3 7.6-3.5 10.5"/><path d="M12 13.5 9 21"/><path d="M12 13.5 15 21"/><circle cx="12" cy="13.5" r="1.1" fill="currentColor" stroke="none"/></svg>`,
-  moon: `<svg class="procedure-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M16.8 16.6A6.8 6.8 0 0 1 7.6 7.4 7.4 7.4 0 1 0 16.8 16.6z"/><path d="M14.5 3.5h4l-4 4h4"/></svg>`,
-  thumbsup: `<svg class="procedure-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6.5 11.5V20"/><path d="M3.5 11.5h3l3.7-7.3a2 2 0 0 1 1.9 2.5L11.3 10h6.2a2 2 0 0 1 2 2.4l-1.2 5.6a2.5 2.5 0 0 1-2.4 2H6.5"/></svg>`,
-  bolt: `<svg class="procedure-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3.5h6M10 6h4v4l-1.4 1.4v7.1L12 20.5l-.6-2v-7.1L10 10V6z"/><path d="M8.5 12h7M8.8 14.3h6.4M9.2 16.6h5.6"/></svg>`,
-  microscope: `<svg class="procedure-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M13 3.5 16.5 7 12 11.5 8.5 8z"/><path d="M10.2 10.2c-2 1.6-2.4 4.1-1 6"/><path d="M15.5 8.5c2 1.3 3 3.3 3 5.5 0 1.3-.4 2.5-1 3.5"/><path d="M8.5 17.5h7"/><path d="M6 21h12"/></svg>`,
-  ellipsis: `<svg class="procedure-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.6" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none"/><circle cx="19" cy="12" r="1.6" fill="currentColor" stroke="none"/></svg>`,
-  calendar: `<svg class="procedure-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17"/><path d="M8 3v4M16 3v4"/></svg>`,
-  mold: `<svg class="procedure-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 18c0-7 3-12 7.5-12s7.5 5 7.5 12"/><path d="M8.5 18c0-4.5 1.5-7.5 3.5-7.5s3.5 3 3.5 7.5"/><path d="M4.5 18h15"/></svg>`,
-  links: `<svg class="procedure-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9.8 14.2l4.4-4.4"/><path d="M10.5 7.2l2.1-2.1a3.6 3.6 0 0 1 5.1 5.1l-2.1 2.1"/><path d="M13.5 16.8l-2.1 2.1a3.6 3.6 0 0 1-5.1-5.1l2.1-2.1"/></svg>`,
-  eye: `<svg class="procedure-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M2.5 12c2.2-4.3 5.4-6.5 9.5-6.5s7.3 2.2 9.5 6.5c-2.2 4.3-5.4 6.5-9.5 6.5S4.7 16.3 2.5 12z"/><circle cx="12" cy="12" r="2.8"/></svg>`,
-  jackhammer: `<svg class="procedure-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 4.5h12"/><path d="M8.5 4.5V7M15.5 4.5V7"/><path d="M9.5 7h5v6h-5z"/><path d="M12 13v4.5"/><path d="M10.2 17.5h3.6L12 21z"/></svg>`,
-  phone: `<svg class="procedure-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6.5 10.5c1.5 3 4 5.5 7 7l2-2a1 1 0 0 1 1.1-.2c1 .5 2.1.8 3.2.9a1 1 0 0 1 .9 1v3a1 1 0 0 1-1 1C10 22 2 14 2 4.3a1 1 0 0 1 1-1H6a1 1 0 0 1 1 .9c.1 1.1.4 2.2.9 3.2a1 1 0 0 1-.2 1.1L6.5 10.5z"/></svg>`
+  magnifier: `<svg ${tablerIconAttrs}><path d="M10 10m-7 0a7 7 0 1 0 14 0a7 7 0 1 0 -14 0"/><path d="M21 21l-6 -6"/></svg>`,
+  forceps: `<svg ${tablerIconAttrs}><path d="M8.5 3c-1.2 4.2 -0.3 7.6 3.5 10.5"/><path d="M15.5 3c1.2 4.2 0.3 7.6 -3.5 10.5"/><path d="M12 13.5l-3 7.5"/><path d="M12 13.5l3 7.5"/><circle cx="12" cy="13.5" r="1.1" fill="currentColor" stroke="none"/></svg>`,
+  moon: `<svg ${tablerIconAttrs}><path d="M12 3c.132 0 .263 0 .393 0a7.5 7.5 0 0 0 7.92 12.446a9 9 0 1 1 -8.313 -12.454z"/><path d="M15 4h4l-4 4h4"/><path d="M19 9.5h2.5l-2.5 2.5h2.5"/></svg>`,
+  thumbsup: `<svg ${tablerIconAttrs}><path d="M7 11v8a1 1 0 0 1 -1 1h-2a1 1 0 0 1 -1 -1v-7a1 1 0 0 1 1 -1h3a4 4 0 0 0 4 -4v-1a2 2 0 0 1 4 0v5h3a2 2 0 0 1 2 2l-1 5a2 3 0 0 1 -2 2h-7a3 3 0 0 1 -3 -3"/></svg>`,
+  bolt: `<svg ${tablerIconAttrs}><path d="M13 3l0 7l6 0l-8 11l0 -7l-6 0l8 -11"/></svg>`,
+  microscope: `<svg ${tablerIconAttrs}><path d="M5 21h14"/><path d="M6 18h2"/><path d="M7 18v3"/><path d="M9 11l3 3l6 -6l-3 -3z"/><path d="M10.5 12.5l-1.5 1.5"/><path d="M17 3l3 3"/><path d="M12 21a6 6 0 0 0 3.715 -10.712"/></svg>`,
+  ellipsis: `<svg ${tablerIconAttrs}><path d="M5 12m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0"/><path d="M12 12m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0"/><path d="M19 12m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0"/></svg>`,
+  calendar: `<svg ${tablerIconAttrs}><path d="M4 7a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2z"/><path d="M16 3v4"/><path d="M8 3v4"/><path d="M4 11h16"/><path d="M11 15h1"/><path d="M12 15v3"/></svg>`,
+  mold: `<svg ${tablerIconAttrs}><path d="M4.5 18c0 -7 3 -12 7.5 -12s7.5 5 7.5 12"/><path d="M8.5 18c0 -4.5 1.5 -7.5 3.5 -7.5s3.5 3 3.5 7.5"/><path d="M4.5 18h15"/></svg>`,
+  links: `<svg ${tablerIconAttrs}><path d="M9 15l6 -6"/><path d="M11 6l.463 -.536a5 5 0 0 1 7.071 7.072l-.534 .464"/><path d="M13 18l-.397 .534a5.068 5.068 0 0 1 -7.127 0a4.972 4.972 0 0 1 0 -7.071l.524 -.463"/></svg>`,
+  eye: `<svg ${tablerIconAttrs}><path d="M10 12a2 2 0 1 0 4 0a2 2 0 0 0 -4 0"/><path d="M21 12c-2.4 4 -5.4 6 -9 6c-3.6 0 -6.6 -2 -9 -6c2.4 -4 5.4 -6 9 -6c3.6 0 6.6 2 9 6"/></svg>`,
+  jackhammer: `<svg ${tablerIconAttrs}><path d="M6 4.5h12"/><path d="M8.5 4.5V7M15.5 4.5V7"/><path d="M9.5 7h5v6h-5z"/><path d="M12 13v4.5"/><path d="M10.2 17.5h3.6L12 21z"/></svg>`,
+  phone: `<svg ${tablerIconAttrs}><path d="M5 4h4l2 5l-2.5 1.5a11 11 0 0 0 5 5l1.5 -2.5l5 2v4a2 2 0 0 1 -2 2a16 16 0 0 1 -15 -15a2 2 0 0 1 2 -2"/></svg>`
 };
 
 function renderProcedureIcon(procedure) {
@@ -1054,7 +1058,7 @@ function renderProcedureIcon(procedure) {
 }
 
 function renderEmptyIcon() {
-  return `<svg class="procedure-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/></svg>`;
+  return `<svg ${tablerIconAttrs}><path d="M5 12h14"/></svg>`;
 }
 
 function escapeHtml(value) {

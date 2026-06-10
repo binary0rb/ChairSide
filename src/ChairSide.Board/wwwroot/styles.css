@@ -216,7 +216,7 @@ select {
   stroke: currentColor;
   stroke-linecap: round;
   stroke-linejoin: round;
-  stroke-width: 2.2;
+  stroke-width: 2;
   overflow: visible;
 }
 
@@ -395,25 +395,31 @@ select {
    these rules touch .room-tile cards on the master board.
    ------------------------------------------------------------------ */
 
+/* The room-local status card gets a clearer procedure area: a soft plate
+   behind the icon and code so they read as one unit on the tablet. */
 .room-tile.large .procedure-lockup {
-  min-height: 48px;
+  min-height: 56px;
+  margin: 6px 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.55);
 }
 
 .room-tile.large .procedure-lockup svg {
-  width: clamp(24px, 2.8vw, 40px);
-  height: clamp(24px, 2.8vw, 40px);
+  width: clamp(28px, 3vw, 44px);
+  height: clamp(28px, 3vw, 44px);
 }
 
 .room-tile.large .procedure-lockup span {
-  font-size: clamp(18px, 2.2vw, 30px);
+  font-size: clamp(20px, 2.4vw, 32px);
 }
 
 .room-tile.large .room-topline strong {
-  font-size: clamp(17px, 1.8vw, 24px);
+  font-size: clamp(18px, 2vw, 26px);
 }
 
 .room-tile.large .room-footer {
-  font-size: clamp(13px, 1.2vw, 17px);
+  font-size: clamp(14px, 1.3vw, 18px);
 }
 
 .room-topline,
@@ -454,7 +460,7 @@ select {
   stroke: currentColor;
   stroke-linecap: round;
   stroke-linejoin: round;
-  stroke-width: 2.2;
+  stroke-width: 2;
 }
 
 .procedure-lockup span {
@@ -518,11 +524,12 @@ select {
 
 .touch-controls {
   display: grid;
-  gap: 16px;
-  padding: 18px;
+  gap: 18px;
+  padding: 20px;
   border: 1px solid var(--line);
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.86);
+  border-radius: 10px;
+  background: var(--panel);
+  box-shadow: 0 3px 10px rgba(23, 32, 51, 0.06);
 }
 
 label,
@@ -562,7 +569,7 @@ label,
   min-height: 76px;
   padding: 12px;
   border: 2px solid var(--line);
-  border-radius: 8px;
+  border-radius: 10px;
   background: #ffffff;
   text-align: left;
 }
@@ -571,6 +578,12 @@ label,
   border-color: #172033;
   background: #eef4ff;
   box-shadow: 0 0 0 4px rgba(23, 32, 51, 0.16);
+}
+
+/* Unselected doctor tiles carry a faint identity tint; selection raises it. */
+.doctor-tile {
+  background: #ffffff;
+  background: color-mix(in srgb, var(--doctor-color) 6%, #ffffff);
 }
 
 .doctor-tile.selected {
@@ -721,8 +734,8 @@ label,
   gap: 12px;
   padding: 14px;
   border: 1px solid #e2e8f0;
-  border-radius: 8px;
-  background: rgba(248, 250, 252, 0.72);
+  border-radius: 10px;
+  background: #f8fafc;
 }
 
 .secondary-actions-label {
