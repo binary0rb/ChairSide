@@ -185,6 +185,41 @@ app.MapPost("/api/reports/cycles/mark-exception", async Task<IResult> (
     return Results.NoContent();
 });
 
+// Admin-protected: confirm the exclusion of an exception cycle, completing its review.
+// The cycle remains an exception (still excluded from normal metrics); confirming review only
+// clears it from the pending-review queue. Targeted solely by the stable completedCycleId.
+// Protected by AdminAccessGuard via the /api/reports/* path prefix.
+app.MapPost("/api/reports/cycles/{completedCycleId:long}/confirm-exclusion", async Task<IResult> (
+    long completedCycleId,
+    DemoBoardStore store,
+    DiagnosticLogger diagnosticLogger,
+    Microsoft.AspNetCore.SignalR.IHubContext<BoardHub> hubContext) =>
+{
+    var result = store.ReviewExceptionCycleById(completedCycleId);
+
+    if (result.Outcome == ReviewExceptionOutcome.NotFound)
+    {
+        return Results.NotFound("No matching completed cycle found for the supplied completedCycleId.");
+    }
+
+    if (result.Outcome == ReviewExceptionOutcome.NotAnException)
+    {
+        return Results.BadRequest("The completed cycle exists but is not an exception.");
+    }
+
+    await diagnosticLogger.LogRoomAuditAsync(new RoomAuditEntry
+    {
+        Timestamp = DateTimeOffset.UtcNow.ToString("O"),
+        Action = "confirm-exclusion",
+        RoomNumber = result.RoomId,
+        Success = true,
+        Reason = ExceptionReasons.ManualReview
+    });
+
+    await hubContext.Clients.All.SendAsync("boardUpdated", store.GetSnapshot());
+    return Results.NoContent();
+});
+
 app.MapGet("/api/rooms/{roomNumber:int}", IResult (int roomNumber, DemoBoardStore store) =>
 {
     var room = store.GetRoom(roomNumber);

@@ -2266,6 +2266,185 @@ public sealed class BoardStoreTests
     }
 
     // -------------------------------------------------------------------------
+    // Exception review workflow (confirm exclusion)
+    // -------------------------------------------------------------------------
+
+    [Fact]
+    public void Marked_exception_starts_pending_review()
+    {
+        using var workspace = TestWorkspace.Create();
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production);
+
+        var cycle = CompleteOneCycle(context, room: 1, doctor: "otte");
+        Assert.True(context.Store.MarkCycleAsExceptionById(cycle.CompletedCycleId, ExceptionReasons.ManualReview, "Exclude from normal metrics"));
+
+        var exception = Assert.Single(context.Store.GetReports().ExceptionCycles);
+        Assert.True(exception.IsException);
+        Assert.True(exception.RequiresReview);
+        Assert.Equal(ReviewStatuses.PendingReview, exception.ReviewStatus);
+        Assert.Null(exception.ReviewedAt);
+        Assert.Null(exception.ReviewedBy);
+    }
+
+    [Fact]
+    public void Confirm_exclusion_marks_reviewed_and_keeps_cycle_excluded()
+    {
+        using var workspace = TestWorkspace.Create();
+        var reviewedAt = new DateTimeOffset(2026, 6, 11, 14, 30, 0, TimeSpan.Zero);
+        var clock = new ManualTimeProvider(reviewedAt);
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production, timeProvider: clock);
+
+        var cycle = CompleteOneCycle(context, room: 1, doctor: "otte");
+        Assert.True(context.Store.MarkCycleAsExceptionById(cycle.CompletedCycleId, ExceptionReasons.ManualReview, "Exclude from normal metrics"));
+
+        var result = context.Store.ReviewExceptionCycleById(cycle.CompletedCycleId);
+        Assert.Equal(ReviewExceptionOutcome.Reviewed, result.Outcome);
+        Assert.Equal(1, result.RoomId);
+
+        var reports = context.Store.GetReports();
+
+        // After review the cycle is no longer pending and never returns to normal completed cycles.
+        Assert.Empty(reports.RecentCompletedCycles);
+        Assert.Empty(reports.ExceptionCycles);
+        Assert.Equal(0, reports.CompletedRoomCyclesCount);
+    }
+
+    [Fact]
+    public void Confirm_exclusion_sets_reviewed_metadata()
+    {
+        using var workspace = TestWorkspace.Create();
+        var reviewedAt = new DateTimeOffset(2026, 6, 11, 14, 30, 0, TimeSpan.Zero);
+        var clock = new ManualTimeProvider(reviewedAt);
+        var databasePath = workspace.ProductionDatabasePath();
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production, timeProvider: clock, databasePath: databasePath);
+
+        var cycle = CompleteOneCycle(context, room: 1, doctor: "otte");
+        Assert.True(context.Store.MarkCycleAsExceptionById(cycle.CompletedCycleId, ExceptionReasons.ManualReview, "Exclude from normal metrics"));
+        Assert.Equal(ReviewExceptionOutcome.Reviewed, context.Store.ReviewExceptionCycleById(cycle.CompletedCycleId).Outcome);
+
+        // Reload from the same database to confirm the reviewed metadata persisted.
+        var reloaded = StoreContext.Create(workspace, environmentName: Environments.Production, databasePath: databasePath);
+        var persisted = reloaded.Repository.LoadCompletedCycles()
+            .Single(item => item.CompletedCycleId == cycle.CompletedCycleId);
+
+        Assert.True(persisted.IsException);
+        Assert.False(persisted.RequiresReview);
+        Assert.Equal(ReviewStatuses.Reviewed, persisted.ReviewStatus);
+        Assert.Equal("Exclude from normal metrics", persisted.SuggestedAction);
+        Assert.Equal(reviewedAt, persisted.ReviewedAt);
+        Assert.Equal(ExceptionReviewers.LocalAdmin, persisted.ReviewedBy);
+    }
+
+    [Fact]
+    public void Reviewed_exception_stays_excluded_from_normal_metrics()
+    {
+        using var workspace = TestWorkspace.Create();
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production);
+
+        // One normal cycle and one cycle that becomes a reviewed exception.
+        var normal = CompleteOneCycle(context, room: 1, doctor: "otte");
+        var flagged = CompleteOneCycle(context, room: 2, doctor: "pledger");
+        Assert.True(context.Store.MarkCycleAsExceptionById(flagged.CompletedCycleId, ExceptionReasons.ManualReview, "Exclude from normal metrics"));
+        Assert.Equal(ReviewExceptionOutcome.Reviewed, context.Store.ReviewExceptionCycleById(flagged.CompletedCycleId).Outcome);
+
+        var reports = context.Store.GetReports();
+
+        // Only the normal cycle counts toward metrics; the reviewed exception is excluded and is
+        // not in the pending-review queue either.
+        Assert.Equal(1, reports.CompletedRoomCyclesCount);
+        Assert.Equal(normal.CompletedCycleId, Assert.Single(reports.RecentCompletedCycles).CompletedCycleId);
+        Assert.Empty(reports.ExceptionCycles);
+
+        // Available-wait math unchanged for the surviving normal cycle.
+        var normalReported = reports.RecentCompletedCycles.Single();
+        Assert.Equal(normalReported.ReadyToDoctorSeconds, normalReported.DoctorAvailableWaitSeconds);
+        Assert.Equal(0, normalReported.DoctorOccupiedWaitSeconds);
+    }
+
+    [Fact]
+    public void Confirm_exclusion_missing_id_returns_not_found()
+    {
+        using var workspace = TestWorkspace.Create();
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production);
+
+        Assert.Equal(ReviewExceptionOutcome.NotFound, context.Store.ReviewExceptionCycleById(999999).Outcome);
+        Assert.Equal(ReviewExceptionOutcome.NotFound, context.Store.ReviewExceptionCycleById(0).Outcome);
+        Assert.Equal(ReviewExceptionOutcome.NotFound, context.Store.ReviewExceptionCycleById(-5).Outcome);
+    }
+
+    [Fact]
+    public void Confirm_exclusion_on_non_exception_returns_not_an_exception()
+    {
+        using var workspace = TestWorkspace.Create();
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production);
+
+        var cycle = CompleteOneCycle(context, room: 1, doctor: "otte");
+        var result = context.Store.ReviewExceptionCycleById(cycle.CompletedCycleId);
+
+        Assert.Equal(ReviewExceptionOutcome.NotAnException, result.Outcome);
+        Assert.Equal(1, result.RoomId);
+
+        // The cycle remains a normal completed cycle, untouched.
+        var reports = context.Store.GetReports();
+        var normal = Assert.Single(reports.RecentCompletedCycles);
+        Assert.False(normal.IsException);
+        Assert.Equal(ReviewStatuses.PendingReview, normal.ReviewStatus);
+        Assert.Null(normal.ReviewedAt);
+    }
+
+    [Fact]
+    public void Confirm_exclusion_is_idempotent()
+    {
+        using var workspace = TestWorkspace.Create();
+        var firstReview = new DateTimeOffset(2026, 6, 11, 14, 30, 0, TimeSpan.Zero);
+        var clock = new ManualTimeProvider(firstReview);
+        var databasePath = workspace.ProductionDatabasePath();
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production, timeProvider: clock, databasePath: databasePath);
+
+        var cycle = CompleteOneCycle(context, room: 1, doctor: "otte");
+        Assert.True(context.Store.MarkCycleAsExceptionById(cycle.CompletedCycleId, ExceptionReasons.ManualReview, "Exclude from normal metrics"));
+
+        Assert.Equal(ReviewExceptionOutcome.Reviewed, context.Store.ReviewExceptionCycleById(cycle.CompletedCycleId).Outcome);
+
+        // Confirming again succeeds (idempotent) and keeps the reviewed state stable.
+        clock.SetUtcNow(firstReview.AddHours(1));
+        Assert.Equal(ReviewExceptionOutcome.Reviewed, context.Store.ReviewExceptionCycleById(cycle.CompletedCycleId).Outcome);
+
+        var reloaded = StoreContext.Create(workspace, environmentName: Environments.Production, databasePath: databasePath);
+        var persisted = reloaded.Repository.LoadCompletedCycles()
+            .Single(item => item.CompletedCycleId == cycle.CompletedCycleId);
+        Assert.False(persisted.RequiresReview);
+        Assert.Equal(ReviewStatuses.Reviewed, persisted.ReviewStatus);
+        Assert.True(persisted.IsException);
+    }
+
+    [Fact]
+    public void Legacy_mark_exception_still_appears_in_pending_review_queue()
+    {
+        using var workspace = TestWorkspace.Create();
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production);
+
+        var cycle = CompleteOneCycle(context, room: 1, doctor: "otte");
+        // Legacy targeting by (roomId, seatedAt) must still flag the cycle as a pending exception.
+        Assert.True(context.Store.MarkCycleAsException(cycle.RoomId, cycle.SeatedAt, ExceptionReasons.ManualReview, "Exclude from normal metrics"));
+
+        var exception = Assert.Single(context.Store.GetReports().ExceptionCycles);
+        Assert.True(exception.RequiresReview);
+        Assert.Equal(ReviewStatuses.PendingReview, exception.ReviewStatus);
+    }
+
+    // Seats, readies, completes, and frees a single room, returning the resulting completed cycle.
+    private static CompletedRoomCycle CompleteOneCycle(StoreContext context, int room, string doctor)
+    {
+        Assert.NotNull(context.Store.SeatRoom(room, doctor, "CON"));
+        Assert.NotNull(context.Store.MarkReadyForDoctor(room));
+        Assert.NotNull(context.Store.MarkDoctorArrived(room));
+        Assert.NotNull(context.Store.MarkDoctorComplete(room));
+        Assert.NotNull(context.Store.MarkRoomAvailable(room));
+        return context.Store.GetReports().RecentCompletedCycles.Single(cycle => cycle.RoomId == room);
+    }
+
+    // -------------------------------------------------------------------------
     // CompletedCycleId stable identity
     // -------------------------------------------------------------------------
 
