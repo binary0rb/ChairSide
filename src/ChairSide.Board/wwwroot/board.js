@@ -599,7 +599,7 @@ function renderExceptionCycles(exceptions) {
 
   body.innerHTML = exceptions.length
     ? exceptions.map(renderExceptionRow).join("")
-    : `<tr><td colspan="11">No exceptions requiring review.</td></tr>`;
+    : `<tr><td colspan="12">No exceptions requiring review.</td></tr>`;
 }
 
 function renderExceptionRow(cycle) {
@@ -617,6 +617,14 @@ function renderExceptionRow(cycle) {
       <td>${escapeHtml(cycle.exceptionReason || "--")}</td>
       <td>${escapeHtml(cycle.suggestedAction || "--")}</td>
       <td>${escapeHtml(cycle.reviewStatus || "--")}</td>
+      <td>
+        <button class="secondary-button utility-button"
+                data-action="confirm-exclusion"
+                data-completed-cycle-id="${escapeAttribute(String(cycle.completedCycleId || ""))}"
+                title="This keeps the cycle excluded from normal metrics.">
+          Confirm Exclusion
+        </button>
+      </td>
     </tr>
   `;
 }
@@ -632,6 +640,12 @@ function wireReportsActions() {
 }
 
 async function handleReportsActionClick(event) {
+  const confirmButton = event.target.closest("[data-action='confirm-exclusion']");
+  if (confirmButton) {
+    await handleConfirmExclusionClick(confirmButton);
+    return;
+  }
+
   const button = event.target.closest("[data-action='mark-exception']");
   if (!button) {
     return;
@@ -675,6 +689,39 @@ async function handleReportsActionClick(event) {
   } catch (error) {
     console.error("[ChairSide] Mark as exception failed.", error);
     alert("Mark as exception failed. Please try again.");
+    button.disabled = false;
+  }
+}
+
+async function handleConfirmExclusionClick(button) {
+  const completedCycleId = Number(button.dataset.completedCycleId);
+  if (!Number.isInteger(completedCycleId) || completedCycleId <= 0) {
+    return;
+  }
+
+  if (!confirm("Confirm exclusion of this exception?\n\nThis keeps the cycle excluded from normal metrics and clears it from the review queue.")) {
+    return;
+  }
+
+  button.disabled = true;
+  try {
+    // Targeted solely by the stable completedCycleId; no request body is required.
+    const response = await fetch(`/api/reports/cycles/${completedCycleId}/confirm-exclusion`, {
+      method: "POST",
+      cache: "no-store",
+      headers: {
+        ...adminRequestHeaders()
+      }
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+
+    await loadReports();
+  } catch (error) {
+    console.error("[ChairSide] Confirm exclusion failed.", error);
+    alert("Confirm exclusion failed. Please try again.");
     button.disabled = false;
   }
 }

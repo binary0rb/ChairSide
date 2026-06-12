@@ -365,8 +365,11 @@ public sealed class DemoBoardStore
                 .Where(cycle => cycle.RoomAvailableAt is not null)
                 .ToList();
 
+            // "Exceptions Requiring Review" is a pending-review queue: only exceptions that still
+            // require review appear here. A reviewed exception remains IsException (and therefore
+            // excluded from normal metrics) but drops out of this queue once its review is confirmed.
             var exceptionCycles = allCycles
-                .Where(cycle => cycle.IsException)
+                .Where(cycle => cycle.IsException && cycle.RequiresReview)
                 .OrderByDescending(cycle => cycle.SeatedAt)
                 .ToList();
 
@@ -449,6 +452,50 @@ public sealed class DemoBoardStore
         cycle.ReviewStatus = ReviewStatuses.PendingReview;
         PersistCycle(cycle);
         return true;
+    }
+
+    /// <summary>
+    /// Confirms the exclusion of an exception cycle by its stable CompletedCycleId, completing the
+    /// review workflow. The cycle stays an exception and therefore stays excluded from normal
+    /// metrics; confirming review only clears it from the pending-review queue.
+    ///
+    /// Outcomes:
+    /// - NotFound when no cycle matches the id (including non-positive ids).
+    /// - NotAnException when the cycle exists but was never flagged as an exception.
+    /// - Reviewed on success. Idempotent: confirming an already-reviewed exception succeeds again.
+    ///
+    /// On success RequiresReview becomes false, ReviewStatus becomes Reviewed, ReviewedAt is set to
+    /// the current time, and ReviewedBy is set to a safe non-PHI reviewer label. SuggestedAction and
+    /// IsException are left unchanged so the cycle remains excluded from normal metrics.
+    /// </summary>
+    public ReviewExceptionResult ReviewExceptionCycleById(long completedCycleId)
+    {
+        lock (_syncRoot)
+        {
+            if (completedCycleId <= 0)
+            {
+                return new ReviewExceptionResult(ReviewExceptionOutcome.NotFound, 0);
+            }
+
+            var cycle = _completedCycles.FirstOrDefault(item => item.CompletedCycleId == completedCycleId);
+            if (cycle is null)
+            {
+                return new ReviewExceptionResult(ReviewExceptionOutcome.NotFound, 0);
+            }
+
+            if (!cycle.IsException)
+            {
+                return new ReviewExceptionResult(ReviewExceptionOutcome.NotAnException, cycle.RoomId);
+            }
+
+            // Idempotent: re-applying these on an already-reviewed exception has no net effect.
+            cycle.RequiresReview = false;
+            cycle.ReviewStatus = ReviewStatuses.Reviewed;
+            cycle.ReviewedAt = Now;
+            cycle.ReviewedBy = ExceptionReviewers.LocalAdmin;
+            PersistCycle(cycle);
+            return new ReviewExceptionResult(ReviewExceptionOutcome.Reviewed, cycle.RoomId);
+        }
     }
 
     /// <summary>
@@ -1271,3 +1318,29 @@ public static class ReviewStatuses
     /// <summary>Cycle has been acknowledged by an admin reviewer.</summary>
     public const string Reviewed = "Reviewed";
 }
+
+public static class ExceptionReviewers
+{
+    /// <summary>
+    /// Safe non-PHI reviewer label recorded when an exception is confirmed through the
+    /// admin-protected reports endpoint. ChairSide has no per-user identity, so the local
+    /// admin operator is attributed generically.
+    /// </summary>
+    public const string LocalAdmin = "local-admin";
+}
+
+/// <summary>Outcome of an attempt to confirm the exclusion of an exception cycle.</summary>
+public enum ReviewExceptionOutcome
+{
+    /// <summary>No completed cycle matched the supplied id.</summary>
+    NotFound,
+
+    /// <summary>The cycle exists but was never flagged as an exception.</summary>
+    NotAnException,
+
+    /// <summary>The exception was confirmed as reviewed (or already was).</summary>
+    Reviewed
+}
+
+/// <summary>Result of ReviewExceptionCycleById, carrying the room id for audit logging.</summary>
+public readonly record struct ReviewExceptionResult(ReviewExceptionOutcome Outcome, int RoomId);
