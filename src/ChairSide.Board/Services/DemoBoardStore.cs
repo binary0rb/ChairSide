@@ -397,7 +397,8 @@ public sealed class DemoBoardStore
                 MedianSeconds(normalCycles.Select(cycle => cycle.DoctorAvailableWaitSeconds)),
                 BuildDoctorSummaries(normalCycles),
                 normalCompletedCycles.Take(25).ToList(),
-                exceptionCycles);
+                exceptionCycles,
+                BuildProcedureSummaries(normalCompletedCycles));
         }
     }
 
@@ -1056,6 +1057,45 @@ public sealed class DemoBoardStore
             .ThenBy(summary => summary.AssignedDoctor)
             .ToList();
 
+    // Groups normal, non-exception completed cycles by procedure code and produces a per-procedure
+    // baseline. The supplied cycles are the same normalCompletedCycles already used by the global
+    // report, so exception and reviewed-exception cycles are excluded upstream, and the occupied /
+    // available wait values are the ones already annotated by AnnotateOccupiedWait. This method
+    // only groups and averages existing values; it does not recompute any wait metric.
+    private IReadOnlyList<ProcedureCycleSummary> BuildProcedureSummaries(IReadOnlyList<CompletedRoomCycle> cycles) =>
+        cycles
+            .GroupBy(cycle => cycle.ProcedureCode ?? "", StringComparer.OrdinalIgnoreCase)
+            .Select(group => new ProcedureCycleSummary(
+                group.Key,
+                ResolveProcedureLabel(group.Key),
+                group.Count(),
+                AverageSeconds(group.Select(cycle => cycle.TotalRoomCycleSeconds)),
+                MedianSeconds(group.Select(cycle => cycle.TotalRoomCycleSeconds)),
+                AverageSeconds(group.Select(cycle => cycle.ReadyToDoctorSeconds)),
+                MedianSeconds(group.Select(cycle => cycle.ReadyToDoctorSeconds)),
+                AverageSeconds(group.Select(cycle => cycle.DoctorInRoomSeconds)),
+                MedianSeconds(group.Select(cycle => cycle.DoctorInRoomSeconds)),
+                AverageSeconds(group.Select(cycle => cycle.DoctorOccupiedWaitSeconds)),
+                AverageSeconds(group.Select(cycle => cycle.DoctorAvailableWaitSeconds)),
+                MedianSeconds(group.Select(cycle => cycle.DoctorOccupiedWaitSeconds)),
+                MedianSeconds(group.Select(cycle => cycle.DoctorAvailableWaitSeconds))))
+            .OrderByDescending(summary => summary.CompletedCycleCount)
+            .ThenBy(summary => summary.ProcedureLabel, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+    // Resolves a display label for a procedure code: prefer the roster label, then the raw code,
+    // then "Unknown". Never throws on a blank or unknown code so reports cannot crash.
+    private string ResolveProcedureLabel(string procedureCode)
+    {
+        var label = FindProcedure(procedureCode)?.Label;
+        if (!string.IsNullOrWhiteSpace(label))
+        {
+            return label;
+        }
+
+        return string.IsNullOrWhiteSpace(procedureCode) ? "Unknown" : procedureCode;
+    }
+
     // Sets DoctorOccupiedWaitSeconds and DoctorAvailableWaitSeconds on each cycle in
     // cyclesToAnnotate. Occupied time is the portion of each cycle's
     // ReadyForDoctorAt -> DoctorArrivedAt window where the same assigned doctor was
@@ -1212,7 +1252,8 @@ public sealed record ReportsSnapshot(
     double MedianDoctorAvailableWaitSeconds,
     IReadOnlyList<DoctorCycleSummary> DoctorSummaries,
     IReadOnlyList<CompletedRoomCycle> RecentCompletedCycles,
-    IReadOnlyList<CompletedRoomCycle> ExceptionCycles);
+    IReadOnlyList<CompletedRoomCycle> ExceptionCycles,
+    IReadOnlyList<ProcedureCycleSummary> ProcedureSummaries);
 
 public sealed class CompletedRoomCycle
 {
@@ -1276,6 +1317,24 @@ public sealed record DoctorCycleSummary(
     double AverageDoctorOccupiedWaitSeconds,
     double MedianDoctorOccupiedWaitSeconds,
     double AverageDoctorAvailableWaitSeconds,
+    double MedianDoctorAvailableWaitSeconds);
+
+// Per-procedure baseline over normal, non-exception completed cycles. Additive reporting only;
+// it reuses the same aggregate helpers and the same occupied/available wait values as the
+// global metrics, so no separate definition of any metric is introduced here.
+public sealed record ProcedureCycleSummary(
+    string ProcedureCode,
+    string ProcedureLabel,
+    int CompletedCycleCount,
+    double AverageTotalSeconds,
+    double MedianTotalSeconds,
+    double AverageReadyToDoctorSeconds,
+    double MedianReadyToDoctorSeconds,
+    double AverageDoctorTimeSeconds,
+    double MedianDoctorTimeSeconds,
+    double AverageDoctorOccupiedWaitSeconds,
+    double AverageDoctorAvailableWaitSeconds,
+    double MedianDoctorOccupiedWaitSeconds,
     double MedianDoctorAvailableWaitSeconds);
 
 public sealed record DemoSeedPattern(

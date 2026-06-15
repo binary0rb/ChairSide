@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>ChairSide Board - Reports</title>
-  <link rel="stylesheet" href="/styles.css?v=20260611-exception-review">
+  <link rel="stylesheet" href="/styles.css?v=20260611-procedure-baselines">
 </head>
 <body data-view="reports">
   <header class="app-header compact">
@@ -32,6 +32,26 @@
 
   <main class="reports-shell">
     <section class="report-summary" id="reportSummary" aria-label="Room flow summary"></section>
+    <section class="report-table-section">
+      <h2>Procedure Baselines</h2>
+      <div class="report-table-wrap">
+        <table class="report-table">
+          <thead>
+            <tr>
+              <th>Procedure</th>
+              <th>Count</th>
+              <th>Avg Total</th>
+              <th>Median Total</th>
+              <th>Avg Ready-to-Doctor</th>
+              <th>Avg Doctor Time</th>
+              <th>Avg Available Wait</th>
+              <th>Avg Occupied Wait</th>
+            </tr>
+          </thead>
+          <tbody id="procedureSummariesBody"></tbody>
+        </table>
+      </div>
+    </section>
     <section class="report-table-section">
       <h2>Exceptions Requiring Review</h2>
       <div class="report-table-wrap">
@@ -91,6 +111,6 @@
   </main>
 
   <script src="/signalr-lite.js"></script>
-  <script src="/board.js?v=20260611-exception-review"></script>
+  <script src="/board.js?v=20260611-procedure-baselines"></script>
 </body>
 </html>

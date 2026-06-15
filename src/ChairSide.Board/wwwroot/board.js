@@ -589,6 +589,33 @@ function renderReports() {
     : `<tr><td colspan="20">No completed room cycles yet.</td></tr>`;
 
   renderExceptionCycles(app.reports.exceptionCycles || []);
+  renderProcedureSummaries(app.reports.procedureSummaries || []);
+}
+
+function renderProcedureSummaries(summaries) {
+  const body = document.getElementById("procedureSummariesBody");
+  if (!body) {
+    return;
+  }
+
+  body.innerHTML = summaries.length
+    ? summaries.map(renderProcedureSummaryRow).join("")
+    : `<tr><td colspan="8">No procedure baselines yet.</td></tr>`;
+}
+
+function renderProcedureSummaryRow(summary) {
+  return `
+    <tr>
+      <td>${escapeHtml(summary.procedureLabel || "Unknown")}</td>
+      <td>${summary.completedCycleCount}</td>
+      <td>${formatDuration(summary.averageTotalSeconds)}</td>
+      <td>${formatDuration(summary.medianTotalSeconds)}</td>
+      <td>${formatDuration(summary.averageReadyToDoctorSeconds)}</td>
+      <td>${formatDuration(summary.averageDoctorTimeSeconds)}</td>
+      <td>${formatDuration(summary.averageDoctorAvailableWaitSeconds)}</td>
+      <td>${formatDuration(summary.averageDoctorOccupiedWaitSeconds)}</td>
+    </tr>
+  `;
 }
 
 function renderExceptionCycles(exceptions) {
