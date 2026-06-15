@@ -240,62 +240,171 @@ public sealed class DemoBoardStore
     {
         lock (_syncRoot)
         {
-            var room = _rooms.FirstOrDefault(item => item.RoomId == roomNumber);
-            if (room is null)
-            {
-                return null;
-            }
-
-            var now = Now;
-            UpdateRoomState(room, now);
-            if (!CanMarkDoctorArrived(room) || room.SeatedAt is null || room.AssignedDoctor is null || room.ProcedureCode is null)
-            {
-                return null;
-            }
-
-            var finalWaitState = room.State;
-            var seatedToDoctorSeconds = SecondsBetween(room.SeatedAt.Value, now);
-            var prepSeconds = room.ReadyForDoctorAt.HasValue
-                ? SecondsBetween(room.SeatedAt.Value, room.ReadyForDoctorAt.Value)
-                : (int?)null;
-            var readyToDoctorSeconds = room.ReadyForDoctorAt.HasValue
-                ? SecondsBetween(room.ReadyForDoctorAt.Value, now)
-                : (int?)null;
-
-            room.DoctorArrivedAt = now;
-            room.State = RoomStates.DoctorInRoom;
-            AddEvent(new RoomEvent(room.RoomId, "DoctorArrived", now, room.AssignedDoctor, room.ProcedureCode, TimeSpan.FromSeconds(seatedToDoctorSeconds)));
-
-            CompletedRoomCycle? cycle = null;
-            if (!HasCycleReport(room.RoomId, room.SeatedAt.Value))
-            {
-                cycle = new CompletedRoomCycle
-                {
-                    RoomId = room.RoomId,
-                    AssignedDoctor = room.AssignedDoctor,
-                    ProcedureCode = room.ProcedureCode,
-                    SeatedAt = room.SeatedAt.Value,
-                    ReadyForDoctorAt = room.ReadyForDoctorAt,
-                    DoctorArrivedAt = now,
-                    SeatedToDoctorSeconds = seatedToDoctorSeconds,
-                    PrepSeconds = prepSeconds,
-                    ReadyToDoctorSeconds = readyToDoctorSeconds,
-                    FinalWaitState = finalWaitState,
-                    AgingThresholdReached = room.AgingStartedAt is not null,
-                    StaleThresholdReached = room.StaleStartedAt is not null
-                };
-                _completedCycles.Add(cycle);
-            }
-
-            PersistRoom(room);
-            if (cycle is not null)
-            {
-                PersistCycle(cycle);
-            }
-
-            return ToRoomStatus(room, now);
+            var room = PrepareDoctorArrived(roomNumber, out var now);
+            return room is null ? null : ApplyDoctorArrived(room, now);
         }
     }
+
+    /// <summary>
+    /// Guarded Doctor Arrived entry used by the API. Behaves like MarkDoctorArrived, but if the
+    /// room's assigned doctor is already marked doctor-in-room in another room it refuses the
+    /// mutation and returns a Conflict outcome carrying safe, non-PHI context (the conflicting
+    /// room number and the doctor id/display name) so the UI can prompt the user.
+    /// </summary>
+    public DoctorArrivalResult TryMarkDoctorArrived(int roomNumber)
+    {
+        lock (_syncRoot)
+        {
+            if (!IsConfiguredRoom(roomNumber))
+            {
+                return new DoctorArrivalResult(DoctorArrivalOutcome.NotConfigured, null, null);
+            }
+
+            var room = PrepareDoctorArrived(roomNumber, out var now);
+            if (room is null)
+            {
+                return new DoctorArrivalResult(DoctorArrivalOutcome.Rejected, null, null);
+            }
+
+            var conflictRoom = FindActiveDoctorRoom(room.AssignedDoctor!, room.RoomId);
+            if (conflictRoom is not null)
+            {
+                var conflict = new DoctorArrivalConflict(
+                    conflictRoom.RoomId,
+                    room.AssignedDoctor,
+                    ResolveDoctorDisplayName(room.AssignedDoctor));
+                return new DoctorArrivalResult(DoctorArrivalOutcome.Conflict, null, conflict);
+            }
+
+            return new DoctorArrivalResult(DoctorArrivalOutcome.Arrived, ApplyDoctorArrived(room, now), null);
+        }
+    }
+
+    /// <summary>
+    /// Resolves a doctor-arrival conflict: marks the old conflicting room Doctor Complete (moving
+    /// it to TURNOVER, never to Available) and then marks the current room Doctor Arrived. The
+    /// conflict is revalidated against current state first - the client is not trusted. If the
+    /// conflict is gone or now points at a different room, no mutation happens and a StaleConflict
+    /// outcome is returned so the caller can refresh and retry.
+    /// </summary>
+    public DoctorArrivalResult ResolveDoctorArrivalConflict(int roomNumber, int conflictingRoomId)
+    {
+        lock (_syncRoot)
+        {
+            if (!IsConfiguredRoom(roomNumber))
+            {
+                return new DoctorArrivalResult(DoctorArrivalOutcome.NotConfigured, null, null);
+            }
+
+            var room = PrepareDoctorArrived(roomNumber, out var now);
+            if (room is null)
+            {
+                return new DoctorArrivalResult(DoctorArrivalOutcome.Rejected, null, null);
+            }
+
+            // Revalidate the conflict. It must still be the same doctor in the same other room.
+            var conflictRoom = FindActiveDoctorRoom(room.AssignedDoctor!, room.RoomId);
+            if (conflictRoom is null || conflictRoom.RoomId != conflictingRoomId)
+            {
+                var staleConflict = conflictRoom is null
+                    ? null
+                    : new DoctorArrivalConflict(
+                        conflictRoom.RoomId,
+                        room.AssignedDoctor,
+                        ResolveDoctorDisplayName(room.AssignedDoctor));
+                return new DoctorArrivalResult(DoctorArrivalOutcome.StaleConflict, null, staleConflict);
+            }
+
+            // Complete the old room first. MarkDoctorComplete moves it to TURNOVER only.
+            var completed = MarkDoctorComplete(conflictingRoomId);
+            if (completed is null)
+            {
+                return new DoctorArrivalResult(DoctorArrivalOutcome.StaleConflict, null, null);
+            }
+
+            return new DoctorArrivalResult(DoctorArrivalOutcome.Arrived, ApplyDoctorArrived(room, now), null);
+        }
+    }
+
+    // Validates that a room can accept Doctor Arrived and advances any pending automatic state
+    // transition. Returns the room when arrivable, otherwise null. Must be called inside _syncRoot.
+    private RoomState? PrepareDoctorArrived(int roomNumber, out DateTimeOffset now)
+    {
+        now = Now;
+        var room = _rooms.FirstOrDefault(item => item.RoomId == roomNumber);
+        if (room is null)
+        {
+            return null;
+        }
+
+        UpdateRoomState(room, now);
+        if (!CanMarkDoctorArrived(room) || room.SeatedAt is null || room.AssignedDoctor is null || room.ProcedureCode is null)
+        {
+            return null;
+        }
+
+        return room;
+    }
+
+    // Applies the Doctor Arrived mutation (state, event, cycle creation, persistence) to a room
+    // that PrepareDoctorArrived has already validated. Must be called inside _syncRoot.
+    private RoomStatus ApplyDoctorArrived(RoomState room, DateTimeOffset now)
+    {
+        var finalWaitState = room.State;
+        var seatedToDoctorSeconds = SecondsBetween(room.SeatedAt!.Value, now);
+        var prepSeconds = room.ReadyForDoctorAt.HasValue
+            ? SecondsBetween(room.SeatedAt.Value, room.ReadyForDoctorAt.Value)
+            : (int?)null;
+        var readyToDoctorSeconds = room.ReadyForDoctorAt.HasValue
+            ? SecondsBetween(room.ReadyForDoctorAt.Value, now)
+            : (int?)null;
+
+        room.DoctorArrivedAt = now;
+        room.State = RoomStates.DoctorInRoom;
+        AddEvent(new RoomEvent(room.RoomId, "DoctorArrived", now, room.AssignedDoctor, room.ProcedureCode, TimeSpan.FromSeconds(seatedToDoctorSeconds)));
+
+        CompletedRoomCycle? cycle = null;
+        if (!HasCycleReport(room.RoomId, room.SeatedAt.Value))
+        {
+            cycle = new CompletedRoomCycle
+            {
+                RoomId = room.RoomId,
+                AssignedDoctor = room.AssignedDoctor!,
+                ProcedureCode = room.ProcedureCode!,
+                SeatedAt = room.SeatedAt.Value,
+                ReadyForDoctorAt = room.ReadyForDoctorAt,
+                DoctorArrivedAt = now,
+                SeatedToDoctorSeconds = seatedToDoctorSeconds,
+                PrepSeconds = prepSeconds,
+                ReadyToDoctorSeconds = readyToDoctorSeconds,
+                FinalWaitState = finalWaitState,
+                AgingThresholdReached = room.AgingStartedAt is not null,
+                StaleThresholdReached = room.StaleStartedAt is not null
+            };
+            _completedCycles.Add(cycle);
+        }
+
+        PersistRoom(room);
+        if (cycle is not null)
+        {
+            PersistCycle(cycle);
+        }
+
+        return ToRoomStatus(room, now);
+    }
+
+    // Returns the first room (deterministic by room id) where the given doctor is currently
+    // checked in (doctor-in-room), excluding the supplied room. Null when none. Inside _syncRoot.
+    private RoomState? FindActiveDoctorRoom(string doctorId, int excludeRoomId) =>
+        _rooms
+            .Where(item => item.RoomId != excludeRoomId
+                && item.State == RoomStates.DoctorInRoom
+                && string.Equals(item.AssignedDoctor, doctorId, StringComparison.Ordinal))
+            .OrderBy(item => item.RoomId)
+            .FirstOrDefault();
+
+    private string? ResolveDoctorDisplayName(string? doctorId) =>
+        doctorId is null ? null : _doctors.FirstOrDefault(item => item.Id == doctorId)?.Name;
 
     public RoomStatus? MarkDoctorComplete(int roomNumber)
     {
@@ -1403,3 +1512,34 @@ public enum ReviewExceptionOutcome
 
 /// <summary>Result of ReviewExceptionCycleById, carrying the room id for audit logging.</summary>
 public readonly record struct ReviewExceptionResult(ReviewExceptionOutcome Outcome, int RoomId);
+
+/// <summary>Outcome of a guarded Doctor Arrived attempt or a conflict resolution attempt.</summary>
+public enum DoctorArrivalOutcome
+{
+    /// <summary>The room id is not configured.</summary>
+    NotConfigured,
+
+    /// <summary>The room is not in a state that allows Doctor Arrived.</summary>
+    Rejected,
+
+    /// <summary>The assigned doctor is already marked doctor-in-room in another room.</summary>
+    Conflict,
+
+    /// <summary>A resolve attempt found the conflict gone or changed; nothing was mutated.</summary>
+    StaleConflict,
+
+    /// <summary>Doctor Arrived was applied successfully.</summary>
+    Arrived
+}
+
+/// <summary>Safe, non-PHI context describing a doctor-arrival conflict for the UI prompt.</summary>
+public sealed record DoctorArrivalConflict(
+    int ConflictingRoomId,
+    string? DoctorId,
+    string? DoctorDisplayName);
+
+/// <summary>Result of TryMarkDoctorArrived / ResolveDoctorArrivalConflict.</summary>
+public readonly record struct DoctorArrivalResult(
+    DoctorArrivalOutcome Outcome,
+    RoomStatus? Status,
+    DoctorArrivalConflict? Conflict);

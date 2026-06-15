@@ -477,20 +477,114 @@ app.MapPost("/api/rooms/{roomNumber:int}/doctor-arrived", async Task<IResult> (
         return bindingFailure;
     }
 
-    var result = store.MarkDoctorArrived(roomNumber);
-    if (result is null)
+    var outcome = store.TryMarkDoctorArrived(roomNumber);
+
+    if (outcome.Outcome == DoctorArrivalOutcome.NotConfigured)
     {
-        var reason = store.IsConfiguredRoom(roomNumber) ? "state-rejected" : "room-not-found";
         await diagnosticLogger.LogRoomAuditAsync(auditCtx.Build(
-            "doctor-arrived", roomNumber, previousRoom, null, false, reason,
+            "doctor-arrived", roomNumber, previousRoom, null, false, "room-not-found",
             previousRoom?.AssignedDoctor, previousRoom?.ProcedureCode));
-        return store.IsConfiguredRoom(roomNumber)
-            ? Results.BadRequest("Doctor Arrived is only available when the room is marked ready for doctor.")
-            : Results.NotFound("Room is not configured.");
+        return Results.NotFound("Room is not configured.");
     }
 
+    if (outcome.Outcome == DoctorArrivalOutcome.Rejected)
+    {
+        await diagnosticLogger.LogRoomAuditAsync(auditCtx.Build(
+            "doctor-arrived", roomNumber, previousRoom, null, false, "state-rejected",
+            previousRoom?.AssignedDoctor, previousRoom?.ProcedureCode));
+        return Results.BadRequest("Doctor Arrived is only available when the room is marked ready for doctor.");
+    }
+
+    if (outcome.Outcome == DoctorArrivalOutcome.Conflict)
+    {
+        var conflict = outcome.Conflict!;
+        await diagnosticLogger.LogRoomAuditAsync(auditCtx.Build(
+            "doctor-arrived", roomNumber, previousRoom, null, false, "doctor-conflict",
+            previousRoom?.AssignedDoctor, previousRoom?.ProcedureCode));
+        return Results.Json(
+            new DoctorArrivedConflictResponse(
+                "Doctor is already marked in another room.",
+                conflict.ConflictingRoomId,
+                conflict.DoctorId,
+                conflict.DoctorDisplayName),
+            statusCode: StatusCodes.Status409Conflict);
+    }
+
+    var result = outcome.Status!;
     await diagnosticLogger.LogRoomAuditAsync(auditCtx.Build(
         "doctor-arrived", roomNumber, previousRoom, result, true, null,
+        result.AssignedDoctor, result.ProcedureCode));
+    await hubContext.Clients.All.SendAsync("boardUpdated", store.GetSnapshot());
+    return Results.Ok(result);
+});
+
+// Resolve a doctor-arrival conflict: complete the conflicting old room (it moves to TURNOVER, not
+// Available) and then mark the current room Doctor Arrived. The store revalidates the conflict
+// against current state before mutating - the client-supplied conflictingRoomId is not trusted.
+app.MapPost("/api/rooms/{roomNumber:int}/doctor-arrived/resolve-conflict", async Task<IResult> (
+    int roomNumber,
+    ResolveDoctorArrivalConflictRequest request,
+    HttpContext httpContext,
+    RoomDeviceTokenValidator roomDeviceTokenValidator,
+    DemoBoardStore store,
+    DiagnosticLogger diagnosticLogger,
+    Microsoft.AspNetCore.SignalR.IHubContext<BoardHub> hubContext) =>
+{
+    var auditCtx = AuditRequestContext.From(httpContext);
+    var previousRoom = store.GetRoom(roomNumber);
+
+    var bindingFailure = RoomDeviceBindingGuard.ValidateMutationRequest(
+        roomNumber,
+        httpContext.Request,
+        roomDeviceTokenValidator);
+    if (bindingFailure is not null)
+    {
+        await diagnosticLogger.LogRoomAuditAsync(auditCtx.Build(
+            "doctor-arrived-resolve", roomNumber, previousRoom, null, false, "binding-rejected",
+            previousRoom?.AssignedDoctor, previousRoom?.ProcedureCode));
+        return bindingFailure;
+    }
+
+    if (request.ConflictingRoomId <= 0)
+    {
+        return Results.BadRequest("conflictingRoomId must be a positive room number.");
+    }
+
+    var outcome = store.ResolveDoctorArrivalConflict(roomNumber, request.ConflictingRoomId);
+
+    if (outcome.Outcome == DoctorArrivalOutcome.NotConfigured)
+    {
+        await diagnosticLogger.LogRoomAuditAsync(auditCtx.Build(
+            "doctor-arrived-resolve", roomNumber, previousRoom, null, false, "room-not-found",
+            previousRoom?.AssignedDoctor, previousRoom?.ProcedureCode));
+        return Results.NotFound("Room is not configured.");
+    }
+
+    if (outcome.Outcome == DoctorArrivalOutcome.Rejected)
+    {
+        await diagnosticLogger.LogRoomAuditAsync(auditCtx.Build(
+            "doctor-arrived-resolve", roomNumber, previousRoom, null, false, "state-rejected",
+            previousRoom?.AssignedDoctor, previousRoom?.ProcedureCode));
+        return Results.BadRequest("Doctor Arrived is only available when the room is marked ready for doctor.");
+    }
+
+    if (outcome.Outcome == DoctorArrivalOutcome.StaleConflict)
+    {
+        await diagnosticLogger.LogRoomAuditAsync(auditCtx.Build(
+            "doctor-arrived-resolve", roomNumber, previousRoom, null, false, "conflict-stale",
+            previousRoom?.AssignedDoctor, previousRoom?.ProcedureCode));
+        return Results.Json(
+            new DoctorArrivedConflictResponse(
+                "The conflict changed. Refresh and try again.",
+                outcome.Conflict?.ConflictingRoomId ?? request.ConflictingRoomId,
+                outcome.Conflict?.DoctorId,
+                outcome.Conflict?.DoctorDisplayName),
+            statusCode: StatusCodes.Status409Conflict);
+    }
+
+    var result = outcome.Status!;
+    await diagnosticLogger.LogRoomAuditAsync(auditCtx.Build(
+        "doctor-arrived-resolve", roomNumber, previousRoom, result, true, null,
         result.AssignedDoctor, result.ProcedureCode));
     await hubContext.Clients.All.SendAsync("boardUpdated", store.GetSnapshot());
     return Results.Ok(result);
@@ -614,6 +708,22 @@ public sealed record MarkExceptionRequest(
     long? CompletedCycleId = null,
     int? RoomId = null,
     DateTimeOffset? SeatedAt = null);
+
+/// <summary>
+/// 409 body returned by the doctor-arrived endpoints when the assigned doctor is already marked
+/// in another room. No PHI - room number and doctor id/display name only.
+/// </summary>
+public sealed record DoctorArrivedConflictResponse(
+    string Message,
+    int ConflictingRoomId,
+    string? DoctorId,
+    string? DoctorDisplayName);
+
+/// <summary>
+/// Body for POST /api/rooms/{room}/doctor-arrived/resolve-conflict.
+/// Identifies the conflicting room to complete before arriving the current room.
+/// </summary>
+public sealed record ResolveDoctorArrivalConflictRequest(int ConflictingRoomId);
 
 /// <summary>
 /// Body posted by the browser error capture in board.js.

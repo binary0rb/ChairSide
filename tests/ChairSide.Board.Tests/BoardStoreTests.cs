@@ -2266,6 +2266,179 @@ public sealed class BoardStoreTests
     }
 
     // -------------------------------------------------------------------------
+    // Doctor-arrival conflict guard
+    // -------------------------------------------------------------------------
+
+    [Fact]
+    public void DoctorArrived_succeeds_when_doctor_not_in_another_room()
+    {
+        using var workspace = TestWorkspace.Create();
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production);
+
+        Assert.NotNull(context.Store.SeatRoom(1, "otte", "CON"));
+        Assert.NotNull(context.Store.MarkReadyForDoctor(1));
+
+        var result = context.Store.TryMarkDoctorArrived(1);
+
+        Assert.Equal(DoctorArrivalOutcome.Arrived, result.Outcome);
+        Assert.NotNull(result.Status);
+        Assert.Equal(RoomStates.DoctorInRoom, result.Status!.State);
+        Assert.Null(result.Conflict);
+    }
+
+    [Fact]
+    public void DoctorArrived_is_rejected_when_same_doctor_already_in_another_room()
+    {
+        using var workspace = TestWorkspace.Create();
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production);
+
+        // Room 1: same doctor checked in.
+        DriveRoomToDoctorInRoom(context, 1, "otte", "CON");
+
+        // Room 2: same doctor, ready for doctor.
+        Assert.NotNull(context.Store.SeatRoom(2, "otte", "EXT"));
+        Assert.NotNull(context.Store.MarkReadyForDoctor(2));
+
+        var result = context.Store.TryMarkDoctorArrived(2);
+
+        Assert.Equal(DoctorArrivalOutcome.Conflict, result.Outcome);
+        Assert.Null(result.Status);
+        // Room 2 must remain ready-for-doctor; it was not checked in.
+        Assert.Equal(RoomStates.ReadyForDoctor, context.Store.GetRoom(2)!.State);
+    }
+
+    [Fact]
+    public void DoctorArrived_conflict_includes_room_and_doctor_context()
+    {
+        using var workspace = TestWorkspace.Create();
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production);
+
+        DriveRoomToDoctorInRoom(context, 1, "otte", "CON");
+        Assert.NotNull(context.Store.SeatRoom(2, "otte", "EXT"));
+        Assert.NotNull(context.Store.MarkReadyForDoctor(2));
+
+        var conflict = context.Store.TryMarkDoctorArrived(2).Conflict;
+
+        Assert.NotNull(conflict);
+        Assert.Equal(1, conflict!.ConflictingRoomId);
+        Assert.Equal("otte", conflict.DoctorId);
+        Assert.False(string.IsNullOrWhiteSpace(conflict.DoctorDisplayName));
+    }
+
+    [Fact]
+    public void DoctorArrived_is_not_blocked_by_a_different_doctor_in_another_room()
+    {
+        using var workspace = TestWorkspace.Create();
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production);
+
+        // Room 1: a different doctor is checked in.
+        DriveRoomToDoctorInRoom(context, 1, "otte", "CON");
+
+        // Room 2: pledger is ready and must not be blocked by otte.
+        Assert.NotNull(context.Store.SeatRoom(2, "pledger", "EXT"));
+        Assert.NotNull(context.Store.MarkReadyForDoctor(2));
+
+        var result = context.Store.TryMarkDoctorArrived(2);
+
+        Assert.Equal(DoctorArrivalOutcome.Arrived, result.Outcome);
+        Assert.Equal(RoomStates.DoctorInRoom, context.Store.GetRoom(2)!.State);
+    }
+
+    [Fact]
+    public void DoctorArrived_is_not_blocked_when_same_doctor_is_not_in_room()
+    {
+        using var workspace = TestWorkspace.Create();
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production);
+
+        // Room 1: same doctor but only ready-for-doctor (not checked in).
+        Assert.NotNull(context.Store.SeatRoom(1, "otte", "CON"));
+        Assert.NotNull(context.Store.MarkReadyForDoctor(1));
+
+        // Room 2: same doctor, ready.
+        Assert.NotNull(context.Store.SeatRoom(2, "otte", "EXT"));
+        Assert.NotNull(context.Store.MarkReadyForDoctor(2));
+
+        var result = context.Store.TryMarkDoctorArrived(2);
+
+        Assert.Equal(DoctorArrivalOutcome.Arrived, result.Outcome);
+        Assert.Equal(RoomStates.DoctorInRoom, context.Store.GetRoom(2)!.State);
+    }
+
+    [Fact]
+    public void Resolve_completes_old_room_and_arrives_new_room_without_marking_available()
+    {
+        using var workspace = TestWorkspace.Create();
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production);
+
+        DriveRoomToDoctorInRoom(context, 1, "otte", "CON");
+        Assert.NotNull(context.Store.SeatRoom(2, "otte", "EXT"));
+        Assert.NotNull(context.Store.MarkReadyForDoctor(2));
+
+        var result = context.Store.ResolveDoctorArrivalConflict(2, 1);
+
+        Assert.Equal(DoctorArrivalOutcome.Arrived, result.Outcome);
+
+        // Old room: Doctor Complete -> TURNOVER, with a complete timestamp but NOT available.
+        var oldRoom = context.Store.GetRoom(1)!;
+        Assert.Equal(RoomStates.Turnover, oldRoom.State);
+        Assert.NotNull(oldRoom.DoctorCompleteAt);
+        Assert.Null(oldRoom.RoomAvailableAt);
+
+        // New room: now doctor-in-room.
+        var newRoom = context.Store.GetRoom(2)!;
+        Assert.Equal(RoomStates.DoctorInRoom, newRoom.State);
+        Assert.NotNull(newRoom.DoctorArrivedAt);
+    }
+
+    [Fact]
+    public void Resolve_revalidates_and_fails_safely_when_conflict_is_stale()
+    {
+        using var workspace = TestWorkspace.Create();
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production);
+
+        DriveRoomToDoctorInRoom(context, 1, "otte", "CON");
+        Assert.NotNull(context.Store.SeatRoom(2, "otte", "EXT"));
+        Assert.NotNull(context.Store.MarkReadyForDoctor(2));
+
+        // The conflict clears before resolve runs: Room 1 is completed independently.
+        Assert.NotNull(context.Store.MarkDoctorComplete(1));
+
+        var result = context.Store.ResolveDoctorArrivalConflict(2, 1);
+
+        Assert.Equal(DoctorArrivalOutcome.StaleConflict, result.Outcome);
+        // Room 2 must NOT have been checked in by the stale resolve.
+        Assert.Equal(RoomStates.ReadyForDoctor, context.Store.GetRoom(2)!.State);
+    }
+
+    [Fact]
+    public void Resolve_fails_safely_when_conflicting_room_id_does_not_match()
+    {
+        using var workspace = TestWorkspace.Create();
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production);
+
+        // Real conflict is in Room 1, but the caller claims Room 3.
+        DriveRoomToDoctorInRoom(context, 1, "otte", "CON");
+        Assert.NotNull(context.Store.SeatRoom(2, "otte", "EXT"));
+        Assert.NotNull(context.Store.MarkReadyForDoctor(2));
+
+        var result = context.Store.ResolveDoctorArrivalConflict(2, 3);
+
+        Assert.Equal(DoctorArrivalOutcome.StaleConflict, result.Outcome);
+        // Neither room was mutated by the mismatched resolve.
+        Assert.Equal(RoomStates.DoctorInRoom, context.Store.GetRoom(1)!.State);
+        Assert.Equal(RoomStates.ReadyForDoctor, context.Store.GetRoom(2)!.State);
+    }
+
+    // Drives a room from available through to doctor-in-room with the given doctor and procedure.
+    private static void DriveRoomToDoctorInRoom(StoreContext context, int room, string doctor, string procedure)
+    {
+        Assert.NotNull(context.Store.SeatRoom(room, doctor, procedure));
+        Assert.NotNull(context.Store.MarkReadyForDoctor(room));
+        Assert.NotNull(context.Store.MarkDoctorArrived(room));
+        Assert.Equal(RoomStates.DoctorInRoom, context.Store.GetRoom(room)!.State);
+    }
+
+    // -------------------------------------------------------------------------
     // Procedure baseline reporting
     // -------------------------------------------------------------------------
 
