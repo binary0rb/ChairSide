@@ -1524,9 +1524,28 @@ function wireRoomPanel() {
     setRoomActionStatus("Marking doctor arrived...", "pending");
 
     try {
-      await sendRoomAction(app.roomNumber, "doctor-arrived", "Doctor Arrived");
-      console.log("[ChairSide] Doctor Arrived succeeded.", { roomNumber: app.roomNumber });
-      setRoomActionStatus("Doctor arrived.", "success");
+      const response = await fetch(`/api/rooms/${app.roomNumber}/doctor-arrived`, {
+        method: "POST",
+        headers: mutationHeaders()
+      });
+
+      if (response.ok) {
+        console.log("[ChairSide] Doctor Arrived succeeded.", { roomNumber: app.roomNumber });
+        setRoomActionStatus("Doctor arrived.", "success");
+        return;
+      }
+
+      // The same doctor is already checked into another room. Offer to move them.
+      if (response.status === 409) {
+        await handleDoctorArrivalConflict(response);
+        return;
+      }
+
+      if (response.status === 401 || response.status === 403) {
+        showRoomTokenPrompt(response.status);
+      }
+
+      throw new Error(await readErrorMessage(response, `Doctor Arrived failed with HTTP ${response.status}.`));
     } catch (error) {
       console.error("[ChairSide] Doctor Arrived failed.", { roomNumber: app.roomNumber, error });
       setRoomActionStatus(error.message || "Failed to mark doctor arrived.", "error");
@@ -1673,6 +1692,56 @@ async function sendAssignmentUpdate(payload) {
   }
 
   return response.json();
+}
+
+// Handles a 409 from the doctor-arrived endpoint: confirms with the user, then asks the server
+// to complete the conflicting room and arrive the current room. The server revalidates the
+// conflict, so a stale confirmation fails safely with a clear message.
+async function handleDoctorArrivalConflict(response) {
+  let conflict = null;
+  try {
+    conflict = await response.json();
+  } catch {
+    conflict = null;
+  }
+
+  if (!conflict || !conflict.conflictingRoomId) {
+    setRoomActionStatus("Doctor is already marked in another room. Refresh and try again.", "error");
+    return;
+  }
+
+  const doctorName = conflict.doctorDisplayName || "The doctor";
+  const oldRoom = conflict.conflictingRoomId;
+  const newRoom = app.roomNumber;
+  const confirmed = confirm(`${doctorName} is already marked in Room ${oldRoom}. Mark Doctor Complete for Room ${oldRoom} and move them to Room ${newRoom}?`);
+  if (!confirmed) {
+    setRoomActionStatus("Doctor Arrived canceled.", "error");
+    return;
+  }
+
+  setRoomActionStatus("Moving doctor...", "pending");
+  try {
+    const resolveResponse = await fetch(`/api/rooms/${newRoom}/doctor-arrived/resolve-conflict`, {
+      method: "POST",
+      headers: mutationHeaders({ "Content-Type": "application/json" }),
+      body: JSON.stringify({ conflictingRoomId: oldRoom })
+    });
+
+    if (resolveResponse.ok) {
+      setRoomActionStatus("Doctor moved. Previous room marked Doctor Complete.", "success");
+      return;
+    }
+
+    if (resolveResponse.status === 401 || resolveResponse.status === 403) {
+      showRoomTokenPrompt(resolveResponse.status);
+    }
+
+    // 409 here means the conflict changed underneath us; the board will refresh via live updates.
+    throw new Error(await readErrorMessage(resolveResponse, `Move failed with HTTP ${resolveResponse.status}.`));
+  } catch (error) {
+    console.error("[ChairSide] Resolve doctor conflict failed.", { roomNumber: newRoom, error });
+    setRoomActionStatus(error.message || "Could not move the doctor. Refresh and try again.", "error");
+  }
 }
 
 async function sendRoomAction(roomNumber, action, label) {
