@@ -1362,3 +1362,493 @@ button:disabled {
     max-width: 140px;
   }
 }
+
+/* ------------------------------------------------------------------
+   Master board visual polish — scoped to body[data-view="master"].
+   Room panel, doctor view, and reports keep the global rules above.
+   ------------------------------------------------------------------ */
+
+@keyframes masterAgingBorderPulse {
+  0%,
+  100% {
+    border-color: #fde68a;
+  }
+
+  50% {
+    border-color: #facc15;
+  }
+}
+
+@keyframes masterStaleBorderPulse {
+  0%,
+  100% {
+    border-color: #fecaca;
+  }
+
+  50% {
+    border-color: #ef4444;
+  }
+}
+
+body[data-view="master"] .app-header.compact {
+  padding-top: 14px;
+  padding-bottom: 8px;
+}
+
+body[data-view="master"] h1 {
+  font-size: clamp(24px, 3.2vw, 42px);
+}
+
+body[data-view="master"] .legend {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  padding: 8px 0 12px;
+}
+
+body[data-view="master"] .doctor-chip,
+body[data-view="master"] .procedure-chip,
+body[data-view="master"] .state-key span {
+  min-height: 30px;
+  padding: 5px 9px;
+  font-size: 13px;
+}
+
+body[data-view="master"] .state-key {
+  gap: 8px;
+}
+
+body[data-view="master"] .room-grid {
+  gap: 12px;
+  padding-bottom: 24px;
+}
+
+body[data-view="master"] .room-tile {
+  min-height: 132px;
+  padding: 10px 12px 10px 20px;
+  border-width: 2px;
+  border-color: rgba(23, 32, 51, 0.16);
+  border-radius: 8px;
+  box-shadow: none;
+}
+
+body[data-view="master"] .room-tile::before {
+  width: 6px;
+}
+
+body[data-view="master"] .room-tile.empty {
+  border-color: rgba(23, 32, 51, 0.1);
+}
+
+body[data-view="master"] .room-tile.aging,
+body[data-view="master"] .room-tile.stale {
+  border-width: 5px;
+  box-shadow: none;
+}
+
+body[data-view="master"] .room-tile.aging {
+  animation: masterAgingBorderPulse 4.5s ease-in-out infinite;
+}
+
+body[data-view="master"] .room-tile.stale {
+  animation: masterStaleBorderPulse 3s ease-in-out infinite;
+}
+
+body[data-view="master"] .room-topline {
+  gap: 8px;
+}
+
+body[data-view="master"] .room-topline strong {
+  font-size: clamp(22px, 2.2vw, 36px);
+  line-height: 1;
+}
+
+body[data-view="master"] .room-topline span {
+  min-height: 26px;
+  padding: 4px 8px;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+}
+
+body[data-view="master"] .room-tile.empty .room-topline span {
+  border-color: rgba(51, 65, 85, 0.18);
+}
+
+body[data-view="master"] .room-tile.seated .room-topline span {
+  border-color: rgba(30, 58, 138, 0.22);
+}
+
+body[data-view="master"] .room-tile.ready-for-doctor .room-topline span {
+  border-color: rgba(66, 32, 6, 0.24);
+}
+
+body[data-view="master"] .room-tile.aging .room-topline span {
+  border-color: rgba(255, 255, 255, 0.35);
+}
+
+body[data-view="master"] .room-tile.stale .room-topline span {
+  border-color: rgba(255, 255, 255, 0.35);
+}
+
+body[data-view="master"] .room-tile.doctor-in-room .room-topline span {
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+body[data-view="master"] .room-tile.turnover .room-topline span {
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+body[data-view="master"] .room-grid .procedure-lockup {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 48px;
+}
+
+body[data-view="master"] .room-grid .procedure-lockup svg {
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+}
+
+body[data-view="master"] .room-grid .procedure-lockup span {
+  font-size: clamp(20px, 2.1vw, 30px);
+  line-height: 1;
+}
+
+body[data-view="master"] .room-footer {
+  font-size: clamp(14px, 1.3vw, 18px);
+}
+
+body[data-view="master"] .room-timer strong {
+  font-size: 1.35em;
+}
+
+body[data-view="master"] .room-timer span {
+  font-size: 0.68em;
+  letter-spacing: 0.04em;
+  opacity: 0.82;
+}
+
+@media (min-width: 981px) {
+  body[data-view="master"] .room-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 560px) {
+  body[data-view="master"] .room-tile {
+    min-height: 128px;
+  }
+}
+
+/* Clickable master tiles only — doctor view cards stay static until linked. */
+body[data-view="master"] .room-tile-link .room-tile {
+  transition:
+    transform 0.16s ease,
+    border-color 0.16s ease,
+    filter 0.16s ease;
+}
+
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  body[data-view="master"] .room-tile-link:hover .room-tile {
+    transform: translateY(-2px) rotate(-0.35deg);
+    border-color: rgba(23, 32, 51, 0.26);
+  }
+}
+
+body[data-view="master"] .room-tile-link:active .room-tile {
+  transform: translateY(0) rotate(0deg);
+  filter: brightness(0.97);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body[data-view="master"] .room-tile-link .room-tile {
+    transition: border-color 0.16s ease, filter 0.16s ease;
+  }
+
+  body[data-view="master"] .room-tile-link:hover .room-tile,
+  body[data-view="master"] .room-tile-link:active .room-tile {
+    transform: none;
+  }
+}
+
+/* ------------------------------------------------------------------
+   Doctor view visual polish — scoped to body[data-view="doctor"].
+   ------------------------------------------------------------------ */
+
+@keyframes doctorAgingBorderPulse {
+  0%,
+  100% {
+    border-color: #fde68a;
+  }
+
+  50% {
+    border-color: #facc15;
+  }
+}
+
+@keyframes doctorStaleBorderPulse {
+  0%,
+  100% {
+    border-color: #fecaca;
+  }
+
+  50% {
+    border-color: #ef4444;
+  }
+}
+
+body[data-view="doctor"] .app-header.compact {
+  padding-top: 14px;
+  padding-bottom: 8px;
+}
+
+body[data-view="doctor"] h1 {
+  font-size: clamp(24px, 3.2vw, 42px);
+}
+
+body[data-view="doctor"] .doctor-list {
+  gap: 12px;
+}
+
+body[data-view="doctor"] .doctor-list .room-tile {
+  min-height: 132px;
+  padding: 10px 12px 10px 20px;
+  border-width: 2px;
+  border-color: rgba(23, 32, 51, 0.16);
+  border-radius: 8px;
+  box-shadow: none;
+}
+
+body[data-view="doctor"] .doctor-list .room-tile::before {
+  width: 6px;
+}
+
+body[data-view="doctor"] .doctor-list .room-tile.empty {
+  border-color: rgba(23, 32, 51, 0.1);
+}
+
+body[data-view="doctor"] .doctor-list .room-tile.aging,
+body[data-view="doctor"] .doctor-list .room-tile.stale {
+  border-width: 5px;
+  box-shadow: none;
+}
+
+body[data-view="doctor"] .doctor-list .room-tile.aging {
+  animation: doctorAgingBorderPulse 4.5s ease-in-out infinite;
+}
+
+body[data-view="doctor"] .doctor-list .room-tile.stale {
+  animation: doctorStaleBorderPulse 3s ease-in-out infinite;
+}
+
+body[data-view="doctor"] .doctor-list .room-topline {
+  gap: 8px;
+}
+
+body[data-view="doctor"] .doctor-list .room-topline strong {
+  font-size: clamp(22px, 2.2vw, 36px);
+  line-height: 1;
+}
+
+body[data-view="doctor"] .doctor-list .room-topline span {
+  min-height: 26px;
+  padding: 4px 8px;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+}
+
+body[data-view="doctor"] .doctor-list .room-tile.empty .room-topline span {
+  border-color: rgba(51, 65, 85, 0.18);
+}
+
+body[data-view="doctor"] .doctor-list .room-tile.seated .room-topline span {
+  border-color: rgba(30, 58, 138, 0.22);
+}
+
+body[data-view="doctor"] .doctor-list .room-tile.ready-for-doctor .room-topline span {
+  border-color: rgba(66, 32, 6, 0.24);
+}
+
+body[data-view="doctor"] .doctor-list .room-tile.aging .room-topline span {
+  border-color: rgba(255, 255, 255, 0.35);
+}
+
+body[data-view="doctor"] .doctor-list .room-tile.stale .room-topline span {
+  border-color: rgba(255, 255, 255, 0.35);
+}
+
+body[data-view="doctor"] .doctor-list .room-tile.doctor-in-room .room-topline span {
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+body[data-view="doctor"] .doctor-list .room-tile.turnover .room-topline span {
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+body[data-view="doctor"] .doctor-list .procedure-lockup {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 48px;
+}
+
+body[data-view="doctor"] .doctor-list .procedure-lockup svg {
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+}
+
+body[data-view="doctor"] .doctor-list .procedure-lockup span {
+  font-size: clamp(20px, 2.1vw, 30px);
+  line-height: 1;
+}
+
+body[data-view="doctor"] .doctor-list .room-footer {
+  font-size: clamp(14px, 1.3vw, 18px);
+}
+
+body[data-view="doctor"] .doctor-list .room-timer strong {
+  font-size: 1.35em;
+}
+
+body[data-view="doctor"] .doctor-list .room-timer span {
+  font-size: 0.68em;
+  letter-spacing: 0.04em;
+  opacity: 0.82;
+}
+
+/* ------------------------------------------------------------------
+   Room panel visual polish — scoped to body[data-view="room"].
+   ------------------------------------------------------------------ */
+
+@keyframes roomAgingBorderPulse {
+  0%,
+  100% {
+    border-color: #fde68a;
+  }
+
+  50% {
+    border-color: #f59e0b;
+  }
+}
+
+@keyframes roomStaleBorderPulse {
+  0%,
+  100% {
+    border-color: #fecaca;
+  }
+
+  50% {
+    border-color: #ef4444;
+  }
+}
+
+body[data-view="room"] .app-header.compact {
+  padding-top: 14px;
+  padding-bottom: 8px;
+}
+
+body[data-view="room"] h1 {
+  font-size: clamp(24px, 3.2vw, 42px);
+}
+
+body[data-view="room"] .panel-status .room-tile.large {
+  border-width: 2px;
+  border-color: rgba(23, 32, 51, 0.16);
+  border-radius: 8px;
+  box-shadow: none;
+}
+
+body[data-view="room"] .panel-status .room-tile.large::before {
+  width: 6px;
+}
+
+body[data-view="room"] .panel-status .room-tile.large.aging,
+body[data-view="room"] .panel-status .room-tile.large.stale {
+  border-width: 6px;
+  box-shadow: none;
+}
+
+body[data-view="room"] .panel-status .room-tile.large.aging {
+  animation: roomAgingBorderPulse 4s ease-in-out infinite;
+}
+
+body[data-view="room"] .panel-status .room-tile.large.stale {
+  animation: roomStaleBorderPulse 2.75s ease-in-out infinite;
+}
+
+body[data-view="room"] .panel-status .room-tile.large .room-topline {
+  gap: 8px;
+}
+
+body[data-view="room"] .panel-status .room-tile.large .room-topline strong {
+  line-height: 1;
+}
+
+body[data-view="room"] .panel-status .room-tile.large .room-topline span {
+  min-height: 26px;
+  padding: 4px 8px;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  letter-spacing: 0.06em;
+}
+
+body[data-view="room"] .panel-status .room-tile.large.empty .room-topline span {
+  border-color: rgba(51, 65, 85, 0.18);
+}
+
+body[data-view="room"] .panel-status .room-tile.large.seated .room-topline span {
+  border-color: rgba(30, 58, 138, 0.22);
+}
+
+body[data-view="room"] .panel-status .room-tile.large.ready-for-doctor .room-topline span {
+  border-color: rgba(66, 32, 6, 0.24);
+}
+
+body[data-view="room"] .panel-status .room-tile.large.aging .room-topline span {
+  border-color: rgba(255, 255, 255, 0.35);
+}
+
+body[data-view="room"] .panel-status .room-tile.large.stale .room-topline span {
+  border-color: rgba(255, 255, 255, 0.35);
+}
+
+body[data-view="room"] .panel-status .room-tile.large.doctor-in-room .room-topline span {
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+body[data-view="room"] .panel-status .room-tile.large.turnover .room-topline span {
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+body[data-view="room"] .panel-status .room-tile.large .room-timer strong {
+  font-size: 1.35em;
+}
+
+body[data-view="room"] .panel-status .room-tile.large .room-timer span {
+  letter-spacing: 0.04em;
+  opacity: 0.82;
+}
+
+body[data-view="room"] .touch-controls {
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(23, 32, 51, 0.06);
+}
+
+body[data-view="room"] .corrections-panel {
+  border-radius: 8px;
+}
+
+body[data-view="room"] .selection-tile {
+  border-radius: 8px;
+}
