@@ -60,13 +60,6 @@ p {
   text-transform: uppercase;
 }
 
-.view-links {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.view-links a,
 button,
 select {
   border: 1px solid var(--line);
@@ -76,46 +69,147 @@ select {
   font: inherit;
 }
 
-.view-links a {
-  padding: 10px 12px;
-  text-decoration: none;
+/* Primary navigation: a compact segmented pill group shared by every page.
+   The whole "Doctor View" control is a single button that owns the dropdown,
+   so the affordance matches what staff instinctively tap. */
+.primary-nav {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  padding: 5px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel);
 }
 
-/* Nav doctor selector: a labeled control styled to sit beside the view
-   links. Overrides the full-width touch sizing that the global label and
-   select rules apply elsewhere. */
-.doctor-view-select {
+.nav-pill {
   display: inline-flex;
   align-items: center;
-  gap: 10px;
-  margin-bottom: 0;
-  padding: 4px 6px 4px 12px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: var(--panel);
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 16px;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  background: transparent;
   color: var(--ink);
   font-size: 16px;
   font-weight: 800;
+  line-height: 1;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.nav-pill:hover {
+  background: color-mix(in srgb, var(--ink) 8%, transparent);
+}
+
+.nav-pill:active {
+  background: color-mix(in srgb, var(--ink) 14%, transparent);
+}
+
+.nav-pill:focus-visible {
+  outline: 3px solid #2563eb;
+  outline-offset: 2px;
+}
+
+/* Active = the current page. Master/Reports are links; Doctor View is the
+   toggle button inside its wrapper. */
+body[data-view="master"] .primary-nav [data-nav="master"],
+body[data-view="reports"] .primary-nav [data-nav="reports"],
+body[data-view="doctor"] .primary-nav [data-nav="doctor"] .nav-pill-toggle {
+  background: var(--ink);
+  color: #ffffff;
+}
+
+.nav-item {
+  position: relative;
+  display: inline-flex;
+}
+
+.nav-caret {
+  width: 0;
+  height: 0;
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-top: 6px solid currentColor;
+  transition: transform 0.15s ease;
+}
+
+.nav-pill-toggle[aria-expanded="true"] .nav-caret {
+  transform: rotate(180deg);
+}
+
+/* Doctor dropdown menu: a real menu surface, not a browser-default select. */
+.nav-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 248px;
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel);
+  box-shadow: 0 14px 32px rgba(15, 23, 42, 0.22);
+}
+
+.nav-menu[hidden] {
+  display: none;
+}
+
+.nav-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  min-height: 48px;
+  padding: 0 14px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ink);
+  font-size: 16px;
+  font-weight: 700;
+  text-align: left;
+  text-decoration: none;
   white-space: nowrap;
   cursor: pointer;
 }
 
-.doctor-view-select span {
-  color: var(--muted);
-  font-size: 13px;
-  font-weight: 900;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+.nav-menu-item:hover {
+  background: color-mix(in srgb, var(--doctor-color, var(--ink)) 14%, transparent);
 }
 
-.doctor-view-select select {
-  width: auto;
-  min-height: 36px;
-  padding: 0 8px;
-  border-radius: 6px;
-  font-size: 16px;
-  font-weight: 700;
-  cursor: pointer;
+.nav-menu-item:focus-visible {
+  outline: 3px solid #2563eb;
+  outline-offset: -2px;
+}
+
+.nav-menu-item.is-current {
+  background: color-mix(in srgb, var(--doctor-color, var(--ink)) 18%, transparent);
+  font-weight: 800;
+}
+
+.nav-menu-swatch {
+  flex: 0 0 auto;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--doctor-color, var(--muted));
+  border: 1px solid rgba(15, 23, 42, 0.25);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nav-pill,
+  .nav-caret {
+    transition: none;
+  }
 }
 
 .connection-status {
