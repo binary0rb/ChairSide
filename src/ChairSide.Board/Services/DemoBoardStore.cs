@@ -124,7 +124,7 @@ public sealed class DemoBoardStore
         }
     }
 
-    public RoomStatus? SeatRoom(int roomNumber, string doctorId, string procedureCode, int demoElapsedMinutes = 0)
+    public RoomStatus? SeatRoom(int roomNumber, string doctorId, string procedureCode, int demoElapsedMinutes = 0, bool sedation = false)
     {
         lock (_syncRoot)
         {
@@ -136,11 +136,19 @@ public sealed class DemoBoardStore
                 return null;
             }
 
+            // Sedation is only valid as a modifier on a sedation-eligible primary
+            // procedure. Requesting it on any other procedure is rejected outright.
+            if (sedation && !procedure.SedationEligible)
+            {
+                return null;
+            }
+
+            var storedProcedureCode = ComposeProcedureCode(procedure.Code, sedation);
             var now = Now;
             var effectiveDemoElapsedMinutes = _demoTimerEnabled ? demoElapsedMinutes : 0;
             var simulatedElapsed = TimeSpan.FromMinutes(Math.Clamp(effectiveDemoElapsedMinutes, 0, 240));
             room.AssignedDoctor = doctor.Id;
-            room.ProcedureCode = procedure.Code;
+            room.ProcedureCode = storedProcedureCode;
             room.SeatedAt = now - simulatedElapsed;
             room.AgingStartedAt = null;
             room.StaleStartedAt = null;
@@ -149,14 +157,14 @@ public sealed class DemoBoardStore
             room.RoomAvailableAt = null;
             room.State = RoomStates.Seated;
             UpdateRoomState(room, now);
-            AddEvent(new RoomEvent(room.RoomId, "Seated", now, doctor.Id, procedure.Code));
+            AddEvent(new RoomEvent(room.RoomId, "Seated", now, doctor.Id, storedProcedureCode));
             PersistRoom(room);
 
             return ToRoomStatus(room, now);
         }
     }
 
-    public RoomStatus? UpdateAssignment(int roomNumber, string doctorId, string procedureCode)
+    public RoomStatus? UpdateAssignment(int roomNumber, string doctorId, string procedureCode, bool sedation = false)
     {
         lock (_syncRoot)
         {
@@ -168,6 +176,11 @@ public sealed class DemoBoardStore
                 return null;
             }
 
+            if (sedation && !procedure.SedationEligible)
+            {
+                return null;
+            }
+
             var now = Now;
             UpdateRoomState(room, now);
             if (!CanEditSeatedRoom(room) || room.SeatedAt is null)
@@ -175,10 +188,11 @@ public sealed class DemoBoardStore
                 return null;
             }
 
+            var storedProcedureCode = ComposeProcedureCode(procedure.Code, sedation);
             room.AssignedDoctor = doctor.Id;
-            room.ProcedureCode = procedure.Code;
+            room.ProcedureCode = storedProcedureCode;
             UpdateRoomState(room, now);
-            AddEvent(new RoomEvent(room.RoomId, "AssignmentUpdated", now, doctor.Id, procedure.Code));
+            AddEvent(new RoomEvent(room.RoomId, "AssignmentUpdated", now, doctor.Id, storedProcedureCode));
             PersistRoom(room);
 
             return ToRoomStatus(room, now);
@@ -810,7 +824,7 @@ public sealed class DemoBoardStore
     {
         var elapsed = room.SeatedAt is null ? TimeSpan.Zero : now - room.SeatedAt.Value;
         var doctor = room.AssignedDoctor is null ? null : _doctors.FirstOrDefault(item => item.Id == room.AssignedDoctor);
-        var procedure = room.ProcedureCode is null ? null : FindProcedure(room.ProcedureCode);
+        var procedure = ResolveProcedure(room.ProcedureCode);
 
         return new RoomStatus(
             room.RoomId,
@@ -895,6 +909,55 @@ public sealed class DemoBoardStore
             string.Equals(item.Id, procedureCode, StringComparison.OrdinalIgnoreCase) ||
             string.Equals(item.Code, procedureCode, StringComparison.OrdinalIgnoreCase));
 
+    // Sedation modifier: stored procedure codes for sedation cases are the eligible
+    // primary code with a "+SED" suffix (e.g. "EXT+SED"). The base procedure code, the
+    // sedation flag, and the combined case type are all derivable from this single token,
+    // so no schema change or extra column is required and historical standalone "SED"
+    // records remain readable.
+    private const string SedationModifierSuffix = "+SED";
+
+    private static bool HasSedationModifier(string? procedureCode) =>
+        procedureCode is not null &&
+        procedureCode.EndsWith(SedationModifierSuffix, StringComparison.OrdinalIgnoreCase);
+
+    private static string StripSedationModifier(string procedureCode) =>
+        HasSedationModifier(procedureCode)
+            ? procedureCode[..^SedationModifierSuffix.Length]
+            : procedureCode;
+
+    private static string ComposeProcedureCode(string baseCode, bool sedation) =>
+        sedation ? $"{baseCode}{SedationModifierSuffix}" : baseCode;
+
+    // Resolves a (possibly sedation-modified) stored code to a display category. For a
+    // sedation case it synthesizes a combined category ("Extraction + Sedation") from the
+    // base procedure while preserving the base icon and eligibility. Falls back to a plain
+    // roster lookup for standalone codes, including historical "SED" records.
+    private ProcedureCategory? ResolveProcedure(string? procedureCode)
+    {
+        if (string.IsNullOrWhiteSpace(procedureCode))
+        {
+            return null;
+        }
+
+        if (!HasSedationModifier(procedureCode))
+        {
+            return FindProcedure(procedureCode);
+        }
+
+        var baseProcedure = FindProcedure(StripSedationModifier(procedureCode));
+        if (baseProcedure is null)
+        {
+            return FindProcedure(procedureCode);
+        }
+
+        return baseProcedure with
+        {
+            Id = $"{baseProcedure.Id}+sed",
+            Code = ComposeProcedureCode(baseProcedure.Code, true),
+            Label = $"{baseProcedure.Label} + Sedation"
+        };
+    }
+
     private static IEnumerable<Doctor> BuildDoctors(DoctorRosterOptions options, bool activeOnly = false) =>
         options.Doctors
             .Where(doctor => !activeOnly || doctor.Active)
@@ -911,7 +974,8 @@ public sealed class DemoBoardStore
                 string.IsNullOrWhiteSpace(procedure.Id) ? procedure.Code.ToLowerInvariant() : procedure.Id,
                 procedure.Code,
                 procedure.Label,
-                procedure.Icon));
+                procedure.Icon,
+                procedure.SedationEligible));
 
     private static RoomState Available(int roomId) => new(roomId);
 
@@ -970,7 +1034,7 @@ public sealed class DemoBoardStore
         yield return new("pledger", "EXT",
             thresholds => StaleSample(thresholds),
             thresholds => StaleSample(thresholds));
-        yield return new("gibson", "SED",
+        yield return new("gibson", "EXT+SED",
             thresholds => StaleSample(thresholds, TimeSpan.FromMinutes(11)),
             thresholds => StaleSample(thresholds, TimeSpan.FromMinutes(11)));
         yield return new("otte", "POST",
@@ -1196,7 +1260,7 @@ public sealed class DemoBoardStore
     // then "Unknown". Never throws on a blank or unknown code so reports cannot crash.
     private string ResolveProcedureLabel(string procedureCode)
     {
-        var label = FindProcedure(procedureCode)?.Label;
+        var label = ResolveProcedure(procedureCode)?.Label;
         if (!string.IsNullOrWhiteSpace(label))
         {
             return label;
@@ -1314,7 +1378,7 @@ public sealed record BoardSnapshot(
 
 public sealed record Doctor(string Id, string Name, string ShortName, string Color);
 
-public sealed record ProcedureCategory(string Id, string Code, string Label, string Icon);
+public sealed record ProcedureCategory(string Id, string Code, string Label, string Icon, bool SedationEligible = false);
 
 public sealed record RoomStatus(
     int RoomId,

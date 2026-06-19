@@ -24,15 +24,20 @@ public sealed class ProcedureRosterOptions
             Code = "EXT",
             Label = "Extraction",
             Icon = "forceps",
-            Active = true
+            Active = true,
+            SedationEligible = true
         },
+        // Sedation is no longer a standalone selectable procedure. It is kept in the
+        // roster as an inactive entry so historical records coded as "SED" still
+        // resolve to a readable label. It is applied to new cases via the sedation
+        // modifier on eligible primary procedures (see SedationEligible).
         new()
         {
             Id = "sedation",
             Code = "SED",
             Label = "Sedation",
             Icon = "moon",
-            Active = true
+            Active = false
         },
         new()
         {
@@ -48,7 +53,8 @@ public sealed class ProcedureRosterOptions
             Code = "IMP",
             Label = "Implant",
             Icon = "bolt",
-            Active = true
+            Active = true,
+            SedationEligible = true
         },
         new()
         {
@@ -56,7 +62,8 @@ public sealed class ProcedureRosterOptions
             Code = "BX",
             Label = "Biopsy",
             Icon = "vial",
-            Active = true
+            Active = true,
+            SedationEligible = true
         },
         new()
         {
@@ -128,6 +135,13 @@ public sealed class ProcedureRosterItem
     public string Icon { get; set; } = "";
 
     public bool Active { get; set; } = true;
+
+    /// <summary>
+    /// When true, this primary procedure may be marked as a sedation case via the
+    /// sedation modifier. Sedation is never a standalone procedure; it only ever
+    /// qualifies an eligible primary procedure (e.g. Extraction + Sedation).
+    /// </summary>
+    public bool SedationEligible { get; set; }
 }
 
 public sealed class ProcedureRosterOptionsValidator : IValidateOptions<ProcedureRosterOptions>

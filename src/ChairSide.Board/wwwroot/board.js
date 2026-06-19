@@ -22,6 +22,7 @@ const app = {
     || new URLSearchParams(location.search).get("doctor"),
   selectedDoctorId: null,
   selectedProcedureId: null,
+  sedationOn: false,
   selectionContext: null
 };
 
@@ -965,7 +966,7 @@ function renderRoomTile(room, large = false) {
       </div>
       <div class="procedure-lockup">
         ${procedure ? renderProcedureIcon(procedure) : renderEmptyIcon()}
-        <span>${procedure ? escapeHtml(procedure.code) : "OPEN"}</span>
+        <span>${procedure ? escapeHtml(formatProcedureCode(procedure.code)) : "OPEN"}</span>
       </div>
       <div class="room-footer">
         <span class="room-doctor-name" title="${escapeAttribute(fullDoctorName)}">${escapeHtml(doctorDisplayName)}</span>
@@ -1120,9 +1121,22 @@ function procedureFromCode(procedureCode) {
 }
 
 function renderProcedureBadge(procedureCode) {
-  const procedure = procedureFromCode(procedureCode);
+  let procedure = procedureFromCode(procedureCode);
+  // Sedation cases are stored as a composite code ("EXT+SED") that has no direct roster
+  // entry; resolve the base procedure for the icon and show a combined label.
+  if (!procedure && hasSedationModifier(procedureCode)) {
+    const baseProcedure = procedureFromCode(stripSedationModifier(procedureCode));
+    if (baseProcedure) {
+      procedure = {
+        ...baseProcedure,
+        code: formatProcedureCode(procedureCode),
+        label: `${baseProcedure.label} + Sedation`
+      };
+    }
+  }
+
   if (!procedure) {
-    return escapeHtml(procedureCode || "--");
+    return escapeHtml(formatProcedureCode(procedureCode) || "--");
   }
 
   return `
@@ -1223,13 +1237,34 @@ function syncRoomSelection(room) {
 
   app.selectionContext = context;
   app.selectedDoctorId = room?.assignedDoctor || room?.doctor?.id || app.snapshot.doctors[0]?.id || null;
-  const procedure = room?.procedure || procedureFromCode(room?.procedureCode) || app.snapshot.procedures[0] || null;
+  // A room's stored procedure code may carry a sedation modifier ("EXT+SED"). Select the
+  // base procedure tile and reflect the sedation toggle from the stored modifier.
+  const rawCode = room?.procedureCode || "";
+  const sedationFromRoom = hasSedationModifier(rawCode);
+  const baseCode = stripSedationModifier(rawCode);
+  const procedure = procedureFromCode(baseCode)
+    || app.snapshot.procedures.find(item => !isSedationCode(item.code))
+    || null;
   app.selectedProcedureId = procedure?.code || null;
+  app.sedationOn = sedationFromRoom && Boolean(procedure && procedure.sedationEligible);
+}
+
+function hasSedationModifier(code) {
+  return /\+SED$/i.test(String(code || ""));
+}
+
+function stripSedationModifier(code) {
+  return String(code || "").replace(/\+SED$/i, "");
+}
+
+function formatProcedureCode(code) {
+  return String(code || "").replace(/\+/g, " + ");
 }
 
 function renderSelectionTiles(room) {
   renderDoctorTiles(room);
   renderProcedureTiles(room);
+  renderSedationToggle(room);
 }
 
 function renderDoctorTiles(room) {
@@ -1264,7 +1299,11 @@ function renderProcedureTiles(room) {
   }
 
   const isEnabled = canEditAssignment(room);
-  target.innerHTML = app.snapshot.procedures.map(procedure => `
+  // Sedation is never a standalone procedure tile; it is applied via the sedation
+  // toggle on eligible primary procedures. Filter it out defensively even if a roster
+  // were misconfigured to mark it active.
+  const procedures = app.snapshot.procedures.filter(procedure => !isSedationCode(procedure.code));
+  target.innerHTML = procedures.map(procedure => `
     <button
       class="selection-tile procedure-tile ${procedure.code === app.selectedProcedureId ? "selected" : ""}"
       type="button"
@@ -1280,6 +1319,51 @@ function renderProcedureTiles(room) {
       ${procedure.code === app.selectedProcedureId ? `<span class="selected-indicator" aria-hidden="true">&#10003;</span>` : ""}
     </button>
   `).join("");
+}
+
+function isSedationCode(code) {
+  return String(code || "").toUpperCase() === "SED";
+}
+
+function selectedProcedureIsSedationEligible() {
+  const procedure = procedureFromCode(app.selectedProcedureId);
+  return Boolean(procedure && procedure.sedationEligible);
+}
+
+// Renders the sedation modifier toggle. It is dormant/disabled unless the room is
+// editable and the currently selected primary procedure is sedation-eligible. It
+// always defaults to Off and only turns on when staff explicitly tap it.
+function renderSedationToggle(room) {
+  const toggle = document.getElementById("sedationToggle");
+  if (!toggle) {
+    return;
+  }
+
+  const canEdit = canEditAssignment(room);
+  const eligible = selectedProcedureIsSedationEligible();
+  const available = canEdit && eligible;
+  if (!available) {
+    app.sedationOn = false;
+  }
+
+  const isOn = available && app.sedationOn;
+  toggle.disabled = !available;
+  toggle.classList.toggle("selected", isOn);
+  toggle.setAttribute("aria-checked", String(isOn));
+
+  const state = toggle.querySelector(".sedation-state");
+  if (state) {
+    state.textContent = isOn ? "On" : "Off";
+  }
+
+  const hint = toggle.querySelector(".sedation-hint");
+  if (hint) {
+    hint.textContent = !canEdit
+      ? "Select a procedure first"
+      : eligible
+        ? "Tap to mark this as a sedation case"
+        : "Not available for this procedure";
+  }
 }
 
 function canEditAssignment(room) {
@@ -1398,12 +1482,14 @@ function wireRoomPanel() {
       return;
     }
 
+    const sedation = app.sedationOn && selectedProcedureIsSedationEligible();
     const payload = {
       roomNumber: app.roomNumber,
       doctorId,
       procedureCode,
       procedureId: procedureCode,
-      demoElapsedMinutes
+      demoElapsedMinutes,
+      sedation
     };
 
     console.log("[ChairSide] Seat Room clicked.", payload);
@@ -1463,7 +1549,8 @@ function wireRoomPanel() {
       roomNumber: app.roomNumber,
       doctorId: app.selectedDoctorId,
       procedureCode: app.selectedProcedureId,
-      procedureId: app.selectedProcedureId
+      procedureId: app.selectedProcedureId,
+      sedation: app.sedationOn && selectedProcedureIsSedationEligible()
     };
 
     console.log("[ChairSide] Update Assignment clicked.", payload);
@@ -1622,6 +1709,19 @@ function wireSelectionTiles() {
     }
 
     app.selectedProcedureId = button.dataset.procedureId;
+    if (!selectedProcedureIsSedationEligible()) {
+      app.sedationOn = false;
+    }
+    renderSelectionTiles(getCurrentRoom());
+  });
+
+  const sedationToggle = document.getElementById("sedationToggle");
+  sedationToggle?.addEventListener("click", () => {
+    if (sedationToggle.disabled || !selectedProcedureIsSedationEligible()) {
+      return;
+    }
+
+    app.sedationOn = !app.sedationOn;
     renderSelectionTiles(getCurrentRoom());
   });
 }
@@ -1656,7 +1756,8 @@ async function sendSeatRoom(payload) {
       doctorId: payload.doctorId,
       procedureCode: payload.procedureCode,
       procedureId: payload.procedureId,
-      demoElapsedMinutes: payload.demoElapsedMinutes
+      demoElapsedMinutes: payload.demoElapsedMinutes,
+      sedation: payload.sedation
     })
   });
 
@@ -1679,7 +1780,8 @@ async function sendAssignmentUpdate(payload) {
     body: JSON.stringify({
       doctorId: payload.doctorId,
       procedureCode: payload.procedureCode,
-      procedureId: payload.procedureId
+      procedureId: payload.procedureId,
+      sedation: payload.sedation
     })
   });
 

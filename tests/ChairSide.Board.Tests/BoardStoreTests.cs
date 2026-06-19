@@ -370,14 +370,20 @@ public sealed class BoardStoreTests
         Assert.Equal(["otte", "pledger", "gibson", "schroeder"], snapshot.Doctors.Select(doctor => doctor.Id));
         Assert.Equal(["Dr. Otte", "Dr. Pledger", "Dr. Gibson", "Dr. Schroeder"], snapshot.Doctors.Select(doctor => doctor.Name));
         Assert.Equal(["Otte", "Pledger", "Gibson", "Schroeder"], snapshot.Doctors.Select(doctor => doctor.ShortName));
+        // Sedation is no longer an active, standalone selectable procedure; it is applied
+        // as a modifier on eligible primary procedures, so "SED" is absent from the roster.
         Assert.Equal(
-            ["CON", "EXT", "SED", "POST", "IMP", "BX", "MISC", "POE", "IMPRES", "INTCK", "BXPOST", "IMPRM", "PCOC"],
+            ["CON", "EXT", "POST", "IMP", "BX", "MISC", "POE", "IMPRES", "INTCK", "BXPOST", "IMPRM", "PCOC"],
             snapshot.Procedures.Select(procedure => procedure.Code));
         Assert.Equal(
-            ["Consult", "Extraction", "Sedation", "Post-op", "Implant", "Biopsy",
+            ["Consult", "Extraction", "Post-op", "Implant", "Biopsy",
              "Misc", "Periodic Exam", "Impressions", "Integration Check",
              "Biopsy Post-op", "Implant Removal", "Phone -> Office Consult"],
             snapshot.Procedures.Select(procedure => procedure.Label));
+        // Only the primary surgical procedures expose the sedation modifier.
+        Assert.Equal(
+            ["EXT", "IMP", "BX"],
+            snapshot.Procedures.Where(procedure => procedure.SedationEligible).Select(procedure => procedure.Code));
     }
 
     [Fact]
@@ -415,6 +421,139 @@ public sealed class BoardStoreTests
         Assert.Equal("ACT", seated.ProcedureCode);
         Assert.Equal("ACT", seated.Procedure?.Code);
         Assert.Equal("Active procedure", seated.Procedure?.Label);
+    }
+
+    [Fact]
+    public void Sedation_is_not_a_standalone_selectable_procedure()
+    {
+        using var workspace = TestWorkspace.Create();
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production);
+
+        var snapshot = context.Store.GetSnapshot();
+        Assert.DoesNotContain("SED", snapshot.Procedures.Select(procedure => procedure.Code));
+
+        // Standalone sedation is not seatable, by code or by id, for new seating or updates.
+        Assert.Null(context.Store.SeatRoom(1, "otte", "SED"));
+        Assert.Null(context.Store.SeatRoom(1, "otte", "sedation"));
+        Assert.NotNull(context.Store.SeatRoom(1, "otte", "EXT"));
+        Assert.Null(context.Store.UpdateAssignment(1, "otte", "SED"));
+    }
+
+    [Fact]
+    public void Eligible_procedure_seated_without_sedation_stays_a_base_procedure()
+    {
+        using var workspace = TestWorkspace.Create();
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production);
+
+        // Sedation defaults Off: an eligible procedure seated without the flag is the base case.
+        var seated = context.Store.SeatRoom(1, "otte", "EXT");
+        Assert.NotNull(seated);
+        Assert.Equal("EXT", seated.ProcedureCode);
+        Assert.Equal("EXT", seated.Procedure?.Code);
+        Assert.Equal("Extraction", seated.Procedure?.Label);
+    }
+
+    [Fact]
+    public void Eligible_procedure_with_sedation_is_stored_and_displayed_as_a_variant()
+    {
+        using var workspace = TestWorkspace.Create();
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production);
+
+        var seated = context.Store.SeatRoom(1, "otte", "EXT", sedation: true);
+        Assert.NotNull(seated);
+        // Base procedure, sedation flag, and combined case type are all derivable from the code.
+        Assert.Equal("EXT+SED", seated.ProcedureCode);
+        Assert.Equal("EXT+SED", seated.Procedure?.Code);
+        Assert.Equal("Extraction + Sedation", seated.Procedure?.Label);
+        Assert.True(seated.Procedure?.SedationEligible);
+    }
+
+    [Fact]
+    public void Sedation_modifier_is_rejected_for_non_eligible_procedures()
+    {
+        using var workspace = TestWorkspace.Create();
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production);
+
+        // Consult is not sedation-eligible, so it can never be marked as a sedation case.
+        Assert.Null(context.Store.SeatRoom(1, "otte", "CON", sedation: true));
+
+        // The same procedure remains seatable without sedation.
+        var seated = context.Store.SeatRoom(1, "otte", "CON");
+        Assert.NotNull(seated);
+        Assert.Equal("CON", seated.ProcedureCode);
+    }
+
+    [Fact]
+    public void Sedation_modifier_can_be_added_and_removed_via_update_assignment()
+    {
+        using var workspace = TestWorkspace.Create();
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production);
+
+        Assert.NotNull(context.Store.SeatRoom(1, "otte", "IMP"));
+
+        var withSedation = context.Store.UpdateAssignment(1, "otte", "IMP", sedation: true);
+        Assert.NotNull(withSedation);
+        Assert.Equal("IMP+SED", withSedation.ProcedureCode);
+        Assert.Equal("Implant + Sedation", withSedation.Procedure?.Label);
+
+        var withoutSedation = context.Store.UpdateAssignment(1, "otte", "IMP");
+        Assert.NotNull(withoutSedation);
+        Assert.Equal("IMP", withoutSedation.ProcedureCode);
+
+        // Switching to a non-eligible procedure cannot carry sedation forward.
+        Assert.Null(context.Store.UpdateAssignment(1, "otte", "POST", sedation: true));
+    }
+
+    [Fact]
+    public void Sedation_cases_report_as_distinct_variants_from_base_procedure()
+    {
+        using var workspace = TestWorkspace.Create();
+        var baseTime = new DateTimeOffset(2026, 6, 1, 8, 0, 0, TimeSpan.Zero);
+        var clock = new ManualTimeProvider(baseTime);
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production, timeProvider: clock);
+
+        // Two plain extractions and one extraction-with-sedation in separate hour blocks.
+        RunProcedureCycle(context, clock, baseTime, 1, "otte", "EXT", prepMin: 5, readyMin: 10, doctorMin: 10, turnoverMin: 5);
+        RunProcedureCycle(context, clock, baseTime.AddHours(1), 1, "otte", "EXT", prepMin: 5, readyMin: 10, doctorMin: 10, turnoverMin: 5);
+        RunProcedureCycle(context, clock, baseTime.AddHours(2), 2, "otte", "EXT", prepMin: 5, readyMin: 10, doctorMin: 10, turnoverMin: 5, sedation: true);
+
+        var summaries = context.Store.GetReports().ProcedureSummaries;
+
+        var extraction = Assert.Single(summaries, summary => summary.ProcedureCode == "EXT");
+        Assert.Equal("Extraction", extraction.ProcedureLabel);
+        Assert.Equal(2, extraction.CompletedCycleCount);
+
+        var sedationVariant = Assert.Single(summaries, summary => summary.ProcedureCode == "EXT+SED");
+        Assert.Equal("Extraction + Sedation", sedationVariant.ProcedureLabel);
+        Assert.Equal(1, sedationVariant.CompletedCycleCount);
+    }
+
+    [Fact]
+    public void Historical_standalone_sedation_records_remain_readable()
+    {
+        using var workspace = TestWorkspace.Create();
+        var databasePath = workspace.ProductionDatabasePath();
+
+        var first = StoreContext.Create(workspace, environmentName: Environments.Production, databasePath: databasePath);
+
+        // Simulate a legacy record persisted before sedation became a modifier: a room whose
+        // stored procedure code is the standalone "SED".
+        var legacyRoom = new RoomState(1)
+        {
+            AssignedDoctor = "otte",
+            ProcedureCode = "SED",
+            State = RoomStates.Seated,
+            SeatedAt = first.Store.GetSnapshot().ServerTime
+        };
+        first.Repository.SaveRooms([legacyRoom], first.Doctors, first.Procedures);
+
+        var second = StoreContext.Create(workspace, environmentName: Environments.Production, databasePath: databasePath);
+        var reloaded = second.Store.GetRoom(1);
+
+        Assert.NotNull(reloaded);
+        Assert.Equal("SED", reloaded.ProcedureCode);
+        Assert.Equal("SED", reloaded.Procedure?.Code);
+        Assert.Equal("Sedation", reloaded.Procedure?.Label);
     }
 
     [Fact]
@@ -2643,10 +2782,11 @@ public sealed class BoardStoreTests
         int prepMin,
         int readyMin,
         int doctorMin,
-        int turnoverMin)
+        int turnoverMin,
+        bool sedation = false)
     {
         clock.SetUtcNow(seatedAt);
-        Assert.NotNull(context.Store.SeatRoom(room, doctor, procedure));
+        Assert.NotNull(context.Store.SeatRoom(room, doctor, procedure, sedation: sedation));
         clock.SetUtcNow(seatedAt.AddMinutes(prepMin));
         Assert.NotNull(context.Store.MarkReadyForDoctor(room));
         clock.SetUtcNow(seatedAt.AddMinutes(prepMin + readyMin));
