@@ -27,7 +27,11 @@ const app = {
   // staff explicitly enters the Update Assignment / Edit flow. Otherwise they are locked
   // read-only case metadata. This stays Off by default after seating.
   assignmentEditMode: false,
-  selectionContext: null
+  selectionContext: null,
+  // True while a pointer is pressed on a doctor/procedure tile. The 1s room poll
+  // defers re-syncing and re-rendering the selection tiles while this is set so a
+  // slow press is never interrupted by a mid-press DOM swap.
+  tilePressActive: false
 };
 
 const stateNames = ["empty", "seated", "aging", "stale", "ready-for-doctor", "doctor-in-room", "turnover"];
@@ -528,8 +532,13 @@ function renderRoomPanel() {
 
   title.textContent = `Room ${app.roomNumber}`;
   status.innerHTML = room ? renderRoomTile(room, true) : renderInvalidRoomMessage();
-  syncRoomSelection(room);
-  renderSelectionTiles(room);
+  // While the user is actively pressing a tile, do not re-sync selection from the
+  // polled room state or rebuild the tiles. The press completes on pointerup; the
+  // next tick (<=1s later) resumes normal syncing.
+  if (!app.tilePressActive) {
+    syncRoomSelection(room);
+    renderSelectionTiles(room);
+  }
   renderRoomTokenPrompt();
   applyDemoTimerVisibility();
   populateDemoTimerSelect();
@@ -1367,7 +1376,10 @@ function renderDoctorTiles(room) {
   }
 
   const isEnabled = canEditAssignment(room);
-  setInnerHtmlIfChanged(target, app.snapshot.doctors.map(doctor => `
+  const doctors = app.snapshot.doctors;
+  const signature = `doctor|${isEnabled}|${app.selectedDoctorId || ""}|`
+    + doctors.map(doctor => `${doctor.id}:${doctor.color}:${doctor.name}`).join(";");
+  setInnerHtmlIfChanged(target, doctors.map(doctor => `
     <button
       class="selection-tile doctor-tile ${doctor.id === app.selectedDoctorId ? "selected" : ""}"
       style="--doctor-color: ${escapeAttribute(doctor.color)}"
@@ -1382,7 +1394,7 @@ function renderDoctorTiles(room) {
       </span>
       ${doctor.id === app.selectedDoctorId ? `<span class="selected-indicator" aria-hidden="true">&#10003;</span>` : ""}
     </button>
-  `).join(""));
+  `).join(""), signature);
 }
 
 function renderProcedureTiles(room) {
@@ -1396,6 +1408,8 @@ function renderProcedureTiles(room) {
   // toggle on eligible primary procedures. Filter it out defensively even if a roster
   // were misconfigured to mark it active.
   const procedures = app.snapshot.procedures.filter(procedure => !isSedationCode(procedure.code));
+  const signature = `procedure|${isEnabled}|${app.selectedProcedureId || ""}|`
+    + procedures.map(procedure => `${procedure.code}:${procedure.label}:${procedure.icon}`).join(";");
   setInnerHtmlIfChanged(target, procedures.map(procedure => `
     <button
       class="selection-tile procedure-tile ${procedure.code === app.selectedProcedureId ? "selected" : ""}"
@@ -1411,7 +1425,7 @@ function renderProcedureTiles(room) {
       </span>
       ${procedure.code === app.selectedProcedureId ? `<span class="selected-indicator" aria-hidden="true">&#10003;</span>` : ""}
     </button>
-  `).join(""));
+  `).join(""), signature);
 }
 
 function isSedationCode(code) {
@@ -1487,14 +1501,22 @@ function canEditAssignment(room) {
   return cancelableStates.has(state) && app.assignmentEditMode;
 }
 
-// Only writes innerHTML when the markup actually changed. The room panel re-renders on a
-// 1s tick; rebuilding the selection tiles every tick would replace the button under a
-// slow press, so the native click (which needs pointerdown + pointerup on the same
-// element) never fires. Skipping no-op rewrites keeps those controls stable mid-press.
-function setInnerHtmlIfChanged(target, html) {
-  if (target.innerHTML !== html) {
-    target.innerHTML = html;
+// Only writes innerHTML when the logical content actually changed. The room panel
+// re-renders on a 1s tick; rebuilding the selection tiles every tick would replace the
+// button under a slow press, so the native click (which needs pointerdown + pointerup on
+// the same node) never fires.
+//
+// We compare a caller-supplied signature instead of re-reading target.innerHTML: the
+// browser normalizes serialized markup (the "&#10003;" checkmark entity becomes "✓",
+// boolean attributes like "disabled" gain ="" ), so a string compare against innerHTML
+// would never match and would rewrite the tiles on every tick.
+function setInnerHtmlIfChanged(target, html, signature) {
+  if (target.dataset.renderKey === signature) {
+    return;
   }
+
+  target.dataset.renderKey = signature;
+  target.innerHTML = html;
 }
 
 function populateDemoTimerSelect() {
@@ -1833,31 +1855,106 @@ function wireRoomPanel() {
   });
 }
 
+// Tracks the logical tile currently being pressed: { selector, idKey, id, activate }.
+// Stored by id (not element reference) so a re-render that swaps the DOM node mid-press
+// can't strand the interaction. Only one pointer press is tracked at a time.
+let pendingTilePress = null;
+let tilePressFailsafe = null;
+// Upper bound on the interaction lock. A deliberate slow press is ~1-2s; this is well
+// clear of that but short enough that a missing pointerup/cancel can never freeze tile
+// rendering indefinitely.
+const TILE_PRESS_FAILSAFE_MS = 4000;
+
+// Releases the interaction lock so the normal render/poll cycle resumes. Idempotent and
+// safe to call from any resume trigger (pointerup, pointercancel, blur, Escape, fail-safe).
+// Note: polling/fetching is never paused; only re-rendering the pressed tile is deferred.
+function clearTilePress() {
+  pendingTilePress = null;
+  app.tilePressActive = false;
+  if (tilePressFailsafe !== null) {
+    clearTimeout(tilePressFailsafe);
+    tilePressFailsafe = null;
+  }
+}
+
+// Resolves a press on pointerup wherever the pointer is released, so a slow press that
+// drifts slightly still completes if it lands on the same logical tile.
+function completeTilePress(event) {
+  const press = pendingTilePress;
+  clearTilePress();
+  if (!press) {
+    return;
+  }
+
+  const button = event.target?.closest?.(press.selector);
+  if (!button || button.disabled || button.dataset[press.idKey] !== press.id) {
+    return;
+  }
+
+  press.activate(button);
+}
+
+function wireTileGroup(container, selector, idKey, activate) {
+  if (!container) {
+    return;
+  }
+
+  container.addEventListener("pointerdown", event => {
+    const button = event.target.closest(selector);
+    if (!button || button.disabled) {
+      return;
+    }
+    pendingTilePress = { selector, idKey, id: button.dataset[idKey], activate };
+    app.tilePressActive = true;
+    if (tilePressFailsafe !== null) {
+      clearTimeout(tilePressFailsafe);
+    }
+    tilePressFailsafe = window.setTimeout(clearTilePress, TILE_PRESS_FAILSAFE_MS);
+  });
+
+  // Keyboard activation (Enter / Space) dispatches a click with detail === 0 and no
+  // pointer sequence. Pointer-driven clicks (detail >= 1) are already handled on
+  // pointerup, so we ignore them here to avoid double-firing.
+  container.addEventListener("click", event => {
+    if (event.detail !== 0) {
+      return;
+    }
+    const button = event.target.closest(selector);
+    if (!button || button.disabled) {
+      return;
+    }
+    activate(button);
+  });
+}
+
 function wireSelectionTiles() {
   const doctorTiles = document.getElementById("doctorTiles");
   const procedureTiles = document.getElementById("procedureTiles");
 
-  doctorTiles?.addEventListener("click", event => {
-    const button = event.target.closest("[data-doctor-id]");
-    if (!button || button.disabled) {
-      return;
-    }
-
+  wireTileGroup(doctorTiles, "[data-doctor-id]", "doctorId", button => {
     app.selectedDoctorId = button.dataset.doctorId;
     renderSelectionTiles(getCurrentRoom());
   });
 
-  procedureTiles?.addEventListener("click", event => {
-    const button = event.target.closest("[data-procedure-id]");
-    if (!button || button.disabled) {
-      return;
-    }
-
+  wireTileGroup(procedureTiles, "[data-procedure-id]", "procedureId", button => {
     app.selectedProcedureId = button.dataset.procedureId;
     if (!selectedProcedureIsSedationEligible()) {
       app.sedationOn = false;
     }
     renderSelectionTiles(getCurrentRoom());
+  });
+
+  // Resolve / clean up the press at the document level so a release outside the
+  // originating tile (or container) never leaves rendering deferred. pointerup applies
+  // the selection when released on the same logical tile; every other path just releases
+  // the lock and lets normal rendering resume.
+  document.addEventListener("pointerup", completeTilePress);
+  document.addEventListener("pointercancel", clearTilePress);
+  window.addEventListener("blur", clearTilePress);
+  document.addEventListener("keydown", event => {
+    if (event.key === "Escape") {
+      clearTilePress();
+    }
   });
 
   const sedationToggle = document.getElementById("sedationToggle");
