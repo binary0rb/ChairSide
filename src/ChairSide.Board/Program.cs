@@ -297,7 +297,7 @@ app.MapPost("/api/rooms/{roomNumber:int}/seat", async Task<IResult> (
         return Results.BadRequest(validationError);
     }
 
-    var result = store.SeatRoom(roomNumber, doctorId!, procedureCode!, request.DemoElapsedMinutes);
+    var result = store.SeatRoom(roomNumber, doctorId!, procedureCode!, request.DemoElapsedMinutes, request.Sedation);
     if (result is null)
     {
         var reason = store.IsConfiguredRoom(roomNumber) ? "state-rejected" : "room-not-found";
@@ -351,7 +351,7 @@ app.MapPost("/api/rooms/{roomNumber:int}/assignment", async Task<IResult> (
         return Results.BadRequest(validationError);
     }
 
-    var result = store.UpdateAssignment(roomNumber, doctorId!, procedureCode!);
+    var result = store.UpdateAssignment(roomNumber, doctorId!, procedureCode!, request.Sedation);
     if (result is null)
     {
         var reason = store.IsConfiguredRoom(roomNumber) ? "state-rejected" : "room-not-found";
@@ -691,12 +691,14 @@ public sealed record SeatRoomRequest(
     string DoctorId,
     string? ProcedureCode = null,
     string? ProcedureId = null,
-    int DemoElapsedMinutes = 0);
+    int DemoElapsedMinutes = 0,
+    bool Sedation = false);
 
 public sealed record UpdateAssignmentRequest(
     string DoctorId,
     string? ProcedureCode = null,
-    string? ProcedureId = null);
+    string? ProcedureId = null,
+    bool Sedation = false);
 
 /// <summary>
 /// Body for POST /api/reports/cycles/mark-exception.

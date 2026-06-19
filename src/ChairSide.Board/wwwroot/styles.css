@@ -1196,6 +1196,38 @@ button:disabled {
   opacity: 0.95;
 }
 
+/* Sedation modifier toggle: a single full-width switch tile that reuses the
+   selection-tile sizing (76px min-height preserves the touch target). The On/Off
+   pill and selected highlight communicate the explicit, default-off state. */
+.sedation-tile {
+  justify-content: space-between;
+}
+
+.sedation-tile .selection-copy {
+  padding-right: 12px;
+}
+
+.sedation-state {
+  flex: 0 0 auto;
+  min-width: 52px;
+  padding: 6px 12px;
+  border: 2px solid var(--line);
+  border-radius: 999px;
+  background: #f1f5f9;
+  color: var(--muted);
+  font-size: 15px;
+  font-weight: 800;
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.sedation-tile.selected .sedation-state {
+  border-color: #2563eb;
+  background: #2563eb;
+  color: #ffffff;
+}
+
 @keyframes agingBorderPulse {
   0%,
   100% {

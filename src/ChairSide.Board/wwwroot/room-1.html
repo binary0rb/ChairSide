@@ -52,6 +52,16 @@
         <span class="control-label" id="procedureTilesLabel">Procedure</span>
         <div class="selection-grid procedure-selection-grid" id="procedureTiles" role="radiogroup" aria-labelledby="procedureTilesLabel"></div>
       </div>
+      <div class="selection-section sedation-section">
+        <span class="control-label" id="sedationToggleLabel">Sedation</span>
+        <button class="selection-tile sedation-tile" id="sedationToggle" type="button" role="switch" aria-checked="false" aria-labelledby="sedationToggleLabel" disabled>
+          <span class="selection-copy">
+            <strong>Add Sedation</strong>
+            <small class="sedation-hint">Select an eligible procedure first</small>
+          </span>
+          <span class="sedation-state" aria-hidden="true">Off</span>
+        </button>
+      </div>
       <div class="demo-timer-control" hidden>
         <label for="demoElapsedSelect">Demo Timer</label>
         <select id="demoElapsedSelect"></select>
