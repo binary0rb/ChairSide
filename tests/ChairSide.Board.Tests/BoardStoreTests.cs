@@ -380,9 +380,9 @@ public sealed class BoardStoreTests
              "Misc", "Periodic Exam", "Impressions", "Integration Check",
              "Biopsy Post-op", "Implant Removal", "Phone -> Office Consult"],
             snapshot.Procedures.Select(procedure => procedure.Label));
-        // Only the primary surgical procedures expose the sedation modifier.
+        // Only the approved sedation-eligible procedures expose the sedation modifier.
         Assert.Equal(
-            ["EXT", "IMP", "BX"],
+            ["EXT", "IMP", "BX", "MISC", "IMPRM"],
             snapshot.Procedures.Where(procedure => procedure.SedationEligible).Select(procedure => procedure.Code));
     }
 
