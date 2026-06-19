@@ -74,7 +74,7 @@ async function boot() {
     wireReportsActions();
   }
 
-  wireDoctorViewSelect();
+  wireDoctorViewMenu();
   connectRealtime();
   app.pollHandle = window.setInterval(loadBoard, 5000);
   app.tickHandle = window.setInterval(render, 1000);
@@ -242,7 +242,7 @@ function render() {
   const view = document.body.dataset.view;
   updateConnectionStatus();
   renderLegend();
-  populateDoctorViewSelect();
+  populateDoctorViewMenu();
 
   if (view === "master") {
     renderMaster();
@@ -391,48 +391,118 @@ function renderLegend() {
   }
 }
 
-// Display-only initials for compact labels. Doctors missing from this map
-// fall back to their configured short name alone.
-const doctorInitialsById = {
-  otte: "LDO",
-  pledger: "JWP",
-  gibson: "JEG",
-  schroeder: "NDS"
-};
-
-function doctorSelectorLabel(doctor) {
-  const shortName = doctor.shortName || cardDoctorName(doctor.name);
-  const initials = doctorInitialsById[doctor.id];
-  return initials ? `${initials} - ${shortName}` : shortName;
-}
-
-// Fills the nav doctor selector from the live roster snapshot. Runs once per
-// page load; render() calls it every tick but the populated guard makes the
-// repeat calls no-ops so an open dropdown is never rebuilt mid-interaction.
-function populateDoctorViewSelect() {
-  const select = document.getElementById("doctorViewSelect");
-  if (!select || select.dataset.populated === "true" || !app.snapshot) {
+// Updates the Doctor View toggle label. On the doctor page it reflects the
+// active doctor ("Doctor View: Dr. Otte"); everywhere else it stays generic.
+function updateDoctorViewToggleLabel() {
+  const label = document.getElementById("doctorViewToggleLabel");
+  if (!label) {
     return;
   }
 
-  const options = [`<option value="">Choose doctor...</option>`];
-  for (const doctor of app.snapshot.doctors) {
-    options.push(`<option value="${escapeAttribute(doctor.id)}">${escapeHtml(doctorSelectorLabel(doctor))}</option>`);
+  if (document.body.dataset.view === "doctor" && app.doctorId && app.snapshot) {
+    const doctor = app.snapshot.doctors.find(item => item.id === app.doctorId);
+    if (doctor) {
+      label.textContent = `Doctor View: ${doctor.name}`;
+      return;
+    }
   }
 
-  select.innerHTML = options.join("");
-  if (document.body.dataset.view === "doctor" && app.doctorId) {
-    select.value = app.doctorId;
-  }
-
-  select.dataset.populated = "true";
+  label.textContent = "Doctor View";
 }
 
-function wireDoctorViewSelect() {
-  document.getElementById("doctorViewSelect")?.addEventListener("change", event => {
-    const doctorId = event.target.value;
-    if (doctorId) {
-      window.location.href = `/doctor.html?doctorId=${encodeURIComponent(doctorId)}`;
+// Fills the Doctor View dropdown from the live roster snapshot. Runs once per
+// page load; render() calls it every tick but the populated guard makes the
+// repeat calls no-ops so an open menu is never rebuilt mid-interaction.
+function populateDoctorViewMenu() {
+  const menu = document.getElementById("doctorViewMenu");
+  if (!menu || menu.dataset.populated === "true" || !app.snapshot) {
+    return;
+  }
+
+  const currentDoctorId = document.body.dataset.view === "doctor" ? app.doctorId : null;
+  menu.innerHTML = app.snapshot.doctors.map(doctor => {
+    const isCurrent = doctor.id === currentDoctorId;
+    return `<a class="nav-menu-item${isCurrent ? " is-current" : ""}" role="menuitem" tabindex="-1"`
+      + ` href="/doctor.html?doctorId=${encodeURIComponent(doctor.id)}"`
+      + ` style="--doctor-color: ${escapeAttribute(doctor.color || "")}"`
+      + `${isCurrent ? ` aria-current="true"` : ""}>`
+      + `<span class="nav-menu-swatch" aria-hidden="true"></span>`
+      + `<span class="nav-menu-item-label">${escapeHtml(doctor.name)}</span>`
+      + `</a>`;
+  }).join("");
+
+  menu.dataset.populated = "true";
+  updateDoctorViewToggleLabel();
+}
+
+// Wires the Doctor View control as a real menu: toggle button owns open/close,
+// outside-click and Escape close it, and arrow keys move between doctors.
+function wireDoctorViewMenu() {
+  const toggle = document.getElementById("doctorViewToggle");
+  const menu = document.getElementById("doctorViewMenu");
+  if (!toggle || !menu) {
+    return;
+  }
+
+  const closeMenu = (returnFocus = false) => {
+    if (menu.hidden) {
+      return;
+    }
+    menu.hidden = true;
+    toggle.setAttribute("aria-expanded", "false");
+    if (returnFocus) {
+      toggle.focus();
+    }
+  };
+
+  const openMenu = () => {
+    menu.hidden = false;
+    toggle.setAttribute("aria-expanded", "true");
+    menu.querySelector(".nav-menu-item")?.focus();
+  };
+
+  toggle.addEventListener("click", event => {
+    event.preventDefault();
+    if (menu.hidden) {
+      openMenu();
+    } else {
+      closeMenu();
+    }
+  });
+
+  document.addEventListener("click", event => {
+    if (menu.hidden) {
+      return;
+    }
+    if (!menu.contains(event.target) && !toggle.contains(event.target)) {
+      closeMenu();
+    }
+  });
+
+  document.addEventListener("keydown", event => {
+    if (event.key === "Escape" && !menu.hidden) {
+      closeMenu(true);
+    }
+  });
+
+  menu.addEventListener("keydown", event => {
+    const items = Array.from(menu.querySelectorAll(".nav-menu-item"));
+    if (!items.length) {
+      return;
+    }
+    const currentIndex = items.indexOf(document.activeElement);
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      items[(currentIndex + 1) % items.length].focus();
+    } else if (event.key === "ArrowUp") {
+      event.preventDefault();
+      items[(currentIndex - 1 + items.length) % items.length].focus();
+    } else if (event.key === "Home") {
+      event.preventDefault();
+      items[0].focus();
+    } else if (event.key === "End") {
+      event.preventDefault();
+      items[items.length - 1].focus();
     }
   });
 }

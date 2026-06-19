@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>ChairSide Board - Room 1 Panel</title>
-  <link rel="stylesheet" href="/styles.css?v=20260619-room-control-interactions">
+  <link rel="stylesheet" href="/styles.css?v=20260619-primary-navigation">
 </head>
 <body data-view="room" data-room-number="1">
   <header class="app-header compact">
@@ -18,15 +18,16 @@
       </div>
       <p>Room lifecycle controls. No patient data.</p>
     </div>
-    <nav class="view-links" aria-label="Views">
-      <a href="/master.html">Master</a>
-      <label class="doctor-view-select">
-        <span>Doctor View</span>
-        <select id="doctorViewSelect" aria-label="Open the board for a doctor">
-          <option value="">Choose doctor...</option>
-        </select>
-      </label>
-      <a href="/reports.html">Reports</a>
+    <nav class="primary-nav" aria-label="Primary views">
+      <a class="nav-pill" href="/master.html" data-nav="master">Master</a>
+      <div class="nav-item" data-nav="doctor">
+        <button type="button" class="nav-pill nav-pill-toggle" id="doctorViewToggle" aria-haspopup="true" aria-expanded="false" aria-controls="doctorViewMenu">
+          <span id="doctorViewToggleLabel">Doctor View</span>
+          <span class="nav-caret" aria-hidden="true"></span>
+        </button>
+        <div class="nav-menu" id="doctorViewMenu" role="menu" aria-label="Choose a doctor" hidden></div>
+      </div>
+      <a class="nav-pill" href="/reports.html" data-nav="reports">Reports</a>
     </nav>
   </header>
 
@@ -80,6 +81,6 @@
   </main>
 
   <script src="/signalr-lite.js"></script>
-  <script src="/board.js?v=20260619-room-control-interactions"></script>
+  <script src="/board.js?v=20260619-primary-navigation"></script>
 </body>
 </html>
