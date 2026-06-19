@@ -1884,3 +1884,13 @@ body[data-view="room"] .corrections-panel {
 body[data-view="room"] .selection-tile {
   border-radius: 8px;
 }
+
+/* Make slow taps/clicks reliable: skip the synthetic double-tap delay and stop the
+   browser from reinterpreting a slow press as text selection or a long-press gesture.
+   Touch target sizes and styling are unchanged. */
+body[data-view="room"] .touch-controls button,
+body[data-view="room"] .corrections-panel button {
+  touch-action: manipulation;
+  -webkit-user-select: none;
+  user-select: none;
+}

@@ -23,6 +23,10 @@ const app = {
   selectedDoctorId: null,
   selectedProcedureId: null,
   sedationOn: false,
+  // Doctor / procedure / sedation are only editable during initial seating or when the
+  // staff explicitly enters the Update Assignment / Edit flow. Otherwise they are locked
+  // read-only case metadata. This stays Off by default after seating.
+  assignmentEditMode: false,
   selectionContext: null
 };
 
@@ -1093,6 +1097,14 @@ function setRoomControlsEnabled(room) {
   const state = room ? normalizeState(room) : "empty";
   const canCorrect = cancelableStates.has(state);
   const isPrep = activeSeatedStates.has(state); // only "seated" - not aging/stale anymore
+
+  // The Edit flow only exists in correctable seated states; drop it everywhere else so a
+  // lifecycle transition (Ready / Doctor Arrived / Available) always re-locks the controls.
+  if (!canCorrect) {
+    app.assignmentEditMode = false;
+  }
+  const isEditing = app.assignmentEditMode && canCorrect;
+
   setDisabled("demoElapsedSelect", !isEnabled || state !== "empty" || !isDemoTimerEnabled());
   setDisabled("seatButton", !isEnabled || state !== "empty");
   setDisabled("readyForDoctorButton", !isEnabled || !isPrep);
@@ -1101,6 +1113,17 @@ function setRoomControlsEnabled(room) {
   setDisabled("doctorArrivedButton", !isEnabled || !doctorArrivedStates.has(state));
   setDisabled("doctorCompleteButton", !isEnabled || state !== "doctor-in-room");
   setDisabled("roomAvailableButton", !isEnabled || state !== "turnover");
+
+  // Contextual labels: the correction buttons enter the Edit flow, then save/cancel it.
+  setButtonLabel("updateAssignmentButton", isEditing ? "Save Assignment" : "Update Assignment");
+  setButtonLabel("cancelSeatingButton", isEditing ? "Cancel Edit" : "Cancel Seating");
+}
+
+function setButtonLabel(id, label) {
+  const control = document.getElementById(id);
+  if (control && control.textContent !== label) {
+    control.textContent = label;
+  }
 }
 
 function setDisabled(id, isDisabled) {
@@ -1274,7 +1297,7 @@ function renderDoctorTiles(room) {
   }
 
   const isEnabled = canEditAssignment(room);
-  target.innerHTML = app.snapshot.doctors.map(doctor => `
+  setInnerHtmlIfChanged(target, app.snapshot.doctors.map(doctor => `
     <button
       class="selection-tile doctor-tile ${doctor.id === app.selectedDoctorId ? "selected" : ""}"
       style="--doctor-color: ${escapeAttribute(doctor.color)}"
@@ -1289,7 +1312,7 @@ function renderDoctorTiles(room) {
       </span>
       ${doctor.id === app.selectedDoctorId ? `<span class="selected-indicator" aria-hidden="true">&#10003;</span>` : ""}
     </button>
-  `).join("");
+  `).join(""));
 }
 
 function renderProcedureTiles(room) {
@@ -1303,7 +1326,7 @@ function renderProcedureTiles(room) {
   // toggle on eligible primary procedures. Filter it out defensively even if a roster
   // were misconfigured to mark it active.
   const procedures = app.snapshot.procedures.filter(procedure => !isSedationCode(procedure.code));
-  target.innerHTML = procedures.map(procedure => `
+  setInnerHtmlIfChanged(target, procedures.map(procedure => `
     <button
       class="selection-tile procedure-tile ${procedure.code === app.selectedProcedureId ? "selected" : ""}"
       type="button"
@@ -1318,7 +1341,7 @@ function renderProcedureTiles(room) {
       </span>
       ${procedure.code === app.selectedProcedureId ? `<span class="selected-indicator" aria-hidden="true">&#10003;</span>` : ""}
     </button>
-  `).join("");
+  `).join(""));
 }
 
 function isSedationCode(code) {
@@ -1330,9 +1353,10 @@ function selectedProcedureIsSedationEligible() {
   return Boolean(procedure && procedure.sedationEligible);
 }
 
-// Renders the sedation modifier toggle. It is dormant/disabled unless the room is
-// editable and the currently selected primary procedure is sedation-eligible. It
-// always defaults to Off and only turns on when staff explicitly tap it.
+// Renders the sedation modifier toggle. It is only interactable during initial seating or
+// the explicit Edit flow, and only for a sedation-eligible primary procedure; it defaults
+// Off and only turns on when staff explicitly tap it. When the assignment is locked it
+// shows the room's actual sedation status as read-only case metadata.
 function renderSedationToggle(room) {
   const toggle = document.getElementById("sedationToggle");
   if (!toggle) {
@@ -1341,13 +1365,24 @@ function renderSedationToggle(room) {
 
   const canEdit = canEditAssignment(room);
   const eligible = selectedProcedureIsSedationEligible();
-  const available = canEdit && eligible;
-  if (!available) {
-    app.sedationOn = false;
+  let interactable;
+  let isOn;
+
+  if (canEdit) {
+    // Seating / editing: the toggle reflects the in-progress choice and is tappable only
+    // for eligible procedures.
+    interactable = eligible;
+    if (!eligible) {
+      app.sedationOn = false;
+    }
+    isOn = eligible && app.sedationOn;
+  } else {
+    // Locked: read-only mirror of the persisted case so EXT + SED still reads as On.
+    interactable = false;
+    isOn = hasSedationModifier(room?.procedureCode);
   }
 
-  const isOn = available && app.sedationOn;
-  toggle.disabled = !available;
+  toggle.disabled = !interactable;
   toggle.classList.toggle("selected", isOn);
   toggle.setAttribute("aria-checked", String(isOn));
 
@@ -1359,20 +1394,37 @@ function renderSedationToggle(room) {
   const hint = toggle.querySelector(".sedation-hint");
   if (hint) {
     hint.textContent = !canEdit
-      ? "Select a procedure first"
+      ? "Use Update Assignment to change"
       : eligible
         ? "Tap to mark this as a sedation case"
         : "Not available for this procedure";
   }
 }
 
+// True when the doctor / procedure / sedation selection controls are live. They are live
+// during initial seating (room empty) and during the explicit Update Assignment / Edit
+// flow. In every other seated state they are locked read-only case metadata.
 function canEditAssignment(room) {
   if (!room) {
     return false;
   }
 
   const state = normalizeState(room);
-  return state === "empty" || cancelableStates.has(state);
+  if (state === "empty") {
+    return true;
+  }
+
+  return cancelableStates.has(state) && app.assignmentEditMode;
+}
+
+// Only writes innerHTML when the markup actually changed. The room panel re-renders on a
+// 1s tick; rebuilding the selection tiles every tick would replace the button under a
+// slow press, so the native click (which needs pointerdown + pointerup on the same
+// element) never fires. Skipping no-op rewrites keeps those controls stable mid-press.
+function setInnerHtmlIfChanged(target, html) {
+  if (target.innerHTML !== html) {
+    target.innerHTML = html;
+  }
 }
 
 function populateDemoTimerSelect() {
@@ -1540,6 +1592,16 @@ function wireRoomPanel() {
       return;
     }
 
+    // First press enters the explicit Edit flow and unlocks procedure / sedation.
+    if (!app.assignmentEditMode) {
+      app.assignmentEditMode = true;
+      console.log("[ChairSide] Entered assignment edit mode.", { roomNumber: app.roomNumber });
+      setRoomActionStatus("Editing assignment - adjust procedure or sedation, then Save.", "pending");
+      renderRoomPanel();
+      return;
+    }
+
+    // Second press saves the edited assignment and re-locks the controls.
     if (!hasAssignmentSelection()) {
       setRoomActionStatus("Choose a doctor and procedure first.", "error");
       return;
@@ -1553,13 +1615,15 @@ function wireRoomPanel() {
       sedation: app.sedationOn && selectedProcedureIsSedationEligible()
     };
 
-    console.log("[ChairSide] Update Assignment clicked.", payload);
+    console.log("[ChairSide] Save Assignment clicked.", payload);
     setRoomActionStatus("Updating assignment...", "pending");
 
     try {
       await sendAssignmentUpdate(payload);
+      app.assignmentEditMode = false;
       console.log("[ChairSide] Update Assignment succeeded.", payload);
       setRoomActionStatus("Assignment updated.", "success");
+      renderRoomPanel();
     } catch (error) {
       console.error("[ChairSide] Update Assignment failed.", { payload, error });
       setRoomActionStatus(error.message || "Failed to update assignment.", "error");
@@ -1574,6 +1638,17 @@ function wireRoomPanel() {
 
     if (!cancelableStates.has(currentRoomState())) {
       setRoomActionStatus("Cancel Seating is only available before Doctor Arrived.", "error");
+      return;
+    }
+
+    // In the Edit flow this button discards in-progress edits and re-locks, rather than
+    // canceling the seating outright.
+    if (app.assignmentEditMode) {
+      app.assignmentEditMode = false;
+      app.selectionContext = null; // force re-sync from the persisted room (discard edits)
+      console.log("[ChairSide] Canceled assignment edit.", { roomNumber: app.roomNumber });
+      setRoomActionStatus("Edit canceled.", "pending");
+      renderRoomPanel();
       return;
     }
 
