@@ -71,7 +71,8 @@ public sealed class ProcedureRosterOptions
             Code = "MISC",
             Label = "Misc",
             Icon = "check",
-            Active = true
+            Active = true,
+            SedationEligible = true
         },
         new()
         {
@@ -111,7 +112,8 @@ public sealed class ProcedureRosterOptions
             Code = "IMPRM",
             Label = "Implant Removal",
             Icon = "wrench",
-            Active = true
+            Active = true,
+            SedationEligible = true
         },
         new()
         {
