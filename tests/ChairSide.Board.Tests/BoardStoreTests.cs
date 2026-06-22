@@ -529,6 +529,151 @@ public sealed class BoardStoreTests
     }
 
     [Fact]
+    public void Variant_summaries_carry_base_code_and_sedation_flag()
+    {
+        using var workspace = TestWorkspace.Create();
+        var baseTime = new DateTimeOffset(2026, 6, 1, 8, 0, 0, TimeSpan.Zero);
+        var clock = new ManualTimeProvider(baseTime);
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production, timeProvider: clock);
+
+        RunProcedureCycle(context, clock, baseTime, 1, "otte", "EXT", prepMin: 5, readyMin: 10, doctorMin: 10, turnoverMin: 5);
+        RunProcedureCycle(context, clock, baseTime.AddHours(1), 2, "otte", "EXT", prepMin: 5, readyMin: 10, doctorMin: 10, turnoverMin: 5, sedation: true);
+
+        var summaries = context.Store.GetReports().ProcedureSummaries;
+
+        var plain = Assert.Single(summaries, summary => summary.ProcedureCode == "EXT");
+        Assert.Equal("EXT", plain.BaseProcedureCode);
+        Assert.False(plain.IsSedationCase);
+
+        var sedationVariant = Assert.Single(summaries, summary => summary.ProcedureCode == "EXT+SED");
+        Assert.Equal("EXT", sedationVariant.BaseProcedureCode);
+        Assert.True(sedationVariant.IsSedationCase);
+    }
+
+    [Fact]
+    public void Base_procedure_summaries_roll_up_variants_over_raw_cycles()
+    {
+        using var workspace = TestWorkspace.Create();
+        var baseTime = new DateTimeOffset(2026, 6, 1, 8, 0, 0, TimeSpan.Zero);
+        var clock = new ManualTimeProvider(baseTime);
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production, timeProvider: clock);
+
+        // Three extractions with distinct durations: two plain, one with sedation. Distinct totals
+        // make the base-group median (over all three raw cycles) differ from anything that could be
+        // recombined from the per-variant EXT summary, which only covers two of them.
+        RunProcedureCycle(context, clock, baseTime, 1, "otte", "EXT", prepMin: 5, readyMin: 10, doctorMin: 10, turnoverMin: 5);
+        RunProcedureCycle(context, clock, baseTime.AddHours(1), 2, "otte", "EXT", prepMin: 5, readyMin: 10, doctorMin: 20, turnoverMin: 5);
+        RunProcedureCycle(context, clock, baseTime.AddHours(2), 1, "otte", "EXT", prepMin: 5, readyMin: 10, doctorMin: 30, turnoverMin: 5, sedation: true);
+
+        var reports = context.Store.GetReports();
+
+        // The full-variant summaries stay distinct.
+        Assert.Equal(2, Assert.Single(reports.ProcedureSummaries, s => s.ProcedureCode == "EXT").CompletedCycleCount);
+        Assert.Equal(1, Assert.Single(reports.ProcedureSummaries, s => s.ProcedureCode == "EXT+SED").CompletedCycleCount);
+
+        // The base roll-up aggregates all three cycles under "EXT" / "Extraction".
+        var baseExtraction = Assert.Single(reports.BaseProcedureSummaries, s => s.ProcedureCode == "EXT");
+        Assert.Equal("Extraction", baseExtraction.ProcedureLabel);
+        Assert.Equal("EXT", baseExtraction.BaseProcedureCode);
+        Assert.False(baseExtraction.IsSedationCase);
+        Assert.Equal(3, baseExtraction.CompletedCycleCount);
+
+        // Median is computed from the raw cycles, not recombined from variant medians.
+        var orderedTotals = reports.RecentCompletedCycles
+            .Select(cycle => cycle.TotalRoomCycleSeconds!.Value)
+            .OrderBy(value => value)
+            .ToList();
+        Assert.Equal(3, orderedTotals.Count);
+        double expectedBaseMedianTotal = orderedTotals[1];
+        Assert.Equal(expectedBaseMedianTotal, baseExtraction.MedianTotalSeconds);
+        // Sanity: the variant EXT median (two cycles) is the mean of the two and differs.
+        Assert.NotEqual(expectedBaseMedianTotal, Assert.Single(reports.ProcedureSummaries, s => s.ProcedureCode == "EXT").MedianTotalSeconds);
+    }
+
+    [Fact]
+    public void Sedation_and_non_sedation_counts_partition_completed_cycles()
+    {
+        using var workspace = TestWorkspace.Create();
+        var baseTime = new DateTimeOffset(2026, 6, 1, 8, 0, 0, TimeSpan.Zero);
+        var clock = new ManualTimeProvider(baseTime);
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production, timeProvider: clock);
+
+        // Two non-sedation cycles, one sedation cycle.
+        RunProcedureCycle(context, clock, baseTime, 1, "otte", "EXT", prepMin: 5, readyMin: 10, doctorMin: 10, turnoverMin: 5);
+        RunProcedureCycle(context, clock, baseTime.AddHours(1), 2, "otte", "IMP", prepMin: 5, readyMin: 10, doctorMin: 10, turnoverMin: 5);
+        RunProcedureCycle(context, clock, baseTime.AddHours(2), 1, "otte", "IMP", prepMin: 5, readyMin: 10, doctorMin: 10, turnoverMin: 5, sedation: true);
+
+        var reports = context.Store.GetReports();
+
+        Assert.Equal(1, reports.SedationCaseCount);
+        Assert.Equal(2, reports.NonSedationCaseCount);
+        Assert.Equal(reports.CompletedRoomCyclesCount, reports.SedationCaseCount + reports.NonSedationCaseCount);
+    }
+
+    [Fact]
+    public void Legacy_standalone_sedation_completed_cycle_is_readable_and_counted_as_sedation()
+    {
+        using var workspace = TestWorkspace.Create();
+        var databasePath = workspace.ProductionDatabasePath();
+        var baseTime = new DateTimeOffset(2026, 6, 1, 8, 0, 0, TimeSpan.Zero);
+
+        var first = StoreContext.Create(workspace, environmentName: Environments.Production, databasePath: databasePath);
+
+        // Simulate a completed cycle persisted before sedation became a modifier: the stored
+        // procedure code is the standalone legacy "SED".
+        var legacyCycle = new CompletedRoomCycle
+        {
+            RoomId = 1,
+            AssignedDoctor = "otte",
+            ProcedureCode = "SED",
+            SeatedAt = baseTime,
+            ReadyForDoctorAt = baseTime.AddMinutes(5),
+            DoctorArrivedAt = baseTime.AddMinutes(15),
+            DoctorCompleteAt = baseTime.AddMinutes(25),
+            RoomAvailableAt = baseTime.AddMinutes(30),
+            SeatedToDoctorSeconds = 900,
+            PrepSeconds = 300,
+            ReadyToDoctorSeconds = 600,
+            DoctorInRoomSeconds = 600,
+            TurnoverSeconds = 300,
+            TotalRoomCycleSeconds = 1800,
+            FinalWaitState = "ready-for-doctor"
+        };
+        first.Repository.SaveCompletedCycle(legacyCycle, first.Doctors, first.Procedures);
+
+        var second = StoreContext.Create(workspace, environmentName: Environments.Production, databasePath: databasePath);
+        var reports = second.Store.GetReports();
+
+        // Readable label, never blank; treated as a sedation-related variant and base bucket.
+        var variant = Assert.Single(reports.ProcedureSummaries, summary => summary.ProcedureCode == "SED");
+        Assert.Equal("Sedation", variant.ProcedureLabel);
+        Assert.Equal("SED", variant.BaseProcedureCode);
+        Assert.True(variant.IsSedationCase);
+
+        var baseSummary = Assert.Single(reports.BaseProcedureSummaries, summary => summary.ProcedureCode == "SED");
+        Assert.Equal("Sedation", baseSummary.ProcedureLabel);
+        Assert.Equal(1, baseSummary.CompletedCycleCount);
+
+        Assert.Equal(1, reports.SedationCaseCount);
+        Assert.Equal(0, reports.NonSedationCaseCount);
+    }
+
+    [Fact]
+    public void Empty_report_snapshot_exposes_empty_additive_fields()
+    {
+        using var workspace = TestWorkspace.Create();
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production);
+
+        var reports = context.Store.GetReports();
+
+        Assert.Equal(0, reports.CompletedRoomCyclesCount);
+        Assert.Equal(0, reports.SedationCaseCount);
+        Assert.Equal(0, reports.NonSedationCaseCount);
+        Assert.Empty(reports.ProcedureSummaries);
+        Assert.Empty(reports.BaseProcedureSummaries);
+    }
+
+    [Fact]
     public void Historical_standalone_sedation_records_remain_readable()
     {
         using var workspace = TestWorkspace.Create();

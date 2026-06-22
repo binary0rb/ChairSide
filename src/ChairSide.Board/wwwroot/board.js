@@ -15,6 +15,10 @@ const app = {
   realtimeLostAt: 0,
   pollInFlight: false,
   reportsInFlight: false,
+  // Hybrid reports filter state. Kept in app (not the DOM) so a SignalR/poll re-render
+  // never resets the user's selected filters. sedation: all | sedation | non-sedation.
+  // grouping: base | variant.
+  reportFilters: { sedation: "all", grouping: "base" },
   roomNumber: getRoomNumber(),
   roomToken: getRoomToken(),
   roomTokenPromptVisible: false,
@@ -76,6 +80,7 @@ async function boot() {
   if (document.body.dataset.view === "reports") {
     await loadReports();
     wireReportsActions();
+    wireReportFilters();
   }
 
   wireDoctorViewMenu();
@@ -643,37 +648,243 @@ function renderReports() {
     return;
   }
 
-  const summary = document.getElementById("reportSummary");
-  const body = document.getElementById("completedCyclesBody");
-  const cycles = app.reports.recentCompletedCycles || [];
+  const r = app.reports;
+  const hasData = (r.completedRoomCyclesCount || 0) > 0;
 
-  summary.innerHTML = [
-    renderMetric("Completed Cycles", app.reports.completedRoomCyclesCount),
-    renderMetric("Exceptions Requiring Review", (app.reports.exceptionCycles || []).length),
-    renderMetric("Avg Prep Time", formatDuration(app.reports.averagePrepSeconds)),
-    renderMetric("Median Prep Time", formatDuration(app.reports.medianPrepSeconds)),
-    renderMetric("Avg Ready-to-Doctor Wait", formatDuration(app.reports.averageReadyToDoctorSeconds)),
-    renderMetric("Median Ready-to-Doctor Wait", formatDuration(app.reports.medianReadyToDoctorSeconds)),
-    renderMetric("Avg Doctor Occupied Wait", formatDuration(app.reports.averageDoctorOccupiedWaitSeconds)),
-    renderMetric("Median Doctor Occupied Wait", formatDuration(app.reports.medianDoctorOccupiedWaitSeconds)),
-    renderMetric("Avg Doctor Available Wait", formatDuration(app.reports.averageDoctorAvailableWaitSeconds)),
-    renderMetric("Median Doctor Available Wait", formatDuration(app.reports.medianDoctorAvailableWaitSeconds)),
-    renderMetric("Avg Total to Doctor", formatDuration(app.reports.averageSeatedToDoctorSeconds)),
-    renderMetric("Median Total to Doctor", formatDuration(app.reports.medianSeatedToDoctorSeconds)),
-    renderMetric("Avg In Room", formatDuration(app.reports.averageDoctorInRoomSeconds)),
-    renderMetric("Median In Room", formatDuration(app.reports.medianDoctorInRoomSeconds)),
-    renderMetric("Avg Turnover", formatDuration(app.reports.averageTurnoverSeconds)),
-    renderMetric("Median Turnover", formatDuration(app.reports.medianTurnoverSeconds)),
-    renderMetric("Aging Events", app.reports.agingEventCount),
-    renderMetric("Stale Events", app.reports.staleEventCount)
+  revealReportDisclosures();
+  renderReportHeadline(r, hasData);
+  syncReportFilterButtons();
+  renderReportFilterBar(hasData);
+  renderGroupedInsights(r, hasData);
+  renderFullMetrics(r, hasData);
+
+  renderCompletedCycles(filterCyclesBySedation(r.recentCompletedCycles || []));
+  renderExceptionCycles(filterCyclesBySedation(r.exceptionCycles || []));
+  renderProcedureSummaries(filterSummariesBySedation(r.procedureSummaries || []));
+}
+
+// Headline band: curated cards when data exists, friendly empty-state when not.
+function renderReportHeadline(r, hasData) {
+  const headline = document.getElementById("reportHeadline");
+  if (!headline) {
+    return;
+  }
+
+  if (!hasData) {
+    headline.classList.add("is-empty");
+    headline.innerHTML = `
+      <article class="report-empty-state">
+        <h2>No completed cycles yet</h2>
+        <p>Operational metrics will appear here as rooms complete their cycle. Exceptions and audit detail remain available below.</p>
+      </article>
+    `;
+    return;
+  }
+
+  headline.classList.remove("is-empty");
+  const exceptions = (r.exceptionCycles || []).length;
+  headline.innerHTML = [
+    renderHeadlineCard("Completed Cases", String(r.completedRoomCyclesCount ?? 0)),
+    renderHeadlineCard("Avg Total to Doctor", formatDuration(r.averageSeatedToDoctorSeconds)),
+    renderHeadlineCard("Avg Doctor Time", formatDuration(r.averageDoctorInRoomSeconds)),
+    renderHeadlineCard("Exceptions to Review", String(exceptions)),
+    renderHeadlineCard("Sedation Cases", `${r.sedationCaseCount ?? 0} / ${r.completedRoomCyclesCount ?? 0}`)
   ].join("");
+}
+
+function renderHeadlineCard(label, value) {
+  return `
+    <article class="metric-card headline-card">
+      <span>${escapeHtml(label)}</span>
+      <strong>${escapeHtml(value)}</strong>
+    </article>
+  `;
+}
+
+function renderReportFilterBar(hasData) {
+  const bar = document.getElementById("reportFilterBar");
+  if (bar) {
+    bar.hidden = !hasData;
+  }
+}
+
+// Reflects app.reportFilters onto the static filter chips so re-renders never desync the
+// pressed state from the stored filter.
+function syncReportFilterButtons() {
+  document.querySelectorAll("#reportFilterBar .report-filter-chip").forEach(chip => {
+    const active = app.reportFilters[chip.dataset.filterGroup] === chip.dataset.filterValue;
+    chip.setAttribute("aria-pressed", String(active));
+    chip.classList.toggle("is-active", active);
+  });
+}
+
+// Chooses the summaries for the grouped-insights section using only backend-provided
+// aggregates - never recomputing or recombining on the client. For a sedation-only or
+// non-sedation-only filter, base and variant groupings coincide (each base has exactly one
+// sedation and one non-sedation variant), so the variant summaries are the correct, accurate
+// answer for both grouping modes. Only the unfiltered "all" view distinguishes base vs variant.
+function getInsightSummaries(r) {
+  const variants = r.procedureSummaries || [];
+  if (app.reportFilters.sedation === "sedation") {
+    return variants.filter(summary => summary.isSedationCase);
+  }
+  if (app.reportFilters.sedation === "non-sedation") {
+    return variants.filter(summary => !summary.isSedationCase);
+  }
+  return app.reportFilters.grouping === "base"
+    ? (r.baseProcedureSummaries || [])
+    : variants;
+}
+
+function insightsHeadingText() {
+  if (app.reportFilters.sedation === "sedation") {
+    return "Sedation cases by procedure";
+  }
+  if (app.reportFilters.sedation === "non-sedation") {
+    return "Non-sedation cases by procedure";
+  }
+  return app.reportFilters.grouping === "base"
+    ? "Procedure insights — base procedure"
+    : "Procedure insights — full variant";
+}
+
+function renderGroupedInsights(r, hasData) {
+  const section = document.getElementById("reportInsights");
+  const grid = document.getElementById("reportInsightsGrid");
+  const heading = document.getElementById("reportInsightsHeading");
+  if (!section || !grid) {
+    return;
+  }
+
+  section.hidden = !hasData;
+  if (!hasData) {
+    grid.innerHTML = "";
+    return;
+  }
+
+  if (heading) {
+    heading.textContent = insightsHeadingText();
+  }
+
+  const summaries = getInsightSummaries(r);
+  grid.innerHTML = summaries.length
+    ? summaries.map(renderInsightCard).join("")
+    : `<p class="report-empty-note">No cases match the selected filter.</p>`;
+}
+
+// One insight card per procedure group. Labels come from the backend-resolved ProcedureLabel
+// (so legacy "SED" reads "Sedation" and composites read "Extraction + Sedation"); the code
+// badge uses formatProcedureCode ("EXT+SED" -> "EXT + SED"). Cards only render when cases
+// exist, so every duration here is a real measured value.
+function renderInsightCard(summary) {
+  const code = formatProcedureCode(summary.procedureCode) || "--";
+  const label = summary.procedureLabel || code || "Unknown";
+  const sedationChip = summary.isSedationCase
+    ? `<span class="sedation-chip">Sedation</span>`
+    : "";
+  return `
+    <article class="insight-card">
+      <div class="insight-card-head">
+        <span class="insight-code">${escapeHtml(code)}</span>
+        ${sedationChip}
+      </div>
+      <h3 class="insight-label">${escapeHtml(label)}</h3>
+      <dl class="insight-metrics">
+        <div><dt>Cases</dt><dd>${escapeHtml(String(summary.completedCycleCount))}</dd></div>
+        <div><dt>Avg Total</dt><dd>${escapeHtml(formatDuration(summary.averageTotalSeconds))}</dd></div>
+        <div><dt>Median Total</dt><dd>${escapeHtml(formatDuration(summary.medianTotalSeconds))}</dd></div>
+        <div><dt>Avg Doctor Time</dt><dd>${escapeHtml(formatDuration(summary.averageDoctorTimeSeconds))}</dd></div>
+        <div><dt>Avg Ready-to-Doctor</dt><dd>${escapeHtml(formatDuration(summary.averageReadyToDoctorSeconds))}</dd></div>
+      </dl>
+    </article>
+  `;
+}
+
+// Full metric set (kept behind the "All metrics" expander). Duration metrics show "—" when
+// there is no completed-cycle data; counts always show their real number (a genuine 0 stays 0).
+function renderFullMetrics(r, hasData) {
+  const summary = document.getElementById("reportSummary");
+  if (!summary) {
+    return;
+  }
+
+  const dur = seconds => (hasData ? formatDuration(seconds) : "—");
+  summary.innerHTML = [
+    renderMetric("Completed Cycles", r.completedRoomCyclesCount),
+    renderMetric("Sedation Cases", r.sedationCaseCount),
+    renderMetric("Non-sedation Cases", r.nonSedationCaseCount),
+    renderMetric("Exceptions Requiring Review", (r.exceptionCycles || []).length),
+    renderMetric("Avg Prep Time", dur(r.averagePrepSeconds)),
+    renderMetric("Median Prep Time", dur(r.medianPrepSeconds)),
+    renderMetric("Avg Ready-to-Doctor Wait", dur(r.averageReadyToDoctorSeconds)),
+    renderMetric("Median Ready-to-Doctor Wait", dur(r.medianReadyToDoctorSeconds)),
+    renderMetric("Avg Doctor Occupied Wait", dur(r.averageDoctorOccupiedWaitSeconds)),
+    renderMetric("Median Doctor Occupied Wait", dur(r.medianDoctorOccupiedWaitSeconds)),
+    renderMetric("Avg Doctor Available Wait", dur(r.averageDoctorAvailableWaitSeconds)),
+    renderMetric("Median Doctor Available Wait", dur(r.medianDoctorAvailableWaitSeconds)),
+    renderMetric("Avg Total to Doctor", dur(r.averageSeatedToDoctorSeconds)),
+    renderMetric("Median Total to Doctor", dur(r.medianSeatedToDoctorSeconds)),
+    renderMetric("Avg In Room", dur(r.averageDoctorInRoomSeconds)),
+    renderMetric("Median In Room", dur(r.medianDoctorInRoomSeconds)),
+    renderMetric("Avg Turnover", dur(r.averageTurnoverSeconds)),
+    renderMetric("Median Turnover", dur(r.medianTurnoverSeconds)),
+    renderMetric("Aging Events", r.agingEventCount),
+    renderMetric("Stale Events", r.staleEventCount)
+  ].join("");
+}
+
+function renderCompletedCycles(cycles) {
+  const body = document.getElementById("completedCyclesBody");
+  if (!body) {
+    return;
+  }
 
   body.innerHTML = cycles.length
     ? cycles.map(renderCycleRow).join("")
-    : `<tr><td colspan="20">No completed room cycles yet.</td></tr>`;
+    : `<tr><td colspan="20">${escapeHtml(noMatchMessage("No completed room cycles yet."))}</td></tr>`;
+}
 
-  renderExceptionCycles(app.reports.exceptionCycles || []);
-  renderProcedureSummaries(app.reports.procedureSummaries || []);
+function revealReportDisclosures() {
+  const metrics = document.getElementById("reportMetrics");
+  const detail = document.getElementById("reportDetail");
+  if (metrics) {
+    metrics.hidden = false;
+  }
+  if (detail) {
+    detail.hidden = false;
+  }
+}
+
+// True for composite "+SED" codes and bare legacy standalone "SED".
+function isSedationProcedureCodeClient(code) {
+  return hasSedationModifier(code) || String(code || "").toUpperCase() === "SED";
+}
+
+function filterCyclesBySedation(cycles) {
+  if (app.reportFilters.sedation === "sedation") {
+    return cycles.filter(cycle => isSedationProcedureCodeClient(cycle.procedureCode));
+  }
+  if (app.reportFilters.sedation === "non-sedation") {
+    return cycles.filter(cycle => !isSedationProcedureCodeClient(cycle.procedureCode));
+  }
+  return cycles;
+}
+
+function filterSummariesBySedation(summaries) {
+  if (app.reportFilters.sedation === "sedation") {
+    return summaries.filter(summary => summary.isSedationCase);
+  }
+  if (app.reportFilters.sedation === "non-sedation") {
+    return summaries.filter(summary => !summary.isSedationCase);
+  }
+  return summaries;
+}
+
+// Empty-row copy that reflects whether an active sedation filter (not "all") is hiding rows.
+function noMatchMessage(defaultMessage) {
+  return app.reportFilters.sedation === "all"
+    ? defaultMessage
+    : "No rows match the selected sedation filter.";
 }
 
 function renderProcedureSummaries(summaries) {
@@ -684,7 +895,7 @@ function renderProcedureSummaries(summaries) {
 
   body.innerHTML = summaries.length
     ? summaries.map(renderProcedureSummaryRow).join("")
-    : `<tr><td colspan="8">No procedure baselines yet.</td></tr>`;
+    : `<tr><td colspan="8">${escapeHtml(noMatchMessage("No procedure baselines yet."))}</td></tr>`;
 }
 
 function renderProcedureSummaryRow(summary) {
@@ -710,7 +921,7 @@ function renderExceptionCycles(exceptions) {
 
   body.innerHTML = exceptions.length
     ? exceptions.map(renderExceptionRow).join("")
-    : `<tr><td colspan="12">No exceptions requiring review.</td></tr>`;
+    : `<tr><td colspan="12">${escapeHtml(noMatchMessage("No exceptions requiring review."))}</td></tr>`;
 }
 
 function renderExceptionRow(cycle) {
@@ -748,6 +959,34 @@ function wireReportsActions() {
   // One-time delegated listener on the document. The completed cycles tbody is
   // re-rendered on every poll, so we cannot attach to individual buttons.
   document.addEventListener("click", handleReportsActionClick);
+}
+
+// Wires the static filter chips. Filter state lives in app.reportFilters (not the DOM), so a
+// SignalR/poll-driven re-render preserves the user's selection; we just re-render the views.
+function wireReportFilters() {
+  const bar = document.getElementById("reportFilterBar");
+  if (!bar) {
+    return;
+  }
+
+  bar.addEventListener("click", event => {
+    const chip = event.target.closest(".report-filter-chip");
+    if (!chip) {
+      return;
+    }
+
+    const group = chip.dataset.filterGroup;
+    const value = chip.dataset.filterValue;
+    if (!group || !value || app.reportFilters[group] === value) {
+      return;
+    }
+
+    app.reportFilters[group] = value;
+    syncReportFilterButtons();
+    if (app.reports) {
+      renderReports();
+    }
+  });
 }
 
 async function handleReportsActionClick(event) {
@@ -838,9 +1077,8 @@ async function handleConfirmExclusionClick(button) {
 }
 
 function renderReportsAccessPrompt(statusCode) {
-  const summary = document.getElementById("reportSummary");
-  const body = document.getElementById("completedCyclesBody");
-  if (!summary || !body) {
+  const headline = document.getElementById("reportHeadline");
+  if (!headline) {
     return;
   }
 
@@ -848,7 +1086,10 @@ function renderReportsAccessPrompt(statusCode) {
     ? "The saved reports token was rejected. Enter the current internal reports token."
     : "Reports access is required for this internal page.";
 
-  summary.innerHTML = `
+  // The access prompt owns the always-visible headline band; the filter bar, insights, and
+  // collapsible metric/detail areas are hidden until a valid token loads report data.
+  headline.classList.remove("is-empty");
+  headline.innerHTML = `
     <article class="report-access-panel">
       <h2>Reports Access</h2>
       <p>${escapeHtml(message)}</p>
@@ -860,7 +1101,12 @@ function renderReportsAccessPrompt(statusCode) {
       <button type="button" class="secondary-button utility-button" id="clearReportAccessToken">Clear Saved Token</button>
     </article>
   `;
-  body.innerHTML = `<tr><td colspan="14">Reports are protected. Enter an internal reports token to continue.</td></tr>`;
+  ["reportFilterBar", "reportInsights", "reportMetrics", "reportDetail"].forEach(id => {
+    const element = document.getElementById(id);
+    if (element) {
+      element.hidden = true;
+    }
+  });
   wireReportsAccessPrompt();
 }
 

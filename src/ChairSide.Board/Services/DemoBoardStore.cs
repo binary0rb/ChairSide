@@ -521,7 +521,10 @@ public sealed class DemoBoardStore
                 BuildDoctorSummaries(normalCycles),
                 normalCompletedCycles.Take(25).ToList(),
                 exceptionCycles,
-                BuildProcedureSummaries(normalCompletedCycles));
+                BuildProcedureSummaries(normalCompletedCycles),
+                normalCompletedCycles.Count(cycle => IsSedationProcedureCode(cycle.ProcedureCode)),
+                normalCompletedCycles.Count(cycle => !IsSedationProcedureCode(cycle.ProcedureCode)),
+                BuildBaseProcedureSummaries(normalCompletedCycles));
         }
     }
 
@@ -928,6 +931,24 @@ public sealed class DemoBoardStore
     private static string ComposeProcedureCode(string baseCode, bool sedation) =>
         sedation ? $"{baseCode}{SedationModifierSuffix}" : baseCode;
 
+    // The historical standalone sedation code. New cases never store this (sedation is a
+    // modifier), but legacy records may, so it is treated as sedation-related for counts.
+    private const string LegacySedationCode = "SED";
+
+    // True for composite "+SED" variants and for bare legacy standalone "SED".
+    private static bool IsSedationProcedureCode(string? procedureCode) =>
+        HasSedationModifier(procedureCode) ||
+        string.Equals(procedureCode, LegacySedationCode, StringComparison.OrdinalIgnoreCase);
+
+    // The base procedure a stored code rolls up under: "EXT+SED" -> "EXT". A non-composite
+    // code (including bare legacy "SED") is its own base. Never throws; blank stays blank.
+    private static string ResolveBaseProcedureCode(string? procedureCode) =>
+        string.IsNullOrWhiteSpace(procedureCode)
+            ? ""
+            : HasSedationModifier(procedureCode)
+                ? StripSedationModifier(procedureCode)
+                : procedureCode;
+
     // Resolves a (possibly sedation-modified) stored code to a display category. For a
     // sedation case it synthesizes a combined category ("Extraction + Sedation") from the
     // base procedure while preserving the base icon and eligibility. Falls back to a plain
@@ -1241,6 +1262,37 @@ public sealed class DemoBoardStore
             .Select(group => new ProcedureCycleSummary(
                 group.Key,
                 ResolveProcedureLabel(group.Key),
+                ResolveBaseProcedureCode(group.Key),
+                IsSedationProcedureCode(group.Key),
+                group.Count(),
+                AverageSeconds(group.Select(cycle => cycle.TotalRoomCycleSeconds)),
+                MedianSeconds(group.Select(cycle => cycle.TotalRoomCycleSeconds)),
+                AverageSeconds(group.Select(cycle => cycle.ReadyToDoctorSeconds)),
+                MedianSeconds(group.Select(cycle => cycle.ReadyToDoctorSeconds)),
+                AverageSeconds(group.Select(cycle => cycle.DoctorInRoomSeconds)),
+                MedianSeconds(group.Select(cycle => cycle.DoctorInRoomSeconds)),
+                AverageSeconds(group.Select(cycle => cycle.DoctorOccupiedWaitSeconds)),
+                AverageSeconds(group.Select(cycle => cycle.DoctorAvailableWaitSeconds)),
+                MedianSeconds(group.Select(cycle => cycle.DoctorOccupiedWaitSeconds)),
+                MedianSeconds(group.Select(cycle => cycle.DoctorAvailableWaitSeconds))))
+            .OrderByDescending(summary => summary.CompletedCycleCount)
+            .ThenBy(summary => summary.ProcedureLabel, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+    // Base-procedure roll-up: groups the same normal completed cycles by base procedure code
+    // ("EXT" and "EXT+SED" both roll up under "EXT") and computes each metric directly from the
+    // raw cycles - it does NOT recombine the per-variant BuildProcedureSummaries values, so
+    // medians and averages stay accurate. IsSedationCase is false on these roll-up rows because a
+    // base row is not a single sedation variant; per-variant sedation detail stays in
+    // ProcedureSummaries and the report-level sedation counts.
+    private IReadOnlyList<ProcedureCycleSummary> BuildBaseProcedureSummaries(IReadOnlyList<CompletedRoomCycle> cycles) =>
+        cycles
+            .GroupBy(cycle => ResolveBaseProcedureCode(cycle.ProcedureCode), StringComparer.OrdinalIgnoreCase)
+            .Select(group => new ProcedureCycleSummary(
+                group.Key,
+                ResolveProcedureLabel(group.Key),
+                group.Key,
+                false,
                 group.Count(),
                 AverageSeconds(group.Select(cycle => cycle.TotalRoomCycleSeconds)),
                 MedianSeconds(group.Select(cycle => cycle.TotalRoomCycleSeconds)),
@@ -1426,7 +1478,15 @@ public sealed record ReportsSnapshot(
     IReadOnlyList<DoctorCycleSummary> DoctorSummaries,
     IReadOnlyList<CompletedRoomCycle> RecentCompletedCycles,
     IReadOnlyList<CompletedRoomCycle> ExceptionCycles,
-    IReadOnlyList<ProcedureCycleSummary> ProcedureSummaries);
+    IReadOnlyList<ProcedureCycleSummary> ProcedureSummaries,
+    // Additive (appended) reporting fields. Counts and base-procedure summaries are
+    // computed server-side over the same normal completed-cycle population as
+    // ProcedureSummaries so the frontend never has to approximate from RecentCompletedCycles
+    // or recombine per-variant averages/medians. SedationCaseCount + NonSedationCaseCount
+    // equals CompletedRoomCyclesCount.
+    int SedationCaseCount,
+    int NonSedationCaseCount,
+    IReadOnlyList<ProcedureCycleSummary> BaseProcedureSummaries);
 
 public sealed class CompletedRoomCycle
 {
@@ -1498,6 +1558,12 @@ public sealed record DoctorCycleSummary(
 public sealed record ProcedureCycleSummary(
     string ProcedureCode,
     string ProcedureLabel,
+    // BaseProcedureCode strips any sedation modifier ("EXT+SED" -> "EXT"); a base row's base
+    // is itself. IsSedationCase marks composite "+SED" variants and bare legacy "SED" as
+    // sedation-related. For base-procedure roll-ups (BaseProcedureSummaries) IsSedationCase is
+    // false by convention because a roll-up is not a single sedation variant.
+    string BaseProcedureCode,
+    bool IsSedationCase,
     int CompletedCycleCount,
     double AverageTotalSeconds,
     double MedianTotalSeconds,

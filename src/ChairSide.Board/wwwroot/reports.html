@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>ChairSide Board - Reports</title>
-  <link rel="stylesheet" href="/styles.css?v=20260619-primary-navigation">
+  <link rel="stylesheet" href="/styles.css?v=20260622-hybrid-reports">
 </head>
 <body data-view="reports">
   <header class="app-header compact">
@@ -32,86 +32,116 @@
   </header>
 
   <main class="reports-shell">
-    <section class="report-summary" id="reportSummary" aria-label="Room flow summary"></section>
-    <section class="report-table-section">
-      <h2>Procedure Baselines</h2>
-      <div class="report-table-wrap">
-        <table class="report-table">
-          <thead>
-            <tr>
-              <th>Procedure</th>
-              <th>Count</th>
-              <th>Avg Total</th>
-              <th>Median Total</th>
-              <th>Avg Ready-to-Doctor</th>
-              <th>Avg Doctor Time</th>
-              <th>Avg Available Wait</th>
-              <th>Avg Occupied Wait</th>
-            </tr>
-          </thead>
-          <tbody id="procedureSummariesBody"></tbody>
-        </table>
+    <!-- Headline band: curated cards when data exists, friendly empty-state when not,
+         or the reports access prompt when the token is missing/rejected. -->
+    <section class="report-headline" id="reportHeadline" aria-label="Report summary"></section>
+
+    <section class="report-filter-bar" id="reportFilterBar" aria-label="Report filters" hidden>
+      <div class="report-filter-group" role="group" aria-label="Sedation filter">
+        <span class="report-filter-label">Cases</span>
+        <button type="button" class="report-filter-chip" data-filter-group="sedation" data-filter-value="all" aria-pressed="true">All</button>
+        <button type="button" class="report-filter-chip" data-filter-group="sedation" data-filter-value="sedation" aria-pressed="false">Sedation only</button>
+        <button type="button" class="report-filter-chip" data-filter-group="sedation" data-filter-value="non-sedation" aria-pressed="false">Non-sedation</button>
+      </div>
+      <div class="report-filter-group" role="group" aria-label="Grouping mode">
+        <span class="report-filter-label">Group by</span>
+        <button type="button" class="report-filter-chip" data-filter-group="grouping" data-filter-value="base" aria-pressed="true">Base procedure</button>
+        <button type="button" class="report-filter-chip" data-filter-group="grouping" data-filter-value="variant" aria-pressed="false">Full variant</button>
       </div>
     </section>
-    <section class="report-table-section">
-      <h2>Exceptions Requiring Review</h2>
-      <div class="report-table-wrap">
-        <table class="report-table">
-          <thead>
-            <tr>
-              <th>Started</th>
-              <th>Room</th>
-              <th>Doctor</th>
-              <th>Procedure</th>
-              <th>Doctor Arrived</th>
-              <th>Doctor Complete</th>
-              <th>Available</th>
-              <th>Last State</th>
-              <th>Reason</th>
-              <th>Suggested Action</th>
-              <th>Review Status</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody id="exceptionCyclesBody"></tbody>
-        </table>
-      </div>
+
+    <section class="report-insights" id="reportInsights" aria-label="Procedure insights" hidden>
+      <h2 id="reportInsightsHeading">Procedure insights</h2>
+      <div class="insight-grid" id="reportInsightsGrid"></div>
     </section>
-    <section class="report-table-section">
-      <h2>Recent Completed Cycles</h2>
-      <div class="report-table-wrap">
-        <table class="report-table">
-          <thead>
-            <tr>
-              <th>Room</th>
-              <th>Doctor</th>
-              <th>Procedure</th>
-              <th>Seated</th>
-              <th>Ready</th>
-              <th>Doctor Arrived</th>
-              <th>Doctor Complete</th>
-              <th>Available</th>
-              <th>Prep Time</th>
-              <th>Ready-to-Doctor Wait</th>
-              <th>Doctor Occupied Wait</th>
-              <th>Doctor Available Wait</th>
-              <th>Total to Doctor</th>
-              <th>In Room</th>
-              <th>Turnover</th>
-              <th>Total</th>
-              <th>Wait State</th>
-              <th>Aging</th>
-              <th>Stale</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody id="completedCyclesBody"></tbody>
-        </table>
-      </div>
-    </section>
+
+    <details class="report-disclosure report-metrics" id="reportMetrics">
+      <summary>All metrics</summary>
+      <section class="report-summary" id="reportSummary" aria-label="Room flow summary"></section>
+    </details>
+
+    <details class="report-disclosure report-detail" id="reportDetail">
+      <summary>Detail &amp; audit</summary>
+      <section class="report-table-section">
+        <h2>Procedure Baselines</h2>
+        <div class="report-table-wrap">
+          <table class="report-table">
+            <thead>
+              <tr>
+                <th>Procedure</th>
+                <th>Count</th>
+                <th>Avg Total</th>
+                <th>Median Total</th>
+                <th>Avg Ready-to-Doctor</th>
+                <th>Avg Doctor Time</th>
+                <th>Avg Available Wait</th>
+                <th>Avg Occupied Wait</th>
+              </tr>
+            </thead>
+            <tbody id="procedureSummariesBody"></tbody>
+          </table>
+        </div>
+      </section>
+      <section class="report-table-section">
+        <h2>Exceptions Requiring Review</h2>
+        <div class="report-table-wrap">
+          <table class="report-table">
+            <thead>
+              <tr>
+                <th>Started</th>
+                <th>Room</th>
+                <th>Doctor</th>
+                <th>Procedure</th>
+                <th>Doctor Arrived</th>
+                <th>Doctor Complete</th>
+                <th>Available</th>
+                <th>Last State</th>
+                <th>Reason</th>
+                <th>Suggested Action</th>
+                <th>Review Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="exceptionCyclesBody"></tbody>
+          </table>
+        </div>
+      </section>
+      <section class="report-table-section">
+        <h2>Recent Completed Cycles</h2>
+        <div class="report-table-wrap">
+          <table class="report-table">
+            <thead>
+              <tr>
+                <th>Room</th>
+                <th>Doctor</th>
+                <th>Procedure</th>
+                <th>Seated</th>
+                <th>Ready</th>
+                <th>Doctor Arrived</th>
+                <th>Doctor Complete</th>
+                <th>Available</th>
+                <th>Prep Time</th>
+                <th>Ready-to-Doctor Wait</th>
+                <th>Doctor Occupied Wait</th>
+                <th>Doctor Available Wait</th>
+                <th>Total to Doctor</th>
+                <th>In Room</th>
+                <th>Turnover</th>
+                <th>Total</th>
+                <th>Wait State</th>
+                <th>Aging</th>
+                <th>Stale</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="completedCyclesBody"></tbody>
+          </table>
+        </div>
+      </section>
+    </details>
   </main>
 
   <script src="/signalr-lite.js"></script>
-  <script src="/board.js?v=20260619-primary-navigation"></script>
+  <script src="/board.js?v=20260622-hybrid-reports"></script>
 </body>
 </html>
