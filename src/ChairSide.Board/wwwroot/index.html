@@ -34,7 +34,6 @@
   <main class="master-shell">
     <section class="legend" aria-label="Doctor color legend">
       <div class="legend-group" id="doctorLegend"></div>
-      <div class="legend-group procedure-key" id="procedureLegend"></div>
       <div class="state-key">
         <span><i class="state-dot empty"></i> Available</span>
         <span><i class="state-dot seated"></i> In Prep: patient preparing, not yet ready</span>
@@ -47,6 +46,11 @@
     </section>
 
     <section class="room-grid" id="roomGrid" aria-label="Room card grid"></section>
+
+    <section class="legend" aria-label="Procedure key">
+      <span class="brand-kicker">Procedure Key</span>
+      <div class="legend-group procedure-key" id="procedureLegend"></div>
+    </section>
   </main>
 
   <script src="/signalr-lite.js"></script>
