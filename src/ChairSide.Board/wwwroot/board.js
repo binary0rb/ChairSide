@@ -1297,7 +1297,7 @@ function renderRoomTile(room, large = false) {
         <strong>Room ${roomId}</strong>
         <span>${badge}</span>
       </div>
-      <div class="procedure-lockup">
+      <div class="procedure-lockup${procedure ? " procedure-lockup--chip" : ""}">
         ${procedure ? renderProcedureIcon(procedure) : renderEmptyIcon()}
         <span>${procedure ? escapeHtml(formatProcedureCode(procedure.code)) : "OPEN"}</span>
       </div>
