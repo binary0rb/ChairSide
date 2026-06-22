@@ -1231,6 +1231,229 @@ button:not(:disabled):active {
   font-weight: 650;
 }
 
+/* ---------------------------------------------------------------------------
+   Hybrid reporting module (Phase 2). Scoped to the reports view where practical
+   so master / doctor / room layouts are untouched. Reuses the existing card and
+   table visual language and the shared color variables.
+   --------------------------------------------------------------------------- */
+body[data-view="reports"] .report-headline {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 12px;
+}
+
+body[data-view="reports"] .headline-card {
+  background: var(--panel);
+}
+
+body[data-view="reports"] .headline-card strong {
+  color: var(--ink);
+}
+
+body[data-view="reports"] .report-empty-state {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 8px;
+  padding: 28px 24px;
+  border: 1px dashed var(--line);
+  border-radius: 12px;
+  background: var(--panel);
+  text-align: center;
+}
+
+body[data-view="reports"] .report-empty-state h2 {
+  margin: 0;
+  font-size: 22px;
+  letter-spacing: 0;
+}
+
+body[data-view="reports"] .report-empty-state p {
+  margin: 0;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+body[data-view="reports"] .report-filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel);
+}
+
+body[data-view="reports"] .report-filter-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+body[data-view="reports"] .report-filter-label {
+  margin-right: 2px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+body[data-view="reports"] .report-filter-chip {
+  min-height: 40px;
+  padding: 0 14px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--bg);
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+body[data-view="reports"] .report-filter-chip:hover {
+  background: color-mix(in srgb, var(--ink) 8%, transparent);
+}
+
+body[data-view="reports"] .report-filter-chip:focus-visible {
+  outline: 3px solid #2563eb;
+  outline-offset: 2px;
+}
+
+body[data-view="reports"] .report-filter-chip.is-active {
+  border-color: var(--ink);
+  background: var(--ink);
+  color: #ffffff;
+}
+
+body[data-view="reports"] .report-insights {
+  display: grid;
+  gap: 12px;
+}
+
+body[data-view="reports"] .report-insights h2 {
+  margin: 0;
+  font-size: 22px;
+  letter-spacing: 0;
+}
+
+body[data-view="reports"] .insight-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 12px;
+}
+
+body[data-view="reports"] .insight-card {
+  display: grid;
+  gap: 10px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel);
+}
+
+body[data-view="reports"] .insight-card-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+body[data-view="reports"] .insight-code {
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--ink) 10%, transparent);
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 900;
+  letter-spacing: 0.02em;
+}
+
+body[data-view="reports"] .sedation-chip {
+  padding: 3px 9px;
+  border: 1px solid #2563eb;
+  border-radius: 999px;
+  background: #2563eb;
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+body[data-view="reports"] .insight-label {
+  margin: 0;
+  font-size: 18px;
+  letter-spacing: 0;
+}
+
+body[data-view="reports"] .insight-metrics {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px 14px;
+  margin: 0;
+}
+
+body[data-view="reports"] .insight-metrics > div {
+  display: grid;
+  gap: 2px;
+}
+
+body[data-view="reports"] .insight-metrics dt {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+body[data-view="reports"] .insight-metrics dd {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+body[data-view="reports"] .report-empty-note {
+  margin: 0;
+  padding: 16px;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+body[data-view="reports"] .report-disclosure {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel);
+}
+
+body[data-view="reports"] .report-disclosure > summary {
+  padding: 14px 16px;
+  font-size: 16px;
+  font-weight: 900;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+  list-style-position: inside;
+}
+
+body[data-view="reports"] .report-disclosure > summary:focus-visible {
+  outline: 3px solid #2563eb;
+  outline-offset: 2px;
+}
+
+body[data-view="reports"] .report-disclosure[open] > summary {
+  border-bottom: 1px solid var(--line);
+}
+
+body[data-view="reports"] .report-disclosure .report-summary,
+body[data-view="reports"] .report-disclosure .report-table-section {
+  padding: 16px;
+}
+
+body[data-view="reports"] .report-disclosure .report-table-section {
+  padding-bottom: 16px;
+}
+
 .procedure-badge {
   display: inline-flex;
   align-items: center;
