@@ -796,6 +796,42 @@ label,
 }
 
 /* ------------------------------------------------------------------
+   Procedure accent (Option A, frontend-only). Driven by the inline
+   --procedure-accent custom property. Accent is a small icon/bar/chip
+   cue only: it never recolors a whole card and never touches the
+   doctor rail/tint or the lifecycle/state badge/border/timer.
+   ------------------------------------------------------------------ */
+
+/* Selectable procedure tiles: a left accent bar plus a tinted icon. The
+   bar persists through the selected state (which keeps its own blue
+   theme) so the procedure cue is never lost; :disabled muting from the
+   shared .selection-tile rules dims the accent for locked/read-only. */
+.procedure-tile::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 5px;
+  border-radius: 10px 0 0 10px;
+  background: var(--procedure-accent, transparent);
+}
+
+.procedure-tile svg {
+  color: var(--procedure-accent, currentColor);
+}
+
+/* Room status / master / doctor procedure lockups: tint just the icon. */
+.procedure-lockup .procedure-icon {
+  color: var(--procedure-accent, currentColor);
+}
+
+/* Reports detail rows: tint the procedure badge icon. */
+.procedure-badge .procedure-icon {
+  color: var(--procedure-accent, currentColor);
+}
+
+/* ------------------------------------------------------------------
    Compact vertical tiles for the 5-column procedure grid.
    Scoped to .procedure-selection-grid so doctor tiles and any other
    .selection-tile usage are unaffected. Master board has no
@@ -1349,6 +1385,9 @@ body[data-view="reports"] .insight-card {
   gap: 10px;
   padding: 16px;
   border: 1px solid var(--line);
+  /* Restrained procedure cue: a thicker accent edge, falling back to the
+     standard line color for unknown/blank codes. */
+  border-left: 4px solid var(--procedure-accent, var(--line));
   border-radius: 12px;
   background: var(--panel);
 }
@@ -1362,8 +1401,8 @@ body[data-view="reports"] .insight-card-head {
 body[data-view="reports"] .insight-code {
   padding: 4px 10px;
   border-radius: 999px;
-  background: color-mix(in srgb, var(--ink) 10%, transparent);
-  color: var(--ink);
+  background: color-mix(in srgb, var(--procedure-accent, var(--ink)) 14%, transparent);
+  color: var(--procedure-accent, var(--ink));
   font-size: 14px;
   font-weight: 900;
   letter-spacing: 0.02em;

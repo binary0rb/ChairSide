@@ -783,7 +783,7 @@ function renderInsightCard(summary) {
     ? `<span class="sedation-chip">Sedation</span>`
     : "";
   return `
-    <article class="insight-card">
+    <article class="insight-card" style="${procedureAccentStyle(summary.procedureCode)}">
       <div class="insight-card-head">
         <span class="insight-code">${escapeHtml(code)}</span>
         ${sedationChip}
@@ -1287,8 +1287,12 @@ function renderRoomTile(room, large = false) {
   const fullDoctorName = room.doctor ? room.doctor.name : "Unassigned";
   const doctorDisplayName = large ? fullDoctorName : (room.doctor?.shortName || cardDoctorName(fullDoctorName));
 
+  const accent = procedure ? resolveProcedureAccent(room.procedureCode) : "";
+  const tileStyle = `--doctor-color: ${escapeAttribute(doctorColor)}`
+    + (accent ? `; --procedure-accent: ${accent}` : "");
+
   return `
-    <article class="room-tile ${state} ${large ? "large" : ""}" style="--doctor-color: ${escapeAttribute(doctorColor)}">
+    <article class="room-tile ${state} ${large ? "large" : ""}" style="${tileStyle}">
       <div class="room-topline">
         <strong>Room ${roomId}</strong>
         <span>${badge}</span>
@@ -1488,7 +1492,7 @@ function renderProcedureBadge(procedureCode) {
   }
 
   return `
-    <span class="procedure-badge">
+    <span class="procedure-badge" style="${procedureAccentStyle(procedureCode)}">
       ${renderProcedureIcon(procedure)}
       <span>
         <strong>${escapeHtml(procedure.code)}</strong>
@@ -1514,7 +1518,10 @@ const procedureIconsByCode = {
   INTCK: "links",
   BXPOST: "eye",
   IMPRM: "jackhammer",
-  PCOC: "phone"
+  PCOC: "phone",
+  UNCOV: "uncover",
+  EXBOND: "bond",
+  AO4: "archfour"
 };
 
 // Legacy roster icon names map to the nearest icon in the current set so a
@@ -1548,7 +1555,13 @@ const procedureIconSvgs = {
   links: `<svg ${tablerIconAttrs}><path d="M9 15l6 -6"/><path d="M11 6l.463 -.536a5 5 0 0 1 7.071 7.072l-.534 .464"/><path d="M13 18l-.397 .534a5.068 5.068 0 0 1 -7.127 0a4.972 4.972 0 0 1 0 -7.071l.524 -.463"/></svg>`,
   eye: `<svg ${tablerIconAttrs}><path d="M10 12a2 2 0 1 0 4 0a2 2 0 0 0 -4 0"/><path d="M21 12c-2.4 4 -5.4 6 -9 6c-3.6 0 -6.6 -2 -9 -6c2.4 -4 5.4 -6 9 -6c3.6 0 6.6 2 9 6"/></svg>`,
   jackhammer: `<svg ${tablerIconAttrs}><path d="M6 4.5h12"/><path d="M8.5 4.5V7M15.5 4.5V7"/><path d="M9.5 7h5v6h-5z"/><path d="M12 13v4.5"/><path d="M10.2 17.5h3.6L12 21z"/></svg>`,
-  phone: `<svg ${tablerIconAttrs}><path d="M5 4h4l2 5l-2.5 1.5a11 11 0 0 0 5 5l1.5 -2.5l5 2v4a2 2 0 0 1 -2 2a16 16 0 0 1 -15 -15a2 2 0 0 1 2 -2"/></svg>`
+  phone: `<svg ${tablerIconAttrs}><path d="M5 4h4l2 5l-2.5 1.5a11 11 0 0 0 5 5l1.5 -2.5l5 2v4a2 2 0 0 1 -2 2a16 16 0 0 1 -15 -15a2 2 0 0 1 2 -2"/></svg>`,
+  // Uncover: a surface with a flap lifting open and an up arrow (reveal concept).
+  uncover: `<svg ${tablerIconAttrs}><path d="M4 20h16"/><path d="M5 16l7 -2.5l7 2.5"/><path d="M12 3v6"/><path d="M9 6l3 -3l3 3"/></svg>`,
+  // Bond: an orthodontic bracket (slotted square) joined to a short chain of links.
+  bond: `<svg ${tablerIconAttrs}><rect x="3" y="9" width="6" height="6" rx="1"/><path d="M3 12h6"/><path d="M9 12h2"/><path d="M13 12m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0"/><path d="M17 12m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0"/></svg>`,
+  // All on Four: a dental arch carried on four implant posts.
+  archfour: `<svg ${tablerIconAttrs}><path d="M4 11a8 7 0 0 1 16 0"/><path d="M7 12v5"/><path d="M11 12v6"/><path d="M13 12v6"/><path d="M17 12v5"/></svg>`
 };
 
 function renderProcedureIcon(procedure) {
@@ -1609,6 +1622,62 @@ function formatProcedureCode(code) {
   return String(code || "").replace(/\+/g, " + ");
 }
 
+// Procedure accent colors are a frontend-only, code-keyed presentation concern (Option A):
+// they never live in the roster config or DTO. The accent is a small chip/icon cue only and
+// must not compete with doctor identity (rail/tint) or lifecycle/state colors (badge/border/timer).
+const procedureBaseColorByCode = {
+  CON: "#e11d48",
+  POE: "#e11d48",
+  PCOC: "#e11d48",
+  EXT: "#ca8a04",
+  BX: "#ca8a04",
+  POST: "#2563eb",
+  IMPRES: "#2563eb",
+  AO4: "#2563eb",
+  IMP: "#6d28d9",
+  INTCK: "#6d28d9",
+  IMPRM: "#6d28d9",
+  UNCOV: "#6d28d9",
+  BXPOST: "#db2777",
+  EXBOND: "#db2777",
+  MISC: "#b45309",
+  // Legacy standalone sedation renders green and stays readable.
+  SED: "#15803d"
+};
+
+// Sedation only overrides the accent for these bases; every other eligible base keeps its
+// base color when sedated (e.g. IMP+SED stays purple, AO4+SED stays blue).
+const procedureSedationOverrideByBase = {
+  EXT: "#15803d",
+  BX: "#15803d",
+  MISC: "#8a4b1f"
+};
+
+// Resolves the accent hex for any stored code: base ("EXT"), composite ("EXT+SED"), legacy
+// standalone ("SED"), or unknown/blank (returns "" so callers omit the accent safely).
+function resolveProcedureAccent(code) {
+  const raw = String(code || "").toUpperCase();
+  if (!raw) {
+    return "";
+  }
+  if (raw === "SED") {
+    return procedureBaseColorByCode.SED;
+  }
+
+  const sedation = hasSedationModifier(raw);
+  const base = sedation ? stripSedationModifier(raw).toUpperCase() : raw;
+  if (sedation && procedureSedationOverrideByBase[base]) {
+    return procedureSedationOverrideByBase[base];
+  }
+  return procedureBaseColorByCode[base] || "";
+}
+
+// Builds an inline custom-property declaration for the accent, or "" when there is no accent.
+function procedureAccentStyle(code) {
+  const accent = resolveProcedureAccent(code);
+  return accent ? `--procedure-accent: ${accent}` : "";
+}
+
 function renderSelectionTiles(room) {
   renderDoctorTiles(room);
   renderProcedureTiles(room);
@@ -1655,10 +1724,11 @@ function renderProcedureTiles(room) {
   // were misconfigured to mark it active.
   const procedures = app.snapshot.procedures.filter(procedure => !isSedationCode(procedure.code));
   const signature = `procedure|${isEnabled}|${app.selectedProcedureId || ""}|`
-    + procedures.map(procedure => `${procedure.code}:${procedure.label}:${procedure.icon}`).join(";");
+    + procedures.map(procedure => `${procedure.code}:${procedure.label}:${procedure.icon}:${resolveProcedureAccent(procedure.code)}`).join(";");
   setInnerHtmlIfChanged(target, procedures.map(procedure => `
     <button
       class="selection-tile procedure-tile ${procedure.code === app.selectedProcedureId ? "selected" : ""}"
+      style="${procedureAccentStyle(procedure.code)}"
       type="button"
       role="radio"
       aria-checked="${procedure.code === app.selectedProcedureId}"

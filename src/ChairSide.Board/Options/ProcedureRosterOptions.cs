@@ -122,6 +122,33 @@ public sealed class ProcedureRosterOptions
             Label = "Phone -> Office Consult",
             Icon = "phone",
             Active = true
+        },
+        new()
+        {
+            Id = "uncover",
+            Code = "UNCOV",
+            Label = "Uncover",
+            Icon = "uncover",
+            Active = true,
+            SedationEligible = true
+        },
+        new()
+        {
+            Id = "expose-and-bond",
+            Code = "EXBOND",
+            Label = "Expose and Bond",
+            Icon = "bond",
+            Active = true,
+            SedationEligible = true
+        },
+        new()
+        {
+            Id = "all-on-four",
+            Code = "AO4",
+            Label = "All on Four",
+            Icon = "archfour",
+            Active = true,
+            SedationEligible = true
         }
     ];
 }
