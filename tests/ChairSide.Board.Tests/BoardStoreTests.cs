@@ -373,16 +373,17 @@ public sealed class BoardStoreTests
         // Sedation is no longer an active, standalone selectable procedure; it is applied
         // as a modifier on eligible primary procedures, so "SED" is absent from the roster.
         Assert.Equal(
-            ["CON", "EXT", "POST", "IMP", "BX", "MISC", "POE", "IMPRES", "INTCK", "BXPOST", "IMPRM", "PCOC"],
+            ["CON", "EXT", "POST", "IMP", "BX", "MISC", "POE", "IMPRES", "INTCK", "BXPOST", "IMPRM", "PCOC", "UNCOV", "EXBOND", "AO4"],
             snapshot.Procedures.Select(procedure => procedure.Code));
         Assert.Equal(
             ["Consult", "Extraction", "Post-op", "Implant", "Biopsy",
              "Misc", "Periodic Exam", "Impressions", "Integration Check",
-             "Biopsy Post-op", "Implant Removal", "Phone -> Office Consult"],
+             "Biopsy Post-op", "Implant Removal", "Phone -> Office Consult",
+             "Uncover", "Expose and Bond", "All on Four"],
             snapshot.Procedures.Select(procedure => procedure.Label));
         // Only the approved sedation-eligible procedures expose the sedation modifier.
         Assert.Equal(
-            ["EXT", "IMP", "BX", "MISC", "IMPRM"],
+            ["EXT", "IMP", "BX", "MISC", "IMPRM", "UNCOV", "EXBOND", "AO4"],
             snapshot.Procedures.Where(procedure => procedure.SedationEligible).Select(procedure => procedure.Code));
     }
 
@@ -466,6 +467,49 @@ public sealed class BoardStoreTests
         Assert.Equal("EXT+SED", seated.Procedure?.Code);
         Assert.Equal("Extraction + Sedation", seated.Procedure?.Label);
         Assert.True(seated.Procedure?.SedationEligible);
+    }
+
+    [Fact]
+    public void New_all_on_four_procedure_supports_sedation_modifier_and_resolves_label()
+    {
+        using var workspace = TestWorkspace.Create();
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production);
+
+        // All on Four is a newly added, sedation-eligible procedure.
+        var seated = context.Store.SeatRoom(1, "otte", "AO4", sedation: true);
+        Assert.NotNull(seated);
+        Assert.Equal("AO4+SED", seated.ProcedureCode);
+        Assert.Equal("AO4+SED", seated.Procedure?.Code);
+        Assert.Equal("All on Four + Sedation", seated.Procedure?.Label);
+        Assert.True(seated.Procedure?.SedationEligible);
+    }
+
+    [Fact]
+    public void New_all_on_four_sedation_variant_rolls_up_under_base_in_reports()
+    {
+        using var workspace = TestWorkspace.Create();
+        var baseTime = new DateTimeOffset(2026, 6, 1, 8, 0, 0, TimeSpan.Zero);
+        var clock = new ManualTimeProvider(baseTime);
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production, timeProvider: clock);
+
+        RunProcedureCycle(context, clock, baseTime, 1, "otte", "AO4", prepMin: 5, readyMin: 10, doctorMin: 10, turnoverMin: 5);
+        RunProcedureCycle(context, clock, baseTime.AddHours(1), 2, "otte", "AO4", prepMin: 5, readyMin: 10, doctorMin: 10, turnoverMin: 5, sedation: true);
+
+        var reports = context.Store.GetReports();
+
+        // Full-variant summaries stay distinct.
+        var plain = Assert.Single(reports.ProcedureSummaries, s => s.ProcedureCode == "AO4");
+        Assert.Equal("AO4", plain.BaseProcedureCode);
+        Assert.False(plain.IsSedationCase);
+
+        var sedationVariant = Assert.Single(reports.ProcedureSummaries, s => s.ProcedureCode == "AO4+SED");
+        Assert.Equal("AO4", sedationVariant.BaseProcedureCode);
+        Assert.True(sedationVariant.IsSedationCase);
+
+        // Base roll-up aggregates both cycles under "AO4" / "All on Four".
+        var baseAllOnFour = Assert.Single(reports.BaseProcedureSummaries, s => s.ProcedureCode == "AO4");
+        Assert.Equal("All on Four", baseAllOnFour.ProcedureLabel);
+        Assert.Equal(2, baseAllOnFour.CompletedCycleCount);
     }
 
     [Fact]
@@ -813,7 +857,7 @@ public sealed class BoardStoreTests
         // in the renderProcedureIcon icons map so tiles never fall back to the
         // empty placeholder icon. INTCK uses "interlock" (PNG); sync remains in
         // the map for backward compat but is no longer a default-roster icon.
-        var requiredIcons = new[] { "speech", "forceps", "moon", "check", "bolt", "vial", "teeth", "interlock", "wrench", "phone" };
+        var requiredIcons = new[] { "speech", "forceps", "moon", "check", "bolt", "vial", "teeth", "interlock", "wrench", "phone", "uncover", "bond", "archfour" };
         foreach (var icon in requiredIcons)
         {
             Assert.Contains($"{icon}:", boardJs);
