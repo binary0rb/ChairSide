@@ -526,14 +526,13 @@ body[data-view="doctor"] .primary-nav [data-nav="doctor"] .nav-pill-toggle {
    these rules touch .room-tile cards on the master board.
    ------------------------------------------------------------------ */
 
-/* The room-local status card gets a clearer procedure area: a soft plate
-   behind the icon and code so they read as one unit on the tablet. */
-.room-tile.large .procedure-lockup {
-  min-height: 56px;
+/* The room-local status card gets a clearer procedure area: a nested accent
+   chip/panel behind the icon and code so they read as one unit on the tablet. */
+.room-tile.large .procedure-lockup--chip {
+  min-height: 60px;
   margin: 6px 0;
-  padding: 8px 10px;
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.55);
+  padding: 10px 14px;
+  gap: 6px;
 }
 
 .room-tile.large .procedure-lockup svg {
@@ -765,15 +764,20 @@ label,
 }
 
 .procedure-tile.selected {
-  border-color: #2563eb;
-  background: #dbeafe;
+  border-color: var(--procedure-accent, #172033);
+  background: color-mix(in srgb, var(--procedure-accent, #172033) 14%, #ffffff);
   box-shadow:
-    inset 0 0 0 2px rgba(37, 99, 235, 0.28),
-    0 0 0 4px rgba(37, 99, 235, 0.18);
+    inset 0 0 0 2px color-mix(in srgb, var(--procedure-accent, #172033) 34%, transparent),
+    0 0 0 4px color-mix(in srgb, var(--procedure-accent, #172033) 16%, transparent);
 }
 
 .procedure-tile.selected svg {
-  color: #1d4ed8;
+  color: var(--procedure-accent, currentColor);
+}
+
+.procedure-tile.selected .selected-indicator {
+  border-color: var(--procedure-accent, #172033);
+  background: var(--procedure-accent, #172033);
 }
 
 .selection-tile strong {
@@ -802,10 +806,19 @@ label,
    doctor rail/tint or the lifecycle/state badge/border/timer.
    ------------------------------------------------------------------ */
 
-/* Selectable procedure tiles: a left accent bar plus a tinted icon. The
-   bar persists through the selected state (which keeps its own blue
-   theme) so the procedure cue is never lost; :disabled muting from the
-   shared .selection-tile rules dims the accent for locked/read-only. */
+/* Nested procedure chip/panel inside seated/master/doctor room cards.
+   Stronger than icon-only tinting, but subordinate to doctor rail and
+   lifecycle/state badge/border/timer. */
+.procedure-lockup--chip {
+  border: 1px solid color-mix(in srgb, var(--procedure-accent, var(--line)) 52%, var(--line));
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--procedure-accent, var(--ink)) 12%, #ffffff);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--procedure-accent, transparent) 10%, transparent);
+}
+
+/* Selectable procedure tiles: left accent bar plus tinted icon. Hover and
+   selected states derive from --procedure-accent instead of generic blue.
+   :disabled muting from .selection-tile rules subdues the accent when locked. */
 .procedure-tile::before {
   content: "";
   position: absolute;
@@ -817,13 +830,31 @@ label,
   background: var(--procedure-accent, transparent);
 }
 
+.procedure-tile:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--procedure-accent, var(--line)) 42%, var(--line));
+  background: color-mix(in srgb, var(--procedure-accent, transparent) 9%, #ffffff);
+}
+
+.procedure-tile:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--procedure-accent, #2563eb) 55%, transparent);
+  outline-offset: 2px;
+}
+
 .procedure-tile svg {
   color: var(--procedure-accent, currentColor);
 }
 
-/* Room status / master / doctor procedure lockups: tint just the icon. */
-.procedure-lockup .procedure-icon {
+.procedure-tile:disabled::before {
+  opacity: 0.45;
+}
+
+/* Room status / master / doctor procedure lockups: nested chip icon tint. */
+.procedure-lockup--chip .procedure-icon {
   color: var(--procedure-accent, currentColor);
+}
+
+.procedure-lockup--chip span {
+  color: var(--ink);
 }
 
 /* Reports detail rows: tint the procedure badge icon. */
@@ -1888,22 +1919,23 @@ body[data-view="master"] .room-tile.turnover .room-topline span {
   border-color: rgba(255, 255, 255, 0.3);
 }
 
-body[data-view="master"] .room-grid .procedure-lockup {
+body[data-view="master"] .room-grid .procedure-lockup--chip {
   display: flex;
   flex-direction: row;
   align-items: center;
   justify-content: center;
   gap: 10px;
-  min-height: 48px;
+  min-height: 52px;
+  padding: 8px 12px;
 }
 
-body[data-view="master"] .room-grid .procedure-lockup svg {
+body[data-view="master"] .room-grid .procedure-lockup--chip svg {
   width: 32px;
   height: 32px;
   flex-shrink: 0;
 }
 
-body[data-view="master"] .room-grid .procedure-lockup span {
+body[data-view="master"] .room-grid .procedure-lockup--chip span {
   font-size: clamp(20px, 2.1vw, 30px);
   line-height: 1;
 }
@@ -2081,22 +2113,23 @@ body[data-view="doctor"] .doctor-list .room-tile.turnover .room-topline span {
   border-color: rgba(255, 255, 255, 0.3);
 }
 
-body[data-view="doctor"] .doctor-list .procedure-lockup {
+body[data-view="doctor"] .doctor-list .procedure-lockup--chip {
   display: flex;
   flex-direction: row;
   align-items: center;
   justify-content: center;
   gap: 10px;
-  min-height: 48px;
+  min-height: 52px;
+  padding: 8px 12px;
 }
 
-body[data-view="doctor"] .doctor-list .procedure-lockup svg {
+body[data-view="doctor"] .doctor-list .procedure-lockup--chip svg {
   width: 32px;
   height: 32px;
   flex-shrink: 0;
 }
 
-body[data-view="doctor"] .doctor-list .procedure-lockup span {
+body[data-view="doctor"] .doctor-list .procedure-lockup--chip span {
   font-size: clamp(20px, 2.1vw, 30px);
   line-height: 1;
 }
