@@ -1058,6 +1058,262 @@ public sealed class BoardStoreTests
         Assert.Equal(1, reports.ExcludedCompletedCycleCount);
     }
 
+    // -------------------------------------------------------------------------
+    // Allocation variance (expected allocation vs measured case flow)
+    // -------------------------------------------------------------------------
+
+    [Fact]
+    public void Positive_allocation_variance_when_case_flow_runs_over_expected()
+    {
+        using var workspace = TestWorkspace.Create();
+        var baseTime = new DateTimeOffset(2026, 6, 1, 8, 0, 0, TimeSpan.Zero);
+        var clock = new ManualTimeProvider(baseTime);
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production, timeProvider: clock);
+
+        // EXT default is 3 units (30 min expected). Seat -> Doctor Complete here is 5+10+25 = 40 min.
+        RunProcedureCycle(context, clock, baseTime, 1, "otte", "EXT", prepMin: 5, readyMin: 10, doctorMin: 25, turnoverMin: 5);
+
+        var cycle = Assert.Single(context.Store.GetReports().RecentCompletedCycles);
+        Assert.Equal(30, cycle.ExpectedAllocationMinutes);
+        Assert.Equal(40, cycle.MeasuredCaseFlowMinutes);
+        Assert.Equal(10, cycle.AllocationVarianceMinutes);
+        Assert.True(cycle.HasAllocationVariance);
+        Assert.True(cycle.IsOverExpectedAllocation);
+        Assert.False(cycle.IsUnderExpectedAllocation);
+        Assert.False(cycle.IsAtExpectedAllocation);
+    }
+
+    [Fact]
+    public void Negative_allocation_variance_when_case_flow_runs_under_expected()
+    {
+        using var workspace = TestWorkspace.Create();
+        var baseTime = new DateTimeOffset(2026, 6, 1, 8, 0, 0, TimeSpan.Zero);
+        var clock = new ManualTimeProvider(baseTime);
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production, timeProvider: clock);
+
+        // IMP default is 6 units (60 min expected). Seat -> Doctor Complete here is 5+10+20 = 35 min.
+        RunProcedureCycle(context, clock, baseTime, 1, "otte", "IMP", prepMin: 5, readyMin: 10, doctorMin: 20, turnoverMin: 5);
+
+        var cycle = Assert.Single(context.Store.GetReports().RecentCompletedCycles);
+        Assert.Equal(60, cycle.ExpectedAllocationMinutes);
+        Assert.Equal(35, cycle.MeasuredCaseFlowMinutes);
+        Assert.Equal(-25, cycle.AllocationVarianceMinutes);
+        Assert.True(cycle.HasAllocationVariance);
+        Assert.True(cycle.IsUnderExpectedAllocation);
+        Assert.False(cycle.IsOverExpectedAllocation);
+        Assert.False(cycle.IsAtExpectedAllocation);
+    }
+
+    [Fact]
+    public void Zero_allocation_variance_when_case_flow_matches_expected()
+    {
+        using var workspace = TestWorkspace.Create();
+        var baseTime = new DateTimeOffset(2026, 6, 1, 8, 0, 0, TimeSpan.Zero);
+        var clock = new ManualTimeProvider(baseTime);
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production, timeProvider: clock);
+
+        // EXT default is 3 units (30 min expected). Seat -> Doctor Complete here is 5+10+15 = 30 min.
+        RunProcedureCycle(context, clock, baseTime, 1, "otte", "EXT", prepMin: 5, readyMin: 10, doctorMin: 15, turnoverMin: 5);
+
+        var cycle = Assert.Single(context.Store.GetReports().RecentCompletedCycles);
+        Assert.Equal(30, cycle.ExpectedAllocationMinutes);
+        Assert.Equal(30, cycle.MeasuredCaseFlowMinutes);
+        Assert.Equal(0, cycle.AllocationVarianceMinutes);
+        Assert.False(cycle.HasAllocationVariance);
+        Assert.True(cycle.IsAtExpectedAllocation);
+        Assert.False(cycle.IsOverExpectedAllocation);
+        Assert.False(cycle.IsUnderExpectedAllocation);
+    }
+
+    [Fact]
+    public void Missing_doctor_complete_does_not_calculate_allocation_variance()
+    {
+        using var workspace = TestWorkspace.Create();
+        var baseTime = new DateTimeOffset(2026, 6, 1, 8, 0, 0, TimeSpan.Zero);
+        var clock = new ManualTimeProvider(baseTime);
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production, timeProvider: clock);
+
+        // Drive only as far as Doctor Arrived: a cycle exists but DoctorCompleteAt is still null.
+        Assert.NotNull(context.Store.SeatRoom(1, "otte", "EXT"));
+        clock.SetUtcNow(baseTime.AddMinutes(5));
+        Assert.NotNull(context.Store.MarkReadyForDoctor(1));
+        clock.SetUtcNow(baseTime.AddMinutes(15));
+        Assert.NotNull(context.Store.MarkDoctorArrived(1));
+
+        var reports = context.Store.GetReports();
+        // The in-progress cycle has no RoomAvailableAt, so it is not in the completed audit list,
+        // and it contributes nothing to the standard variance aggregate.
+        Assert.DoesNotContain(reports.RecentCompletedCycles, c => c.RoomId == 1);
+        Assert.Equal(0, reports.AllocationVariance!.AllocationVarianceCycleCount);
+
+        var persisted = Assert.Single(context.Repository.LoadCompletedCycles());
+        Assert.Null(persisted.DoctorCompleteAt);
+    }
+
+    [Fact]
+    public void Missing_expected_allocation_does_not_calculate_allocation_variance()
+    {
+        using var workspace = TestWorkspace.Create();
+        var databasePath = workspace.ProductionDatabasePath();
+        var baseTime = new DateTimeOffset(2026, 6, 1, 8, 0, 0, TimeSpan.Zero);
+
+        var first = StoreContext.Create(workspace, environmentName: Environments.Production, databasePath: databasePath);
+
+        // A completed cycle with no expected allocation captured (0 minutes), but a mapped, active
+        // procedure so it is not a reporting exception.
+        var cycle = new CompletedRoomCycle
+        {
+            RoomId = 1,
+            AssignedDoctor = "otte",
+            ProcedureCode = "EXT",
+            SeatedAt = baseTime,
+            ReadyForDoctorAt = baseTime.AddMinutes(5),
+            DoctorArrivedAt = baseTime.AddMinutes(15),
+            DoctorCompleteAt = baseTime.AddMinutes(40),
+            RoomAvailableAt = baseTime.AddMinutes(45),
+            SeatedToDoctorSeconds = 900,
+            PrepSeconds = 300,
+            ReadyToDoctorSeconds = 600,
+            DoctorInRoomSeconds = 1500,
+            TurnoverSeconds = 300,
+            TotalRoomCycleSeconds = 2700,
+            FinalWaitState = "ready-for-doctor",
+            ExpectedAllocationMinutes = 0,
+            ExpectedAllocationUnits = 0
+        };
+        first.Repository.SaveCompletedCycle(cycle, first.Doctors, first.Procedures);
+
+        var second = StoreContext.Create(workspace, environmentName: Environments.Production, databasePath: databasePath);
+        var reports = second.Store.GetReports();
+
+        var loaded = Assert.Single(reports.RecentCompletedCycles, c => c.RoomId == 1);
+        // Measured case flow is still exposed (DoctorCompleteAt present), but variance is not computed.
+        Assert.Equal(40, loaded.MeasuredCaseFlowMinutes);
+        Assert.Null(loaded.AllocationVarianceMinutes);
+        Assert.False(loaded.HasAllocationVariance);
+        Assert.False(loaded.IsAtExpectedAllocation);
+        Assert.Equal(0, reports.AllocationVariance!.AllocationVarianceCycleCount);
+    }
+
+    [Fact]
+    public void Reporting_exception_cycle_does_not_contribute_to_standard_variance_aggregates()
+    {
+        using var workspace = TestWorkspace.Create();
+        var databasePath = workspace.ProductionDatabasePath();
+        var baseTime = new DateTimeOffset(2026, 6, 1, 8, 0, 0, TimeSpan.Zero);
+
+        var first = StoreContext.Create(workspace, environmentName: Environments.Production, databasePath: databasePath);
+
+        // An extreme-duration cycle (~18h) that nonetheless carries an expected allocation snapshot.
+        var extreme = new CompletedRoomCycle
+        {
+            RoomId = 1,
+            AssignedDoctor = "otte",
+            ProcedureCode = "EXT",
+            SeatedAt = baseTime,
+            ReadyForDoctorAt = baseTime.AddMinutes(5),
+            DoctorArrivedAt = baseTime.AddMinutes(15),
+            DoctorCompleteAt = baseTime.AddHours(18),
+            RoomAvailableAt = baseTime.AddHours(18).AddMinutes(5),
+            SeatedToDoctorSeconds = 900,
+            PrepSeconds = 300,
+            ReadyToDoctorSeconds = 600,
+            DoctorInRoomSeconds = 63900,
+            TurnoverSeconds = 300,
+            TotalRoomCycleSeconds = 65100,
+            FinalWaitState = "ready-for-doctor",
+            ExpectedAllocationUnits = 3,
+            ExpectedAllocationMinutes = 30,
+            OriginalDefaultExpectedUnits = 3
+        };
+        first.Repository.SaveCompletedCycle(extreme, first.Doctors, first.Procedures);
+
+        var second = StoreContext.Create(workspace, environmentName: Environments.Production, databasePath: databasePath);
+        var reports = second.Store.GetReports();
+
+        // Excluded from standard aggregates, so the global variance summary is empty...
+        Assert.Equal(0, reports.AllocationVariance!.AllocationVarianceCycleCount);
+        Assert.Equal(0, reports.AllocationVariance.NetAllocationVarianceMinutes);
+
+        // ...but its own allocation fields remain exposed for raw/audit.
+        var raw = Assert.Single(reports.RecentCompletedCycles, c => c.RoomId == 1);
+        Assert.True(raw.IsExcludedFromStandardMetrics);
+        Assert.Equal(30, raw.ExpectedAllocationMinutes);
+        Assert.True(raw.MeasuredCaseFlowMinutes > 1000);
+        Assert.True(raw.IsOverExpectedAllocation);
+    }
+
+    [Fact]
+    public void Global_allocation_variance_aggregate_sums_over_included_cycles()
+    {
+        using var workspace = TestWorkspace.Create();
+        var baseTime = new DateTimeOffset(2026, 6, 1, 8, 0, 0, TimeSpan.Zero);
+        var clock = new ManualTimeProvider(baseTime);
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production, timeProvider: clock);
+
+        // EXT (30 expected): over by +10 (40 measured).
+        RunProcedureCycle(context, clock, baseTime, 1, "otte", "EXT", prepMin: 5, readyMin: 10, doctorMin: 25, turnoverMin: 5);
+        // IMP (60 expected): under by -25 (35 measured).
+        RunProcedureCycle(context, clock, baseTime.AddHours(2), 2, "otte", "IMP", prepMin: 5, readyMin: 10, doctorMin: 20, turnoverMin: 5);
+
+        var allocation = context.Store.GetReports().AllocationVariance!;
+        Assert.Equal(2, allocation.AllocationVarianceCycleCount);
+        Assert.Equal(90, allocation.TotalExpectedAllocationMinutes);
+        Assert.Equal(75, allocation.TotalMeasuredCaseFlowMinutes);
+        Assert.Equal(-15, allocation.NetAllocationVarianceMinutes);
+        Assert.Equal(-7.5, allocation.AverageAllocationVarianceMinutes);
+        Assert.Equal(1, allocation.CasesOverExpectedAllocation);
+        Assert.Equal(1, allocation.CasesUnderExpectedAllocation);
+        Assert.Equal(0, allocation.CasesAtExpectedAllocation);
+    }
+
+    [Fact]
+    public void Doctor_and_procedure_summaries_carry_allocation_variance_aggregates()
+    {
+        using var workspace = TestWorkspace.Create();
+        var baseTime = new DateTimeOffset(2026, 6, 1, 8, 0, 0, TimeSpan.Zero);
+        var clock = new ManualTimeProvider(baseTime);
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production, timeProvider: clock);
+
+        // Two EXT cycles for the same doctor: +10 and +10 over the 30-min expected allocation.
+        RunProcedureCycle(context, clock, baseTime, 1, "otte", "EXT", prepMin: 5, readyMin: 10, doctorMin: 25, turnoverMin: 5);
+        RunProcedureCycle(context, clock, baseTime.AddHours(2), 2, "otte", "EXT", prepMin: 5, readyMin: 10, doctorMin: 25, turnoverMin: 5);
+
+        var reports = context.Store.GetReports();
+
+        var doctor = Assert.Single(reports.DoctorSummaries);
+        Assert.Equal(2, doctor.Allocation.AllocationVarianceCycleCount);
+        Assert.Equal(20, doctor.Allocation.NetAllocationVarianceMinutes);
+        Assert.Equal(2, doctor.Allocation.CasesOverExpectedAllocation);
+
+        var procedure = Assert.Single(reports.ProcedureSummaries, summary => summary.ProcedureCode == "EXT");
+        Assert.Equal(2, procedure.Allocation.AllocationVarianceCycleCount);
+        Assert.Equal(60, procedure.Allocation.TotalExpectedAllocationMinutes);
+        Assert.Equal(80, procedure.Allocation.TotalMeasuredCaseFlowMinutes);
+        Assert.Equal(20, procedure.Allocation.NetAllocationVarianceMinutes);
+
+        var baseProcedure = Assert.Single(reports.BaseProcedureSummaries, summary => summary.ProcedureCode == "EXT");
+        Assert.Equal(2, baseProcedure.Allocation.AllocationVarianceCycleCount);
+        Assert.Equal(20, baseProcedure.Allocation.NetAllocationVarianceMinutes);
+    }
+
+    [Fact]
+    public void Adjusted_allocation_cycle_count_reflects_units_changed_from_default()
+    {
+        using var workspace = TestWorkspace.Create();
+        var baseTime = new DateTimeOffset(2026, 6, 1, 8, 0, 0, TimeSpan.Zero);
+        var clock = new ManualTimeProvider(baseTime);
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production, timeProvider: clock);
+
+        // One EXT seated at its default allocation, one EXT seated with adjusted units.
+        RunProcedureCycle(context, clock, baseTime, 1, "otte", "EXT", prepMin: 5, readyMin: 10, doctorMin: 25, turnoverMin: 5);
+        RunProcedureCycle(context, clock, baseTime.AddHours(2), 2, "otte", "EXT", prepMin: 5, readyMin: 10, doctorMin: 25, turnoverMin: 5, expectedAllocationUnits: 6);
+
+        var allocation = context.Store.GetReports().AllocationVariance!;
+        Assert.Equal(2, allocation.AllocationVarianceCycleCount);
+        Assert.Equal(1, allocation.AdjustedAllocationCycleCount);
+    }
+
     [Fact]
     public void Normal_completed_cycle_is_not_flagged_and_is_included()
     {
@@ -3352,10 +3608,11 @@ public sealed class BoardStoreTests
         int readyMin,
         int doctorMin,
         int turnoverMin,
-        bool sedation = false)
+        bool sedation = false,
+        int? expectedAllocationUnits = null)
     {
         clock.SetUtcNow(seatedAt);
-        Assert.NotNull(context.Store.SeatRoom(room, doctor, procedure, sedation: sedation));
+        Assert.NotNull(context.Store.SeatRoom(room, doctor, procedure, sedation: sedation, expectedAllocationUnits: expectedAllocationUnits));
         clock.SetUtcNow(seatedAt.AddMinutes(prepMin));
         Assert.NotNull(context.Store.MarkReadyForDoctor(room));
         clock.SetUtcNow(seatedAt.AddMinutes(prepMin + readyMin));
