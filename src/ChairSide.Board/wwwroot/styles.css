@@ -1640,6 +1640,95 @@ button:disabled {
   color: #475569;
 }
 
+/* Allocation balance presentation (Phase 3B): calm, neutral cards and compact rows. */
+.report-allocation {
+  display: grid;
+  gap: 14px;
+  margin-bottom: 8px;
+}
+
+.allocation-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 14px;
+}
+
+.report-card {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel);
+  padding: 14px 16px;
+  box-shadow: 0 3px 10px rgba(23, 32, 51, 0.06);
+}
+
+.report-card h3 {
+  margin: 0 0 8px;
+  font-size: 16px;
+}
+
+.report-card p {
+  margin: 2px 0;
+  font-size: 14px;
+  color: var(--ink);
+}
+
+.allocation-lead,
+.allocation-net {
+  font-weight: 700;
+}
+
+.allocation-counts,
+.allocation-breakdown-line,
+.allocation-context,
+.allocation-empty,
+.allocation-ok,
+.allocation-note {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.allocation-group {
+  margin-top: 10px;
+}
+
+.allocation-group h3 {
+  margin: 8px 0;
+  font-size: 15px;
+}
+
+.allocation-row-list {
+  display: grid;
+  gap: 6px;
+}
+
+.allocation-row {
+  display: grid;
+  grid-template-columns: minmax(120px, 200px) 1fr;
+  gap: 12px;
+  align-items: baseline;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.allocation-row-name {
+  font-weight: 800;
+}
+
+.allocation-row-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 14px;
+}
+
+.allocation-row-detail small {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
 /* Expected allocation stepper: compact, touch-friendly, restrained emphasis. */
 .allocation-selector {
   display: flex;

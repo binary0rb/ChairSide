@@ -663,6 +663,7 @@ function renderReports() {
   renderReportHeadline(r, hasData);
   syncReportFilterButtons();
   renderReportFilterBar(hasData);
+  renderAllocationReports(r);
   renderGroupedInsights(r, hasData);
   renderFullMetrics(r, hasData);
 
@@ -707,6 +708,180 @@ function renderHeadlineCard(label, value) {
       <strong>${escapeHtml(value)}</strong>
     </article>
   `;
+}
+
+// ---------------------------------------------------------------------------
+// Allocation balance presentation (Phase 3B). Surfaces the Phase 3A math in
+// plain, neutral language: expected allocation vs measured case flow. No
+// ranking, no scoring, no "sedation time".
+// ---------------------------------------------------------------------------
+function renderAllocationReports(r) {
+  renderAllocationBalanceCard(r);
+  renderDataQualityCard(r);
+  renderDoctorAllocation(r);
+  renderProcedureAllocation(r);
+}
+
+function renderAllocationBalanceCard(r) {
+  const card = document.getElementById("allocationBalanceCard");
+  if (!card) {
+    return;
+  }
+
+  const a = r.allocationVariance;
+  if (!a || (a.allocationVarianceCycleCount || 0) === 0) {
+    card.innerHTML = `
+      <h3>Allocation Balance</h3>
+      <p class="allocation-empty">No allocation variance data available for this report range.</p>`;
+    return;
+  }
+
+  const count = a.allocationVarianceCycleCount;
+  card.innerHTML = `
+    <h3>Allocation Balance</h3>
+    <p class="allocation-lead">${count} ${count === 1 ? "case" : "cases"} measured against expected allocation.</p>
+    <p class="allocation-net">Net ${escapeHtml(formatAllocationVariance(a.netAllocationVarianceMinutes))} across included cases.</p>
+    <p>Average ${escapeHtml(formatAverageVariancePerCase(a.averageAllocationVarianceMinutes))}.</p>
+    <p class="allocation-breakdown-line">${a.casesOverExpectedAllocation} over expected · ${a.casesUnderExpectedAllocation} under expected · ${a.casesAtExpectedAllocation} at expected</p>
+    <p class="allocation-context">${a.adjustedAllocationCycleCount} adjusted allocation ${a.adjustedAllocationCycleCount === 1 ? "case" : "cases"} · ${a.totalExpectedAllocationMinutes} min expected · ${a.totalMeasuredCaseFlowMinutes} min measured</p>`;
+}
+
+function renderDataQualityCard(r) {
+  const card = document.getElementById("dataQualityCard");
+  if (!card) {
+    return;
+  }
+
+  const included = r.includedCompletedCycleCount || 0;
+  const excluded = r.excludedCompletedCycleCount || 0;
+  const exceptions = r.exceptionCount || 0;
+
+  const detail = excluded === 0 && exceptions === 0
+    ? `<p class="allocation-ok">All completed records in this range are included in standard metrics.</p>
+       <p class="allocation-ok">No reporting exceptions found in this date range.</p>`
+    : `<p class="allocation-note">${excluded} ${excluded === 1 ? "record" : "records"} excluded from standard metrics.</p>
+       <p class="allocation-note">${exceptions} reporting ${exceptions === 1 ? "exception" : "exceptions"} flagged. Excluded records remain visible below with badges and reasons.</p>`;
+
+  card.innerHTML = `
+    <h3>Data Quality</h3>
+    <p class="allocation-counts">${included} included · ${excluded} excluded</p>
+    ${detail}`;
+}
+
+function renderDoctorAllocation(r) {
+  const list = document.getElementById("doctorAllocationList");
+  if (!list) {
+    return;
+  }
+
+  const aggregated = aggregateAllocationByDoctor(r.doctorSummaries || []);
+  list.innerHTML = aggregated.length
+    ? aggregated.map(renderDoctorAllocationRow).join("")
+    : `<p class="allocation-empty">No doctor allocation data for this range.</p>`;
+}
+
+// Sums each doctor's allocation across the returned (per-month) summaries so a doctor appears
+// once. Ordered by the doctor roster - never by variance, to avoid implying a ranking.
+function aggregateAllocationByDoctor(summaries) {
+  const byDoctor = new Map();
+  for (const summary of summaries) {
+    const a = summary.allocation;
+    if (!a) {
+      continue;
+    }
+    const key = summary.assignedDoctor;
+    const agg = byDoctor.get(key) || { doctorId: key, count: 0, net: 0, over: 0, under: 0, at: 0, adjusted: 0 };
+    agg.count += a.allocationVarianceCycleCount || 0;
+    agg.net += a.netAllocationVarianceMinutes || 0;
+    agg.over += a.casesOverExpectedAllocation || 0;
+    agg.under += a.casesUnderExpectedAllocation || 0;
+    agg.at += a.casesAtExpectedAllocation || 0;
+    agg.adjusted += a.adjustedAllocationCycleCount || 0;
+    byDoctor.set(key, agg);
+  }
+
+  const order = (app.snapshot?.doctors || []).map(doctor => doctor.id);
+  const rank = id => {
+    const index = order.indexOf(id);
+    return index === -1 ? Number.MAX_SAFE_INTEGER : index;
+  };
+  return [...byDoctor.values()].sort((x, y) => rank(x.doctorId) - rank(y.doctorId));
+}
+
+function renderDoctorAllocationRow(agg) {
+  const name = doctorName(agg.doctorId);
+  if (agg.count === 0) {
+    return `
+      <div class="allocation-row">
+        <span class="allocation-row-name">${escapeHtml(name)}</span>
+        <span class="allocation-row-detail allocation-empty">No allocation variance cases.</span>
+      </div>`;
+  }
+
+  return `
+    <div class="allocation-row">
+      <span class="allocation-row-name">${escapeHtml(name)}</span>
+      <span class="allocation-row-detail">
+        ${describeAllocation(agg.count, agg.net)}
+        <small>${agg.over} over · ${agg.under} under · ${agg.at} at · ${agg.adjusted} adjusted</small>
+      </span>
+    </div>`;
+}
+
+function renderProcedureAllocation(r) {
+  const list = document.getElementById("procedureAllocationList");
+  if (!list) {
+    return;
+  }
+
+  // Procedure family (base) summaries only - sedation variants roll up under their family.
+  const families = (r.baseProcedureSummaries || [])
+    .filter(summary => summary.allocation && (summary.allocation.allocationVarianceCycleCount || 0) > 0);
+
+  list.innerHTML = families.length
+    ? families.map(renderProcedureAllocationRow).join("")
+    : `<p class="allocation-empty">No procedure family allocation data for this range.</p>`;
+}
+
+function renderProcedureAllocationRow(summary) {
+  const a = summary.allocation;
+  const label = summary.procedureLabel || summary.procedureCode || "Unknown";
+  return `
+    <div class="allocation-row">
+      <span class="allocation-row-name">${escapeHtml(label)}</span>
+      <span class="allocation-row-detail">
+        ${describeAllocation(a.allocationVarianceCycleCount, a.netAllocationVarianceMinutes)}
+        <small>${a.casesOverExpectedAllocation} over · ${a.casesUnderExpectedAllocation} under · ${a.casesAtExpectedAllocation} at · ${a.adjustedAllocationCycleCount} adjusted</small>
+      </span>
+    </div>`;
+}
+
+// Compact neutral one-liner for a doctor/procedure row. Average is derived from the row's own
+// net and case count so it stays correct after per-doctor aggregation.
+function describeAllocation(count, net) {
+  const cases = `${count} ${count === 1 ? "case" : "cases"}`;
+  if (net === 0) {
+    return `<strong>At expected allocation across ${cases}.</strong>`;
+  }
+  const avg = count > 0 ? net / count : 0;
+  return `<strong>Net ${escapeHtml(formatAllocationVariance(net))} across ${cases}.</strong>
+          <span>Average ${escapeHtml(formatAverageVariancePerCase(avg))}.</span>`;
+}
+
+// Neutral average-per-case label, rounded to one decimal.
+function formatAverageVariancePerCase(averageMinutes) {
+  if (!Number.isFinite(averageMinutes)) {
+    return "--";
+  }
+  const rounded = Math.round(averageMinutes * 10) / 10;
+  const magnitude = Math.abs(rounded);
+  if (rounded > 0) {
+    return `+${magnitude} min over expected per case`;
+  }
+  if (rounded < 0) {
+    return `-${magnitude} min under expected per case`;
+  }
+  return "0 min at expected per case";
 }
 
 function renderReportFilterBar(hasData) {
