@@ -27,6 +27,14 @@ const app = {
   selectedDoctorId: null,
   selectedProcedureId: null,
   sedationOn: false,
+  // Expected allocation (1 unit = 10 minutes). Kept in app (not the DOM) so a SignalR/poll
+  // re-render never discards an in-progress staff adjustment. expectedUnitsManual tracks whether
+  // staff have changed units since selecting the current procedure: a procedure change always
+  // re-seeds from the new default, but a sedation change only re-seeds when not manually adjusted.
+  expectedUnits: null,
+  expectedUnitsManual: false,
+  expectedUnitsProcedureCode: null,
+  expectedUnitsSedation: false,
   // Doctor / procedure / sedation are only editable during initial seating or when the
   // staff explicitly enters the Update Assignment / Edit flow. Otherwise they are locked
   // read-only case metadata. This stays Off by default after seating.
@@ -1236,13 +1244,43 @@ function renderMetric(label, value) {
   `;
 }
 
+// Neutral, non-punitive labels for reporting-time data-hygiene flags.
+const reportingExceptionBadgeLabels = {
+  LegacyProcedure: "Legacy",
+  UnmappedProcedure: "Unmapped",
+  ExtremeDuration: "Extreme duration",
+  OvernightLifecycle: "Overnight",
+  MissingTiming: "Missing timing"
+};
+
+function renderReportingExceptionBadges(cycle) {
+  const reasons = Array.isArray(cycle.reportingExceptionReasons) ? cycle.reportingExceptionReasons : [];
+  const badges = reasons.map(reason =>
+    `<span class="report-badge report-badge-exception">${escapeHtml(reportingExceptionBadgeLabels[reason] || reason)}</span>`
+  );
+  if (cycle.isExcludedFromStandardMetrics) {
+    badges.push(`<span class="report-badge report-badge-excluded">Excluded</span>`);
+  }
+
+  return badges.length ? `<div class="report-badges">${badges.join("")}</div>` : "";
+}
+
+// Raw/audit procedure cell. Flagged cycles show the server display label (e.g. "Sedation (Legacy)")
+// since their code does not resolve to an active roster tile; clean cycles keep the normal badge.
+function renderCycleProcedureCell(cycle) {
+  const label = cycle.hasReportingException && cycle.displayProcedureLabel
+    ? escapeHtml(cycle.displayProcedureLabel)
+    : renderProcedureBadge(cycle.procedureCode);
+  return `${label}${renderReportingExceptionBadges(cycle)}`;
+}
+
 function renderCycleRow(cycle) {
   const doctor = doctorName(cycle.assignedDoctor);
   return `
     <tr>
       <td>Room ${cycle.roomId}</td>
       <td>${escapeHtml(doctor)}</td>
-      <td>${renderProcedureBadge(cycle.procedureCode)}</td>
+      <td>${renderCycleProcedureCell(cycle)}</td>
       <td>${formatDateTime(cycle.seatedAt)}</td>
       <td>${formatDateTime(cycle.readyForDoctorAt)}</td>
       <td>${formatDateTime(cycle.doctorArrivedAt)}</td>
@@ -1682,6 +1720,141 @@ function renderSelectionTiles(room) {
   renderDoctorTiles(room);
   renderProcedureTiles(room);
   renderSedationToggle(room);
+  renderAllocationSelector(room);
+}
+
+// Expected allocation bounds (1 unit = 10 minutes). Mirrors the server-side clamp in
+// DemoBoardStore so a value never disagrees between the stepper and the stored snapshot.
+const EXPECTED_UNITS_MIN = 1;
+const EXPECTED_UNITS_MAX = 24;
+const MINUTES_PER_UNIT = 10;
+
+function clampExpectedUnits(units) {
+  const value = Math.round(Number(units));
+  if (!Number.isFinite(value)) {
+    return EXPECTED_UNITS_MIN;
+  }
+
+  return Math.min(EXPECTED_UNITS_MAX, Math.max(EXPECTED_UNITS_MIN, value));
+}
+
+function isVariableProcedure(procedure) {
+  return String(procedure?.allocationBehavior || "").toLowerCase() === "variable";
+}
+
+// Default expected units for the currently selected procedure, clamped and defended against
+// missing roster metadata (falls back to the minimum).
+function selectedProcedureDefaultUnits() {
+  const procedure = procedureFromCode(app.selectedProcedureId);
+  const raw = Number(procedure?.defaultExpectedUnits);
+  return clampExpectedUnits(Number.isFinite(raw) && raw > 0 ? raw : EXPECTED_UNITS_MIN);
+}
+
+// Re-seeds app.expectedUnits from the selected procedure default when the procedure changes
+// (always) or when sedation changes and units have not been manually adjusted. A manual
+// adjustment otherwise survives live re-renders.
+function syncExpectedUnits() {
+  const procedureCode = app.selectedProcedureId || null;
+  if (!procedureCode) {
+    app.expectedUnits = null;
+    app.expectedUnitsManual = false;
+    app.expectedUnitsProcedureCode = null;
+    app.expectedUnitsSedation = false;
+    return;
+  }
+
+  const procedureChanged = procedureCode !== app.expectedUnitsProcedureCode;
+  const sedationChanged = app.sedationOn !== app.expectedUnitsSedation;
+
+  if (app.expectedUnits === null || procedureChanged) {
+    app.expectedUnits = selectedProcedureDefaultUnits();
+    app.expectedUnitsManual = false;
+  } else if (sedationChanged && !app.expectedUnitsManual) {
+    app.expectedUnits = selectedProcedureDefaultUnits();
+  }
+
+  app.expectedUnitsProcedureCode = procedureCode;
+  app.expectedUnitsSedation = app.sedationOn;
+}
+
+// Renders the expected allocation stepper. Interactive only while seating an empty room; for an
+// already-seated room it shows the persisted snapshot read-only (and hides when none exists).
+function renderAllocationSelector(room) {
+  const section = document.getElementById("allocationSection");
+  if (!section) {
+    return;
+  }
+
+  syncExpectedUnits();
+
+  const seating = room ? normalizeState(room) === "empty" : false;
+  let units;
+  if (seating) {
+    units = app.expectedUnits ?? selectedProcedureDefaultUnits();
+  } else {
+    const persisted = Number(room?.expectedAllocationUnits);
+    units = Number.isFinite(persisted) && persisted > 0 ? persisted : null;
+  }
+
+  if (units === null) {
+    section.hidden = true;
+    section.classList.remove("allocation-variable");
+    return;
+  }
+
+  section.hidden = false;
+  const minutes = units * MINUTES_PER_UNIT;
+
+  const unitsEl = document.getElementById("allocationUnits");
+  const minutesEl = document.getElementById("allocationMinutes");
+  const hintEl = document.getElementById("allocationHint");
+  const minusBtn = document.getElementById("allocationMinus");
+  const plusBtn = document.getElementById("allocationPlus");
+
+  if (unitsEl) {
+    unitsEl.textContent = `${units} ${units === 1 ? "unit" : "units"}`;
+  }
+
+  if (minutesEl) {
+    minutesEl.textContent = `${minutes} min`;
+  }
+
+  const variable = isVariableProcedure(procedureFromCode(app.selectedProcedureId));
+  section.classList.toggle("allocation-variable", seating && variable);
+
+  if (hintEl) {
+    hintEl.textContent = !seating
+      ? "Confirmed at seating."
+      : variable
+        ? "This procedure may vary. Confirm units against the scheduled block."
+        : "Standard expected allocation. Adjust only if needed.";
+  }
+
+  if (minusBtn) {
+    minusBtn.disabled = !seating || units <= EXPECTED_UNITS_MIN;
+  }
+
+  if (plusBtn) {
+    plusBtn.disabled = !seating || units >= EXPECTED_UNITS_MAX;
+  }
+}
+
+// Adjusts expected units by delta during seating, marking the value as manually set so a later
+// live re-render does not snap it back to the procedure default.
+function adjustExpectedUnits(delta) {
+  if (currentRoomState() !== "empty") {
+    return;
+  }
+
+  const base = app.expectedUnits ?? selectedProcedureDefaultUnits();
+  const next = clampExpectedUnits(base + delta);
+  if (next === app.expectedUnits) {
+    return;
+  }
+
+  app.expectedUnits = next;
+  app.expectedUnitsManual = true;
+  renderAllocationSelector(getCurrentRoom());
 }
 
 function renderDoctorTiles(room) {
@@ -1943,13 +2116,15 @@ function wireRoomPanel() {
     }
 
     const sedation = app.sedationOn && selectedProcedureIsSedationEligible();
+    const expectedAllocationUnits = clampExpectedUnits(app.expectedUnits ?? selectedProcedureDefaultUnits());
     const payload = {
       roomNumber: app.roomNumber,
       doctorId,
       procedureCode,
       procedureId: procedureCode,
       demoElapsedMinutes,
-      sedation
+      sedation,
+      expectedAllocationUnits
     };
 
     console.log("[ChairSide] Seat Room clicked.", payload);
@@ -2282,6 +2457,9 @@ function wireSelectionTiles() {
     app.sedationOn = !app.sedationOn;
     renderSelectionTiles(getCurrentRoom());
   });
+
+  document.getElementById("allocationMinus")?.addEventListener("click", () => adjustExpectedUnits(-1));
+  document.getElementById("allocationPlus")?.addEventListener("click", () => adjustExpectedUnits(1));
 }
 
 function hasAssignmentSelection() {
@@ -2315,7 +2493,8 @@ async function sendSeatRoom(payload) {
       procedureCode: payload.procedureCode,
       procedureId: payload.procedureId,
       demoElapsedMinutes: payload.demoElapsedMinutes,
-      sedation: payload.sedation
+      sedation: payload.sedation,
+      expectedAllocationUnits: payload.expectedAllocationUnits
     })
   });
 
