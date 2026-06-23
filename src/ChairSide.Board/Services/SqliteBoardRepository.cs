@@ -56,7 +56,11 @@ public sealed class SqliteBoardRepository
                 ready_for_doctor_at,
                 doctor_arrived_at,
                 doctor_complete_at,
-                room_available_at
+                room_available_at,
+                original_default_expected_units,
+                expected_allocation_units,
+                expected_allocation_minutes,
+                allocation_adjusted_from_default
             FROM active_rooms
             WHERE room_id BETWEEN 1 AND $roomCount
             ORDER BY room_id;
@@ -78,7 +82,11 @@ public sealed class SqliteBoardRepository
                 ReadyForDoctorAt = ReadNullableDateTimeOffset(reader, 7),
                 DoctorArrivedAt = ReadNullableDateTimeOffset(reader, 8),
                 DoctorCompleteAt = ReadNullableDateTimeOffset(reader, 9),
-                RoomAvailableAt = ReadNullableDateTimeOffset(reader, 10)
+                RoomAvailableAt = ReadNullableDateTimeOffset(reader, 10),
+                OriginalDefaultExpectedUnits = reader.GetInt32(11),
+                ExpectedAllocationUnits = reader.GetInt32(12),
+                ExpectedAllocationMinutes = reader.GetInt32(13),
+                AllocationAdjustedFromDefault = reader.GetInt32(14) == 1
             });
         }
 
@@ -164,7 +172,11 @@ public sealed class SqliteBoardRepository
                 review_status,
                 suggested_action,
                 reviewed_at,
-                reviewed_by
+                reviewed_by,
+                original_default_expected_units,
+                expected_allocation_units,
+                expected_allocation_minutes,
+                allocation_adjusted_from_default
             FROM completed_room_cycles
             ORDER BY doctor_arrived_at DESC;
             """;
@@ -199,7 +211,11 @@ public sealed class SqliteBoardRepository
                 ReviewStatus = ReadNullableString(reader, 21) ?? ReviewStatuses.PendingReview,
                 SuggestedAction = ReadNullableString(reader, 22),
                 ReviewedAt = ReadNullableDateTimeOffset(reader, 23),
-                ReviewedBy = ReadNullableString(reader, 24)
+                ReviewedBy = ReadNullableString(reader, 24),
+                OriginalDefaultExpectedUnits = reader.GetInt32(25),
+                ExpectedAllocationUnits = reader.GetInt32(26),
+                ExpectedAllocationMinutes = reader.GetInt32(27),
+                AllocationAdjustedFromDefault = reader.GetInt32(28) == 1
             });
         }
 
@@ -241,6 +257,10 @@ public sealed class SqliteBoardRepository
                 suggested_action,
                 reviewed_at,
                 reviewed_by,
+                original_default_expected_units,
+                expected_allocation_units,
+                expected_allocation_minutes,
+                allocation_adjusted_from_default,
                 created_at,
                 updated_at
             )
@@ -271,6 +291,10 @@ public sealed class SqliteBoardRepository
                 $suggestedAction,
                 $reviewedAt,
                 $reviewedBy,
+                $originalDefaultExpectedUnits,
+                $expectedAllocationUnits,
+                $expectedAllocationMinutes,
+                $allocationAdjustedFromDefault,
                 $now,
                 $now
             )
@@ -299,6 +323,10 @@ public sealed class SqliteBoardRepository
                 suggested_action = excluded.suggested_action,
                 reviewed_at = excluded.reviewed_at,
                 reviewed_by = excluded.reviewed_by,
+                original_default_expected_units = excluded.original_default_expected_units,
+                expected_allocation_units = excluded.expected_allocation_units,
+                expected_allocation_minutes = excluded.expected_allocation_minutes,
+                allocation_adjusted_from_default = excluded.allocation_adjusted_from_default,
                 updated_at = excluded.updated_at;
             """;
 
@@ -329,6 +357,10 @@ public sealed class SqliteBoardRepository
         command.Parameters.AddWithValue("$suggestedAction", ToDbValue(cycle.SuggestedAction));
         command.Parameters.AddWithValue("$reviewedAt", ToDbValue(cycle.ReviewedAt));
         command.Parameters.AddWithValue("$reviewedBy", ToDbValue(cycle.ReviewedBy));
+        command.Parameters.AddWithValue("$originalDefaultExpectedUnits", cycle.OriginalDefaultExpectedUnits);
+        command.Parameters.AddWithValue("$expectedAllocationUnits", cycle.ExpectedAllocationUnits);
+        command.Parameters.AddWithValue("$expectedAllocationMinutes", cycle.ExpectedAllocationMinutes);
+        command.Parameters.AddWithValue("$allocationAdjustedFromDefault", cycle.AllocationAdjustedFromDefault ? 1 : 0);
         command.Parameters.AddWithValue("$now", now);
         command.ExecuteNonQuery();
 
@@ -374,6 +406,10 @@ public sealed class SqliteBoardRepository
                     doctor_arrived_at TEXT NULL,
                     doctor_complete_at TEXT NULL,
                     room_available_at TEXT NULL,
+                    original_default_expected_units INTEGER NOT NULL DEFAULT 0,
+                    expected_allocation_units INTEGER NOT NULL DEFAULT 0,
+                    expected_allocation_minutes INTEGER NOT NULL DEFAULT 0,
+                    allocation_adjusted_from_default INTEGER NOT NULL DEFAULT 0,
                     updated_at TEXT NOT NULL
                 );
 
@@ -395,6 +431,10 @@ public sealed class SqliteBoardRepository
                     doctor_in_room_seconds INTEGER NULL,
                     turnover_seconds INTEGER NULL,
                     total_room_cycle_seconds INTEGER NULL,
+                    original_default_expected_units INTEGER NOT NULL DEFAULT 0,
+                    expected_allocation_units INTEGER NOT NULL DEFAULT 0,
+                    expected_allocation_minutes INTEGER NOT NULL DEFAULT 0,
+                    allocation_adjusted_from_default INTEGER NOT NULL DEFAULT 0,
                     final_wait_state TEXT NOT NULL,
                     aging_threshold_reached INTEGER NOT NULL DEFAULT 0,
                     stale_threshold_reached INTEGER NOT NULL DEFAULT 0,
@@ -426,6 +466,17 @@ public sealed class SqliteBoardRepository
         TryAddColumn(connection, "ALTER TABLE completed_room_cycles ADD COLUMN suggested_action TEXT NULL");
         TryAddColumn(connection, "ALTER TABLE completed_room_cycles ADD COLUMN reviewed_at TEXT NULL");
         TryAddColumn(connection, "ALTER TABLE completed_room_cycles ADD COLUMN reviewed_by TEXT NULL");
+
+        // Expected allocation snapshot (operational, non-PHI). Additive on both tables; existing
+        // rows default to 0 (no allocation captured), which is harmless for historical records.
+        TryAddColumn(connection, "ALTER TABLE active_rooms ADD COLUMN original_default_expected_units INTEGER NOT NULL DEFAULT 0");
+        TryAddColumn(connection, "ALTER TABLE active_rooms ADD COLUMN expected_allocation_units INTEGER NOT NULL DEFAULT 0");
+        TryAddColumn(connection, "ALTER TABLE active_rooms ADD COLUMN expected_allocation_minutes INTEGER NOT NULL DEFAULT 0");
+        TryAddColumn(connection, "ALTER TABLE active_rooms ADD COLUMN allocation_adjusted_from_default INTEGER NOT NULL DEFAULT 0");
+        TryAddColumn(connection, "ALTER TABLE completed_room_cycles ADD COLUMN original_default_expected_units INTEGER NOT NULL DEFAULT 0");
+        TryAddColumn(connection, "ALTER TABLE completed_room_cycles ADD COLUMN expected_allocation_units INTEGER NOT NULL DEFAULT 0");
+        TryAddColumn(connection, "ALTER TABLE completed_room_cycles ADD COLUMN expected_allocation_minutes INTEGER NOT NULL DEFAULT 0");
+        TryAddColumn(connection, "ALTER TABLE completed_room_cycles ADD COLUMN allocation_adjusted_from_default INTEGER NOT NULL DEFAULT 0");
 
         // Migration: ensure completed_room_cycles has an explicit id primary key column.
         // The table has declared "id INTEGER PRIMARY KEY AUTOINCREMENT" since its first version,
@@ -462,6 +513,10 @@ public sealed class SqliteBoardRepository
             doctor_in_room_seconds INTEGER NULL,
             turnover_seconds INTEGER NULL,
             total_room_cycle_seconds INTEGER NULL,
+            original_default_expected_units INTEGER NOT NULL DEFAULT 0,
+            expected_allocation_units INTEGER NOT NULL DEFAULT 0,
+            expected_allocation_minutes INTEGER NOT NULL DEFAULT 0,
+            allocation_adjusted_from_default INTEGER NOT NULL DEFAULT 0,
             final_wait_state TEXT NOT NULL,
             aging_threshold_reached INTEGER NOT NULL DEFAULT 0,
             stale_threshold_reached INTEGER NOT NULL DEFAULT 0,
@@ -498,6 +553,10 @@ public sealed class SqliteBoardRepository
         "doctor_in_room_seconds",
         "turnover_seconds",
         "total_room_cycle_seconds",
+        "original_default_expected_units",
+        "expected_allocation_units",
+        "expected_allocation_minutes",
+        "allocation_adjusted_from_default",
         "final_wait_state",
         "aging_threshold_reached",
         "stale_threshold_reached",
@@ -614,6 +673,10 @@ public sealed class SqliteBoardRepository
                 doctor_in_room_seconds INTEGER NULL,
                 turnover_seconds INTEGER NULL,
                 total_room_cycle_seconds INTEGER NULL,
+                original_default_expected_units INTEGER NOT NULL DEFAULT 0,
+                expected_allocation_units INTEGER NOT NULL DEFAULT 0,
+                expected_allocation_minutes INTEGER NOT NULL DEFAULT 0,
+                allocation_adjusted_from_default INTEGER NOT NULL DEFAULT 0,
                 final_wait_state TEXT NOT NULL,
                 aging_threshold_reached INTEGER NOT NULL DEFAULT 0,
                 stale_threshold_reached INTEGER NOT NULL DEFAULT 0,
@@ -658,6 +721,10 @@ public sealed class SqliteBoardRepository
                 suggested_action,
                 reviewed_at,
                 reviewed_by,
+                original_default_expected_units,
+                expected_allocation_units,
+                expected_allocation_minutes,
+                allocation_adjusted_from_default,
                 created_at,
                 updated_at
             )
@@ -689,6 +756,10 @@ public sealed class SqliteBoardRepository
                 suggested_action,
                 reviewed_at,
                 reviewed_by,
+                original_default_expected_units,
+                expected_allocation_units,
+                expected_allocation_minutes,
+                allocation_adjusted_from_default,
                 created_at,
                 updated_at
             FROM completed_room_cycles_v1;
@@ -773,6 +844,10 @@ public sealed class SqliteBoardRepository
                 doctor_arrived_at,
                 doctor_complete_at,
                 room_available_at,
+                original_default_expected_units,
+                expected_allocation_units,
+                expected_allocation_minutes,
+                allocation_adjusted_from_default,
                 updated_at
             )
             VALUES (
@@ -789,6 +864,10 @@ public sealed class SqliteBoardRepository
                 $doctorArrivedAt,
                 $doctorCompleteAt,
                 $roomAvailableAt,
+                $originalDefaultExpectedUnits,
+                $expectedAllocationUnits,
+                $expectedAllocationMinutes,
+                $allocationAdjustedFromDefault,
                 $updatedAt
             )
             ON CONFLICT(room_id) DO UPDATE SET
@@ -804,6 +883,10 @@ public sealed class SqliteBoardRepository
                 doctor_arrived_at = excluded.doctor_arrived_at,
                 doctor_complete_at = excluded.doctor_complete_at,
                 room_available_at = excluded.room_available_at,
+                original_default_expected_units = excluded.original_default_expected_units,
+                expected_allocation_units = excluded.expected_allocation_units,
+                expected_allocation_minutes = excluded.expected_allocation_minutes,
+                allocation_adjusted_from_default = excluded.allocation_adjusted_from_default,
                 updated_at = excluded.updated_at;
             """;
 
@@ -820,6 +903,10 @@ public sealed class SqliteBoardRepository
         command.Parameters.AddWithValue("$doctorArrivedAt", ToDbValue(room.DoctorArrivedAt));
         command.Parameters.AddWithValue("$doctorCompleteAt", ToDbValue(room.DoctorCompleteAt));
         command.Parameters.AddWithValue("$roomAvailableAt", ToDbValue(room.RoomAvailableAt));
+        command.Parameters.AddWithValue("$originalDefaultExpectedUnits", room.OriginalDefaultExpectedUnits);
+        command.Parameters.AddWithValue("$expectedAllocationUnits", room.ExpectedAllocationUnits);
+        command.Parameters.AddWithValue("$expectedAllocationMinutes", room.ExpectedAllocationMinutes);
+        command.Parameters.AddWithValue("$allocationAdjustedFromDefault", room.AllocationAdjustedFromDefault ? 1 : 0);
         command.Parameters.AddWithValue("$updatedAt", FormatDateTimeOffset(DateTimeOffset.UtcNow));
         command.ExecuteNonQuery();
     }

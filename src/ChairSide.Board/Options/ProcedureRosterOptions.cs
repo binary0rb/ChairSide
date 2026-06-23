@@ -2,12 +2,33 @@ using Microsoft.Extensions.Options;
 
 namespace ChairSide.Board.Options;
 
+/// <summary>
+/// Allocation behavior classifies how strongly staff should confirm a case's expected
+/// allocation at seating. Stored as a stable string so serialization stays simple and
+/// forward compatible. Operational metadata only - never PHI.
+/// </summary>
+public static class AllocationBehaviors
+{
+    /// <summary>Standardized procedure: expected allocation prepopulates with softer adjustment.</summary>
+    public const string Known = "Known";
+
+    /// <summary>Variable procedure: staff should be prompted more strongly to confirm allocation.</summary>
+    public const string Variable = "Variable";
+
+    public static bool IsValid(string? value) =>
+        string.Equals(value, Known, StringComparison.Ordinal) ||
+        string.Equals(value, Variable, StringComparison.Ordinal);
+}
+
 public sealed class ProcedureRosterOptions
 {
     public const string SectionName = "ProcedureRosterOptions";
 
     public List<ProcedureRosterItem> Procedures { get; set; } = [];
 
+    // DefaultExpectedUnits are placeholder operational baselines (1 unit = 10 minutes).
+    // They are intentionally rough and easy to tune later; do not treat them as clinically
+    // authoritative. AllocationBehavior follows the Known/Variable classification.
     public static List<ProcedureRosterItem> DefaultProcedures() =>
     [
         new()
@@ -16,7 +37,9 @@ public sealed class ProcedureRosterOptions
             Code = "CON",
             Label = "Consult",
             Icon = "speech",
-            Active = true
+            Active = true,
+            AllocationBehavior = AllocationBehaviors.Known,
+            DefaultExpectedUnits = 1
         },
         new()
         {
@@ -25,7 +48,9 @@ public sealed class ProcedureRosterOptions
             Label = "Extraction",
             Icon = "forceps",
             Active = true,
-            SedationEligible = true
+            SedationEligible = true,
+            AllocationBehavior = AllocationBehaviors.Variable,
+            DefaultExpectedUnits = 3
         },
         // Sedation is no longer a standalone selectable procedure. It is kept in the
         // roster as an inactive entry so historical records coded as "SED" still
@@ -37,7 +62,9 @@ public sealed class ProcedureRosterOptions
             Code = "SED",
             Label = "Sedation",
             Icon = "moon",
-            Active = false
+            Active = false,
+            AllocationBehavior = AllocationBehaviors.Variable,
+            DefaultExpectedUnits = 3
         },
         new()
         {
@@ -45,7 +72,9 @@ public sealed class ProcedureRosterOptions
             Code = "POST",
             Label = "Post-op",
             Icon = "check",
-            Active = true
+            Active = true,
+            AllocationBehavior = AllocationBehaviors.Known,
+            DefaultExpectedUnits = 1
         },
         new()
         {
@@ -54,7 +83,9 @@ public sealed class ProcedureRosterOptions
             Label = "Implant",
             Icon = "bolt",
             Active = true,
-            SedationEligible = true
+            SedationEligible = true,
+            AllocationBehavior = AllocationBehaviors.Variable,
+            DefaultExpectedUnits = 6
         },
         new()
         {
@@ -63,7 +94,9 @@ public sealed class ProcedureRosterOptions
             Label = "Biopsy",
             Icon = "vial",
             Active = true,
-            SedationEligible = true
+            SedationEligible = true,
+            AllocationBehavior = AllocationBehaviors.Variable,
+            DefaultExpectedUnits = 2
         },
         new()
         {
@@ -72,7 +105,9 @@ public sealed class ProcedureRosterOptions
             Label = "Misc",
             Icon = "check",
             Active = true,
-            SedationEligible = true
+            SedationEligible = true,
+            AllocationBehavior = AllocationBehaviors.Variable,
+            DefaultExpectedUnits = 2
         },
         new()
         {
@@ -80,7 +115,9 @@ public sealed class ProcedureRosterOptions
             Code = "POE",
             Label = "Periodic Exam",
             Icon = "speech",
-            Active = true
+            Active = true,
+            AllocationBehavior = AllocationBehaviors.Known,
+            DefaultExpectedUnits = 1
         },
         new()
         {
@@ -88,7 +125,9 @@ public sealed class ProcedureRosterOptions
             Code = "IMPRES",
             Label = "Impressions",
             Icon = "teeth",
-            Active = true
+            Active = true,
+            AllocationBehavior = AllocationBehaviors.Known,
+            DefaultExpectedUnits = 2
         },
         new()
         {
@@ -96,7 +135,9 @@ public sealed class ProcedureRosterOptions
             Code = "INTCK",
             Label = "Integration Check",
             Icon = "sync",
-            Active = true
+            Active = true,
+            AllocationBehavior = AllocationBehaviors.Known,
+            DefaultExpectedUnits = 1
         },
         new()
         {
@@ -104,7 +145,9 @@ public sealed class ProcedureRosterOptions
             Code = "BXPOST",
             Label = "Biopsy Post-op",
             Icon = "vial",
-            Active = true
+            Active = true,
+            AllocationBehavior = AllocationBehaviors.Known,
+            DefaultExpectedUnits = 1
         },
         new()
         {
@@ -113,7 +156,9 @@ public sealed class ProcedureRosterOptions
             Label = "Implant Removal",
             Icon = "wrench",
             Active = true,
-            SedationEligible = true
+            SedationEligible = true,
+            AllocationBehavior = AllocationBehaviors.Variable,
+            DefaultExpectedUnits = 3
         },
         new()
         {
@@ -121,7 +166,9 @@ public sealed class ProcedureRosterOptions
             Code = "PCOC",
             Label = "Phone -> Office Consult",
             Icon = "phone",
-            Active = true
+            Active = true,
+            AllocationBehavior = AllocationBehaviors.Known,
+            DefaultExpectedUnits = 1
         },
         new()
         {
@@ -130,7 +177,9 @@ public sealed class ProcedureRosterOptions
             Label = "Uncover",
             Icon = "uncover",
             Active = true,
-            SedationEligible = true
+            SedationEligible = true,
+            AllocationBehavior = AllocationBehaviors.Variable,
+            DefaultExpectedUnits = 2
         },
         new()
         {
@@ -139,7 +188,9 @@ public sealed class ProcedureRosterOptions
             Label = "Expose and Bond",
             Icon = "bond",
             Active = true,
-            SedationEligible = true
+            SedationEligible = true,
+            AllocationBehavior = AllocationBehaviors.Variable,
+            DefaultExpectedUnits = 3
         },
         new()
         {
@@ -148,7 +199,9 @@ public sealed class ProcedureRosterOptions
             Label = "All on Four",
             Icon = "archfour",
             Active = true,
-            SedationEligible = true
+            SedationEligible = true,
+            AllocationBehavior = AllocationBehaviors.Variable,
+            DefaultExpectedUnits = 12
         }
     ];
 }
@@ -171,6 +224,18 @@ public sealed class ProcedureRosterItem
     /// qualifies an eligible primary procedure (e.g. Extraction + Sedation).
     /// </summary>
     public bool SedationEligible { get; set; }
+
+    /// <summary>
+    /// Known or Variable. Drives how strongly staff are prompted to confirm expected
+    /// allocation at seating. Operational metadata only - never PHI.
+    /// </summary>
+    public string AllocationBehavior { get; set; } = AllocationBehaviors.Variable;
+
+    /// <summary>
+    /// Default expected allocation in 10-minute units (1 unit = 10 minutes). Prepopulates
+    /// the case-level expected allocation snapshot at seating; staff may override it.
+    /// </summary>
+    public int DefaultExpectedUnits { get; set; } = 1;
 }
 
 public sealed class ProcedureRosterOptionsValidator : IValidateOptions<ProcedureRosterOptions>
@@ -205,6 +270,16 @@ public sealed class ProcedureRosterOptionsValidator : IValidateOptions<Procedure
             if (string.IsNullOrWhiteSpace(procedure.Icon))
             {
                 failures.Add($"{prefix}:Icon is required.");
+            }
+
+            if (!AllocationBehaviors.IsValid(procedure.AllocationBehavior))
+            {
+                failures.Add($"{prefix}:AllocationBehavior must be either '{AllocationBehaviors.Known}' or '{AllocationBehaviors.Variable}'.");
+            }
+
+            if (procedure.DefaultExpectedUnits < 1)
+            {
+                failures.Add($"{prefix}:DefaultExpectedUnits must be greater than 0.");
             }
         }
 

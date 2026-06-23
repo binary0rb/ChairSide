@@ -387,6 +387,226 @@ public sealed class BoardStoreTests
             snapshot.Procedures.Where(procedure => procedure.SedationEligible).Select(procedure => procedure.Code));
     }
 
+    // -------------------------------------------------------------------------
+    // Expected allocation snapshot (operational, non-PHI; 1 unit = 10 minutes)
+    // -------------------------------------------------------------------------
+
+    [Fact]
+    public void Procedure_roster_exposes_allocation_behavior_and_default_expected_units()
+    {
+        using var workspace = TestWorkspace.Create();
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production);
+
+        var snapshot = context.Store.GetSnapshot();
+
+        var extraction = snapshot.Procedures.Single(procedure => procedure.Code == "EXT");
+        Assert.Equal(AllocationBehaviors.Variable, extraction.AllocationBehavior);
+        Assert.Equal(3, extraction.DefaultExpectedUnits);
+
+        var consult = snapshot.Procedures.Single(procedure => procedure.Code == "CON");
+        Assert.Equal(AllocationBehaviors.Known, consult.AllocationBehavior);
+        Assert.Equal(1, consult.DefaultExpectedUnits);
+    }
+
+    [Fact]
+    public void Procedure_allocation_behavior_classification_matches_known_and_variable_lists()
+    {
+        using var workspace = TestWorkspace.Create();
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production);
+
+        var behaviorByCode = context.Store.GetSnapshot().Procedures
+            .ToDictionary(procedure => procedure.Code, procedure => procedure.AllocationBehavior);
+
+        string[] expectedVariable = ["EXT", "IMP", "IMPRM", "EXBOND", "AO4", "UNCOV", "BX", "MISC"];
+        string[] expectedKnown = ["CON", "POST", "POE", "IMPRES", "INTCK", "BXPOST", "PCOC"];
+
+        foreach (var code in expectedVariable)
+        {
+            Assert.Equal(AllocationBehaviors.Variable, behaviorByCode[code]);
+        }
+
+        foreach (var code in expectedKnown)
+        {
+            Assert.Equal(AllocationBehaviors.Known, behaviorByCode[code]);
+        }
+
+        // Every active procedure is classified by exactly one of the two lists.
+        Assert.Equal(expectedVariable.Length + expectedKnown.Length, behaviorByCode.Count);
+    }
+
+    [Fact]
+    public void Seating_without_units_applies_procedure_default_allocation()
+    {
+        using var workspace = TestWorkspace.Create();
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production);
+
+        // EXT default is 3 units (30 minutes).
+        var seated = context.Store.SeatRoom(1, "otte", "EXT");
+        Assert.NotNull(seated);
+        Assert.Equal(3, seated.OriginalDefaultExpectedUnits);
+        Assert.Equal(3, seated.ExpectedAllocationUnits);
+        Assert.Equal(30, seated.ExpectedAllocationMinutes);
+        Assert.False(seated.AllocationAdjustedFromDefault);
+    }
+
+    [Fact]
+    public void Seating_with_explicit_units_stores_final_allocation()
+    {
+        using var workspace = TestWorkspace.Create();
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production);
+
+        var seated = context.Store.SeatRoom(1, "otte", "EXT", expectedAllocationUnits: 5);
+        Assert.NotNull(seated);
+        Assert.Equal(3, seated.OriginalDefaultExpectedUnits);
+        Assert.Equal(5, seated.ExpectedAllocationUnits);
+        Assert.Equal(50, seated.ExpectedAllocationMinutes);
+        Assert.True(seated.AllocationAdjustedFromDefault);
+    }
+
+    [Fact]
+    public void Allocation_adjusted_flag_is_false_when_units_equal_default()
+    {
+        using var workspace = TestWorkspace.Create();
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production);
+
+        // Explicitly supplying the default value is not an adjustment.
+        var seated = context.Store.SeatRoom(1, "otte", "EXT", expectedAllocationUnits: 3);
+        Assert.NotNull(seated);
+        Assert.Equal(3, seated.ExpectedAllocationUnits);
+        Assert.Equal(30, seated.ExpectedAllocationMinutes);
+        Assert.False(seated.AllocationAdjustedFromDefault);
+    }
+
+    [Fact]
+    public void Allocation_adjusted_flag_is_true_when_units_differ_from_default()
+    {
+        using var workspace = TestWorkspace.Create();
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production);
+
+        var seated = context.Store.SeatRoom(1, "otte", "IMP", expectedAllocationUnits: 4);
+        Assert.NotNull(seated);
+        Assert.Equal(6, seated.OriginalDefaultExpectedUnits);
+        Assert.Equal(4, seated.ExpectedAllocationUnits);
+        Assert.Equal(40, seated.ExpectedAllocationMinutes);
+        Assert.True(seated.AllocationAdjustedFromDefault);
+    }
+
+    [Fact]
+    public void Seating_with_zero_units_clamps_to_minimum_and_never_yields_zero_minutes()
+    {
+        using var workspace = TestWorkspace.Create();
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production);
+
+        // Explicit 0 must not produce a 0-minute expected allocation.
+        var seated = context.Store.SeatRoom(1, "otte", "EXT", expectedAllocationUnits: 0);
+        Assert.NotNull(seated);
+        Assert.Equal(1, seated.ExpectedAllocationUnits);
+        Assert.Equal(10, seated.ExpectedAllocationMinutes);
+        // EXT default is 3, so a clamped-to-1 value is an adjustment from default.
+        Assert.True(seated.AllocationAdjustedFromDefault);
+    }
+
+    [Fact]
+    public void Seating_with_negative_units_clamps_to_minimum()
+    {
+        using var workspace = TestWorkspace.Create();
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production);
+
+        var seated = context.Store.SeatRoom(1, "otte", "EXT", expectedAllocationUnits: -5);
+        Assert.NotNull(seated);
+        Assert.Equal(1, seated.ExpectedAllocationUnits);
+        Assert.Equal(10, seated.ExpectedAllocationMinutes);
+    }
+
+    [Fact]
+    public void Seating_with_units_above_maximum_clamps_to_maximum()
+    {
+        using var workspace = TestWorkspace.Create();
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production);
+
+        var seated = context.Store.SeatRoom(1, "otte", "EXT", expectedAllocationUnits: 100);
+        Assert.NotNull(seated);
+        Assert.Equal(24, seated.ExpectedAllocationUnits);
+        Assert.Equal(240, seated.ExpectedAllocationMinutes);
+        Assert.True(seated.AllocationAdjustedFromDefault);
+    }
+
+    [Fact]
+    public void Allocation_snapshot_carries_from_active_room_into_completed_cycle()
+    {
+        using var workspace = TestWorkspace.Create();
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production);
+
+        Assert.NotNull(context.Store.SeatRoom(1, "otte", "IMP", expectedAllocationUnits: 7));
+        Assert.NotNull(context.Store.MarkReadyForDoctor(1));
+        Assert.NotNull(context.Store.MarkDoctorArrived(1));
+        Assert.NotNull(context.Store.MarkDoctorComplete(1));
+        Assert.NotNull(context.Store.MarkRoomAvailable(1));
+
+        var cycle = Assert.Single(context.Store.GetReports().RecentCompletedCycles);
+        Assert.Equal(6, cycle.OriginalDefaultExpectedUnits);
+        Assert.Equal(7, cycle.ExpectedAllocationUnits);
+        Assert.Equal(70, cycle.ExpectedAllocationMinutes);
+        Assert.True(cycle.AllocationAdjustedFromDefault);
+    }
+
+    [Fact]
+    public void Allocation_snapshot_survives_restart_for_active_rooms()
+    {
+        using var workspace = TestWorkspace.Create();
+        var databasePath = workspace.ProductionDatabasePath();
+
+        var first = StoreContext.Create(workspace, environmentName: Environments.Production, databasePath: databasePath);
+        Assert.NotNull(first.Store.SeatRoom(1, "otte", "EXT", expectedAllocationUnits: 5));
+
+        var second = StoreContext.Create(workspace, environmentName: Environments.Production, databasePath: databasePath);
+        var reloaded = second.Store.GetRoom(1);
+
+        Assert.NotNull(reloaded);
+        Assert.Equal(3, reloaded.OriginalDefaultExpectedUnits);
+        Assert.Equal(5, reloaded.ExpectedAllocationUnits);
+        Assert.Equal(50, reloaded.ExpectedAllocationMinutes);
+        Assert.True(reloaded.AllocationAdjustedFromDefault);
+    }
+
+    [Fact]
+    public void Allocation_snapshot_survives_restart_for_completed_cycles()
+    {
+        using var workspace = TestWorkspace.Create();
+        var databasePath = workspace.ProductionDatabasePath();
+
+        var first = StoreContext.Create(workspace, environmentName: Environments.Production, databasePath: databasePath);
+        Assert.NotNull(first.Store.SeatRoom(1, "otte", "IMP", expectedAllocationUnits: 9));
+        Assert.NotNull(first.Store.MarkReadyForDoctor(1));
+        Assert.NotNull(first.Store.MarkDoctorArrived(1));
+        Assert.NotNull(first.Store.MarkDoctorComplete(1));
+        Assert.NotNull(first.Store.MarkRoomAvailable(1));
+
+        var second = StoreContext.Create(workspace, environmentName: Environments.Production, databasePath: databasePath);
+        var cycle = Assert.Single(second.Store.GetReports().RecentCompletedCycles);
+
+        Assert.Equal(6, cycle.OriginalDefaultExpectedUnits);
+        Assert.Equal(9, cycle.ExpectedAllocationUnits);
+        Assert.Equal(90, cycle.ExpectedAllocationMinutes);
+        Assert.True(cycle.AllocationAdjustedFromDefault);
+    }
+
+    [Fact]
+    public void Sedation_variant_inherits_base_procedure_default_allocation()
+    {
+        using var workspace = TestWorkspace.Create();
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production);
+
+        // The sedation modifier does not change which roster default applies.
+        var seated = context.Store.SeatRoom(1, "otte", "EXT", sedation: true);
+        Assert.NotNull(seated);
+        Assert.Equal("EXT+SED", seated.ProcedureCode);
+        Assert.Equal(3, seated.OriginalDefaultExpectedUnits);
+        Assert.Equal(3, seated.ExpectedAllocationUnits);
+        Assert.Equal(30, seated.ExpectedAllocationMinutes);
+        Assert.False(seated.AllocationAdjustedFromDefault);
+    }
+
     [Fact]
     public void Inactive_doctors_and_procedures_are_not_selectable()
     {
@@ -655,7 +875,7 @@ public sealed class BoardStoreTests
     }
 
     [Fact]
-    public void Legacy_standalone_sedation_completed_cycle_is_readable_and_counted_as_sedation()
+    public void Legacy_standalone_sedation_completed_cycle_is_flagged_excluded_but_readable()
     {
         using var workspace = TestWorkspace.Create();
         var databasePath = workspace.ProductionDatabasePath();
@@ -688,18 +908,178 @@ public sealed class BoardStoreTests
         var second = StoreContext.Create(workspace, environmentName: Environments.Production, databasePath: databasePath);
         var reports = second.Store.GetReports();
 
-        // Readable label, never blank; treated as a sedation-related variant and base bucket.
-        var variant = Assert.Single(reports.ProcedureSummaries, summary => summary.ProcedureCode == "SED");
-        Assert.Equal("Sedation", variant.ProcedureLabel);
-        Assert.Equal("SED", variant.BaseProcedureCode);
-        Assert.True(variant.IsSedationCase);
-
-        var baseSummary = Assert.Single(reports.BaseProcedureSummaries, summary => summary.ProcedureCode == "SED");
-        Assert.Equal("Sedation", baseSummary.ProcedureLabel);
-        Assert.Equal(1, baseSummary.CompletedCycleCount);
-
-        Assert.Equal(1, reports.SedationCaseCount);
+        // Standalone Sedation is legacy data now that sedation is a modifier: it must not appear as a
+        // current procedure family and must not contribute to standard sedation counts.
+        Assert.DoesNotContain(reports.ProcedureSummaries, summary => summary.ProcedureCode == "SED");
+        Assert.DoesNotContain(reports.BaseProcedureSummaries, summary => summary.ProcedureCode == "SED");
+        Assert.Equal(0, reports.SedationCaseCount);
         Assert.Equal(0, reports.NonSedationCaseCount);
+        Assert.Equal(0, reports.IncludedCompletedCycleCount);
+        Assert.Equal(1, reports.ExcludedCompletedCycleCount);
+        Assert.Equal(1, reports.ExceptionCount);
+
+        // The record is retained and remains visible in raw/audit output, flagged and relabeled.
+        var legacy = Assert.Single(reports.RecentCompletedCycles, cycle => cycle.ProcedureCode == "SED");
+        Assert.True(legacy.HasReportingException);
+        Assert.True(legacy.IsLegacyProcedure);
+        Assert.False(legacy.IsUnmappedProcedure);
+        Assert.True(legacy.IsExcludedFromStandardMetrics);
+        Assert.Contains(ReportingExceptionReasons.LegacyProcedure, legacy.ReportingExceptionReasons);
+        Assert.Equal("Sedation (Legacy)", legacy.DisplayProcedureLabel);
+    }
+
+    [Fact]
+    public void Unknown_procedure_completed_cycle_is_flagged_as_unmapped_and_excluded()
+    {
+        using var workspace = TestWorkspace.Create();
+        var databasePath = workspace.ProductionDatabasePath();
+        var baseTime = new DateTimeOffset(2026, 6, 1, 8, 0, 0, TimeSpan.Zero);
+
+        var first = StoreContext.Create(workspace, environmentName: Environments.Production, databasePath: databasePath);
+
+        var unmappedCycle = new CompletedRoomCycle
+        {
+            RoomId = 1,
+            AssignedDoctor = "otte",
+            ProcedureCode = "ZZZ",
+            SeatedAt = baseTime,
+            ReadyForDoctorAt = baseTime.AddMinutes(5),
+            DoctorArrivedAt = baseTime.AddMinutes(15),
+            DoctorCompleteAt = baseTime.AddMinutes(25),
+            RoomAvailableAt = baseTime.AddMinutes(30),
+            SeatedToDoctorSeconds = 900,
+            PrepSeconds = 300,
+            ReadyToDoctorSeconds = 600,
+            DoctorInRoomSeconds = 600,
+            TurnoverSeconds = 300,
+            TotalRoomCycleSeconds = 1800,
+            FinalWaitState = "ready-for-doctor"
+        };
+        first.Repository.SaveCompletedCycle(unmappedCycle, first.Doctors, first.Procedures);
+
+        var second = StoreContext.Create(workspace, environmentName: Environments.Production, databasePath: databasePath);
+        var reports = second.Store.GetReports();
+
+        Assert.DoesNotContain(reports.ProcedureSummaries, summary => summary.ProcedureCode == "ZZZ");
+        Assert.Equal(0, reports.IncludedCompletedCycleCount);
+        Assert.Equal(1, reports.ExcludedCompletedCycleCount);
+
+        var unmapped = Assert.Single(reports.RecentCompletedCycles, cycle => cycle.ProcedureCode == "ZZZ");
+        Assert.True(unmapped.HasReportingException);
+        Assert.True(unmapped.IsUnmappedProcedure);
+        Assert.False(unmapped.IsLegacyProcedure);
+        Assert.True(unmapped.IsExcludedFromStandardMetrics);
+        Assert.Contains(ReportingExceptionReasons.UnmappedProcedure, unmapped.ReportingExceptionReasons);
+        Assert.Equal("ZZZ (Unmapped)", unmapped.DisplayProcedureLabel);
+    }
+
+    [Fact]
+    public void Extreme_duration_completed_cycle_is_flagged_and_excluded()
+    {
+        using var workspace = TestWorkspace.Create();
+        var databasePath = workspace.ProductionDatabasePath();
+        // ~18 hour case flow, modelling an accidentally-open overnight record.
+        var seatedAt = new DateTimeOffset(2026, 6, 1, 8, 0, 0, TimeSpan.Zero);
+
+        var first = StoreContext.Create(workspace, environmentName: Environments.Production, databasePath: databasePath);
+
+        var extremeCycle = new CompletedRoomCycle
+        {
+            RoomId = 1,
+            AssignedDoctor = "otte",
+            ProcedureCode = "EXT",
+            SeatedAt = seatedAt,
+            ReadyForDoctorAt = seatedAt.AddMinutes(5),
+            DoctorArrivedAt = seatedAt.AddMinutes(15),
+            DoctorCompleteAt = seatedAt.AddHours(18),
+            RoomAvailableAt = seatedAt.AddHours(18).AddMinutes(5),
+            SeatedToDoctorSeconds = 900,
+            PrepSeconds = 300,
+            ReadyToDoctorSeconds = 600,
+            DoctorInRoomSeconds = 63900,
+            TurnoverSeconds = 300,
+            TotalRoomCycleSeconds = 65100,
+            FinalWaitState = "ready-for-doctor"
+        };
+        first.Repository.SaveCompletedCycle(extremeCycle, first.Doctors, first.Procedures);
+
+        var second = StoreContext.Create(workspace, environmentName: Environments.Production, databasePath: databasePath);
+        var reports = second.Store.GetReports();
+
+        Assert.DoesNotContain(reports.ProcedureSummaries, summary => summary.ProcedureCode == "EXT");
+        Assert.Equal(0, reports.IncludedCompletedCycleCount);
+        Assert.Equal(1, reports.ExcludedCompletedCycleCount);
+
+        var extreme = Assert.Single(reports.RecentCompletedCycles, cycle => cycle.RoomId == 1);
+        Assert.True(extreme.HasReportingException);
+        Assert.True(extreme.IsExcludedFromStandardMetrics);
+        Assert.Contains(ReportingExceptionReasons.ExtremeDuration, extreme.ReportingExceptionReasons);
+    }
+
+    [Fact]
+    public void Overnight_lifecycle_completed_cycle_is_flagged_independent_of_duration()
+    {
+        using var workspace = TestWorkspace.Create();
+        var databasePath = workspace.ProductionDatabasePath();
+        // A short (~1 hour) case that nonetheless crosses midnight.
+        var seatedAt = new DateTimeOffset(2026, 6, 1, 23, 30, 0, TimeSpan.Zero);
+
+        var first = StoreContext.Create(workspace, environmentName: Environments.Production, databasePath: databasePath);
+
+        var overnightCycle = new CompletedRoomCycle
+        {
+            RoomId = 1,
+            AssignedDoctor = "otte",
+            ProcedureCode = "EXT",
+            SeatedAt = seatedAt,
+            ReadyForDoctorAt = seatedAt.AddMinutes(5),
+            DoctorArrivedAt = seatedAt.AddMinutes(15),
+            DoctorCompleteAt = seatedAt.AddMinutes(45),
+            RoomAvailableAt = seatedAt.AddMinutes(50),
+            SeatedToDoctorSeconds = 900,
+            PrepSeconds = 300,
+            ReadyToDoctorSeconds = 600,
+            DoctorInRoomSeconds = 1800,
+            TurnoverSeconds = 300,
+            TotalRoomCycleSeconds = 3000,
+            FinalWaitState = "ready-for-doctor"
+        };
+        first.Repository.SaveCompletedCycle(overnightCycle, first.Doctors, first.Procedures);
+
+        var second = StoreContext.Create(workspace, environmentName: Environments.Production, databasePath: databasePath);
+        var reports = second.Store.GetReports();
+
+        var overnight = Assert.Single(reports.RecentCompletedCycles, cycle => cycle.RoomId == 1);
+        Assert.True(overnight.HasReportingException);
+        Assert.True(overnight.IsExcludedFromStandardMetrics);
+        Assert.Contains(ReportingExceptionReasons.OvernightLifecycle, overnight.ReportingExceptionReasons);
+        // A 45-minute case is overnight but not extreme.
+        Assert.DoesNotContain(ReportingExceptionReasons.ExtremeDuration, overnight.ReportingExceptionReasons);
+        Assert.Equal(1, reports.ExcludedCompletedCycleCount);
+    }
+
+    [Fact]
+    public void Normal_completed_cycle_is_not_flagged_and_is_included()
+    {
+        using var workspace = TestWorkspace.Create();
+        var baseTime = new DateTimeOffset(2026, 6, 1, 8, 0, 0, TimeSpan.Zero);
+        var clock = new ManualTimeProvider(baseTime);
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production, timeProvider: clock);
+
+        RunProcedureCycle(context, clock, baseTime, 1, "otte", "EXT", prepMin: 5, readyMin: 10, doctorMin: 10, turnoverMin: 5);
+
+        var reports = context.Store.GetReports();
+
+        var cycle = Assert.Single(reports.RecentCompletedCycles);
+        Assert.False(cycle.HasReportingException);
+        Assert.False(cycle.IsExcludedFromStandardMetrics);
+        Assert.Empty(cycle.ReportingExceptionReasons);
+        Assert.Equal("Extraction", cycle.DisplayProcedureLabel);
+        Assert.Equal(1, reports.IncludedCompletedCycleCount);
+        Assert.Equal(0, reports.ExcludedCompletedCycleCount);
+        Assert.Equal(0, reports.ExceptionCount);
+        // The included cycle still drives standard procedure baselines.
+        Assert.Contains(reports.ProcedureSummaries, summary => summary.ProcedureCode == "EXT");
     }
 
     [Fact]
@@ -3409,6 +3789,10 @@ public sealed class BoardStoreTests
         "doctor_arrived_at",
         "doctor_complete_at",
         "room_available_at",
+        "original_default_expected_units",
+        "expected_allocation_units",
+        "expected_allocation_minutes",
+        "allocation_adjusted_from_default",
         "updated_at"
     ];
 
@@ -3431,6 +3815,10 @@ public sealed class BoardStoreTests
         "doctor_in_room_seconds",
         "turnover_seconds",
         "total_room_cycle_seconds",
+        "original_default_expected_units",
+        "expected_allocation_units",
+        "expected_allocation_minutes",
+        "allocation_adjusted_from_default",
         "final_wait_state",
         "aging_threshold_reached",
         "stale_threshold_reached",

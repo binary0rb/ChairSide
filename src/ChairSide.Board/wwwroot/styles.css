@@ -1615,6 +1615,99 @@ button:disabled {
   color: #ffffff;
 }
 
+/* Reporting data-hygiene badges: small neutral pills in the raw/audit cycle table. Never alarm. */
+.report-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.report-badge {
+  display: inline-block;
+  padding: 2px 6px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #f1f5f9;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.report-badge-excluded {
+  border-color: #cbd5e1;
+  background: #e2e8f0;
+  color: #475569;
+}
+
+/* Expected allocation stepper: compact, touch-friendly, restrained emphasis. */
+.allocation-selector {
+  display: flex;
+  align-items: stretch;
+  gap: 12px;
+}
+
+.allocation-step {
+  flex: 0 0 auto;
+  width: 64px;
+  min-height: 56px;
+  border: 2px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel);
+  color: var(--ink);
+  font-size: 28px;
+  font-weight: 800;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.allocation-step:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.allocation-readout {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-height: 56px;
+  padding: 6px 12px;
+  border: 2px solid var(--line);
+  border-radius: 10px;
+  background: #f8fafc;
+}
+
+.allocation-readout .allocation-units {
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--ink);
+}
+
+.allocation-readout .allocation-minutes {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.allocation-hint {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* Variable procedures get a subtle confirm cue on the readout - never alarm styling. */
+.allocation-section.allocation-variable .allocation-readout {
+  border-color: #2563eb;
+  background: #eff4ff;
+}
+
+.allocation-section.allocation-variable .allocation-hint {
+  color: #1d4ed8;
+}
+
 @keyframes agingBorderPulse {
   0%,
   100% {

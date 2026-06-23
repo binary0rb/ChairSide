@@ -16,6 +16,31 @@ public static class ExceptionReasons
     public const string AfterHoursSweep = "AfterHoursSweep";
 }
 
+/// <summary>
+/// Neutral, non-punitive reporting-time classifications derived from a completed cycle's own
+/// data (never persisted). These protect doctor-facing summaries from legacy/sample/training
+/// records without deleting or hiding them: flagged cycles stay visible in raw/audit output but
+/// are excluded from standard aggregates. Distinct from the manual <see cref="ExceptionReasons"/>
+/// review workflow.
+/// </summary>
+public static class ReportingExceptionReasons
+{
+    /// <summary>Procedure resolves in the roster but is no longer active (e.g. standalone Sedation).</summary>
+    public const string LegacyProcedure = "LegacyProcedure";
+
+    /// <summary>Procedure code cannot be resolved to any roster entry.</summary>
+    public const string UnmappedProcedure = "UnmappedProcedure";
+
+    /// <summary>Measured duration exceeds a conservative threshold.</summary>
+    public const string ExtremeDuration = "ExtremeDuration";
+
+    /// <summary>Seated and completed/available timestamps fall on different calendar days.</summary>
+    public const string OvernightLifecycle = "OvernightLifecycle";
+
+    /// <summary>Timestamps required for standard timing calculations are missing.</summary>
+    public const string MissingTiming = "MissingTiming";
+}
+
 public sealed class DemoBoardStore
 {
     private const int MaxRoomEvents = 200;
@@ -124,7 +149,7 @@ public sealed class DemoBoardStore
         }
     }
 
-    public RoomStatus? SeatRoom(int roomNumber, string doctorId, string procedureCode, int demoElapsedMinutes = 0, bool sedation = false)
+    public RoomStatus? SeatRoom(int roomNumber, string doctorId, string procedureCode, int demoElapsedMinutes = 0, bool sedation = false, int? expectedAllocationUnits = null)
     {
         lock (_syncRoot)
         {
@@ -149,6 +174,7 @@ public sealed class DemoBoardStore
             var simulatedElapsed = TimeSpan.FromMinutes(Math.Clamp(effectiveDemoElapsedMinutes, 0, 240));
             room.AssignedDoctor = doctor.Id;
             room.ProcedureCode = storedProcedureCode;
+            ApplyExpectedAllocation(room, procedure, expectedAllocationUnits);
             room.SeatedAt = now - simulatedElapsed;
             room.AgingStartedAt = null;
             room.StaleStartedAt = null;
@@ -393,7 +419,11 @@ public sealed class DemoBoardStore
                 ReadyToDoctorSeconds = readyToDoctorSeconds,
                 FinalWaitState = finalWaitState,
                 AgingThresholdReached = room.AgingStartedAt is not null,
-                StaleThresholdReached = room.StaleStartedAt is not null
+                StaleThresholdReached = room.StaleStartedAt is not null,
+                OriginalDefaultExpectedUnits = room.OriginalDefaultExpectedUnits,
+                ExpectedAllocationUnits = room.ExpectedAllocationUnits,
+                ExpectedAllocationMinutes = room.ExpectedAllocationMinutes,
+                AllocationAdjustedFromDefault = room.AllocationAdjustedFromDefault
             };
             _completedCycles.Add(cycle);
         }
@@ -482,9 +512,23 @@ public sealed class DemoBoardStore
                 .OrderByDescending(cycle => cycle.DoctorArrivedAt)
                 .ToList();
 
-            // Exception cycles are excluded from normal operational metrics by default.
+            // Classify every cycle for reporting data hygiene (legacy/unmapped procedures,
+            // extreme/overnight durations, missing timing). This only annotates derived metadata;
+            // it never mutates persisted state or the manual review queue.
+            AnnotateReportingExceptions(allCycles);
+
+            // Manual review exceptions are excluded from normal operational metrics by default.
             var normalCycles = allCycles.Where(cycle => !cycle.IsException).ToList();
+            // Standard population additionally drops reporting-exception cycles (legacy/unmapped/
+            // extreme/overnight) so doctor-facing aggregates are not skewed by sample/legacy data.
+            var standardCycles = normalCycles.Where(cycle => !cycle.IsExcludedFromStandardMetrics).ToList();
+
+            // Raw/audit completed set keeps reporting-exception cycles visible (with badges);
+            // the standard completed set drives aggregates.
             var normalCompletedCycles = normalCycles
+                .Where(cycle => cycle.RoomAvailableAt is not null)
+                .ToList();
+            var standardCompletedCycles = standardCycles
                 .Where(cycle => cycle.RoomAvailableAt is not null)
                 .ToList();
 
@@ -496,35 +540,39 @@ public sealed class DemoBoardStore
                 .OrderByDescending(cycle => cycle.SeatedAt)
                 .ToList();
 
-            // Annotate normal cycles with doctor-occupied and doctor-available wait.
-            // Exception cycles are excluded from the blocker pool per spec.
-            AnnotateOccupiedWait(normalCycles, normalCycles);
+            // Annotate the raw display set with doctor-occupied / available wait, but use only the
+            // standard population as the blocker pool so an extreme/overnight outlier never distorts
+            // another cycle's occupied wait.
+            AnnotateOccupiedWait(normalCycles, standardCycles);
 
             return new ReportsSnapshot(
                 normalCompletedCycles.Count,
-                AverageSeconds(normalCycles.Select(cycle => (int?)cycle.SeatedToDoctorSeconds)),
-                MedianSeconds(normalCycles.Select(cycle => (int?)cycle.SeatedToDoctorSeconds)),
-                AverageSeconds(normalCycles.Select(cycle => cycle.PrepSeconds)),
-                MedianSeconds(normalCycles.Select(cycle => cycle.PrepSeconds)),
-                AverageSeconds(normalCycles.Select(cycle => cycle.ReadyToDoctorSeconds)),
-                MedianSeconds(normalCycles.Select(cycle => cycle.ReadyToDoctorSeconds)),
-                AverageSeconds(normalCycles.Select(cycle => cycle.DoctorInRoomSeconds)),
-                MedianSeconds(normalCycles.Select(cycle => cycle.DoctorInRoomSeconds)),
-                AverageSeconds(normalCycles.Select(cycle => cycle.TurnoverSeconds)),
-                MedianSeconds(normalCycles.Select(cycle => cycle.TurnoverSeconds)),
-                normalCycles.Count(cycle => cycle.AgingThresholdReached),
-                normalCycles.Count(cycle => cycle.StaleThresholdReached),
-                AverageSeconds(normalCycles.Select(cycle => cycle.DoctorOccupiedWaitSeconds)),
-                MedianSeconds(normalCycles.Select(cycle => cycle.DoctorOccupiedWaitSeconds)),
-                AverageSeconds(normalCycles.Select(cycle => cycle.DoctorAvailableWaitSeconds)),
-                MedianSeconds(normalCycles.Select(cycle => cycle.DoctorAvailableWaitSeconds)),
-                BuildDoctorSummaries(normalCycles),
+                AverageSeconds(standardCycles.Select(cycle => (int?)cycle.SeatedToDoctorSeconds)),
+                MedianSeconds(standardCycles.Select(cycle => (int?)cycle.SeatedToDoctorSeconds)),
+                AverageSeconds(standardCycles.Select(cycle => cycle.PrepSeconds)),
+                MedianSeconds(standardCycles.Select(cycle => cycle.PrepSeconds)),
+                AverageSeconds(standardCycles.Select(cycle => cycle.ReadyToDoctorSeconds)),
+                MedianSeconds(standardCycles.Select(cycle => cycle.ReadyToDoctorSeconds)),
+                AverageSeconds(standardCycles.Select(cycle => cycle.DoctorInRoomSeconds)),
+                MedianSeconds(standardCycles.Select(cycle => cycle.DoctorInRoomSeconds)),
+                AverageSeconds(standardCycles.Select(cycle => cycle.TurnoverSeconds)),
+                MedianSeconds(standardCycles.Select(cycle => cycle.TurnoverSeconds)),
+                standardCycles.Count(cycle => cycle.AgingThresholdReached),
+                standardCycles.Count(cycle => cycle.StaleThresholdReached),
+                AverageSeconds(standardCycles.Select(cycle => cycle.DoctorOccupiedWaitSeconds)),
+                MedianSeconds(standardCycles.Select(cycle => cycle.DoctorOccupiedWaitSeconds)),
+                AverageSeconds(standardCycles.Select(cycle => cycle.DoctorAvailableWaitSeconds)),
+                MedianSeconds(standardCycles.Select(cycle => cycle.DoctorAvailableWaitSeconds)),
+                BuildDoctorSummaries(standardCycles),
                 normalCompletedCycles.Take(25).ToList(),
                 exceptionCycles,
-                BuildProcedureSummaries(normalCompletedCycles),
-                normalCompletedCycles.Count(cycle => IsSedationProcedureCode(cycle.ProcedureCode)),
-                normalCompletedCycles.Count(cycle => !IsSedationProcedureCode(cycle.ProcedureCode)),
-                BuildBaseProcedureSummaries(normalCompletedCycles));
+                BuildProcedureSummaries(standardCompletedCycles),
+                standardCompletedCycles.Count(cycle => IsSedationProcedureCode(cycle.ProcedureCode)),
+                standardCompletedCycles.Count(cycle => !IsSedationProcedureCode(cycle.ProcedureCode)),
+                BuildBaseProcedureSummaries(standardCompletedCycles),
+                standardCompletedCycles.Count,
+                normalCompletedCycles.Count - standardCompletedCycles.Count,
+                normalCompletedCycles.Count(cycle => cycle.HasReportingException));
         }
     }
 
@@ -761,7 +809,11 @@ public sealed class DemoBoardStore
                 ReadyToDoctorSeconds = null,
                 FinalWaitState = room.State,
                 AgingThresholdReached = room.AgingStartedAt is not null,
-                StaleThresholdReached = room.StaleStartedAt is not null
+                StaleThresholdReached = room.StaleStartedAt is not null,
+                OriginalDefaultExpectedUnits = room.OriginalDefaultExpectedUnits,
+                ExpectedAllocationUnits = room.ExpectedAllocationUnits,
+                ExpectedAllocationMinutes = room.ExpectedAllocationMinutes,
+                AllocationAdjustedFromDefault = room.AllocationAdjustedFromDefault
             };
             _completedCycles.Add(cycle);
         }
@@ -844,7 +896,11 @@ public sealed class DemoBoardStore
             room.DoctorArrivedAt,
             room.DoctorCompleteAt,
             room.RoomAvailableAt,
-            elapsed < TimeSpan.Zero ? TimeSpan.Zero : elapsed);
+            elapsed < TimeSpan.Zero ? TimeSpan.Zero : elapsed,
+            room.OriginalDefaultExpectedUnits,
+            room.ExpectedAllocationUnits,
+            room.ExpectedAllocationMinutes,
+            room.AllocationAdjustedFromDefault);
     }
 
     private void UpdateRoomState(RoomState room, DateTimeOffset now)
@@ -996,7 +1052,9 @@ public sealed class DemoBoardStore
                 procedure.Code,
                 procedure.Label,
                 procedure.Icon,
-                procedure.SedationEligible));
+                procedure.SedationEligible,
+                procedure.AllocationBehavior,
+                procedure.DefaultExpectedUnits));
 
     private static RoomState Available(int roomId) => new(roomId);
 
@@ -1081,6 +1139,27 @@ public sealed class DemoBoardStore
     private static TimeSpan StaleSample(BoardThresholdOptions thresholds, TimeSpan extraElapsed) =>
         thresholds.StaleThreshold + extraElapsed;
 
+    // Bounds for the expected allocation snapshot (1 unit = 10 minutes). Kept consistent with
+    // the seating UI stepper so a clamped value never disagrees between client and server.
+    private const int MinExpectedUnits = 1;
+    private const int MaxExpectedUnits = 24;
+
+    // Captures the case-level expected allocation snapshot onto the active room at seating.
+    // The default comes from the procedure roster; staff may override it with explicit units.
+    // 1 unit = 10 minutes. Both the default and any override are clamped to [Min, Max] so an
+    // explicit 0/negative value can never yield 0 expected minutes. AllocationAdjustedFromDefault
+    // is true only when the final confirmed units differ from the (clamped) original default.
+    // Operational metadata only - never PHI.
+    private static void ApplyExpectedAllocation(RoomState room, ProcedureCategory procedure, int? expectedAllocationUnits)
+    {
+        var defaultUnits = Math.Clamp(procedure.DefaultExpectedUnits, MinExpectedUnits, MaxExpectedUnits);
+        var finalUnits = Math.Clamp(expectedAllocationUnits ?? defaultUnits, MinExpectedUnits, MaxExpectedUnits);
+        room.OriginalDefaultExpectedUnits = defaultUnits;
+        room.ExpectedAllocationUnits = finalUnits;
+        room.ExpectedAllocationMinutes = finalUnits * 10;
+        room.AllocationAdjustedFromDefault = finalUnits != defaultUnits;
+    }
+
     private static void ResetRoom(RoomState room)
     {
         room.AssignedDoctor = null;
@@ -1093,6 +1172,10 @@ public sealed class DemoBoardStore
         room.DoctorArrivedAt = null;
         room.DoctorCompleteAt = null;
         room.RoomAvailableAt = null;
+        room.OriginalDefaultExpectedUnits = 0;
+        room.ExpectedAllocationUnits = 0;
+        room.ExpectedAllocationMinutes = 0;
+        room.AllocationAdjustedFromDefault = false;
     }
 
     private void SeedDemoRoom(int roomId, string doctorId, string procedureCode, DateTimeOffset seatedAt, DateTimeOffset? readyForDoctorAt = null)
@@ -1321,6 +1404,107 @@ public sealed class DemoBoardStore
         return string.IsNullOrWhiteSpace(procedureCode) ? "Unknown" : procedureCode;
     }
 
+    // Conservative reporting-time duration thresholds (first pass). A case flow (Seat -> Doctor
+    // Complete) over 4h, or a room cycle (Seat -> Room Available) over 6h, is treated as extreme.
+    private static readonly TimeSpan ExtremeCaseFlowThreshold = TimeSpan.FromHours(4);
+    private static readonly TimeSpan ExtremeRoomCycleThreshold = TimeSpan.FromHours(6);
+
+    // Annotates each completed cycle with neutral, non-PHI reporting-time exception metadata,
+    // derived from the cycle's own data. Never mutates persisted state or the manual review queue.
+    // Flagged cycles stay visible in raw/audit output but are excluded from standard aggregates.
+    private void AnnotateReportingExceptions(IReadOnlyList<CompletedRoomCycle> cycles)
+    {
+        foreach (var cycle in cycles)
+        {
+            var reasons = new List<string>();
+
+            var (isLegacy, isUnmapped) = ClassifyProcedureMapping(cycle.ProcedureCode);
+            if (isUnmapped)
+            {
+                reasons.Add(ReportingExceptionReasons.UnmappedProcedure);
+            }
+            else if (isLegacy)
+            {
+                reasons.Add(ReportingExceptionReasons.LegacyProcedure);
+            }
+
+            if (HasExtremeDuration(cycle))
+            {
+                reasons.Add(ReportingExceptionReasons.ExtremeDuration);
+            }
+
+            if (CrossesCalendarDay(cycle))
+            {
+                reasons.Add(ReportingExceptionReasons.OvernightLifecycle);
+            }
+
+            if (cycle.DoctorArrivedAt is null)
+            {
+                reasons.Add(ReportingExceptionReasons.MissingTiming);
+            }
+
+            cycle.IsLegacyProcedure = isLegacy;
+            cycle.IsUnmappedProcedure = isUnmapped;
+            cycle.ReportingExceptionReasons = reasons;
+            cycle.HasReportingException = reasons.Count > 0;
+            cycle.IsExcludedFromStandardMetrics = reasons.Count > 0;
+            cycle.DisplayProcedureLabel = BuildDisplayProcedureLabel(cycle.ProcedureCode, isLegacy, isUnmapped);
+        }
+    }
+
+    // Maps a stored procedure code to current-roster status. Legacy = resolvable in the full roster
+    // but no longer active (e.g. standalone "SED" now that sedation is a modifier); Unmapped = not
+    // resolvable at all. A blank code is neither (caught instead by MissingTiming).
+    private (bool IsLegacy, bool IsUnmapped) ClassifyProcedureMapping(string? procedureCode)
+    {
+        if (string.IsNullOrWhiteSpace(procedureCode))
+        {
+            return (false, false);
+        }
+
+        var baseCode = ResolveBaseProcedureCode(procedureCode);
+        if (FindActiveProcedure(baseCode) is not null)
+        {
+            return (false, false);
+        }
+
+        return FindProcedure(baseCode) is not null ? (true, false) : (false, true);
+    }
+
+    private static bool HasExtremeDuration(CompletedRoomCycle cycle)
+    {
+        if (cycle.DoctorCompleteAt is { } completeAt && completeAt - cycle.SeatedAt > ExtremeCaseFlowThreshold)
+        {
+            return true;
+        }
+
+        return cycle.RoomAvailableAt is { } availableAt && availableAt - cycle.SeatedAt > ExtremeRoomCycleThreshold;
+    }
+
+    // Calendar-day crossing is evaluated in UTC (the storage clock). A first-pass overnight signal;
+    // a future patch may evaluate it in the clinic timezone.
+    private static bool CrossesCalendarDay(CompletedRoomCycle cycle)
+    {
+        var seatedDate = cycle.SeatedAt.UtcDateTime.Date;
+        if (cycle.DoctorCompleteAt is { } completeAt && completeAt.UtcDateTime.Date != seatedDate)
+        {
+            return true;
+        }
+
+        return cycle.RoomAvailableAt is { } availableAt && availableAt.UtcDateTime.Date != seatedDate;
+    }
+
+    private string BuildDisplayProcedureLabel(string? procedureCode, bool isLegacy, bool isUnmapped)
+    {
+        var label = ResolveProcedureLabel(procedureCode ?? "");
+        if (isUnmapped)
+        {
+            return $"{label} (Unmapped)";
+        }
+
+        return isLegacy ? $"{label} (Legacy)" : label;
+    }
+
     // Sets DoctorOccupiedWaitSeconds and DoctorAvailableWaitSeconds on each cycle in
     // cyclesToAnnotate. Occupied time is the portion of each cycle's
     // ReadyForDoctorAt -> DoctorArrivedAt window where the same assigned doctor was
@@ -1430,7 +1614,14 @@ public sealed record BoardSnapshot(
 
 public sealed record Doctor(string Id, string Name, string ShortName, string Color);
 
-public sealed record ProcedureCategory(string Id, string Code, string Label, string Icon, bool SedationEligible = false);
+public sealed record ProcedureCategory(
+    string Id,
+    string Code,
+    string Label,
+    string Icon,
+    bool SedationEligible = false,
+    string AllocationBehavior = AllocationBehaviors.Variable,
+    int DefaultExpectedUnits = 1);
 
 public sealed record RoomStatus(
     int RoomId,
@@ -1447,7 +1638,11 @@ public sealed record RoomStatus(
     DateTimeOffset? DoctorArrivedAt,
     DateTimeOffset? DoctorCompleteAt,
     DateTimeOffset? RoomAvailableAt,
-    TimeSpan Elapsed);
+    TimeSpan Elapsed,
+    int OriginalDefaultExpectedUnits = 0,
+    int ExpectedAllocationUnits = 0,
+    int ExpectedAllocationMinutes = 0,
+    bool AllocationAdjustedFromDefault = false);
 
 public sealed record RoomEvent(
     int RoomNumber,
@@ -1486,7 +1681,14 @@ public sealed record ReportsSnapshot(
     // equals CompletedRoomCyclesCount.
     int SedationCaseCount,
     int NonSedationCaseCount,
-    IReadOnlyList<ProcedureCycleSummary> BaseProcedureSummaries);
+    IReadOnlyList<ProcedureCycleSummary> BaseProcedureSummaries,
+    // Reporting data-hygiene counts. Standard aggregates above are computed over the included
+    // (non-reporting-exception) population; excluded cycles remain visible in RecentCompletedCycles
+    // with their reason metadata. IncludedCompletedCycleCount + ExcludedCompletedCycleCount equals
+    // CompletedRoomCyclesCount.
+    int IncludedCompletedCycleCount = 0,
+    int ExcludedCompletedCycleCount = 0,
+    int ExceptionCount = 0);
 
 public sealed class CompletedRoomCycle
 {
@@ -1512,9 +1714,28 @@ public sealed class CompletedRoomCycle
     public int? DoctorInRoomSeconds { get; set; }
     public int? TurnoverSeconds { get; set; }
     public int? TotalRoomCycleSeconds { get; set; }
+
+    // Expected allocation snapshot (operational, non-PHI), copied from the active room when the
+    // cycle is created. Preserved through the rest of the lifecycle and across restart so reporting
+    // can compare measured case flow against the final confirmed allocation. 1 unit = 10 minutes.
+    public int OriginalDefaultExpectedUnits { get; set; }
+    public int ExpectedAllocationUnits { get; set; }
+    public int ExpectedAllocationMinutes { get; set; }
+    public bool AllocationAdjustedFromDefault { get; set; }
+
     // Computed at report time from cross-cycle doctor-occupied intervals. Not persisted to storage.
     public int? DoctorOccupiedWaitSeconds { get; set; }
     public int? DoctorAvailableWaitSeconds { get; set; }
+
+    // Reporting-time exception classification (operational, non-PHI). Derived from this cycle's own
+    // data on each GetReports call and never persisted. Flagged cycles stay visible in raw/audit
+    // output but are excluded from standard aggregates. See ReportingExceptionReasons.
+    public bool HasReportingException { get; set; }
+    public IReadOnlyList<string> ReportingExceptionReasons { get; set; } = [];
+    public bool IsExcludedFromStandardMetrics { get; set; }
+    public string DisplayProcedureLabel { get; set; } = "";
+    public bool IsLegacyProcedure { get; set; }
+    public bool IsUnmappedProcedure { get; set; }
     public string FinalWaitState { get; set; } = "";
     public bool AgingThresholdReached { get; set; }
     public bool StaleThresholdReached { get; set; }
@@ -1595,6 +1816,13 @@ public sealed class RoomState(int roomId)
     public DateTimeOffset? DoctorArrivedAt { get; set; }
     public DateTimeOffset? DoctorCompleteAt { get; set; }
     public DateTimeOffset? RoomAvailableAt { get; set; }
+
+    // Expected allocation snapshot (operational, non-PHI). Captured at seating from the
+    // procedure default and any staff override. 1 unit = 10 minutes.
+    public int OriginalDefaultExpectedUnits { get; set; }
+    public int ExpectedAllocationUnits { get; set; }
+    public int ExpectedAllocationMinutes { get; set; }
+    public bool AllocationAdjustedFromDefault { get; set; }
 }
 
 public static class RoomStates

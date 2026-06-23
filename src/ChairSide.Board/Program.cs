@@ -297,7 +297,7 @@ app.MapPost("/api/rooms/{roomNumber:int}/seat", async Task<IResult> (
         return Results.BadRequest(validationError);
     }
 
-    var result = store.SeatRoom(roomNumber, doctorId!, procedureCode!, request.DemoElapsedMinutes, request.Sedation);
+    var result = store.SeatRoom(roomNumber, doctorId!, procedureCode!, request.DemoElapsedMinutes, request.Sedation, request.ExpectedAllocationUnits);
     if (result is null)
     {
         var reason = store.IsConfiguredRoom(roomNumber) ? "state-rejected" : "room-not-found";
@@ -692,7 +692,10 @@ public sealed record SeatRoomRequest(
     string? ProcedureCode = null,
     string? ProcedureId = null,
     int DemoElapsedMinutes = 0,
-    bool Sedation = false);
+    bool Sedation = false,
+    // Optional final confirmed expected allocation in 10-minute units. When omitted, the
+    // selected procedure's default expected units are used. Operational metadata only - never PHI.
+    int? ExpectedAllocationUnits = null);
 
 public sealed record UpdateAssignmentRequest(
     string DoctorId,
