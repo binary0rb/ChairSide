@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>ChairSide Board - Reports</title>
-  <link rel="stylesheet" href="/styles.css?v=20260623-allocation-cards">
+  <link rel="stylesheet" href="/styles.css?v=20260623-report-layers">
 </head>
 <body data-view="reports">
   <header class="app-header compact">
@@ -34,29 +34,33 @@
   <main class="reports-shell">
     <!-- Headline band: curated cards when data exists, friendly empty-state when not,
          or the reports access prompt when the token is missing/rejected. -->
+    <p class="layer-pill layer-pill--population report-layer-label">Report Population</p>
     <section class="report-headline" id="reportHeadline" aria-label="Report summary"></section>
 
     <section class="report-filter-bar" id="reportFilterBar" aria-label="Report filters" hidden>
-      <div class="report-filter-group" role="group" aria-label="Sedation filter">
-        <span class="report-filter-label">Cases</span>
-        <button type="button" class="report-filter-chip" data-filter-group="sedation" data-filter-value="all" aria-pressed="true">All</button>
-        <button type="button" class="report-filter-chip" data-filter-group="sedation" data-filter-value="sedation" aria-pressed="false">Sedation only</button>
-        <button type="button" class="report-filter-chip" data-filter-group="sedation" data-filter-value="non-sedation" aria-pressed="false">Non-sedation</button>
-      </div>
       <div class="report-filter-group" role="group" aria-label="Grouping mode">
         <span class="report-filter-label">Group by</span>
-        <button type="button" class="report-filter-chip" data-filter-group="grouping" data-filter-value="base" aria-pressed="true">Base procedure</button>
-        <button type="button" class="report-filter-chip" data-filter-group="grouping" data-filter-value="variant" aria-pressed="false">Full variant</button>
+        <button type="button" class="report-filter-chip" data-filter-group="grouping" data-filter-value="base" aria-pressed="true">Procedure family</button>
+        <button type="button" class="report-filter-chip" data-filter-group="grouping" data-filter-value="variant" aria-pressed="false">Detailed variant</button>
       </div>
+      <details class="report-advanced-filters">
+        <summary>Modifier filters</summary>
+        <div class="report-filter-group" role="group" aria-label="Sedation modifier">
+          <span class="report-filter-label">Sedation modifier</span>
+          <button type="button" class="report-filter-chip" data-filter-group="sedation" data-filter-value="all" aria-pressed="true">All</button>
+          <button type="button" class="report-filter-chip" data-filter-group="sedation" data-filter-value="sedation" aria-pressed="false">Sedation only</button>
+          <button type="button" class="report-filter-chip" data-filter-group="sedation" data-filter-value="non-sedation" aria-pressed="false">Non-sedation</button>
+        </div>
+      </details>
     </section>
 
     <section class="report-allocation" id="reportAllocation" aria-label="Allocation balance">
       <div class="allocation-summary-grid">
-        <article class="report-card" id="allocationBalanceCard" aria-label="Allocation balance summary"></article>
-        <article class="report-card" id="dataQualityCard" aria-label="Data quality"></article>
+        <article class="report-card layer-rail--allocation" id="allocationBalanceCard" aria-label="Allocation balance summary"></article>
+        <article class="report-card layer-rail--data-quality" id="dataQualityCard" aria-label="Data quality"></article>
       </div>
-      <details class="report-disclosure allocation-breakdown" id="allocationBreakdown">
-        <summary>Allocation balance by doctor and procedure family</summary>
+      <details class="report-disclosure allocation-breakdown layer-rail--allocation" id="allocationBreakdown">
+        <summary><span class="layer-pill layer-pill--allocation">Allocation Logic</span> Allocation balance by doctor and procedure family</summary>
         <section class="allocation-group" aria-label="Doctor allocation balance">
           <h3>Doctor Allocation Balance</h3>
           <div class="allocation-row-list" id="doctorAllocationList"></div>
@@ -163,6 +167,6 @@
   </main>
 
   <script src="/signalr-lite.js"></script>
-  <script src="/board.js?v=20260623-allocation-cards"></script>
+  <script src="/board.js?v=20260623-report-layers"></script>
 </body>
 </html>
