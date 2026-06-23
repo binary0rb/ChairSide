@@ -728,22 +728,26 @@ function renderAllocationBalanceCard(r) {
     return;
   }
 
+  const pill = `<span class="layer-pill layer-pill--allocation">Allocation Logic</span>`;
   const a = r.allocationVariance;
   if (!a || (a.allocationVarianceCycleCount || 0) === 0) {
     card.innerHTML = `
-      <h3>Allocation Balance</h3>
-      <p class="allocation-empty">No allocation variance data available for this report range.</p>`;
+      ${pill}
+      <h3>Overall Allocation Balance</h3>
+      <p class="allocation-empty">No allocation variance data available for this report view.</p>`;
     return;
   }
 
   const count = a.allocationVarianceCycleCount;
   card.innerHTML = `
-    <h3>Allocation Balance</h3>
-    <p class="allocation-lead">${count} ${count === 1 ? "case" : "cases"} measured against expected allocation.</p>
-    <p class="allocation-net">Net ${escapeHtml(formatAllocationVariance(a.netAllocationVarianceMinutes))} across included cases.</p>
-    <p>Average ${escapeHtml(formatAverageVariancePerCase(a.averageAllocationVarianceMinutes))}.</p>
+    ${pill}
+    <h3>Overall Allocation Balance</h3>
+    <p class="allocation-lead">${count} ${count === 1 ? "case" : "cases"} measured against expected allocation across included cases in this report view.</p>
+    <p class="allocation-net">Net ${renderVarianceBadge(a.netAllocationVarianceMinutes)} across included cases.</p>
+    <p>Average ${renderAverageVarianceBadge(a.averageAllocationVarianceMinutes)}.</p>
     <p class="allocation-breakdown-line">${a.casesOverExpectedAllocation} over expected · ${a.casesUnderExpectedAllocation} under expected · ${a.casesAtExpectedAllocation} at expected</p>
-    <p class="allocation-context">${a.adjustedAllocationCycleCount} adjusted allocation ${a.adjustedAllocationCycleCount === 1 ? "case" : "cases"} · ${a.totalExpectedAllocationMinutes} min expected · ${a.totalMeasuredCaseFlowMinutes} min measured</p>`;
+    <p class="allocation-context">${a.adjustedAllocationCycleCount} adjusted allocation ${a.adjustedAllocationCycleCount === 1 ? "case" : "cases"} · ${a.totalExpectedAllocationMinutes} min expected · ${a.totalMeasuredCaseFlowMinutes} min measured</p>
+    <p class="allocation-footnote">Practice-wide aggregate. Only includes completed cases that have an expected allocation snapshot and a Doctor Complete timestamp, so this can be fewer than total completed cases.</p>`;
 }
 
 function renderDataQualityCard(r) {
@@ -763,9 +767,11 @@ function renderDataQualityCard(r) {
        <p class="allocation-note">${exceptions} reporting ${exceptions === 1 ? "exception" : "exceptions"} flagged. Excluded records remain visible below with badges and reasons.</p>`;
 
   card.innerHTML = `
+    <span class="layer-pill layer-pill--data-quality">Data Quality</span>
     <h3>Data Quality</h3>
     <p class="allocation-counts">${included} included · ${excluded} excluded</p>
-    ${detail}`;
+    ${detail}
+    <p class="allocation-footnote">Included/excluded records are a separate layer from allocation-calculable cases above.</p>`;
 }
 
 function renderDoctorAllocation(r) {
@@ -864,8 +870,8 @@ function describeAllocation(count, net) {
     return `<strong>At expected allocation across ${cases}.</strong>`;
   }
   const avg = count > 0 ? net / count : 0;
-  return `<strong>Net ${escapeHtml(formatAllocationVariance(net))} across ${cases}.</strong>
-          <span>Average ${escapeHtml(formatAverageVariancePerCase(avg))}.</span>`;
+  return `<strong>Net ${renderVarianceBadge(net)} across ${cases}.</strong>
+          <span>Average ${renderAverageVarianceBadge(avg)}.</span>`;
 }
 
 // Neutral average-per-case label, rounded to one decimal.
@@ -882,6 +888,31 @@ function formatAverageVariancePerCase(averageMinutes) {
     return `-${magnitude} min under expected per case`;
   }
   return "0 min at expected per case";
+}
+
+// Semantic color class for an allocation variance value, by operational meaning (not ranking):
+// over expected = warm/red, under expected = green, at expected = neutral, not calculable = muted.
+function varianceClass(minutes) {
+  if (!Number.isFinite(minutes)) {
+    return "variance-none";
+  }
+  if (minutes > 0) {
+    return "variance-over";
+  }
+  if (minutes < 0) {
+    return "variance-under";
+  }
+  return "variance-at";
+}
+
+// Colored variance label keeping the explicit "over expected" / "under expected" wording.
+function renderVarianceBadge(minutes) {
+  return `<span class="variance ${varianceClass(minutes)}">${escapeHtml(formatAllocationVariance(minutes))}</span>`;
+}
+
+function renderAverageVarianceBadge(averageMinutes) {
+  const rounded = Number.isFinite(averageMinutes) ? Math.round(averageMinutes * 10) / 10 : averageMinutes;
+  return `<span class="variance ${varianceClass(rounded)}">${escapeHtml(formatAverageVariancePerCase(averageMinutes))}</span>`;
 }
 
 function renderReportFilterBar(hasData) {
@@ -927,8 +958,8 @@ function insightsHeadingText() {
     return "Non-sedation cases by procedure";
   }
   return app.reportFilters.grouping === "base"
-    ? "Procedure insights — base procedure"
-    : "Procedure insights — full variant";
+    ? "Procedure insights — procedure family"
+    : "Procedure insights — detailed variant";
 }
 
 function renderGroupedInsights(r, hasData) {
@@ -1491,7 +1522,7 @@ function renderCycleRow(cycle) {
       <td>${formatDuration(cycle.totalRoomCycleSeconds)}</td>
       <td>${formatAllocationMinutes(cycle.expectedAllocationMinutes)}</td>
       <td>${formatAllocationMinutes(cycle.measuredCaseFlowMinutes)}</td>
-      <td>${escapeHtml(formatAllocationVariance(cycle.allocationVarianceMinutes))}</td>
+      <td>${renderVarianceBadge(cycle.allocationVarianceMinutes)}</td>
       <td>${escapeHtml(String(cycle.finalWaitState || "--").toUpperCase())}</td>
       <td>${cycle.agingThresholdReached ? "Yes" : "No"}</td>
       <td>${cycle.staleThresholdReached ? "Yes" : "No"}</td>

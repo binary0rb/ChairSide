@@ -1640,6 +1640,100 @@ button:disabled {
   color: #475569;
 }
 
+/* Semantic report layers (Phase 3C): color groups layers for comprehension, never ranking.
+   Population = slate, Data Quality = amber/gold, Allocation Logic = indigo/violet. */
+.layer-pill {
+  display: inline-block;
+  align-self: flex-start;
+  margin-bottom: 8px;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.report-layer-label {
+  margin: 0 0 8px;
+}
+
+.layer-pill--population {
+  background: #e2e8f0;
+  color: #334155;
+}
+
+.layer-pill--data-quality {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.layer-pill--allocation {
+  background: #e0e7ff;
+  color: #3730a3;
+}
+
+.layer-rail--population {
+  border-left: 3px solid #94a3b8;
+}
+
+.layer-rail--data-quality {
+  border-left: 3px solid #d97706;
+}
+
+.layer-rail--allocation {
+  border-left: 3px solid #6366f1;
+}
+
+/* Allocation variance semantic color: operational meaning, not a doctor ranking.
+   Over expected = warm/red, under expected = green, at expected = neutral, n/a = muted. */
+.variance {
+  font-weight: 700;
+}
+
+.variance-over {
+  color: #b91c1c;
+}
+
+.variance-under {
+  color: #15803d;
+}
+
+.variance-at {
+  color: #475569;
+}
+
+.variance-none {
+  color: var(--muted);
+}
+
+.allocation-footnote {
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 12px;
+  font-style: italic;
+}
+
+/* Modifier (sedation) filters tucked under a disclosure so sedation is not a primary axis. */
+.report-advanced-filters {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 4px 10px;
+  background: var(--panel);
+}
+
+.report-advanced-filters > summary {
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--muted);
+  padding: 4px 0;
+}
+
+.report-advanced-filters .report-filter-group {
+  margin-top: 8px;
+}
+
 /* Allocation balance presentation (Phase 3B): calm, neutral cards and compact rows. */
 .report-allocation {
   display: grid;
