@@ -849,7 +849,27 @@ function renderCompletedCycles(cycles) {
 
   body.innerHTML = cycles.length
     ? cycles.map(renderCycleRow).join("")
-    : `<tr><td colspan="20">${escapeHtml(noMatchMessage("No completed room cycles yet."))}</td></tr>`;
+    : `<tr><td colspan="23">${escapeHtml(noMatchMessage("No completed room cycles yet."))}</td></tr>`;
+}
+
+// Allocation minutes cell: "30 min" when present and positive, otherwise "--". Used for the raw
+// expected/measured columns in the completed-cycle audit table.
+function formatAllocationMinutes(minutes) {
+  return Number.isFinite(minutes) && minutes > 0 ? `${minutes} min` : "--";
+}
+
+// Neutral allocation variance label. Positive = over expected, negative = under, zero = at.
+function formatAllocationVariance(varianceMinutes) {
+  if (!Number.isFinite(varianceMinutes)) {
+    return "--";
+  }
+  if (varianceMinutes > 0) {
+    return `+${varianceMinutes} min over expected`;
+  }
+  if (varianceMinutes < 0) {
+    return `${varianceMinutes} min under expected`;
+  }
+  return "0 min at expected";
 }
 
 function revealReportDisclosures() {
@@ -1294,6 +1314,9 @@ function renderCycleRow(cycle) {
       <td>${formatDuration(cycle.doctorInRoomSeconds)}</td>
       <td>${formatDuration(cycle.turnoverSeconds)}</td>
       <td>${formatDuration(cycle.totalRoomCycleSeconds)}</td>
+      <td>${formatAllocationMinutes(cycle.expectedAllocationMinutes)}</td>
+      <td>${formatAllocationMinutes(cycle.measuredCaseFlowMinutes)}</td>
+      <td>${escapeHtml(formatAllocationVariance(cycle.allocationVarianceMinutes))}</td>
       <td>${escapeHtml(String(cycle.finalWaitState || "--").toUpperCase())}</td>
       <td>${cycle.agingThresholdReached ? "Yes" : "No"}</td>
       <td>${cycle.staleThresholdReached ? "Yes" : "No"}</td>

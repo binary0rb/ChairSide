@@ -517,6 +517,9 @@ public sealed class DemoBoardStore
             // it never mutates persisted state or the manual review queue.
             AnnotateReportingExceptions(allCycles);
 
+            // Compute per-cycle measured case flow and allocation variance (derived, never persisted).
+            AnnotateAllocationVariance(allCycles);
+
             // Manual review exceptions are excluded from normal operational metrics by default.
             var normalCycles = allCycles.Where(cycle => !cycle.IsException).ToList();
             // Standard population additionally drops reporting-exception cycles (legacy/unmapped/
@@ -572,7 +575,8 @@ public sealed class DemoBoardStore
                 BuildBaseProcedureSummaries(standardCompletedCycles),
                 standardCompletedCycles.Count,
                 normalCompletedCycles.Count - standardCompletedCycles.Count,
-                normalCompletedCycles.Count(cycle => cycle.HasReportingException));
+                normalCompletedCycles.Count(cycle => cycle.HasReportingException),
+                BuildAllocationVarianceSummary(standardCompletedCycles));
         }
     }
 
@@ -1329,7 +1333,8 @@ public sealed class DemoBoardStore
                 AverageSeconds(group.Select(cycle => cycle.DoctorOccupiedWaitSeconds)),
                 MedianSeconds(group.Select(cycle => cycle.DoctorOccupiedWaitSeconds)),
                 AverageSeconds(group.Select(cycle => cycle.DoctorAvailableWaitSeconds)),
-                MedianSeconds(group.Select(cycle => cycle.DoctorAvailableWaitSeconds))))
+                MedianSeconds(group.Select(cycle => cycle.DoctorAvailableWaitSeconds)),
+                BuildAllocationVarianceSummary(group)))
             .OrderByDescending(summary => summary.Month)
             .ThenBy(summary => summary.AssignedDoctor)
             .ToList();
@@ -1357,7 +1362,8 @@ public sealed class DemoBoardStore
                 AverageSeconds(group.Select(cycle => cycle.DoctorOccupiedWaitSeconds)),
                 AverageSeconds(group.Select(cycle => cycle.DoctorAvailableWaitSeconds)),
                 MedianSeconds(group.Select(cycle => cycle.DoctorOccupiedWaitSeconds)),
-                MedianSeconds(group.Select(cycle => cycle.DoctorAvailableWaitSeconds))))
+                MedianSeconds(group.Select(cycle => cycle.DoctorAvailableWaitSeconds)),
+                BuildAllocationVarianceSummary(group)))
             .OrderByDescending(summary => summary.CompletedCycleCount)
             .ThenBy(summary => summary.ProcedureLabel, StringComparer.OrdinalIgnoreCase)
             .ToList();
@@ -1386,7 +1392,8 @@ public sealed class DemoBoardStore
                 AverageSeconds(group.Select(cycle => cycle.DoctorOccupiedWaitSeconds)),
                 AverageSeconds(group.Select(cycle => cycle.DoctorAvailableWaitSeconds)),
                 MedianSeconds(group.Select(cycle => cycle.DoctorOccupiedWaitSeconds)),
-                MedianSeconds(group.Select(cycle => cycle.DoctorAvailableWaitSeconds))))
+                MedianSeconds(group.Select(cycle => cycle.DoctorAvailableWaitSeconds)),
+                BuildAllocationVarianceSummary(group)))
             .OrderByDescending(summary => summary.CompletedCycleCount)
             .ThenBy(summary => summary.ProcedureLabel, StringComparer.OrdinalIgnoreCase)
             .ToList();
@@ -1503,6 +1510,70 @@ public sealed class DemoBoardStore
         }
 
         return isLegacy ? $"{label} (Legacy)" : label;
+    }
+
+    // Computes per-cycle measured case flow (SeatedAt -> DoctorCompleteAt) and allocation variance
+    // (measured - expected allocation minutes). Derived, never persisted. Variance is only computed
+    // when DoctorCompleteAt is present and the cycle carries a positive expected allocation; otherwise
+    // the variance fields stay null/false. Measured case flow is exposed whenever DoctorCompleteAt
+    // exists, independent of expected allocation.
+    private static void AnnotateAllocationVariance(IReadOnlyList<CompletedRoomCycle> cycles)
+    {
+        foreach (var cycle in cycles)
+        {
+            cycle.MeasuredCaseFlowMinutes = null;
+            cycle.AllocationVarianceMinutes = null;
+            cycle.HasAllocationVariance = false;
+            cycle.IsOverExpectedAllocation = false;
+            cycle.IsUnderExpectedAllocation = false;
+            cycle.IsAtExpectedAllocation = false;
+
+            if (cycle.DoctorCompleteAt is not { } completeAt)
+            {
+                continue;
+            }
+
+            var measuredMinutes = Math.Max(0, (int)Math.Round((completeAt - cycle.SeatedAt).TotalMinutes));
+            cycle.MeasuredCaseFlowMinutes = measuredMinutes;
+
+            if (cycle.ExpectedAllocationMinutes <= 0)
+            {
+                continue;
+            }
+
+            var variance = measuredMinutes - cycle.ExpectedAllocationMinutes;
+            cycle.AllocationVarianceMinutes = variance;
+            cycle.IsOverExpectedAllocation = variance > 0;
+            cycle.IsUnderExpectedAllocation = variance < 0;
+            cycle.IsAtExpectedAllocation = variance == 0;
+            cycle.HasAllocationVariance = variance != 0;
+        }
+    }
+
+    // Builds an allocation variance aggregate over the supplied completed cycles. Only cycles with a
+    // calculable variance (AllocationVarianceMinutes set by AnnotateAllocationVariance) contribute to
+    // the totals and over/under/at counts; AdjustedAllocationCycleCount counts adjusted-from-default
+    // cycles across the whole supplied population. Callers pass standard/included completed cycles.
+    private static AllocationVarianceSummary BuildAllocationVarianceSummary(IEnumerable<CompletedRoomCycle> cycles)
+    {
+        var population = cycles.ToList();
+        var contributing = population.Where(cycle => cycle.AllocationVarianceMinutes.HasValue).ToList();
+
+        var count = contributing.Count;
+        var totalExpected = contributing.Sum(cycle => cycle.ExpectedAllocationMinutes);
+        var totalMeasured = contributing.Sum(cycle => cycle.MeasuredCaseFlowMinutes ?? 0);
+        var net = totalMeasured - totalExpected;
+
+        return new AllocationVarianceSummary(
+            count,
+            totalExpected,
+            totalMeasured,
+            net,
+            count == 0 ? 0 : (double)net / count,
+            contributing.Count(cycle => cycle.IsOverExpectedAllocation),
+            contributing.Count(cycle => cycle.IsUnderExpectedAllocation),
+            contributing.Count(cycle => cycle.IsAtExpectedAllocation),
+            population.Count(cycle => cycle.AllocationAdjustedFromDefault));
     }
 
     // Sets DoctorOccupiedWaitSeconds and DoctorAvailableWaitSeconds on each cycle in
@@ -1688,7 +1759,9 @@ public sealed record ReportsSnapshot(
     // CompletedRoomCyclesCount.
     int IncludedCompletedCycleCount = 0,
     int ExcludedCompletedCycleCount = 0,
-    int ExceptionCount = 0);
+    int ExceptionCount = 0,
+    // Allocation variance over standard/included completed cycles (expected vs measured case flow).
+    AllocationVarianceSummary? AllocationVariance = null);
 
 public sealed class CompletedRoomCycle
 {
@@ -1736,6 +1809,18 @@ public sealed class CompletedRoomCycle
     public string DisplayProcedureLabel { get; set; } = "";
     public bool IsLegacyProcedure { get; set; }
     public bool IsUnmappedProcedure { get; set; }
+
+    // Allocation variance (operational, non-PHI), computed at report time and never persisted.
+    // Measured case flow = SeatedAt -> DoctorCompleteAt. Variance = measured - expected allocation.
+    // Both are null when not calculable (no DoctorCompleteAt, or no expected allocation minutes).
+    // Positive variance = ran over expected; negative = ran under. Neutral framing only.
+    public int? MeasuredCaseFlowMinutes { get; set; }
+    public int? AllocationVarianceMinutes { get; set; }
+    public bool HasAllocationVariance { get; set; }
+    public bool IsOverExpectedAllocation { get; set; }
+    public bool IsUnderExpectedAllocation { get; set; }
+    public bool IsAtExpectedAllocation { get; set; }
+
     public string FinalWaitState { get; set; } = "";
     public bool AgingThresholdReached { get; set; }
     public bool StaleThresholdReached { get; set; }
@@ -1771,7 +1856,24 @@ public sealed record DoctorCycleSummary(
     double AverageDoctorOccupiedWaitSeconds,
     double MedianDoctorOccupiedWaitSeconds,
     double AverageDoctorAvailableWaitSeconds,
-    double MedianDoctorAvailableWaitSeconds);
+    double MedianDoctorAvailableWaitSeconds,
+    AllocationVarianceSummary Allocation);
+
+// Allocation variance aggregate (operational, non-PHI). Reused for the global report, per-doctor,
+// and per-procedure-family summaries. Computed over standard/included completed cycles only.
+// Counts reflect cycles where variance is calculable (expected allocation present and case flow
+// measurable); AdjustedAllocationCycleCount reflects how many of the population had units adjusted
+// from the procedure default. Neutral framing - "over"/"under"/"at", never "saved"/"waste".
+public sealed record AllocationVarianceSummary(
+    int AllocationVarianceCycleCount,
+    int TotalExpectedAllocationMinutes,
+    int TotalMeasuredCaseFlowMinutes,
+    int NetAllocationVarianceMinutes,
+    double AverageAllocationVarianceMinutes,
+    int CasesOverExpectedAllocation,
+    int CasesUnderExpectedAllocation,
+    int CasesAtExpectedAllocation,
+    int AdjustedAllocationCycleCount);
 
 // Per-procedure baseline over normal, non-exception completed cycles. Additive reporting only;
 // it reuses the same aggregate helpers and the same occupied/available wait values as the
@@ -1795,7 +1897,8 @@ public sealed record ProcedureCycleSummary(
     double AverageDoctorOccupiedWaitSeconds,
     double AverageDoctorAvailableWaitSeconds,
     double MedianDoctorOccupiedWaitSeconds,
-    double MedianDoctorAvailableWaitSeconds);
+    double MedianDoctorAvailableWaitSeconds,
+    AllocationVarianceSummary Allocation);
 
 public sealed record DemoSeedPattern(
     string DoctorId,
