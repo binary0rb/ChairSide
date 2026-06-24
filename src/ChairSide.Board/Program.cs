@@ -86,6 +86,16 @@ builder.Services.AddSingleton<ClientErrorRateLimiter>();
 builder.Services.AddHostedService<RoomExpirationService>();
 
 var app = builder.Build();
+
+// Operator-run maintenance CLI (console-only; never serves HTTP). Resolve enforces an explicit
+// per-command confirmation token; a refusal mutates nothing. This is the only reset mechanism and
+// it is deliberately not a web endpoint or UI button.
+var maintenance = MaintenanceCommands.Resolve(args);
+if (maintenance.Outcome != MaintenanceOutcome.NotRequested)
+{
+    return RunMaintenance(app, maintenance);
+}
+
 _ = app.Services.GetRequiredService<DemoBoardStore>();
 
 var roomDeviceBindingOptions = app.Services.GetRequiredService<IOptions<RoomDeviceBindingOptions>>().Value;
@@ -706,7 +716,42 @@ app.MapPost("/api/rooms/{roomNumber:int}/available", async Task<IResult> (
 static string? Truncate(string? value, int maxLength) =>
     value is null ? null : value.Length <= maxLength ? value : value[..maxLength];
 
+// Executes a resolved maintenance command against app services and returns a process exit code.
+// Console-only: no HTTP is served. A refusal performs no mutation.
+static int RunMaintenance(WebApplication maintenanceApp, MaintenanceResolution resolution)
+{
+    if (resolution.Outcome == MaintenanceOutcome.Refused)
+    {
+        Console.Error.WriteLine($"[ChairSide Maintenance] Refused: {resolution.RefusalReason}");
+        Console.Error.WriteLine("[ChairSide Maintenance] No data was changed.");
+        return 2;
+    }
+
+    var store = maintenanceApp.Services.GetRequiredService<DemoBoardStore>();
+    var repository = maintenanceApp.Services.GetRequiredService<SqliteBoardRepository>();
+
+    Console.WriteLine("[ChairSide Maintenance] Starting.");
+    Console.WriteLine($"[ChairSide Maintenance] Environment: {maintenanceApp.Environment.EnvironmentName}");
+    Console.WriteLine($"[ChairSide Maintenance] Database:    {repository.DatabasePath}");
+    Console.WriteLine($"[ChairSide Maintenance] Command:     {resolution.Command}");
+
+    var result = string.Equals(resolution.Command, MaintenanceCommands.TrainingSeedCommand, StringComparison.Ordinal)
+        ? store.ResetAndSeedSyntheticTrainingData()
+        : store.ResetAllDataForEmptyBeta();
+
+    Console.WriteLine($"[ChairSide Maintenance] Completed cycles cleared:  {result.CompletedCyclesCleared}");
+    Console.WriteLine($"[ChairSide Maintenance] Active rooms reset:        {result.ActiveRoomsReset}");
+    Console.WriteLine($"[ChairSide Maintenance] Synthetic cycles seeded:   {result.CyclesSeeded}");
+    Console.WriteLine($"[ChairSide Maintenance] Doctors represented:       {result.DoctorsRepresented}");
+    Console.WriteLine($"[ChairSide Maintenance] Procedure families:        {result.ProcedureFamiliesRepresented}");
+    Console.WriteLine($"[ChairSide Maintenance] Expected-allocation cases: {result.ExpectedAllocationCases}");
+    Console.WriteLine($"[ChairSide Maintenance] Reporting exceptions:      {result.ExceptionsExpected}");
+    Console.WriteLine("[ChairSide Maintenance] Done. The web host was not started.");
+    return 0;
+}
+
 app.Run();
+return 0;
 
 // ---------------------------------------------------------------------------
 // Request / response types
