@@ -3594,6 +3594,117 @@ public sealed class BoardStoreTests
         Assert.Equal(900, con.AverageReadyToDoctorSeconds);
     }
 
+    // -------------------------------------------------------------------------
+    // Dev-only synthetic report data seeding
+    // -------------------------------------------------------------------------
+
+    [Fact]
+    public void Synthetic_report_data_seeds_clean_included_cycles_within_target_shape()
+    {
+        using var workspace = TestWorkspace.Create();
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production);
+
+        var result = context.Store.SeedSyntheticReportData();
+
+        Assert.InRange(result.CyclesInserted, 40, 60);
+        Assert.Equal(4, result.DoctorsRepresented);
+        Assert.True(result.ProcedureFamiliesRepresented >= 7);
+        Assert.Equal(result.CyclesInserted, result.ExpectedAllocationCases);
+        Assert.Equal(0, result.ExceptionsExpected);
+
+        var reports = context.Store.GetReports();
+        // No reporting exceptions: everything is included in standard metrics.
+        Assert.True(reports.IncludedCompletedCycleCount > 0);
+        Assert.Equal(0, reports.ExcludedCompletedCycleCount);
+        Assert.Equal(0, reports.ExceptionCount);
+        Assert.Equal(result.CyclesInserted, reports.IncludedCompletedCycleCount);
+    }
+
+    [Fact]
+    public void Synthetic_report_data_has_allocation_snapshots_and_no_legacy_or_standalone_sedation()
+    {
+        using var workspace = TestWorkspace.Create();
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production);
+
+        context.Store.SeedSyntheticReportData();
+
+        var cycles = context.Repository.LoadCompletedCycles();
+        Assert.NotEmpty(cycles);
+        Assert.All(cycles, cycle =>
+        {
+            // Expected allocation snapshot present on every seeded cycle.
+            Assert.True(cycle.ExpectedAllocationUnits > 0);
+            Assert.True(cycle.ExpectedAllocationMinutes > 0);
+            Assert.Equal(cycle.ExpectedAllocationUnits * 10, cycle.ExpectedAllocationMinutes);
+            // Full timing - nothing missing.
+            Assert.NotNull(cycle.DoctorArrivedAt);
+            Assert.NotNull(cycle.DoctorCompleteAt);
+            Assert.NotNull(cycle.RoomAvailableAt);
+            // No standalone legacy "SED" procedure (sedation is only ever a "+SED" modifier).
+            Assert.NotEqual("SED", cycle.ProcedureCode.ToUpperInvariant());
+            // No calendar-day crossing.
+            Assert.Equal(cycle.SeatedAt.UtcDateTime.Date, cycle.DoctorCompleteAt!.Value.UtcDateTime.Date);
+        });
+    }
+
+    [Fact]
+    public void Synthetic_report_data_covers_doctors_families_and_variance_distribution()
+    {
+        using var workspace = TestWorkspace.Create();
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production);
+
+        context.Store.SeedSyntheticReportData();
+        var reports = context.Store.GetReports();
+
+        // All four doctors and at least seven procedure families are represented.
+        Assert.Equal(4, reports.DoctorSummaries.Select(summary => summary.AssignedDoctor).Distinct().Count());
+        Assert.True(reports.BaseProcedureSummaries.Count >= 7);
+
+        // Over / under / at expected allocation examples all exist, plus adjusted-from-default cases.
+        var allocation = reports.AllocationVariance!;
+        Assert.True(allocation.CasesOverExpectedAllocation > 0);
+        Assert.True(allocation.CasesUnderExpectedAllocation > 0);
+        Assert.True(allocation.CasesAtExpectedAllocation > 0);
+        Assert.True(allocation.AdjustedAllocationCycleCount > 0);
+    }
+
+    [Fact]
+    public void Synthetic_report_data_produces_distinct_doctor_allocation_profiles()
+    {
+        using var workspace = TestWorkspace.Create();
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production);
+
+        context.Store.SeedSyntheticReportData();
+        var reports = context.Store.GetReports();
+
+        // Net allocation variance per doctor (summed across the returned per-month summaries).
+        var netByDoctor = reports.DoctorSummaries
+            .GroupBy(summary => summary.AssignedDoctor)
+            .Select(group => group.Sum(summary => summary.Allocation.NetAllocationVarianceMinutes))
+            .ToList();
+
+        // The four doctors must not all share the same allocation balance.
+        Assert.True(netByDoctor.Distinct().Count() >= 2);
+        // At least one doctor runs net over expected and at least one runs net under expected,
+        // so the UI shows genuinely different doctor profiles (not a symmetrical pattern).
+        Assert.True(netByDoctor.Max() > 0);
+        Assert.True(netByDoctor.Min() < 0);
+    }
+
+    [Fact]
+    public void Synthetic_report_data_seeding_is_idempotent()
+    {
+        using var workspace = TestWorkspace.Create();
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production);
+
+        var first = context.Store.SeedSyntheticReportData();
+        var second = context.Store.SeedSyntheticReportData();
+
+        // Re-seeding writes the same deterministic set without duplicating records.
+        Assert.Equal(first.CyclesInserted, second.CyclesInserted);
+        Assert.Equal(first.CyclesInserted, context.Store.GetReports().IncludedCompletedCycleCount);
+    }
+
     // Seats, readies, completes, and frees one room across the given minute offsets from seatedAt.
     // Each call uses a self-contained time window; keep windows non-overlapping to avoid
     // cross-cycle doctor-occupied wait when that is not under test.

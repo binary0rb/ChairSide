@@ -133,6 +133,31 @@ app.MapGet("/api/board", (DemoBoardStore store) => store.GetSnapshot());
 
 app.MapGet("/api/reports", (DemoBoardStore store) => store.GetReports());
 
+// Development-only: populate deterministic, non-PHI synthetic completed cycles for local/beta
+// reporting smoke tests. Mapped only in Development so it can never be reached in Production.
+if (app.Environment.IsDevelopment())
+{
+    app.MapPost("/api/dev/seed-report-data", async Task<IResult> (
+        DemoBoardStore store,
+        DiagnosticLogger diagnosticLogger,
+        Microsoft.AspNetCore.SignalR.IHubContext<BoardHub> hubContext) =>
+    {
+        var summary = store.SeedSyntheticReportData();
+        await diagnosticLogger.LogRoomAuditAsync(new RoomAuditEntry
+        {
+            Timestamp = DateTimeOffset.UtcNow.ToString("O"),
+            Action = "dev-seed-report-data",
+            RoomNumber = 0,
+            Success = true,
+            Reason = $"seeded {summary.CyclesInserted} synthetic cycles"
+        });
+
+        // Reports read from a fresh GetReports call; nudge any live boards to refresh too.
+        await hubContext.Clients.All.SendAsync("boardUpdated", store.GetSnapshot());
+        return Results.Ok(summary);
+    });
+}
+
 // Admin-protected: mark a completed cycle as an exception, removing it from normal metrics.
 // Protected by AdminAccessGuard via the /api/reports/* path prefix.
 app.MapPost("/api/reports/cycles/mark-exception", async Task<IResult> (
