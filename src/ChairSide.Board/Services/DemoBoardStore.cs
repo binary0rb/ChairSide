@@ -581,6 +581,60 @@ public sealed class DemoBoardStore
     }
 
     /// <summary>
+    /// Maintenance only: clears all completed cycles and resets every active room to Available, then
+    /// repopulates clean, deterministic, non-PHI synthetic training data. Taking a timestamped backup
+    /// first is the caller's responsibility (the maintenance script). Idempotent - re-running converges
+    /// to the same fixture. Returns before/after counts. Destructive execution is gated at the CLI
+    /// layer (confirmation token); this method itself is environment-independent for testability.
+    /// </summary>
+    public MaintenanceResetResult ResetAndSeedSyntheticTrainingData()
+    {
+        lock (_syncRoot)
+        {
+            var clearedCompleted = ClearCompletedAndResetRoomsLocked();
+            var seed = SeedSyntheticReportData();
+            return new MaintenanceResetResult(
+                clearedCompleted,
+                _rooms.Count,
+                seed.CyclesInserted,
+                seed.DoctorsRepresented,
+                seed.ProcedureFamiliesRepresented,
+                seed.ExpectedAllocationCases,
+                seed.ExceptionsExpected);
+        }
+    }
+
+    /// <summary>
+    /// Maintenance only: clears all completed cycles and resets every active room to Available for an
+    /// official beta go-live. Does NOT seed synthetic data - the board starts empty. Returns
+    /// before/after counts.
+    /// </summary>
+    public MaintenanceResetResult ResetAllDataForEmptyBeta()
+    {
+        lock (_syncRoot)
+        {
+            var clearedCompleted = ClearCompletedAndResetRoomsLocked();
+            return new MaintenanceResetResult(clearedCompleted, _rooms.Count, 0, 0, 0, 0, 0);
+        }
+    }
+
+    // Clears persisted + in-memory completed cycles and resets every active room (persisted and
+    // in-memory) to Available. Must be called inside _syncRoot. Returns the number of cleared cycles.
+    private int ClearCompletedAndResetRoomsLocked()
+    {
+        var clearedCompleted = _completedCycles.Count;
+        _repository.ClearCompletedCycles();
+        _repository.ResetActiveRooms(_roomCount);
+        _completedCycles.Clear();
+        foreach (var room in _rooms)
+        {
+            ResetRoom(room);
+        }
+
+        return clearedCompleted;
+    }
+
+    /// <summary>
     /// Development/test only: populates a deterministic set of clean, non-PHI completed cycles so
     /// the Reports page can be evaluated with realistic values. Every seeded cycle stays inside the
     /// current reporting rules (mapped/active procedures, full timing, no overnight/extreme records,
@@ -2190,6 +2244,16 @@ public struct SyntheticJitter(int seed)
 /// <summary>Non-PHI summary returned by the dev-only synthetic report-data seeder.</summary>
 public sealed record SeedReportDataResult(
     int CyclesInserted,
+    int DoctorsRepresented,
+    int ProcedureFamiliesRepresented,
+    int ExpectedAllocationCases,
+    int ExceptionsExpected);
+
+/// <summary>Non-PHI before/after summary returned by the maintenance reset commands.</summary>
+public sealed record MaintenanceResetResult(
+    int CompletedCyclesCleared,
+    int ActiveRoomsReset,
+    int CyclesSeeded,
     int DoctorsRepresented,
     int ProcedureFamiliesRepresented,
     int ExpectedAllocationCases,

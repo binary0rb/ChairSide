@@ -3705,6 +3705,175 @@ public sealed class BoardStoreTests
         Assert.Equal(first.CyclesInserted, context.Store.GetReports().IncludedCompletedCycleCount);
     }
 
+    // -------------------------------------------------------------------------
+    // Maintenance reset (training seed / empty beta)
+    // -------------------------------------------------------------------------
+
+    [Fact]
+    public void Training_reset_clears_prior_completed_cycles_and_seeds_synthetic_data()
+    {
+        using var workspace = TestWorkspace.Create();
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production);
+
+        // Pre-existing "alpha" completed cycle with a distinctive sub-second seat time.
+        var alpha = CompleteOneCycle(context, room: 1, doctor: "otte");
+        var alphaSeatedAt = alpha.SeatedAt;
+
+        var result = context.Store.ResetAndSeedSyntheticTrainingData();
+
+        Assert.True(result.CompletedCyclesCleared >= 1);
+        Assert.InRange(result.CyclesSeeded, 40, 60);
+        Assert.Equal(0, result.ExceptionsExpected);
+
+        var cycles = context.Repository.LoadCompletedCycles();
+        // The alpha cycle is gone; only the freshly seeded synthetic set remains.
+        Assert.DoesNotContain(cycles, cycle => cycle.SeatedAt == alphaSeatedAt);
+        Assert.Equal(result.CyclesSeeded, cycles.Count);
+    }
+
+    [Fact]
+    public void Training_reset_clears_active_room_state()
+    {
+        using var workspace = TestWorkspace.Create();
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production);
+
+        Assert.NotNull(context.Store.SeatRoom(1, "otte", "EXT", expectedAllocationUnits: 5));
+
+        context.Store.ResetAndSeedSyntheticTrainingData();
+
+        var room = context.Store.GetRoom(1);
+        Assert.NotNull(room);
+        Assert.Equal(RoomStates.Available, room.State);
+        Assert.Null(room.SeatedAt);
+        Assert.Equal(0, room.ExpectedAllocationUnits);
+        Assert.Equal(0, room.ExpectedAllocationMinutes);
+    }
+
+    [Fact]
+    public void Training_reset_produces_zero_exceptions_and_calculable_allocation()
+    {
+        using var workspace = TestWorkspace.Create();
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production);
+
+        var result = context.Store.ResetAndSeedSyntheticTrainingData();
+        var reports = context.Store.GetReports();
+
+        Assert.Equal(0, reports.ExcludedCompletedCycleCount);
+        Assert.Equal(0, reports.ExceptionCount);
+        Assert.Equal(result.CyclesSeeded, reports.IncludedCompletedCycleCount);
+        // Every seeded completed cycle contributes a calculable allocation variance.
+        Assert.Equal(reports.IncludedCompletedCycleCount, reports.AllocationVariance!.AllocationVarianceCycleCount);
+    }
+
+    [Fact]
+    public void Training_reset_is_idempotent_and_does_not_duplicate()
+    {
+        using var workspace = TestWorkspace.Create();
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production);
+
+        var first = context.Store.ResetAndSeedSyntheticTrainingData();
+        var second = context.Store.ResetAndSeedSyntheticTrainingData();
+
+        Assert.Equal(first.CyclesSeeded, second.CyclesSeeded);
+        Assert.Equal(second.CyclesSeeded, context.Repository.LoadCompletedCycles().Count);
+        // The second run cleared exactly what the first run seeded - no accumulation.
+        Assert.Equal(first.CyclesSeeded, second.CompletedCyclesCleared);
+    }
+
+    [Fact]
+    public void Training_reset_persists_across_store_restart()
+    {
+        using var workspace = TestWorkspace.Create();
+        var databasePath = workspace.ProductionDatabasePath();
+
+        var first = StoreContext.Create(workspace, environmentName: Environments.Production, databasePath: databasePath);
+        var result = first.Store.ResetAndSeedSyntheticTrainingData();
+
+        var second = StoreContext.Create(workspace, environmentName: Environments.Production, databasePath: databasePath);
+        var reports = second.Store.GetReports();
+
+        Assert.Equal(result.CyclesSeeded, reports.IncludedCompletedCycleCount);
+        Assert.Equal(0, reports.ExcludedCompletedCycleCount);
+        Assert.Equal(0, reports.ExceptionCount);
+    }
+
+    [Fact]
+    public void Empty_beta_reset_clears_completed_cycles_and_leaves_no_synthetic_data()
+    {
+        using var workspace = TestWorkspace.Create();
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production);
+
+        // Start from a seeded training fixture, then reset to empty.
+        context.Store.ResetAndSeedSyntheticTrainingData();
+
+        var result = context.Store.ResetAllDataForEmptyBeta();
+
+        Assert.True(result.CompletedCyclesCleared >= 40);
+        Assert.Equal(0, result.CyclesSeeded);
+        Assert.Empty(context.Repository.LoadCompletedCycles());
+
+        var reports = context.Store.GetReports();
+        Assert.Equal(0, reports.CompletedRoomCyclesCount);
+        Assert.Equal(0, reports.IncludedCompletedCycleCount);
+    }
+
+    [Fact]
+    public void Empty_beta_reset_clears_active_room_state()
+    {
+        using var workspace = TestWorkspace.Create();
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production);
+
+        Assert.NotNull(context.Store.SeatRoom(1, "otte", "EXT"));
+
+        context.Store.ResetAllDataForEmptyBeta();
+
+        var room = context.Store.GetRoom(1);
+        Assert.NotNull(room);
+        Assert.Equal(RoomStates.Available, room.State);
+        Assert.Null(room.SeatedAt);
+    }
+
+    // -------------------------------------------------------------------------
+    // Maintenance CLI argument resolution (refusals never mutate)
+    // -------------------------------------------------------------------------
+
+    [Fact]
+    public void Maintenance_resolve_returns_not_requested_without_flag()
+    {
+        Assert.Equal(MaintenanceOutcome.NotRequested, MaintenanceCommands.Resolve([]).Outcome);
+        Assert.Equal(MaintenanceOutcome.NotRequested, MaintenanceCommands.Resolve(["--urls", "http://localhost"]).Outcome);
+    }
+
+    [Fact]
+    public void Maintenance_resolve_authorizes_matching_command_and_token()
+    {
+        var training = MaintenanceCommands.Resolve(["--maintenance", "reset-training-data", "--confirm", "RESET_TRAINING_DATA"]);
+        Assert.Equal(MaintenanceOutcome.Authorized, training.Outcome);
+        Assert.Equal(MaintenanceCommands.TrainingSeedCommand, training.Command);
+
+        var empty = MaintenanceCommands.Resolve(["--maintenance", "reset-empty", "--confirm", "RESET_EMPTY_BETA"]);
+        Assert.Equal(MaintenanceOutcome.Authorized, empty.Outcome);
+        Assert.Equal(MaintenanceCommands.EmptyBetaCommand, empty.Command);
+    }
+
+    [Theory]
+    [InlineData("reset-training-data", "WRONG_TOKEN")]
+    [InlineData("reset-training-data", "RESET_EMPTY_BETA")]
+    [InlineData("reset-empty", "RESET_TRAINING_DATA")]
+    public void Maintenance_resolve_refuses_wrong_token(string command, string token)
+    {
+        var resolution = MaintenanceCommands.Resolve(["--maintenance", command, "--confirm", token]);
+        Assert.Equal(MaintenanceOutcome.Refused, resolution.Outcome);
+        Assert.NotNull(resolution.RefusalReason);
+    }
+
+    [Fact]
+    public void Maintenance_resolve_refuses_missing_token_and_unknown_command()
+    {
+        Assert.Equal(MaintenanceOutcome.Refused, MaintenanceCommands.Resolve(["--maintenance", "reset-training-data"]).Outcome);
+        Assert.Equal(MaintenanceOutcome.Refused, MaintenanceCommands.Resolve(["--maintenance", "drop-everything", "--confirm", "x"]).Outcome);
+    }
+
     // Seats, readies, completes, and frees one room across the given minute offsets from seatedAt.
     // Each call uses a self-contained time window; keep windows non-overlapping to avoid
     // cross-cycle doctor-occupied wait when that is not under test.

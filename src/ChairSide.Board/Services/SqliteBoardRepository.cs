@@ -122,6 +122,34 @@ public sealed class SqliteBoardRepository
         transaction.Commit();
     }
 
+    /// <summary>
+    /// Maintenance only: deletes every completed-cycle row. Operates through the app's WAL-mode
+    /// SQLite connection so sidecar files stay consistent; no raw file manipulation.
+    /// </summary>
+    public void ClearCompletedCycles()
+    {
+        using var connection = OpenConnection();
+        using var command = connection.CreateCommand();
+        command.CommandText = "DELETE FROM completed_room_cycles;";
+        command.ExecuteNonQuery();
+    }
+
+    /// <summary>
+    /// Maintenance only: clears every active-room row and recreates the configured rooms as
+    /// Available with no lifecycle/allocation residue, reusing the standard initialization path.
+    /// </summary>
+    public void ResetActiveRooms(int roomCount)
+    {
+        using (var connection = OpenConnection())
+        using (var command = connection.CreateCommand())
+        {
+            command.CommandText = "DELETE FROM active_rooms;";
+            command.ExecuteNonQuery();
+        }
+
+        EnsureConfiguredRooms(roomCount);
+    }
+
     public void SaveRooms(IEnumerable<RoomState> rooms, IReadOnlyList<Doctor> doctors, IReadOnlyList<ProcedureCategory> procedures)
     {
         using var connection = OpenConnection();
