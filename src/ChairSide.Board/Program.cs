@@ -141,7 +141,11 @@ app.MapHub<BoardHub>("/boardHub");
 
 app.MapGet("/api/board", (DemoBoardStore store) => store.GetSnapshot());
 
-app.MapGet("/api/reports", (DemoBoardStore store) => store.GetReports());
+// Optional ISO yyyy-MM-dd `from`/`to` query params bound the completed-cycle population by
+// completion date (DoctorCompleteAt) before any report calculation. Missing/invalid dates degrade
+// to an all-time window; a reversed pair is normalized.
+app.MapGet("/api/reports", (DemoBoardStore store, string? from, string? to) =>
+    store.GetReports(ReportDateRange.FromDateStrings(from, to)));
 
 // Development-only: populate deterministic, non-PHI synthetic completed cycles for local/beta
 // reporting smoke tests. Mapped only in Development so it can never be reached in Production.

@@ -1,3 +1,5 @@
+using System.Globalization;
+
 using ChairSide.Board.Options;
 using Microsoft.Extensions.Options;
 
@@ -504,11 +506,26 @@ public sealed class DemoBoardStore
         }
     }
 
-    public ReportsSnapshot GetReports()
+    public ReportsSnapshot GetReports() => GetReports(ReportDateRange.AllTime);
+
+    /// <summary>
+    /// Builds the report snapshot over completed cycles whose completion anchor (DoctorCompleteAt -
+    /// the established end of the measured case flow) falls within <paramref name="range"/>. The date
+    /// filter is applied to the source population first, so every downstream count, hygiene
+    /// classification, allocation-variance aggregate, doctor/procedure summary, and the recent-cycle
+    /// list all reflect the selected window. An all-time range is a no-op filter (identical to the
+    /// historical behavior). Cycles without a DoctorCompleteAt (in-progress or force-expired) have no
+    /// completion date and are therefore only present in the unbounded all-time range.
+    /// </summary>
+    public ReportsSnapshot GetReports(ReportDateRange range)
     {
         lock (_syncRoot)
         {
+            // All-time completed total (for "X of Y" context), independent of the selected window.
+            var totalCompletedAllTime = _completedCycles.Count(cycle => cycle.RoomAvailableAt is not null);
+
             var allCycles = _completedCycles
+                .Where(cycle => range.Includes(cycle.DoctorCompleteAt))
                 .OrderByDescending(cycle => cycle.DoctorArrivedAt)
                 .ToList();
 
@@ -576,7 +593,11 @@ public sealed class DemoBoardStore
                 standardCompletedCycles.Count,
                 normalCompletedCycles.Count - standardCompletedCycles.Count,
                 normalCompletedCycles.Count(cycle => cycle.HasReportingException),
-                BuildAllocationVarianceSummary(standardCompletedCycles));
+                BuildAllocationVarianceSummary(standardCompletedCycles),
+                range.StartDateText,
+                range.EndDateText,
+                range.Label,
+                totalCompletedAllTime);
         }
     }
 
@@ -652,98 +673,99 @@ public sealed class DemoBoardStore
                 return new SeedReportDataResult(0, 0, 0, 0, 0);
             }
 
-            var days = RecentWeekdays(4);
+            // Anchor on today's UTC date and walk back across a fixed history horizon. Every calendar
+            // day (including today, even on a weekend) gets a deterministic, front-loaded case count so
+            // the report date-range presets are all exercised: more cases recently, fewer further back.
+            var today = new DateTimeOffset(Now.UtcDateTime.Date, TimeSpan.Zero);
             var written = 0;
             var doctorsRepresented = new HashSet<string>(StringComparer.Ordinal);
             var familiesRepresented = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             var globalIndex = 0;
 
-            for (var dayIndex = 0; dayIndex < days.Count; dayIndex++)
+            for (var dayOffset = 0; dayOffset <= SyntheticHistoryDays; dayOffset++)
             {
-                var slotInDay = 0;
-                foreach (var profile in SyntheticProfiles)
+                var day = today.AddDays(-dayOffset);
+                var casesForDay = CasesForDayOffset(dayOffset);
+                for (var caseInDay = 0; caseInDay < casesForDay; caseInDay++)
                 {
-                    if (profile.DoctorIndex >= doctorIds.Count)
+                    // Round-robin doctors so even a small window (e.g. Today) represents all four;
+                    // the per-doctor style profile is aligned to the doctor.
+                    var doctorIndex = globalIndex % doctorIds.Count;
+                    var profile = SyntheticProfiles[doctorIndex % SyntheticProfiles.Count];
+                    var doctorId = doctorIds[doctorIndex];
+
+                    // Deterministic pseudo-randomness: the jitter stream is seeded from stable inputs
+                    // (day offset, doctor, case-in-day), so the same date always reproduces the same
+                    // cycle regardless of iteration order.
+                    var jitter = new SyntheticJitter(DeterministicSeed(dayOffset, doctorIndex, caseInDay));
+
+                    // Rotate procedure families across the whole dataset to guarantee coverage.
+                    var family = SyntheticFamilies[globalIndex % SyntheticFamilies.Count];
+                    var procedure = FindActiveProcedure(family.Code);
+                    if (procedure is null)
                     {
+                        globalIndex++;
                         continue;
                     }
 
-                    var doctorId = doctorIds[profile.DoctorIndex];
-                    for (var caseIndex = 0; caseIndex < profile.CasesPerDay; caseIndex++)
+                    var sedation = family.SedationEligible
+                        && procedure.SedationEligible
+                        && jitter.Next(0, 99) < profile.SedationChancePercent;
+                    var storedCode = ComposeProcedureCode(procedure.Code, sedation);
+
+                    // Expected allocation: roster default, nudged by doctor style (generous vs tight)
+                    // on variable families, plus a small bump for sedation burden.
+                    var defaultUnits = Math.Clamp(procedure.DefaultExpectedUnits, MinExpectedUnits, MaxExpectedUnits);
+                    var unitDelta = family.Code is "EXT" or "IMP" ? profile.VariableUnitDelta : 0;
+                    if (sedation)
                     {
-                        // Deterministic pseudo-randomness: the jitter stream is seeded from stable
-                        // inputs (day, doctor, case index), so the same context always reproduces the
-                        // same cycle regardless of iteration order.
-                        var jitter = new SyntheticJitter(DeterministicSeed(dayIndex, profile.DoctorIndex, caseIndex));
-
-                        // Rotate procedure families across the whole dataset to guarantee coverage.
-                        var family = SyntheticFamilies[globalIndex % SyntheticFamilies.Count];
-                        var procedure = FindActiveProcedure(family.Code);
-                        if (procedure is null)
-                        {
-                            globalIndex++;
-                            continue;
-                        }
-
-                        var sedation = family.SedationEligible
-                            && procedure.SedationEligible
-                            && jitter.Next(0, 99) < profile.SedationChancePercent;
-                        var storedCode = ComposeProcedureCode(procedure.Code, sedation);
-
-                        // Expected allocation: roster default, nudged by doctor style (generous vs
-                        // tight) on variable families, plus a small bump for sedation burden.
-                        var defaultUnits = Math.Clamp(procedure.DefaultExpectedUnits, MinExpectedUnits, MaxExpectedUnits);
-                        var unitDelta = family.Code is "EXT" or "IMP" ? profile.VariableUnitDelta : 0;
-                        if (sedation)
-                        {
-                            unitDelta += 1;
-                        }
-                        var expectedUnits = Math.Clamp(defaultUnits + unitDelta, MinExpectedUnits, MaxExpectedUnits);
-                        var expectedMinutes = expectedUnits * 10;
-
-                        // Measured case flow: doctor bias + (family character * profile weight) + jitter,
-                        // clamped to a realistic per-family range. Always draw the jitter so the stream
-                        // stays identical whether or not this case is forced to land at expected.
-                        var minFlow = sedation ? family.MinFlowMinutes + 15 : family.MinFlowMinutes;
-                        var maxFlow = sedation ? family.MaxFlowMinutes + 15 : family.MaxFlowMinutes;
-                        var varianceJitter = jitter.Next(-profile.VarianceSpread, profile.VarianceSpread);
-                        int measuredMinutes;
-                        if (globalIndex % 9 == 0)
-                        {
-                            // Guarantee some exactly-at-expected cases for the neutral variance example.
-                            measuredMinutes = Math.Clamp(expectedMinutes, minFlow, maxFlow);
-                        }
-                        else
-                        {
-                            var lean = family.CharacterLeanMinutes * profile.FamilyLeanWeight;
-                            measuredMinutes = Math.Clamp(expectedMinutes + profile.VarianceBiasMinutes + lean + varianceJitter, minFlow, maxFlow);
-                        }
-
-                        // Split measured case flow into prep / ready / doctor minutes (doctor >= 1) so
-                        // the timestamp-derived measured flow exactly equals measuredMinutes.
-                        var prepMin = Math.Clamp(measuredMinutes * 12 / 100, 2, 12);
-                        var readyMin = Math.Clamp(measuredMinutes * 18 / 100, 2, 20);
-                        if (prepMin + readyMin >= measuredMinutes)
-                        {
-                            prepMin = Math.Max(1, measuredMinutes / 4);
-                            readyMin = Math.Max(1, measuredMinutes / 4);
-                        }
-                        var doctorMin = Math.Max(1, measuredMinutes - prepMin - readyMin);
-                        var turnoverMin = jitter.Next(4, 12);
-
-                        var roomId = 1 + (slotInDay % Math.Max(1, _roomCount));
-                        var seatedAt = days[dayIndex].AddHours(8 + slotInDay).AddMinutes(jitter.Next(0, 11) * 5);
-
-                        UpsertSyntheticCycle(
-                            roomId, doctorId, storedCode, seatedAt,
-                            prepMin, readyMin, doctorMin, turnoverMin, defaultUnits, expectedUnits);
-
-                        written++;
-                        doctorsRepresented.Add(doctorId);
-                        familiesRepresented.Add(ResolveBaseProcedureCode(storedCode));
-                        slotInDay++;
-                        globalIndex++;
+                        unitDelta += 1;
                     }
+                    var expectedUnits = Math.Clamp(defaultUnits + unitDelta, MinExpectedUnits, MaxExpectedUnits);
+                    var expectedMinutes = expectedUnits * 10;
+
+                    // Measured case flow: doctor bias + (family character * profile weight) + jitter,
+                    // clamped to a realistic per-family range. Always draw the jitter so the stream
+                    // stays identical whether or not this case is forced to land at expected.
+                    var minFlow = sedation ? family.MinFlowMinutes + 15 : family.MinFlowMinutes;
+                    var maxFlow = sedation ? family.MaxFlowMinutes + 15 : family.MaxFlowMinutes;
+                    var varianceJitter = jitter.Next(-profile.VarianceSpread, profile.VarianceSpread);
+                    int measuredMinutes;
+                    if (globalIndex % 9 == 0)
+                    {
+                        // Guarantee some exactly-at-expected cases for the neutral variance example.
+                        measuredMinutes = Math.Clamp(expectedMinutes, minFlow, maxFlow);
+                    }
+                    else
+                    {
+                        var lean = family.CharacterLeanMinutes * profile.FamilyLeanWeight;
+                        measuredMinutes = Math.Clamp(expectedMinutes + profile.VarianceBiasMinutes + lean + varianceJitter, minFlow, maxFlow);
+                    }
+
+                    // Split measured case flow into prep / ready / doctor minutes (doctor >= 1) so the
+                    // timestamp-derived measured flow exactly equals measuredMinutes. Seat hours stay
+                    // within the day (8am + case index) so no cycle crosses a UTC calendar day.
+                    var prepMin = Math.Clamp(measuredMinutes * 12 / 100, 2, 12);
+                    var readyMin = Math.Clamp(measuredMinutes * 18 / 100, 2, 20);
+                    if (prepMin + readyMin >= measuredMinutes)
+                    {
+                        prepMin = Math.Max(1, measuredMinutes / 4);
+                        readyMin = Math.Max(1, measuredMinutes / 4);
+                    }
+                    var doctorMin = Math.Max(1, measuredMinutes - prepMin - readyMin);
+                    var turnoverMin = jitter.Next(4, 12);
+
+                    var roomId = 1 + (caseInDay % Math.Max(1, _roomCount));
+                    var seatedAt = day.AddHours(8 + caseInDay).AddMinutes(jitter.Next(0, 11) * 5);
+
+                    UpsertSyntheticCycle(
+                        roomId, doctorId, storedCode, seatedAt,
+                        prepMin, readyMin, doctorMin, turnoverMin, defaultUnits, expectedUnits);
+
+                    written++;
+                    doctorsRepresented.Add(doctorId);
+                    familiesRepresented.Add(ResolveBaseProcedureCode(storedCode));
+                    globalIndex++;
                 }
             }
 
@@ -826,10 +848,10 @@ public sealed class DemoBoardStore
     // DoctorIndex maps to the active-doctor roster order (Otte, Pledger, Gibson, Schroeder).
     private static readonly IReadOnlyList<DoctorStyleProfile> SyntheticProfiles =
     [
-        new(DoctorIndex: 0, CasesPerDay: 3, VarianceBiasMinutes: -5, VarianceSpread: 6, FamilyLeanWeight: 1, VariableUnitDelta: 1, SedationChancePercent: 25),
-        new(DoctorIndex: 1, CasesPerDay: 3, VarianceBiasMinutes: 0, VarianceSpread: 8, FamilyLeanWeight: 1, VariableUnitDelta: 0, SedationChancePercent: 20),
-        new(DoctorIndex: 2, CasesPerDay: 4, VarianceBiasMinutes: 1, VarianceSpread: 14, FamilyLeanWeight: 2, VariableUnitDelta: 0, SedationChancePercent: 30),
-        new(DoctorIndex: 3, CasesPerDay: 2, VarianceBiasMinutes: 7, VarianceSpread: 5, FamilyLeanWeight: 1, VariableUnitDelta: -1, SedationChancePercent: 15)
+        new(DoctorIndex: 0, VarianceBiasMinutes: -5, VarianceSpread: 6, FamilyLeanWeight: 1, VariableUnitDelta: 1, SedationChancePercent: 25),
+        new(DoctorIndex: 1, VarianceBiasMinutes: 0, VarianceSpread: 8, FamilyLeanWeight: 1, VariableUnitDelta: 0, SedationChancePercent: 20),
+        new(DoctorIndex: 2, VarianceBiasMinutes: 1, VarianceSpread: 14, FamilyLeanWeight: 2, VariableUnitDelta: 0, SedationChancePercent: 30),
+        new(DoctorIndex: 3, VarianceBiasMinutes: 7, VarianceSpread: 5, FamilyLeanWeight: 1, VariableUnitDelta: -1, SedationChancePercent: 15)
     ];
 
     // Procedure families used by the seeder. CharacterLeanMinutes is a small intrinsic over/under
@@ -859,24 +881,35 @@ public sealed class DemoBoardStore
         }
     }
 
-    // Returns the most recent <count> weekdays (UTC), oldest first. Synthetic seat times are placed
-    // within these days so no record crosses a calendar day.
-    private List<DateTimeOffset> RecentWeekdays(int count)
-    {
-        var days = new List<DateTimeOffset>();
-        var cursor = new DateTimeOffset(Now.UtcDateTime.Date, TimeSpan.Zero);
-        while (days.Count < count)
-        {
-            if (cursor.DayOfWeek is not DayOfWeek.Saturday and not DayOfWeek.Sunday)
-            {
-                days.Add(cursor);
-            }
+    // How many calendar days back the synthetic history spans (inclusive of today). ~6 weeks so the
+    // "older than 30 days" bucket is populated for All-time vs Last-30 comparisons.
+    private const int SyntheticHistoryDays = 41;
 
-            cursor = cursor.AddDays(-1);
+    // Deterministic, front-loaded case count per day offset from today (0 = today). Recent days carry
+    // more cases than older days so every report date-range preset is meaningfully different:
+    //   today          -> 8           (Today preset is small but non-empty)
+    //   1-6 days ago    -> 4 each      (Last 7 days noticeably larger than Today)
+    //   7-29 days ago   -> 2-3 each    (Last 30 days larger than Last 7)
+    //   30+ days ago    -> 2 each      (All time larger than Last 30)
+    // Totals: Today 8, Last 7 ~32, Last 30 ~90, All time ~114.
+    private static int CasesForDayOffset(int dayOffset)
+    {
+        if (dayOffset == 0)
+        {
+            return 8;
         }
 
-        days.Reverse();
-        return days;
+        if (dayOffset <= 6)
+        {
+            return 4;
+        }
+
+        if (dayOffset <= 29)
+        {
+            return 2 + (dayOffset % 2);
+        }
+
+        return 2;
     }
 
     /// <summary>
@@ -2060,7 +2093,112 @@ public sealed record ReportsSnapshot(
     int ExcludedCompletedCycleCount = 0,
     int ExceptionCount = 0,
     // Allocation variance over standard/included completed cycles (expected vs measured case flow).
-    AllocationVarianceSummary? AllocationVariance = null);
+    AllocationVarianceSummary? AllocationVariance = null,
+    // Active report window metadata. Dates are ISO yyyy-MM-dd (null = unbounded). RangeLabel is a
+    // plain-English summary ("All time" or "Jun 17 – Jun 24"). TotalCompletedCycleCount is the
+    // all-time completed total for "X of Y" context, independent of the selected window.
+    string? RangeStartDate = null,
+    string? RangeEndDate = null,
+    string RangeLabel = "All time",
+    int TotalCompletedCycleCount = 0);
+
+/// <summary>
+/// A completed-cycle reporting window. Dates are interpreted as whole UTC calendar days (start
+/// inclusive at 00:00, end inclusive through 23:59:59.9999999 via an exclusive next-day bound).
+/// The UTC assumption is isolated here so a clinic-timezone abstraction can replace it later without
+/// touching report calculations.
+/// </summary>
+public readonly record struct ReportDateRange(
+    DateOnly? StartDate,
+    DateOnly? EndDate,
+    DateTimeOffset? FromInclusive,
+    DateTimeOffset? ToExclusive)
+{
+    public static ReportDateRange AllTime => new(null, null, null, null);
+
+    public bool IsAllTime => FromInclusive is null && ToExclusive is null;
+
+    public string? StartDateText => StartDate?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+
+    public string? EndDateText => EndDate?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+
+    // Builds a range from calendar dates. A reversed (start > end) pair is normalized by swapping
+    // so the report still renders a sensible window instead of erroring.
+    public static ReportDateRange FromDates(DateOnly? start, DateOnly? end)
+    {
+        if (start is null && end is null)
+        {
+            return AllTime;
+        }
+
+        if (start is { } s && end is { } e && s > e)
+        {
+            (start, end) = (end, start);
+        }
+
+        DateTimeOffset? from = start is { } s2
+            ? new DateTimeOffset(s2.ToDateTime(TimeOnly.MinValue), TimeSpan.Zero)
+            : null;
+        DateTimeOffset? to = end is { } e2
+            ? new DateTimeOffset(e2.AddDays(1).ToDateTime(TimeOnly.MinValue), TimeSpan.Zero)
+            : null;
+
+        return new ReportDateRange(start, end, from, to);
+    }
+
+    // Parses ISO yyyy-MM-dd query strings. Unparseable values are treated as absent (graceful, never
+    // throws) so a malformed query degrades to a wider/all-time window rather than crashing.
+    public static ReportDateRange FromDateStrings(string? from, string? to) =>
+        FromDates(ParseDate(from), ParseDate(to));
+
+    private static DateOnly? ParseDate(string? value) =>
+        DateOnly.TryParseExact(value, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var parsed)
+            ? parsed
+            : null;
+
+    public bool Includes(DateTimeOffset? anchor)
+    {
+        if (IsAllTime)
+        {
+            return true;
+        }
+
+        if (anchor is null)
+        {
+            return false;
+        }
+
+        var value = anchor.Value.ToUniversalTime();
+        if (FromInclusive is { } from && value < from)
+        {
+            return false;
+        }
+
+        return ToExclusive is not { } to || value < to;
+    }
+
+    public string Label
+    {
+        get
+        {
+            if (StartDate is null && EndDate is null)
+            {
+                return "All time";
+            }
+
+            if (StartDate is { } start && EndDate is { } end)
+            {
+                return $"{FormatDay(start)} – {FormatDay(end)}";
+            }
+
+            return StartDate is { } startOnly
+                ? $"From {FormatDay(startOnly)}"
+                : $"Through {FormatDay(EndDate!.Value)}";
+        }
+    }
+
+    private static string FormatDay(DateOnly day) => day.ToString("MMM d", CultureInfo.InvariantCulture);
+}
 
 public sealed class CompletedRoomCycle
 {
@@ -2209,7 +2347,6 @@ public sealed record DemoSeedPattern(
 // A per-doctor style profile that gives each doctor a distinct, non-punitive allocation shape.
 public sealed record DoctorStyleProfile(
     int DoctorIndex,
-    int CasesPerDay,
     int VarianceBiasMinutes,
     int VarianceSpread,
     int FamilyLeanWeight,

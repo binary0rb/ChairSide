@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>ChairSide Board - Reports</title>
-  <link rel="stylesheet" href="/styles.css?v=20260623-report-layers">
+  <link rel="stylesheet" href="/styles.css?v=20260624-report-date-range">
 </head>
 <body data-view="reports">
   <header class="app-header compact">
@@ -35,6 +35,24 @@
     <!-- Headline band: curated cards when data exists, friendly empty-state when not,
          or the reports access prompt when the token is missing/rejected. -->
     <p class="layer-pill layer-pill--population report-layer-label">Report Population</p>
+
+    <section class="report-daterange" id="reportDateRange" aria-label="Report date range">
+      <div class="report-filter-group" role="group" aria-label="Date range presets">
+        <span class="report-filter-label">Range</span>
+        <button type="button" class="report-range-chip" data-range-preset="today" aria-pressed="false">Today</button>
+        <button type="button" class="report-range-chip" data-range-preset="last7" aria-pressed="true">Last 7 days</button>
+        <button type="button" class="report-range-chip" data-range-preset="last30" aria-pressed="false">Last 30 days</button>
+        <button type="button" class="report-range-chip" data-range-preset="all" aria-pressed="false">All time</button>
+        <button type="button" class="report-range-chip" data-range-preset="custom" aria-pressed="false">Custom</button>
+      </div>
+      <div class="report-range-custom" id="reportRangeCustom" hidden>
+        <label class="report-range-field">From <input type="date" id="reportRangeStart"></label>
+        <label class="report-range-field">To <input type="date" id="reportRangeEnd"></label>
+        <button type="button" class="report-filter-chip" id="reportRangeApply">Apply</button>
+      </div>
+      <p class="report-range-window" id="reportRangeWindow" aria-live="polite"></p>
+    </section>
+
     <section class="report-headline" id="reportHeadline" aria-label="Report summary"></section>
 
     <section class="report-filter-bar" id="reportFilterBar" aria-label="Report filters" hidden>
@@ -167,6 +185,6 @@
   </main>
 
   <script src="/signalr-lite.js"></script>
-  <script src="/board.js?v=20260623-report-layers"></script>
+  <script src="/board.js?v=20260624-report-date-range"></script>
 </body>
 </html>

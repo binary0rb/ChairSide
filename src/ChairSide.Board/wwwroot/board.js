@@ -19,6 +19,9 @@ const app = {
   // never resets the user's selected filters. sedation: all | sedation | non-sedation.
   // grouping: base | variant.
   reportFilters: { sedation: "all", grouping: "base" },
+  // Report date window. Drives the backend completed-cycle filter, so changing it reloads from the
+  // API. start/end are ISO yyyy-MM-dd (null = unbounded). Default preset is Last 7 days.
+  dateRange: { preset: "last7", start: null, end: null },
   roomNumber: getRoomNumber(),
   roomToken: getRoomToken(),
   roomTokenPromptVisible: false,
@@ -86,9 +89,11 @@ async function boot() {
 
   await loadBoard();
   if (document.body.dataset.view === "reports") {
+    initDateRange();
     await loadReports();
     wireReportsActions();
     wireReportFilters();
+    wireDateRange();
   }
 
   wireDoctorViewMenu();
@@ -136,7 +141,7 @@ async function loadReports() {
 
   app.reportsInFlight = true;
   try {
-    const response = await fetch("/api/reports", {
+    const response = await fetch(reportsRequestUrl(), {
       cache: "no-store",
       headers: adminRequestHeaders()
     });
@@ -160,6 +165,157 @@ async function loadReports() {
   } finally {
     app.reportsInFlight = false;
   }
+}
+
+// ---------------------------------------------------------------------------
+// Report date range. The selected window is a real backend filter (it bounds the completed-cycle
+// population before any calculation), so changing it reloads /api/reports. Dates are ISO yyyy-MM-dd
+// computed in UTC to match the server's UTC-day report window semantics.
+// ---------------------------------------------------------------------------
+function initDateRange() {
+  if (!app.dateRange) {
+    app.dateRange = { preset: "last7", start: null, end: null };
+  }
+  if (app.dateRange.preset !== "custom" && app.dateRange.preset !== "all") {
+    const resolved = computePresetRange(app.dateRange.preset);
+    app.dateRange.start = resolved.start;
+    app.dateRange.end = resolved.end;
+  }
+}
+
+function reportsRequestUrl() {
+  const range = app.dateRange;
+  if (!range || range.preset === "all") {
+    return "/api/reports";
+  }
+
+  const params = new URLSearchParams();
+  if (range.start) {
+    params.set("from", range.start);
+  }
+  if (range.end) {
+    params.set("to", range.end);
+  }
+
+  const query = params.toString();
+  return query ? `/api/reports?${query}` : "/api/reports";
+}
+
+function utcDateString(date) {
+  return date.toISOString().slice(0, 10);
+}
+
+function computePresetRange(preset) {
+  const now = new Date();
+  const today = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+  if (preset === "today") {
+    return { start: utcDateString(today), end: utcDateString(today) };
+  }
+  if (preset === "last30") {
+    const start = new Date(today);
+    start.setUTCDate(start.getUTCDate() - 29);
+    return { start: utcDateString(start), end: utcDateString(today) };
+  }
+  // Default and "last7".
+  const start = new Date(today);
+  start.setUTCDate(start.getUTCDate() - 6);
+  return { start: utcDateString(start), end: utcDateString(today) };
+}
+
+async function selectDateRangePreset(preset) {
+  if (preset === "custom") {
+    app.dateRange = { ...app.dateRange, preset: "custom" };
+    syncDateRangeControls();
+    return; // wait for explicit Apply
+  }
+
+  if (preset === "all") {
+    app.dateRange = { preset: "all", start: null, end: null };
+  } else {
+    const resolved = computePresetRange(preset);
+    app.dateRange = { preset, start: resolved.start, end: resolved.end };
+  }
+
+  syncDateRangeControls();
+  await loadReports();
+}
+
+async function applyCustomDateRange() {
+  const startInput = document.getElementById("reportRangeStart");
+  const endInput = document.getElementById("reportRangeEnd");
+  const start = startInput && startInput.value ? startInput.value : null;
+  const end = endInput && endInput.value ? endInput.value : null;
+  if (!start && !end) {
+    return; // nothing to apply; leave current window
+  }
+
+  app.dateRange = { preset: "custom", start, end };
+  syncDateRangeControls();
+  await loadReports();
+}
+
+// Reflects app.dateRange onto the static controls so a re-render never desyncs the chips/inputs.
+function syncDateRangeControls() {
+  document.querySelectorAll(".report-range-chip").forEach(chip => {
+    const active = chip.dataset.rangePreset === app.dateRange.preset;
+    chip.classList.toggle("is-active", active);
+    chip.setAttribute("aria-pressed", String(active));
+  });
+
+  const custom = document.getElementById("reportRangeCustom");
+  if (custom) {
+    custom.hidden = app.dateRange.preset !== "custom";
+  }
+
+  if (app.dateRange.preset === "custom") {
+    const startInput = document.getElementById("reportRangeStart");
+    const endInput = document.getElementById("reportRangeEnd");
+    if (startInput && app.dateRange.start) {
+      startInput.value = app.dateRange.start;
+    }
+    if (endInput && app.dateRange.end) {
+      endInput.value = app.dateRange.end;
+    }
+  }
+}
+
+function wireDateRange() {
+  const container = document.getElementById("reportDateRange");
+  if (!container) {
+    return;
+  }
+
+  container.addEventListener("click", event => {
+    const chip = event.target.closest(".report-range-chip");
+    if (chip) {
+      selectDateRangePreset(chip.dataset.rangePreset);
+      return;
+    }
+
+    if (event.target.closest("#reportRangeApply")) {
+      applyCustomDateRange();
+    }
+  });
+
+  syncDateRangeControls();
+}
+
+// Plain-English window label, using the server's range metadata and all-time context.
+function renderReportWindow(r) {
+  const el = document.getElementById("reportRangeWindow");
+  if (!el) {
+    return;
+  }
+
+  const label = r && r.rangeLabel ? r.rangeLabel : "All time";
+  const total = r ? (r.totalCompletedCycleCount ?? 0) : 0;
+  if (label === "All time") {
+    el.textContent = `Showing all completed cases (${total} total)`;
+    return;
+  }
+
+  const shown = r ? (r.completedRoomCyclesCount ?? 0) : 0;
+  el.textContent = `Showing completed cases from ${label} (${shown} of ${total} all-time)`;
 }
 
 function connectRealtime() {
@@ -660,6 +816,8 @@ function renderReports() {
   const hasData = (r.completedRoomCyclesCount || 0) > 0;
 
   revealReportDisclosures();
+  renderReportWindow(r);
+  syncDateRangeControls();
   renderReportHeadline(r, hasData);
   syncReportFilterButtons();
   renderReportFilterBar(hasData);
