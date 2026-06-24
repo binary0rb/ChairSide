@@ -581,6 +581,251 @@ public sealed class DemoBoardStore
     }
 
     /// <summary>
+    /// Development/test only: populates a deterministic set of clean, non-PHI completed cycles so
+    /// the Reports page can be evaluated with realistic values. Every seeded cycle stays inside the
+    /// current reporting rules (mapped/active procedures, full timing, no overnight/extreme records,
+    /// expected-allocation snapshot present) so none are flagged as reporting exceptions. Idempotent:
+    /// re-running writes the same deterministic set (keyed by room + seated time) without duplicating.
+    /// Must never be exposed in Production - the calling endpoint is mapped only in Development.
+    /// </summary>
+    public SeedReportDataResult SeedSyntheticReportData()
+    {
+        lock (_syncRoot)
+        {
+            var doctorIds = _activeDoctors.Select(doctor => doctor.Id).ToList();
+            if (doctorIds.Count == 0)
+            {
+                return new SeedReportDataResult(0, 0, 0, 0, 0);
+            }
+
+            var days = RecentWeekdays(4);
+            var written = 0;
+            var doctorsRepresented = new HashSet<string>(StringComparer.Ordinal);
+            var familiesRepresented = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var globalIndex = 0;
+
+            for (var dayIndex = 0; dayIndex < days.Count; dayIndex++)
+            {
+                var slotInDay = 0;
+                foreach (var profile in SyntheticProfiles)
+                {
+                    if (profile.DoctorIndex >= doctorIds.Count)
+                    {
+                        continue;
+                    }
+
+                    var doctorId = doctorIds[profile.DoctorIndex];
+                    for (var caseIndex = 0; caseIndex < profile.CasesPerDay; caseIndex++)
+                    {
+                        // Deterministic pseudo-randomness: the jitter stream is seeded from stable
+                        // inputs (day, doctor, case index), so the same context always reproduces the
+                        // same cycle regardless of iteration order.
+                        var jitter = new SyntheticJitter(DeterministicSeed(dayIndex, profile.DoctorIndex, caseIndex));
+
+                        // Rotate procedure families across the whole dataset to guarantee coverage.
+                        var family = SyntheticFamilies[globalIndex % SyntheticFamilies.Count];
+                        var procedure = FindActiveProcedure(family.Code);
+                        if (procedure is null)
+                        {
+                            globalIndex++;
+                            continue;
+                        }
+
+                        var sedation = family.SedationEligible
+                            && procedure.SedationEligible
+                            && jitter.Next(0, 99) < profile.SedationChancePercent;
+                        var storedCode = ComposeProcedureCode(procedure.Code, sedation);
+
+                        // Expected allocation: roster default, nudged by doctor style (generous vs
+                        // tight) on variable families, plus a small bump for sedation burden.
+                        var defaultUnits = Math.Clamp(procedure.DefaultExpectedUnits, MinExpectedUnits, MaxExpectedUnits);
+                        var unitDelta = family.Code is "EXT" or "IMP" ? profile.VariableUnitDelta : 0;
+                        if (sedation)
+                        {
+                            unitDelta += 1;
+                        }
+                        var expectedUnits = Math.Clamp(defaultUnits + unitDelta, MinExpectedUnits, MaxExpectedUnits);
+                        var expectedMinutes = expectedUnits * 10;
+
+                        // Measured case flow: doctor bias + (family character * profile weight) + jitter,
+                        // clamped to a realistic per-family range. Always draw the jitter so the stream
+                        // stays identical whether or not this case is forced to land at expected.
+                        var minFlow = sedation ? family.MinFlowMinutes + 15 : family.MinFlowMinutes;
+                        var maxFlow = sedation ? family.MaxFlowMinutes + 15 : family.MaxFlowMinutes;
+                        var varianceJitter = jitter.Next(-profile.VarianceSpread, profile.VarianceSpread);
+                        int measuredMinutes;
+                        if (globalIndex % 9 == 0)
+                        {
+                            // Guarantee some exactly-at-expected cases for the neutral variance example.
+                            measuredMinutes = Math.Clamp(expectedMinutes, minFlow, maxFlow);
+                        }
+                        else
+                        {
+                            var lean = family.CharacterLeanMinutes * profile.FamilyLeanWeight;
+                            measuredMinutes = Math.Clamp(expectedMinutes + profile.VarianceBiasMinutes + lean + varianceJitter, minFlow, maxFlow);
+                        }
+
+                        // Split measured case flow into prep / ready / doctor minutes (doctor >= 1) so
+                        // the timestamp-derived measured flow exactly equals measuredMinutes.
+                        var prepMin = Math.Clamp(measuredMinutes * 12 / 100, 2, 12);
+                        var readyMin = Math.Clamp(measuredMinutes * 18 / 100, 2, 20);
+                        if (prepMin + readyMin >= measuredMinutes)
+                        {
+                            prepMin = Math.Max(1, measuredMinutes / 4);
+                            readyMin = Math.Max(1, measuredMinutes / 4);
+                        }
+                        var doctorMin = Math.Max(1, measuredMinutes - prepMin - readyMin);
+                        var turnoverMin = jitter.Next(4, 12);
+
+                        var roomId = 1 + (slotInDay % Math.Max(1, _roomCount));
+                        var seatedAt = days[dayIndex].AddHours(8 + slotInDay).AddMinutes(jitter.Next(0, 11) * 5);
+
+                        UpsertSyntheticCycle(
+                            roomId, doctorId, storedCode, seatedAt,
+                            prepMin, readyMin, doctorMin, turnoverMin, defaultUnits, expectedUnits);
+
+                        written++;
+                        doctorsRepresented.Add(doctorId);
+                        familiesRepresented.Add(ResolveBaseProcedureCode(storedCode));
+                        slotInDay++;
+                        globalIndex++;
+                    }
+                }
+            }
+
+            return new SeedReportDataResult(
+                written,
+                doctorsRepresented.Count,
+                familiesRepresented.Count,
+                written,
+                0);
+        }
+    }
+
+    // Writes (insert or deterministic update) one clean synthetic completed cycle. Keyed by
+    // (room, seated time) so re-running on the same day never duplicates records.
+    private void UpsertSyntheticCycle(
+        int roomId,
+        string doctorId,
+        string storedCode,
+        DateTimeOffset seatedAt,
+        int prepMin,
+        int readyMin,
+        int doctorMin,
+        int turnoverMin,
+        int defaultUnits,
+        int expectedUnits)
+    {
+        var readyAt = seatedAt.AddMinutes(prepMin);
+        var arrivedAt = readyAt.AddMinutes(readyMin);
+        var completeAt = arrivedAt.AddMinutes(doctorMin);
+        var availableAt = completeAt.AddMinutes(turnoverMin);
+
+        var cycle = _completedCycles.FirstOrDefault(item => item.RoomId == roomId && item.SeatedAt == seatedAt);
+        var isNew = cycle is null;
+        cycle ??= new CompletedRoomCycle();
+
+        cycle.RoomId = roomId;
+        cycle.AssignedDoctor = doctorId;
+        cycle.ProcedureCode = storedCode;
+        cycle.SeatedAt = seatedAt;
+        cycle.ReadyForDoctorAt = readyAt;
+        cycle.DoctorArrivedAt = arrivedAt;
+        cycle.DoctorCompleteAt = completeAt;
+        cycle.RoomAvailableAt = availableAt;
+        cycle.SeatedToDoctorSeconds = (prepMin + readyMin) * 60;
+        cycle.PrepSeconds = prepMin * 60;
+        cycle.ReadyToDoctorSeconds = readyMin * 60;
+        cycle.DoctorInRoomSeconds = doctorMin * 60;
+        cycle.TurnoverSeconds = turnoverMin * 60;
+        cycle.TotalRoomCycleSeconds = (prepMin + readyMin + doctorMin + turnoverMin) * 60;
+        cycle.FinalWaitState = RoomStates.ReadyForDoctor;
+        cycle.AgingThresholdReached = false;
+        cycle.StaleThresholdReached = false;
+        cycle.OriginalDefaultExpectedUnits = defaultUnits;
+        cycle.ExpectedAllocationUnits = expectedUnits;
+        cycle.ExpectedAllocationMinutes = expectedUnits * 10;
+        cycle.AllocationAdjustedFromDefault = expectedUnits != defaultUnits;
+        // Synthetic data is clean: never a manual exception.
+        cycle.IsException = false;
+        cycle.RequiresReview = false;
+        cycle.ExceptionReason = null;
+        cycle.ReviewStatus = ReviewStatuses.PendingReview;
+        cycle.SuggestedAction = null;
+        cycle.ReviewedAt = null;
+        cycle.ReviewedBy = null;
+
+        if (isNew)
+        {
+            _completedCycles.Add(cycle);
+        }
+
+        PersistCycle(cycle);
+    }
+
+    // Deterministic per-doctor synthetic style profiles (no punitive meaning). The profiles give
+    // each doctor a distinct, plausible allocation shape so the Reports page is not symmetrical:
+    //   Otte      - buffered: generous expected units, leans under/at expected.
+    //   Pledger   - balanced: mixed, net near zero.
+    //   Gibson    - variable case-mix: variance swings by procedure family (high family-lean weight).
+    //   Schroeder - tight: lower expected units, leans modestly over expected.
+    // DoctorIndex maps to the active-doctor roster order (Otte, Pledger, Gibson, Schroeder).
+    private static readonly IReadOnlyList<DoctorStyleProfile> SyntheticProfiles =
+    [
+        new(DoctorIndex: 0, CasesPerDay: 3, VarianceBiasMinutes: -5, VarianceSpread: 6, FamilyLeanWeight: 1, VariableUnitDelta: 1, SedationChancePercent: 25),
+        new(DoctorIndex: 1, CasesPerDay: 3, VarianceBiasMinutes: 0, VarianceSpread: 8, FamilyLeanWeight: 1, VariableUnitDelta: 0, SedationChancePercent: 20),
+        new(DoctorIndex: 2, CasesPerDay: 4, VarianceBiasMinutes: 1, VarianceSpread: 14, FamilyLeanWeight: 2, VariableUnitDelta: 0, SedationChancePercent: 30),
+        new(DoctorIndex: 3, CasesPerDay: 2, VarianceBiasMinutes: 7, VarianceSpread: 5, FamilyLeanWeight: 1, VariableUnitDelta: -1, SedationChancePercent: 15)
+    ];
+
+    // Procedure families used by the seeder. CharacterLeanMinutes is a small intrinsic over/under
+    // tendency (procedures that run long are positive); realistic case-flow bounds keep every record
+    // well under the extreme-duration thresholds. Default expected units come from the live roster.
+    private static readonly IReadOnlyList<SyntheticFamily> SyntheticFamilies =
+    [
+        new("CON", 10, 40, -3, false),
+        new("POST", 5, 25, -2, false),
+        new("IMPRES", 10, 35, -2, false),
+        new("BX", 20, 60, 3, false),
+        new("EXT", 20, 90, 5, true),
+        new("IMP", 45, 120, 5, true),
+        new("MISC", 10, 60, 2, false)
+    ];
+
+    // Stable FNV-1a hash of the seed components, used to seed the per-cycle jitter stream.
+    private static int DeterministicSeed(int dayIndex, int doctorIndex, int caseIndex)
+    {
+        unchecked
+        {
+            var hash = 2166136261u;
+            hash = (hash ^ (uint)dayIndex) * 16777619u;
+            hash = (hash ^ (uint)doctorIndex) * 16777619u;
+            hash = (hash ^ (uint)caseIndex) * 16777619u;
+            return (int)(hash & 0x7fffffff);
+        }
+    }
+
+    // Returns the most recent <count> weekdays (UTC), oldest first. Synthetic seat times are placed
+    // within these days so no record crosses a calendar day.
+    private List<DateTimeOffset> RecentWeekdays(int count)
+    {
+        var days = new List<DateTimeOffset>();
+        var cursor = new DateTimeOffset(Now.UtcDateTime.Date, TimeSpan.Zero);
+        while (days.Count < count)
+        {
+            if (cursor.DayOfWeek is not DayOfWeek.Saturday and not DayOfWeek.Sunday)
+            {
+                days.Add(cursor);
+            }
+
+            cursor = cursor.AddDays(-1);
+        }
+
+        days.Reverse();
+        return days;
+    }
+
+    /// <summary>
     /// Marks an existing completed cycle as an exception, removing it from normal
     /// reporting metrics and surfacing it in the Exceptions Requiring Review section.
     /// Returns false if no matching cycle is found.
@@ -1905,6 +2150,50 @@ public sealed record DemoSeedPattern(
     string ProcedureCode,
     Func<BoardThresholdOptions, TimeSpan> Elapsed,
     Func<BoardThresholdOptions, TimeSpan>? ReadyForDoctorElapsed = null);
+
+// Development/test only synthetic data shaping (see DemoBoardStore.SeedSyntheticReportData).
+// A per-doctor style profile that gives each doctor a distinct, non-punitive allocation shape.
+public sealed record DoctorStyleProfile(
+    int DoctorIndex,
+    int CasesPerDay,
+    int VarianceBiasMinutes,
+    int VarianceSpread,
+    int FamilyLeanWeight,
+    int VariableUnitDelta,
+    int SedationChancePercent);
+
+// A procedure family used by the seeder, with realistic case-flow bounds and a small intrinsic
+// over/under lean. Default expected units are read from the live roster, not stored here.
+public sealed record SyntheticFamily(
+    string Code,
+    int MinFlowMinutes,
+    int MaxFlowMinutes,
+    int CharacterLeanMinutes,
+    bool SedationEligible);
+
+// Tiny deterministic xorshift32 stream. Seeded from stable inputs so seeded data is reproducible
+// (pseudo-random feel, fully deterministic) - never wall-clock or Random-default seeded.
+public struct SyntheticJitter(int seed)
+{
+    private uint _state = (uint)seed | 1u;
+
+    public int Next(int minInclusive, int maxInclusive)
+    {
+        _state ^= _state << 13;
+        _state ^= _state >> 17;
+        _state ^= _state << 5;
+        var span = (uint)(maxInclusive - minInclusive + 1);
+        return minInclusive + (int)(_state % span);
+    }
+}
+
+/// <summary>Non-PHI summary returned by the dev-only synthetic report-data seeder.</summary>
+public sealed record SeedReportDataResult(
+    int CyclesInserted,
+    int DoctorsRepresented,
+    int ProcedureFamiliesRepresented,
+    int ExpectedAllocationCases,
+    int ExceptionsExpected);
 
 public sealed class RoomState(int roomId)
 {
