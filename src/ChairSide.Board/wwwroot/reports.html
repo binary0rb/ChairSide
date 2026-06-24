@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>ChairSide Board - Reports</title>
-  <link rel="stylesheet" href="/styles.css?v=20260624-report-date-range">
+  <link rel="stylesheet" href="/styles.css?v=20260624-doctor-report-cards">
 </head>
 <body data-view="reports">
   <header class="app-header compact">
@@ -55,6 +55,19 @@
 
     <section class="report-headline" id="reportHeadline" aria-label="Report summary"></section>
 
+    <section class="doctor-report-dashboard" id="doctorReportDashboard" aria-label="Doctor reports" hidden>
+      <div class="doctor-report-dashboard-head">
+        <div>
+          <span class="layer-pill layer-pill--allocation">Doctor Reports</span>
+          <h2>Doctor Report Overview</h2>
+        </div>
+        <p>Allocation balance by doctor for the selected report range.</p>
+      </div>
+      <div class="doctor-report-card-grid" id="doctorReportCards"></div>
+    </section>
+
+    <section class="selected-doctor-panel" id="selectedDoctorPanel" aria-label="Selected doctor report" hidden></section>
+
     <section class="report-filter-bar" id="reportFilterBar" aria-label="Report filters" hidden>
       <div class="report-filter-group" role="group" aria-label="Grouping mode">
         <span class="report-filter-label">Group by</span>
@@ -79,8 +92,8 @@
       </div>
       <details class="report-disclosure allocation-breakdown layer-rail--allocation" id="allocationBreakdown">
         <summary><span class="layer-pill layer-pill--allocation">Allocation Logic</span> Allocation balance by doctor and procedure family</summary>
-        <section class="allocation-group" aria-label="Doctor allocation balance">
-          <h3>Doctor Allocation Balance</h3>
+        <section class="allocation-group" aria-label="Doctor reports">
+          <h3>Doctor Reports</h3>
           <div class="allocation-row-list" id="doctorAllocationList"></div>
         </section>
         <section class="allocation-group" aria-label="Procedure family allocation balance">
@@ -185,6 +198,6 @@
   </main>
 
   <script src="/signalr-lite.js"></script>
-  <script src="/board.js?v=20260624-report-date-range"></script>
+  <script src="/board.js?v=20260624-doctor-report-cards"></script>
 </body>
 </html>

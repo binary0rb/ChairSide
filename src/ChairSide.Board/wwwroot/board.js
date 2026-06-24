@@ -19,6 +19,8 @@ const app = {
   // never resets the user's selected filters. sedation: all | sedation | non-sedation.
   // grouping: base | variant.
   reportFilters: { sedation: "all", grouping: "base" },
+  reportDoctorId: null,
+  reportDoctorTab: "overview",
   // Report date window. Drives the backend completed-cycle filter, so changing it reloads from the
   // API. start/end are ISO yyyy-MM-dd (null = unbounded). Default preset is Last 7 days.
   dateRange: { preset: "last7", start: null, end: null },
@@ -819,6 +821,7 @@ function renderReports() {
   renderReportWindow(r);
   syncDateRangeControls();
   renderReportHeadline(r, hasData);
+  renderDoctorReportDashboard(r, hasData);
   syncReportFilterButtons();
   renderReportFilterBar(hasData);
   renderAllocationReports(r);
@@ -866,6 +869,44 @@ function renderHeadlineCard(label, value) {
       <strong>${escapeHtml(value)}</strong>
     </article>
   `;
+}
+
+function renderDoctorReportDashboard(r, hasData) {
+  const section = document.getElementById("doctorReportDashboard");
+  const grid = document.getElementById("doctorReportCards");
+  const panel = document.getElementById("selectedDoctorPanel");
+  if (!section || !grid || !panel) {
+    return;
+  }
+
+  const doctors = aggregateAllocationByDoctor(r.doctorSummaries || []);
+  section.hidden = !hasData && doctors.length === 0;
+  if (section.hidden) {
+    grid.innerHTML = "";
+    panel.hidden = true;
+    panel.innerHTML = "";
+    return;
+  }
+
+  syncSelectedReportDoctor(doctors);
+  grid.innerHTML = doctors.length
+    ? doctors.map(renderDoctorAllocationCard).join("")
+    : `<p class="report-empty-note">No doctor report data for this range.</p>`;
+  renderSelectedDoctorPanel(r, doctors);
+}
+
+function syncSelectedReportDoctor(doctors) {
+  if (!doctors.length) {
+    app.reportDoctorId = null;
+    return;
+  }
+
+  const current = doctors.find(item => item.doctorId === app.reportDoctorId);
+  if (current) {
+    return;
+  }
+
+  app.reportDoctorId = doctors.find(item => (item.count || 0) > 0)?.doctorId || doctors[0].doctorId;
 }
 
 // ---------------------------------------------------------------------------
@@ -939,6 +980,7 @@ function renderDoctorAllocation(r) {
   }
 
   const aggregated = aggregateAllocationByDoctor(r.doctorSummaries || []);
+  list.classList.remove("doctor-report-card-grid");
   list.innerHTML = aggregated.length
     ? aggregated.map(renderDoctorAllocationRow).join("")
     : `<p class="allocation-empty">No doctor allocation data for this range.</p>`;
@@ -969,7 +1011,262 @@ function aggregateAllocationByDoctor(summaries) {
     const index = order.indexOf(id);
     return index === -1 ? Number.MAX_SAFE_INTEGER : index;
   };
-  return [...byDoctor.values()].sort((x, y) => rank(x.doctorId) - rank(y.doctorId));
+
+  const rosterCards = (app.snapshot?.doctors || []).map(doctor => ({
+    doctorId: doctor.id,
+    count: 0,
+    net: 0,
+    over: 0,
+    under: 0,
+    at: 0,
+    adjusted: 0,
+    ...byDoctor.get(doctor.id)
+  }));
+  const rosterIds = new Set(rosterCards.map(item => item.doctorId));
+  const historicalCards = [...byDoctor.values()]
+    .filter(item => !rosterIds.has(item.doctorId))
+    .sort((x, y) => rank(x.doctorId) - rank(y.doctorId));
+
+  return [...rosterCards, ...historicalCards];
+}
+
+const doctorReportIdentity = {
+  otte: { initials: "LDO", color: "#dc2626" },
+  pledger: { initials: "JWP", color: "#16a34a" },
+  gibson: { initials: "JEG", color: "#7c3aed" },
+  schroeder: { initials: "NDS", color: "#eab308" }
+};
+
+function renderDoctorAllocationCard(agg) {
+  const doctor = (app.snapshot?.doctors || []).find(item => item.id === agg.doctorId);
+  const name = doctor ? doctor.name : doctorName(agg.doctorId);
+  const identity = doctorReportIdentity[agg.doctorId] || {
+    initials: initialsFromDoctorName(name),
+    color: doctor?.color || "#64748b"
+  };
+  const count = agg.count || 0;
+  const average = count > 0 ? agg.net / count : Number.NaN;
+  const selected = agg.doctorId === app.reportDoctorId;
+
+  return `
+    <article class="doctor-report-card ${count === 0 ? "is-empty" : ""} ${selected ? "is-selected" : ""}" style="--doctor-color: ${escapeAttribute(identity.color)}">
+      <header class="doctor-report-card-head">
+        <span class="doctor-report-initials" aria-hidden="true">${escapeHtml(identity.initials)}</span>
+        <div class="doctor-report-identity">
+          <h4>${escapeHtml(name)}</h4>
+          <p>${escapeHtml(doctorAllocationSummary(agg))}</p>
+        </div>
+      </header>
+      <dl class="doctor-report-metrics">
+        <div>
+          <dt>Cases</dt>
+          <dd>${escapeHtml(String(count))}</dd>
+        </div>
+        <div>
+          <dt>Balance</dt>
+          <dd class="${escapeAttribute(varianceClass(agg.net))}">${escapeHtml(formatSignedMinutes(agg.net))}</dd>
+        </div>
+        <div>
+          <dt>Avg</dt>
+          <dd class="${escapeAttribute(varianceClass(average))}">${escapeHtml(formatSignedMinutes(average))}</dd>
+        </div>
+        <div>
+          <dt>O / U / A</dt>
+          <dd>${escapeHtml(`${agg.over} / ${agg.under} / ${agg.at}`)}</dd>
+        </div>
+      </dl>
+      <button class="doctor-report-detail-link" type="button" data-report-doctor-id="${escapeAttribute(agg.doctorId)}" aria-pressed="${selected ? "true" : "false"}">
+        ${selected ? "Viewing details" : "View details"}
+      </button>
+    </article>`;
+}
+
+function doctorAllocationSummary(agg) {
+  const count = agg.count || 0;
+  if (count === 0) {
+    return "No allocation variance cases in this report range.";
+  }
+  if (agg.net === 0) {
+    return `Measured case flow stayed at expected allocation across ${count} ${count === 1 ? "case" : "cases"}.`;
+  }
+
+  const direction = agg.net > 0 ? "over expected" : "under expected";
+  return `Measured case flow ran ${formatAbsoluteMinutes(agg.net)} ${direction} across ${count} ${count === 1 ? "case" : "cases"}.`;
+}
+
+function mainPressurePoint(agg) {
+  if (!agg.count) {
+    return "No cases";
+  }
+
+  const points = [
+    { label: "Over expected", value: agg.over || 0 },
+    { label: "Under expected", value: agg.under || 0 },
+    { label: "At expected", value: agg.at || 0 }
+  ].sort((a, b) => b.value - a.value);
+
+  return points[0].value > 0 ? points[0].label : "No variance";
+}
+
+function renderSelectedDoctorPanel(r, doctors) {
+  const panel = document.getElementById("selectedDoctorPanel");
+  if (!panel) {
+    return;
+  }
+
+  const agg = doctors.find(item => item.doctorId === app.reportDoctorId) || doctors[0];
+  if (!agg) {
+    panel.hidden = true;
+    panel.innerHTML = "";
+    return;
+  }
+
+  const doctor = (app.snapshot?.doctors || []).find(item => item.id === agg.doctorId);
+  const name = doctor ? doctor.name : doctorName(agg.doctorId);
+  const identity = doctorReportIdentity[agg.doctorId] || {
+    initials: initialsFromDoctorName(name),
+    color: doctor?.color || "#64748b"
+  };
+  const tabs = ["overview", "trends", "procedures", "flow", "audit"];
+  if (!tabs.includes(app.reportDoctorTab)) {
+    app.reportDoctorTab = "overview";
+  }
+
+  panel.hidden = false;
+  panel.style.setProperty("--doctor-color", identity.color);
+  panel.innerHTML = `
+    <div class="selected-doctor-head">
+      <span class="doctor-report-initials" aria-hidden="true">${escapeHtml(identity.initials)}</span>
+      <div>
+        <h2>${escapeHtml(name)}</h2>
+        <p>${escapeHtml(doctorAllocationSummary(agg))}</p>
+      </div>
+    </div>
+    <div class="selected-doctor-tabs" role="tablist" aria-label="${escapeAttribute(name)} report sections">
+      ${tabs.map(tab => renderDoctorReportTabButton(tab)).join("")}
+    </div>
+    <div class="selected-doctor-tab-panel">
+      ${renderSelectedDoctorTabContent(app.reportDoctorTab, r, agg)}
+    </div>`;
+}
+
+function renderDoctorReportTabButton(tab) {
+  const labels = {
+    overview: "Overview",
+    trends: "Trends",
+    procedures: "Procedures",
+    flow: "Flow Breakdown",
+    audit: "Case Audit"
+  };
+  const selected = app.reportDoctorTab === tab;
+  return `
+    <button class="selected-doctor-tab ${selected ? "is-active" : ""}" type="button" role="tab" aria-selected="${selected ? "true" : "false"}" data-report-doctor-tab="${escapeAttribute(tab)}">
+      ${escapeHtml(labels[tab])}
+    </button>`;
+}
+
+function renderSelectedDoctorTabContent(tab, r, agg) {
+  if (tab === "audit") {
+    return renderSelectedDoctorAudit(r, agg.doctorId);
+  }
+
+  if (tab === "overview") {
+    return renderSelectedDoctorOverview(r, agg);
+  }
+
+  const messages = {
+    trends: "Trend lines need full-range per-day case data. The current payload only guarantees the 25 most recent completed cycles, so this view is intentionally left blank for now.",
+    procedures: "Procedure mix by selected doctor is not included in the current report payload.",
+    flow: "Detailed flow breakdown by selected doctor is not included in the current report payload."
+  };
+  return `<p class="report-empty-note">${escapeHtml(messages[tab] || "Not enough data in the current payload.")}</p>`;
+}
+
+function renderSelectedDoctorOverview(r, agg) {
+  const count = agg.count || 0;
+  const average = count > 0 ? agg.net / count : Number.NaN;
+  return `
+    <section class="selected-doctor-overview">
+      <div class="selected-doctor-summary">
+        <h3>Range Flow Summary</h3>
+        <p>${escapeHtml(doctorAllocationSummary(agg))}</p>
+        <p class="allocation-footnote">Uses existing doctor allocation aggregates for ${escapeHtml(r.rangeLabel || "the selected range")}.</p>
+      </div>
+      <dl class="selected-doctor-kpis">
+        <div><dt>Cases</dt><dd>${escapeHtml(String(count))}</dd></div>
+        <div><dt>Net balance</dt><dd class="${escapeAttribute(varianceClass(agg.net))}">${escapeHtml(formatSignedMinutes(agg.net))}</dd></div>
+        <div><dt>Average variance</dt><dd class="${escapeAttribute(varianceClass(average))}">${escapeHtml(formatSignedMinutes(average))}</dd></div>
+        <div><dt>Pressure point</dt><dd>${escapeHtml(mainPressurePoint(agg))}</dd></div>
+      </dl>
+    </section>`;
+}
+
+function renderSelectedDoctorAudit(r, doctorId) {
+  const cycles = (r.recentCompletedCycles || []).filter(cycle => cycle.assignedDoctor === doctorId);
+  if (!cycles.length) {
+    return `<p class="report-empty-note">No recent completed cycles for this doctor are available in the current payload.</p>`;
+  }
+
+  return `
+    <div class="selected-doctor-audit">
+      <table class="report-table">
+        <thead>
+          <tr>
+            <th>Room</th>
+            <th>Procedure</th>
+            <th>Doctor Complete</th>
+            <th>Expected</th>
+            <th>Measured</th>
+            <th>Variance</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${cycles.map(cycle => `
+            <tr>
+              <td>Room ${cycle.roomId}</td>
+              <td>${renderCycleProcedureCell(cycle)}</td>
+              <td>${formatDateTime(cycle.doctorCompleteAt)}</td>
+              <td>${formatAllocationMinutes(cycle.expectedAllocationMinutes)}</td>
+              <td>${formatAllocationMinutes(cycle.measuredCaseFlowMinutes)}</td>
+              <td>${renderVarianceBadge(cycle.allocationVarianceMinutes)}</td>
+            </tr>
+          `).join("")}
+        </tbody>
+      </table>
+      <p class="allocation-footnote">Case Audit is limited to the recent completed cycles returned by the current report payload.</p>
+    </div>`;
+}
+
+function initialsFromDoctorName(name) {
+  const cleaned = String(name || "")
+    .replace(/^Dr\.\s+/i, "")
+    .replace(/[^a-z\s]/gi, " ")
+    .trim();
+  const initials = cleaned.split(/\s+/)
+    .filter(Boolean)
+    .map(part => part[0])
+    .join("")
+    .toUpperCase();
+  return initials || "--";
+}
+
+function formatAbsoluteMinutes(minutes) {
+  if (!Number.isFinite(minutes)) {
+    return "--";
+  }
+  const rounded = Math.round(Math.abs(minutes) * 10) / 10;
+  return `${rounded} min`;
+}
+
+function formatSignedMinutes(minutes) {
+  if (!Number.isFinite(minutes)) {
+    return "--";
+  }
+  const rounded = Math.round(minutes * 10) / 10;
+  if (rounded > 0) {
+    return `+${rounded} min`;
+  }
+  return `${rounded} min`;
 }
 
 function renderDoctorAllocationRow(agg) {
@@ -1382,6 +1679,25 @@ function wireReportFilters() {
 }
 
 async function handleReportsActionClick(event) {
+  const doctorButton = event.target.closest("[data-report-doctor-id]");
+  if (doctorButton) {
+    app.reportDoctorId = doctorButton.dataset.reportDoctorId;
+    app.reportDoctorTab = "overview";
+    if (app.reports) {
+      renderReports();
+    }
+    return;
+  }
+
+  const doctorTab = event.target.closest("[data-report-doctor-tab]");
+  if (doctorTab) {
+    app.reportDoctorTab = doctorTab.dataset.reportDoctorTab || "overview";
+    if (app.reports) {
+      renderReports();
+    }
+    return;
+  }
+
   const confirmButton = event.target.closest("[data-action='confirm-exclusion']");
   if (confirmButton) {
     await handleConfirmExclusionClick(confirmButton);
