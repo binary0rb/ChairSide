@@ -3606,7 +3606,7 @@ public sealed class BoardStoreTests
 
         var result = context.Store.SeedSyntheticReportData();
 
-        Assert.InRange(result.CyclesInserted, 40, 60);
+        Assert.InRange(result.CyclesInserted, 100, 140);
         Assert.Equal(4, result.DoctorsRepresented);
         Assert.True(result.ProcedureFamiliesRepresented >= 7);
         Assert.Equal(result.CyclesInserted, result.ExpectedAllocationCases);
@@ -3705,6 +3705,80 @@ public sealed class BoardStoreTests
         Assert.Equal(first.CyclesInserted, context.Store.GetReports().IncludedCompletedCycleCount);
     }
 
+    [Fact]
+    public void Synthetic_report_data_populates_every_date_range_preset()
+    {
+        using var workspace = TestWorkspace.Create();
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production);
+        context.Store.SeedSyntheticReportData();
+
+        var today = DateOnly.FromDateTime(DateTimeOffset.UtcNow.UtcDateTime);
+        int CompletedIn(DateOnly start, DateOnly end) =>
+            context.Store.GetReports(ReportDateRange.FromDates(start, end)).CompletedRoomCyclesCount;
+
+        var todayCount = CompletedIn(today, today);
+        var last7 = CompletedIn(today.AddDays(-6), today);
+        var last30 = CompletedIn(today.AddDays(-29), today);
+        var allTime = context.Store.GetReports().CompletedRoomCyclesCount;
+
+        // Today non-empty; each wider preset is strictly larger so the presets are all meaningful.
+        Assert.True(todayCount >= 6, $"today={todayCount}");
+        Assert.True(last7 > todayCount, $"last7={last7} today={todayCount}");
+        Assert.True(last30 > last7, $"last30={last30} last7={last7}");
+        Assert.True(allTime > last30, $"all={allTime} last30={last30}");
+        Assert.InRange(allTime, 100, 140);
+    }
+
+    [Fact]
+    public void Synthetic_report_data_is_clean_across_all_date_range_presets()
+    {
+        using var workspace = TestWorkspace.Create();
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production);
+        context.Store.SeedSyntheticReportData();
+
+        var today = DateOnly.FromDateTime(DateTimeOffset.UtcNow.UtcDateTime);
+        var ranges = new[]
+        {
+            ReportDateRange.FromDates(today, today),
+            ReportDateRange.FromDates(today.AddDays(-6), today),
+            ReportDateRange.FromDates(today.AddDays(-29), today),
+            ReportDateRange.AllTime
+        };
+
+        foreach (var range in ranges)
+        {
+            var reports = context.Store.GetReports(range);
+            Assert.Equal(0, reports.ExcludedCompletedCycleCount);
+            Assert.Equal(0, reports.ExceptionCount);
+        }
+    }
+
+    [Fact]
+    public void Synthetic_report_data_summaries_grow_with_wider_date_ranges()
+    {
+        using var workspace = TestWorkspace.Create();
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production);
+        context.Store.SeedSyntheticReportData();
+
+        var today = DateOnly.FromDateTime(DateTimeOffset.UtcNow.UtcDateTime);
+        var todayReports = context.Store.GetReports(ReportDateRange.FromDates(today, today));
+        var allReports = context.Store.GetReports();
+
+        // Procedure family summaries cover more completed cycles over the wider window.
+        var todayFamilyCycles = todayReports.BaseProcedureSummaries.Sum(summary => summary.CompletedCycleCount);
+        var allFamilyCycles = allReports.BaseProcedureSummaries.Sum(summary => summary.CompletedCycleCount);
+        Assert.True(allFamilyCycles > todayFamilyCycles, $"all={allFamilyCycles} today={todayFamilyCycles}");
+
+        // Doctor summaries (via allocation aggregates) likewise reflect more cases over the wider window.
+        var todayDoctorCycles = todayReports.DoctorSummaries.Sum(summary => summary.Allocation.AllocationVarianceCycleCount);
+        var allDoctorCycles = allReports.DoctorSummaries.Sum(summary => summary.Allocation.AllocationVarianceCycleCount);
+        Assert.True(allDoctorCycles > todayDoctorCycles, $"all={allDoctorCycles} today={todayDoctorCycles}");
+
+        // Both windows still represent all four doctors.
+        Assert.Equal(4, allReports.DoctorSummaries.Select(summary => summary.AssignedDoctor).Distinct().Count());
+        Assert.Equal(4, todayReports.DoctorSummaries.Select(summary => summary.AssignedDoctor).Distinct().Count());
+    }
+
     // -------------------------------------------------------------------------
     // Maintenance reset (training seed / empty beta)
     // -------------------------------------------------------------------------
@@ -3722,7 +3796,7 @@ public sealed class BoardStoreTests
         var result = context.Store.ResetAndSeedSyntheticTrainingData();
 
         Assert.True(result.CompletedCyclesCleared >= 1);
-        Assert.InRange(result.CyclesSeeded, 40, 60);
+        Assert.InRange(result.CyclesSeeded, 100, 140);
         Assert.Equal(0, result.ExceptionsExpected);
 
         var cycles = context.Repository.LoadCompletedCycles();
@@ -4069,6 +4143,162 @@ public sealed class BoardStoreTests
         var exception = Assert.Single(context.Store.GetReports().ExceptionCycles);
         Assert.True(exception.RequiresReview);
         Assert.Equal(ReviewStatuses.PendingReview, exception.ReviewStatus);
+    }
+
+    // -------------------------------------------------------------------------
+    // Report date range filtering (bounds the completed-cycle population by DoctorCompleteAt)
+    // -------------------------------------------------------------------------
+
+    [Fact]
+    public void Reports_without_date_range_include_all_completed_cycles()
+    {
+        using var workspace = TestWorkspace.Create();
+        var databasePath = workspace.ProductionDatabasePath();
+        var seed = StoreContext.Create(workspace, environmentName: Environments.Production, databasePath: databasePath);
+
+        SaveCleanCycle(seed, room: 1, doctor: "otte", code: "EXT", completeAt: Utc(2026, 6, 10, 14), expectedUnits: 3);
+        SaveCleanCycle(seed, room: 2, doctor: "otte", code: "EXT", completeAt: Utc(2026, 6, 20, 14), expectedUnits: 3);
+
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production, databasePath: databasePath);
+        var reports = context.Store.GetReports();
+
+        Assert.Equal(2, reports.CompletedRoomCyclesCount);
+        Assert.Equal("All time", reports.RangeLabel);
+        Assert.Null(reports.RangeStartDate);
+        Assert.Equal(2, reports.TotalCompletedCycleCount);
+    }
+
+    [Fact]
+    public void Date_range_includes_in_range_and_excludes_out_of_range_cycles()
+    {
+        using var workspace = TestWorkspace.Create();
+        var databasePath = workspace.ProductionDatabasePath();
+        var seed = StoreContext.Create(workspace, environmentName: Environments.Production, databasePath: databasePath);
+
+        SaveCleanCycle(seed, room: 1, doctor: "otte", code: "EXT", completeAt: Utc(2026, 6, 10, 14), expectedUnits: 3);
+        SaveCleanCycle(seed, room: 2, doctor: "otte", code: "EXT", completeAt: Utc(2026, 6, 20, 14), expectedUnits: 3);
+
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production, databasePath: databasePath);
+        var reports = context.Store.GetReports(ReportDateRange.FromDateStrings("2026-06-08", "2026-06-12"));
+
+        // Only the in-range cycle survives the source filter.
+        Assert.Equal(1, reports.CompletedRoomCyclesCount);
+        var cycle = Assert.Single(reports.RecentCompletedCycles);
+        Assert.Equal(1, cycle.RoomId);
+        // Window metadata reflects the selection; the all-time total is still reported for context.
+        Assert.Equal("2026-06-08", reports.RangeStartDate);
+        Assert.Equal("2026-06-12", reports.RangeEndDate);
+        Assert.Equal(2, reports.TotalCompletedCycleCount);
+    }
+
+    [Fact]
+    public void Date_range_end_day_is_inclusive_through_end_of_day()
+    {
+        using var workspace = TestWorkspace.Create();
+        var databasePath = workspace.ProductionDatabasePath();
+        var seed = StoreContext.Create(workspace, environmentName: Environments.Production, databasePath: databasePath);
+
+        // A cycle completing late on the end day must be included (end day inclusive through 23:59).
+        SaveCleanCycle(seed, room: 1, doctor: "otte", code: "EXT", completeAt: Utc(2026, 6, 12, 23, 30), expectedUnits: 3);
+
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production, databasePath: databasePath);
+        var reports = context.Store.GetReports(ReportDateRange.FromDateStrings("2026-06-10", "2026-06-12"));
+
+        Assert.Equal(1, reports.CompletedRoomCyclesCount);
+    }
+
+    [Fact]
+    public void Date_filter_applies_before_allocation_and_hygiene_counts()
+    {
+        using var workspace = TestWorkspace.Create();
+        var databasePath = workspace.ProductionDatabasePath();
+        var seed = StoreContext.Create(workspace, environmentName: Environments.Production, databasePath: databasePath);
+
+        SaveCleanCycle(seed, room: 1, doctor: "otte", code: "EXT", completeAt: Utc(2026, 6, 10, 14), expectedUnits: 3);
+        SaveCleanCycle(seed, room: 2, doctor: "otte", code: "EXT", completeAt: Utc(2026, 6, 20, 14), expectedUnits: 3);
+
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production, databasePath: databasePath);
+        var reports = context.Store.GetReports(ReportDateRange.FromDateStrings("2026-06-08", "2026-06-12"));
+
+        // Hygiene and allocation aggregates are computed over the date-filtered population only.
+        Assert.Equal(1, reports.IncludedCompletedCycleCount);
+        Assert.Equal(0, reports.ExcludedCompletedCycleCount);
+        Assert.Equal(1, reports.AllocationVariance!.AllocationVarianceCycleCount);
+    }
+
+    [Fact]
+    public void Date_filter_affects_doctor_and_procedure_family_summaries()
+    {
+        using var workspace = TestWorkspace.Create();
+        var databasePath = workspace.ProductionDatabasePath();
+        var seed = StoreContext.Create(workspace, environmentName: Environments.Production, databasePath: databasePath);
+
+        // In range: otte / EXT. Out of range: pledger / IMP.
+        SaveCleanCycle(seed, room: 1, doctor: "otte", code: "EXT", completeAt: Utc(2026, 6, 10, 14), expectedUnits: 3);
+        SaveCleanCycle(seed, room: 2, doctor: "pledger", code: "IMP", completeAt: Utc(2026, 6, 20, 14), expectedUnits: 6);
+
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production, databasePath: databasePath);
+        var reports = context.Store.GetReports(ReportDateRange.FromDateStrings("2026-06-08", "2026-06-12"));
+
+        Assert.Equal("otte", Assert.Single(reports.DoctorSummaries).AssignedDoctor);
+        Assert.Equal("EXT", Assert.Single(reports.BaseProcedureSummaries).ProcedureCode);
+    }
+
+    [Fact]
+    public void Reversed_date_range_is_normalized_and_invalid_dates_degrade_to_all_time()
+    {
+        using var workspace = TestWorkspace.Create();
+        var databasePath = workspace.ProductionDatabasePath();
+        var seed = StoreContext.Create(workspace, environmentName: Environments.Production, databasePath: databasePath);
+
+        SaveCleanCycle(seed, room: 1, doctor: "otte", code: "EXT", completeAt: Utc(2026, 6, 15, 14), expectedUnits: 3);
+        SaveCleanCycle(seed, room: 2, doctor: "otte", code: "EXT", completeAt: Utc(2026, 7, 15, 14), expectedUnits: 3);
+
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production, databasePath: databasePath);
+
+        // Reversed pair is normalized to Jun 10 - Jun 20 and includes the Jun 15 cycle.
+        var reversed = context.Store.GetReports(ReportDateRange.FromDateStrings("2026-06-20", "2026-06-10"));
+        Assert.Equal(1, reversed.CompletedRoomCyclesCount);
+        Assert.Equal("2026-06-10", reversed.RangeStartDate);
+        Assert.Equal("2026-06-20", reversed.RangeEndDate);
+
+        // Unparseable dates do not crash and behave as all-time.
+        var invalid = context.Store.GetReports(ReportDateRange.FromDateStrings("not-a-date", "also-bad"));
+        Assert.Equal(2, invalid.CompletedRoomCyclesCount);
+        Assert.Equal("All time", invalid.RangeLabel);
+    }
+
+    private static DateTimeOffset Utc(int year, int month, int day, int hour, int minute = 0) =>
+        new(year, month, day, hour, minute, 0, TimeSpan.Zero);
+
+    // Persists a single clean, allocation-calculable completed cycle anchored on completeAt (same UTC
+    // day, no hygiene flags), for date-range tests. Reload a new StoreContext on the same DB to read it.
+    private static void SaveCleanCycle(
+        StoreContext context, int room, string doctor, string code, DateTimeOffset completeAt, int expectedUnits)
+    {
+        var seatedAt = completeAt.AddMinutes(-30);
+        var cycle = new CompletedRoomCycle
+        {
+            RoomId = room,
+            AssignedDoctor = doctor,
+            ProcedureCode = code,
+            SeatedAt = seatedAt,
+            ReadyForDoctorAt = seatedAt.AddMinutes(5),
+            DoctorArrivedAt = seatedAt.AddMinutes(15),
+            DoctorCompleteAt = completeAt,
+            RoomAvailableAt = completeAt.AddMinutes(5),
+            SeatedToDoctorSeconds = 900,
+            PrepSeconds = 300,
+            ReadyToDoctorSeconds = 600,
+            DoctorInRoomSeconds = 900,
+            TurnoverSeconds = 300,
+            TotalRoomCycleSeconds = 2100,
+            FinalWaitState = "ready-for-doctor",
+            OriginalDefaultExpectedUnits = expectedUnits,
+            ExpectedAllocationUnits = expectedUnits,
+            ExpectedAllocationMinutes = expectedUnits * 10
+        };
+        context.Repository.SaveCompletedCycle(cycle, context.Doctors, context.Procedures);
     }
 
     // Seats, readies, completes, and frees a single room, returning the resulting completed cycle.
