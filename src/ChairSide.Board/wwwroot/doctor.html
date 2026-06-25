@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>ChairSide Board - Doctor View</title>
-  <link rel="stylesheet" href="/styles.css?v=20260624-report-date-range">
+  <link rel="stylesheet" href="/styles.css?v=20260625-doctor-cockpit-mtd">
 </head>
 <body data-view="doctor">
   <header class="app-header compact">
@@ -32,10 +32,16 @@
   </header>
 
   <main class="doctor-shell">
+    <!-- Cockpit: non-interactive summary card + full selected-doctor detail panel with tabs.
+         Hidden until app.reports loads (silent if no admin token). -->
+    <section id="doctorCockpit" class="doctor-cockpit" hidden>
+      <div id="doctorContextCard" class="doctor-context-card"></div>
+      <section id="selectedDoctorPanel" class="selected-doctor-panel" hidden></section>
+    </section>
     <section class="doctor-list" id="doctorRoomList"></section>
   </main>
 
   <script src="/signalr-lite.js"></script>
-  <script src="/board.js?v=20260624-report-date-range"></script>
+  <script src="/board.js?v=20260625-doctor-cockpit-mtd"></script>
 </body>
 </html>

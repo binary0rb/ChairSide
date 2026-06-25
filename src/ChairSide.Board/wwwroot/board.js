@@ -107,6 +107,17 @@ async function boot() {
     wireReportPressGuard();
   }
 
+  if (document.body.dataset.view === "doctor") {
+    // Use month-to-date for the cockpit so metrics reflect the current calendar month.
+    // app.dateRange is set before loadReports() so reportsRequestUrl() picks up the right from/to.
+    const mtd = computePresetRange("mtd");
+    app.dateRange = { preset: "mtd", start: mtd.start, end: mtd.end };
+    loadReports();
+    window.setInterval(loadReports, 60_000);
+    wireDoctorCockpitActions();
+    wireDoctorCockpitPressGuard();
+  }
+
   wireDoctorViewMenu();
   connectRealtime();
   app.pollHandle = window.setInterval(loadBoard, 5000);
@@ -222,6 +233,10 @@ function computePresetRange(preset) {
   const today = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
   if (preset === "today") {
     return { start: utcDateString(today), end: utcDateString(today) };
+  }
+  if (preset === "mtd") {
+    const start = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), 1));
+    return { start: utcDateString(start), end: utcDateString(today) };
   }
   if (preset === "last30") {
     const start = new Date(today);
@@ -814,9 +829,61 @@ function renderDoctorView() {
   title.textContent = doctor.name;
   document.documentElement.style.setProperty("--active-doctor", doctor.color);
 
+  // Pin the report selection to this page's doctor, then render the cockpit when reports are loaded.
+  // Reports load asynchronously in boot(); the cockpit is hidden until app.reports is available.
+  app.reportDoctorId = doctor.id;
+  if (app.reports) {
+    renderDoctorCockpit(app.reports, doctor);
+  } else {
+    const cockpit = document.getElementById("doctorCockpit");
+    if (cockpit) {
+      cockpit.hidden = true;
+    }
+  }
+
   target.innerHTML = rooms.length
     ? rooms.map(room => renderRoomTile(room)).join("")
     : `<div class="empty-message">No active rooms for ${escapeHtml(doctor.name)}.</div>`;
+}
+
+function renderDoctorCockpit(r, doctor) {
+  const cockpit = document.getElementById("doctorCockpit");
+  if (!cockpit) {
+    return;
+  }
+
+  const allDoctors = aggregateAllocationByDoctor(r.doctorSummaries || []);
+  const agg = allDoctors.find(item => item.doctorId === doctor.id)
+    || { doctorId: doctor.id, count: 0, net: 0, over: 0, under: 0, at: 0, adjusted: 0 };
+  const identity = doctorReportIdentity[doctor.id] || {
+    initials: initialsFromDoctorName(doctor.name),
+    color: doctor.color || "#64748b"
+  };
+
+  cockpit.hidden = false;
+
+  // Non-interactive summary card. Token guards against rewriting it on every 1-second tick
+  // when nothing has changed. The panel below has its own token guard via renderSelectedDoctorPanel.
+  const contextCard = document.getElementById("doctorContextCard");
+  if (contextCard) {
+    const cardToken = `${app.reportsVersion}|${doctor.id}`;
+    if (contextCard.dataset.renderKey !== cardToken) {
+      contextCard.dataset.renderKey = cardToken;
+      const rangeSuffix = r.rangeLabel ? ` · ${r.rangeLabel}` : "";
+      contextCard.innerHTML = `
+        <p class="doctor-cockpit-range-label">Reporting range: Month to date${escapeHtml(rangeSuffix)}</p>
+        <article class="doctor-report-card is-selected is-panel-summary"
+          style="--doctor-color: ${escapeAttribute(identity.color)}"
+          aria-label="${escapeAttribute(`${doctor.name} — allocation summary`)}">
+          ${renderDoctorCardBody(agg, r, doctor.name, identity)}
+        </article>`;
+    }
+  }
+
+  // Full selected-doctor detail panel (head + tabs + tab content) reused directly.
+  // app.reportDoctorId was pinned to doctor.id in renderDoctorView, so the panel's
+  // internal doctors.find(item => item.doctorId === app.reportDoctorId) always resolves.
+  renderSelectedDoctorPanel(r, [agg]);
 }
 
 function renderReports() {
@@ -1062,6 +1129,44 @@ const doctorReportIdentity = {
   schroeder: { initials: "NDS", color: "#eab308" }
 };
 
+// Renders the inner body of a doctor report card: header (initials + name + summary), metrics dl,
+// and sparkline. Used by both the interactive grid card and the non-interactive cockpit summary.
+function renderDoctorCardBody(agg, report, name, identity) {
+  const count = agg.count || 0;
+  const average = count > 0 ? agg.net / count : Number.NaN;
+  const sparkPoints = (report?.doctorDailyAllocationSeries || []).find(item => item.doctorId === agg.doctorId)?.points;
+  return `
+    <header class="doctor-report-card-head">
+      <span class="doctor-report-initials" aria-hidden="true">${escapeHtml(identity.initials)}</span>
+      <div class="doctor-report-identity">
+        <h4>${escapeHtml(name)}</h4>
+        <p>${escapeHtml(doctorAllocationSummary(agg))}</p>
+      </div>
+    </header>
+    <dl class="doctor-report-metrics">
+      <div>
+        <dt>Cases</dt>
+        <dd>${escapeHtml(String(count))}</dd>
+      </div>
+      <div>
+        <dt>Balance</dt>
+        <dd class="${escapeAttribute(varianceClass(agg.net))}">${escapeHtml(formatSignedMinutes(agg.net))}</dd>
+      </div>
+      <div>
+        <dt>Avg</dt>
+        <dd class="${escapeAttribute(varianceClass(average))}">${escapeHtml(formatSignedMinutes(average))}</dd>
+      </div>
+      <div>
+        <dt>O / U / A</dt>
+        <dd>${escapeHtml(`${agg.over} / ${agg.under} / ${agg.at}`)}</dd>
+      </div>
+    </dl>
+    ${renderDoctorSparkline(sparkPoints)}`;
+}
+
+// The whole card is the selection control (role="button", focusable). The "View details" affordance
+// is a non-interactive visual cue (aria-hidden span) so we never nest interactive controls; clicks
+// anywhere in the card and Enter/Space on the focused card both resolve to data-report-doctor-id.
 function renderDoctorAllocationCard(agg, report) {
   const doctor = (app.snapshot?.doctors || []).find(item => item.id === agg.doctorId);
   const name = doctor ? doctor.name : doctorName(agg.doctorId);
@@ -1070,41 +1175,10 @@ function renderDoctorAllocationCard(agg, report) {
     color: doctor?.color || "#64748b"
   };
   const count = agg.count || 0;
-  const average = count > 0 ? agg.net / count : Number.NaN;
   const selected = agg.doctorId === app.reportDoctorId;
-  const sparkPoints = (report?.doctorDailyAllocationSeries || []).find(item => item.doctorId === agg.doctorId)?.points;
-
-  // The whole card is the selection control (role="button", focusable). The "View details" affordance
-  // is a non-interactive visual cue (aria-hidden span) so we never nest interactive controls; clicks
-  // anywhere in the card and Enter/Space on the focused card both resolve to data-report-doctor-id.
   return `
     <article class="doctor-report-card ${count === 0 ? "is-empty" : ""} ${selected ? "is-selected" : ""}" style="--doctor-color: ${escapeAttribute(identity.color)}" data-report-doctor-id="${escapeAttribute(agg.doctorId)}" role="button" tabindex="0" aria-pressed="${selected ? "true" : "false"}" aria-label="${escapeAttribute(`Show report details for ${name}`)}">
-      <header class="doctor-report-card-head">
-        <span class="doctor-report-initials" aria-hidden="true">${escapeHtml(identity.initials)}</span>
-        <div class="doctor-report-identity">
-          <h4>${escapeHtml(name)}</h4>
-          <p>${escapeHtml(doctorAllocationSummary(agg))}</p>
-        </div>
-      </header>
-      <dl class="doctor-report-metrics">
-        <div>
-          <dt>Cases</dt>
-          <dd>${escapeHtml(String(count))}</dd>
-        </div>
-        <div>
-          <dt>Balance</dt>
-          <dd class="${escapeAttribute(varianceClass(agg.net))}">${escapeHtml(formatSignedMinutes(agg.net))}</dd>
-        </div>
-        <div>
-          <dt>Avg</dt>
-          <dd class="${escapeAttribute(varianceClass(average))}">${escapeHtml(formatSignedMinutes(average))}</dd>
-        </div>
-        <div>
-          <dt>O / U / A</dt>
-          <dd>${escapeHtml(`${agg.over} / ${agg.under} / ${agg.at}`)}</dd>
-        </div>
-      </dl>
-      ${renderDoctorSparkline(sparkPoints)}
+      ${renderDoctorCardBody(agg, report, name, identity)}
       <span class="doctor-report-detail-link" aria-hidden="true">
         ${selected ? "Viewing details" : "View details"}
       </span>
@@ -1847,6 +1921,55 @@ function wireReportPressGuard() {
     app.reportPressActive = false;
     if (app.reports) {
       renderReports();
+    }
+  };
+
+  document.addEventListener("pointerup", clearPress);
+  document.addEventListener("pointercancel", clearPress);
+}
+
+function wireDoctorCockpitActions() {
+  document.addEventListener("click", event => {
+    const tab = event.target.closest("[data-report-doctor-tab]");
+    if (!tab) {
+      return;
+    }
+    app.reportDoctorTab = tab.dataset.reportDoctorTab || "overview";
+    if (app.reports) {
+      renderDoctorView();
+    }
+  });
+}
+
+// Mirrors wireReportPressGuard but scoped to the doctor cockpit. Uses the same shared
+// app.reportPressActive flag so renderSelectedDoctorPanel's existing press guard applies.
+function wireDoctorCockpitPressGuard() {
+  const cockpit = document.querySelector(".doctor-cockpit");
+  if (!cockpit) {
+    return;
+  }
+
+  cockpit.addEventListener("pointerdown", event => {
+    if (!event.target.closest("[data-report-doctor-tab]")) {
+      return;
+    }
+    app.reportPressActive = true;
+    clearTimeout(reportPressFailsafe);
+    reportPressFailsafe = window.setTimeout(() => {
+      app.reportPressActive = false;
+      reportPressFailsafe = null;
+    }, 3000);
+  });
+
+  const clearPress = () => {
+    clearTimeout(reportPressFailsafe);
+    reportPressFailsafe = null;
+    if (!app.reportPressActive) {
+      return;
+    }
+    app.reportPressActive = false;
+    if (app.reports) {
+      renderDoctorView();
     }
   };
 
