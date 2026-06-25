@@ -1,3 +1,5 @@
+using System.Globalization;
+
 using ChairSide.Board.Options;
 using ChairSide.Board.Services;
 using Microsoft.AspNetCore.Http;
@@ -4266,6 +4268,156 @@ public sealed class BoardStoreTests
         var invalid = context.Store.GetReports(ReportDateRange.FromDateStrings("not-a-date", "also-bad"));
         Assert.Equal(2, invalid.CompletedRoomCyclesCount);
         Assert.Equal("All time", invalid.RangeLabel);
+    }
+
+    // -------------------------------------------------------------------------
+    // Doctor daily allocation balance (sparkline data)
+    //
+    // SaveCleanCycle fixes measured case flow at 30 min (seated 30 min before complete), so each
+    // cycle's net allocation variance is 30 - expectedUnits * 10: expectedUnits 2 => +10 (over),
+    // 1 => +20 (over), 4 => -10 (under), 3 => 0 (at expected).
+    // -------------------------------------------------------------------------
+
+    [Fact]
+    public void Doctor_daily_allocation_series_reflects_filtered_date_range()
+    {
+        using var workspace = TestWorkspace.Create();
+        var databasePath = workspace.ProductionDatabasePath();
+        var seed = StoreContext.Create(workspace, environmentName: Environments.Production, databasePath: databasePath);
+
+        // otte: one cycle in range (Jun 10, +10 variance), one outside the window (Jun 20).
+        SaveCleanCycle(seed, room: 1, doctor: "otte", code: "EXT", completeAt: Utc(2026, 6, 10, 14), expectedUnits: 2);
+        SaveCleanCycle(seed, room: 2, doctor: "otte", code: "EXT", completeAt: Utc(2026, 6, 20, 14), expectedUnits: 2);
+
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production, databasePath: databasePath);
+        var reports = context.Store.GetReports(ReportDateRange.FromDateStrings("2026-06-08", "2026-06-12"));
+
+        var series = Assert.Single(reports.DoctorDailyAllocationSeries!);
+        Assert.Equal("otte", series.DoctorId);
+        var point = Assert.Single(series.Points);
+        Assert.Equal("2026-06-10", point.Date);
+        Assert.Equal(1, point.CaseCount);
+        Assert.Equal(10, point.NetVarianceMinutes);
+    }
+
+    [Fact]
+    public void Doctor_daily_allocation_point_net_variance_can_be_negative()
+    {
+        using var workspace = TestWorkspace.Create();
+        var databasePath = workspace.ProductionDatabasePath();
+        var seed = StoreContext.Create(workspace, environmentName: Environments.Production, databasePath: databasePath);
+
+        // expectedUnits 4 => 40 min expected vs 30 min measured => -10 (under expected).
+        SaveCleanCycle(seed, room: 1, doctor: "pledger", code: "IMP", completeAt: Utc(2026, 6, 10, 14), expectedUnits: 4);
+
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production, databasePath: databasePath);
+        var reports = context.Store.GetReports(ReportDateRange.FromDateStrings("2026-06-08", "2026-06-12"));
+
+        var point = Assert.Single(Assert.Single(reports.DoctorDailyAllocationSeries!).Points);
+        Assert.Equal(1, point.CaseCount);
+        Assert.Equal(-10, point.NetVarianceMinutes);
+    }
+
+    [Fact]
+    public void Doctor_daily_allocation_series_today_contains_only_todays_points()
+    {
+        using var workspace = TestWorkspace.Create();
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production);
+        context.Store.SeedSyntheticReportData();
+
+        var today = DateOnly.FromDateTime(DateTimeOffset.UtcNow.UtcDateTime);
+        var reports = context.Store.GetReports(ReportDateRange.FromDates(today, today));
+
+        var todayStr = today.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+        foreach (var series in reports.DoctorDailyAllocationSeries!)
+        {
+            foreach (var point in series.Points)
+            {
+                Assert.Equal(todayStr, point.Date);
+            }
+        }
+    }
+
+    [Fact]
+    public void Doctor_daily_allocation_series_grows_with_wider_date_ranges()
+    {
+        using var workspace = TestWorkspace.Create();
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production);
+        context.Store.SeedSyntheticReportData();
+
+        var today = DateOnly.FromDateTime(DateTimeOffset.UtcNow.UtcDateTime);
+        static int TotalPoints(IReadOnlyList<DoctorDailyAllocation>? series) =>
+            (series ?? []).Sum(s => s.Points.Count);
+
+        var todayPoints = TotalPoints(context.Store.GetReports(ReportDateRange.FromDates(today, today)).DoctorDailyAllocationSeries);
+        var last7Points = TotalPoints(context.Store.GetReports(ReportDateRange.FromDates(today.AddDays(-6), today)).DoctorDailyAllocationSeries);
+        var last30Points = TotalPoints(context.Store.GetReports(ReportDateRange.FromDates(today.AddDays(-29), today)).DoctorDailyAllocationSeries);
+        var allPoints = TotalPoints(context.Store.GetReports().DoctorDailyAllocationSeries);
+
+        Assert.True(last7Points > todayPoints, $"last7={last7Points} today={todayPoints}");
+        Assert.True(last30Points > last7Points, $"last30={last30Points} last7={last7Points}");
+        Assert.True(allPoints > last30Points, $"all={allPoints} last30={last30Points}");
+    }
+
+    [Fact]
+    public void Doctor_daily_allocation_series_covers_all_four_seeded_doctors()
+    {
+        using var workspace = TestWorkspace.Create();
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production);
+        context.Store.SeedSyntheticReportData();
+
+        var doctorIds = context.Store.GetReports().DoctorDailyAllocationSeries!
+            .Select(s => s.DoctorId)
+            .ToHashSet();
+
+        Assert.Contains("otte", doctorIds);
+        Assert.Contains("pledger", doctorIds);
+        Assert.Contains("gibson", doctorIds);
+        Assert.Contains("schroeder", doctorIds);
+    }
+
+    [Fact]
+    public void Doctor_daily_allocation_point_aggregates_case_count_and_signed_net_variance()
+    {
+        using var workspace = TestWorkspace.Create();
+        var databasePath = workspace.ProductionDatabasePath();
+        var seed = StoreContext.Create(workspace, environmentName: Environments.Production, databasePath: databasePath);
+
+        // Three cycles for otte on the same UTC day, mixing over and under so the signed sum (not an
+        // absolute) is exercised: +20, +10, -10 => net +20 across 3 cases.
+        SaveCleanCycle(seed, room: 1, doctor: "otte", code: "CON", completeAt: Utc(2026, 6, 10, 9), expectedUnits: 1);
+        SaveCleanCycle(seed, room: 2, doctor: "otte", code: "EXT", completeAt: Utc(2026, 6, 10, 11), expectedUnits: 2);
+        SaveCleanCycle(seed, room: 3, doctor: "otte", code: "IMP", completeAt: Utc(2026, 6, 10, 14), expectedUnits: 4);
+
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production, databasePath: databasePath);
+        var reports = context.Store.GetReports(ReportDateRange.FromDateStrings("2026-06-10", "2026-06-10"));
+
+        var series = Assert.Single(reports.DoctorDailyAllocationSeries!);
+        Assert.Equal("otte", series.DoctorId);
+        var point = Assert.Single(series.Points);
+        Assert.Equal("2026-06-10", point.Date);
+        Assert.Equal(3, point.CaseCount);
+        Assert.Equal(20, point.NetVarianceMinutes);
+    }
+
+    [Fact]
+    public void Doctor_daily_allocation_point_net_variance_rolls_up_to_report_total()
+    {
+        using var workspace = TestWorkspace.Create();
+        var databasePath = workspace.ProductionDatabasePath();
+        var seed = StoreContext.Create(workspace, environmentName: Environments.Production, databasePath: databasePath);
+
+        // Two cycles for otte across two different days, both in range.
+        SaveCleanCycle(seed, room: 1, doctor: "otte", code: "EXT", completeAt: Utc(2026, 6, 10, 9), expectedUnits: 2);
+        SaveCleanCycle(seed, room: 2, doctor: "otte", code: "IMP", completeAt: Utc(2026, 6, 11, 9), expectedUnits: 4);
+
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production, databasePath: databasePath);
+        var reports = context.Store.GetReports(ReportDateRange.FromDateStrings("2026-06-08", "2026-06-12"));
+
+        // The doctor's daily points sum to the same net the report's allocation aggregate reports.
+        var series = Assert.Single(reports.DoctorDailyAllocationSeries!);
+        var dailySum = series.Points.Sum(p => p.NetVarianceMinutes);
+        Assert.Equal(reports.AllocationVariance!.NetAllocationVarianceMinutes, dailySum);
     }
 
     private static DateTimeOffset Utc(int year, int month, int day, int hour, int minute = 0) =>
