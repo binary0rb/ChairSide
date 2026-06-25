@@ -48,7 +48,15 @@ const app = {
   // True while a pointer is pressed on a doctor/procedure tile. The 1s room poll
   // defers re-syncing and re-rendering the selection tiles while this is set so a
   // slow press is never interrupted by a mid-press DOM swap.
-  tilePressActive: false
+  tilePressActive: false,
+  // True while a pointer is pressed on an interactive reports-page element (doctor card,
+  // tab button, or table action button). Defers innerHTML writes for those regions so a
+  // mid-press DOM swap cannot drop the click. Mirrors the tilePressActive pattern.
+  reportPressActive: false,
+  // Monotonically incremented each time loadReports() stores a new payload. Used as the
+  // data-identity component of render tokens so guarded renders can skip innerHTML writes
+  // on 1-second ticks where app.reports hasn't changed.
+  reportsVersion: 0
 };
 
 const stateNames = ["empty", "seated", "aging", "stale", "ready-for-doctor", "doctor-in-room", "turnover"];
@@ -96,6 +104,7 @@ async function boot() {
     wireReportsActions();
     wireReportFilters();
     wireDateRange();
+    wireReportPressGuard();
   }
 
   wireDoctorViewMenu();
@@ -163,6 +172,7 @@ async function loadReports() {
     }
 
     app.reports = await response.json();
+    app.reportsVersion++;
     render();
   } finally {
     app.reportsInFlight = false;
@@ -883,15 +893,30 @@ function renderDoctorReportDashboard(r, hasData) {
   section.hidden = !hasData && doctors.length === 0;
   if (section.hidden) {
     grid.innerHTML = "";
+    grid.dataset.renderKey = "";
     panel.hidden = true;
     panel.innerHTML = "";
     return;
   }
 
   syncSelectedReportDoctor(doctors);
-  grid.innerHTML = doctors.length
-    ? doctors.map(agg => renderDoctorAllocationCard(agg, r)).join("")
-    : `<p class="report-empty-note">No doctor report data for this range.</p>`;
+
+  // Skip grid rebuild when neither the payload nor the selected doctor has changed.
+  // Card HTML depends on reportsVersion (data) and reportDoctorId (is-selected class /
+  // aria-pressed). Tab does not affect card markup, so it is excluded from this token.
+  // During an active pointer press, skip to avoid destroying the pressed element mid-click;
+  // do NOT update the key so the catch-up render (on pointerup) sees the stale token and
+  // rebuilds if data arrived during the press.
+  const gridToken = `${app.reportsVersion}|${app.reportDoctorId}`;
+  if (grid.dataset.renderKey !== gridToken) {
+    if (!app.reportPressActive) {
+      grid.dataset.renderKey = gridToken;
+      grid.innerHTML = doctors.length
+        ? doctors.map(agg => renderDoctorAllocationCard(agg, r)).join("")
+        : `<p class="report-empty-note">No doctor report data for this range.</p>`;
+    }
+  }
+
   renderSelectedDoctorPanel(r, doctors);
 }
 
@@ -1166,6 +1191,7 @@ function renderSelectedDoctorPanel(r, doctors) {
   if (!agg) {
     panel.hidden = true;
     panel.innerHTML = "";
+    panel.dataset.renderKey = "";
     return;
   }
 
@@ -1179,6 +1205,19 @@ function renderSelectedDoctorPanel(r, doctors) {
   if (!tabs.includes(app.reportDoctorTab)) {
     app.reportDoctorTab = "overview";
   }
+
+  // Skip panel rebuild when payload, selected doctor, and active tab are all unchanged.
+  // Tab is included because it drives both the tab-button aria-selected states and the
+  // entire tab-panel content. During an active pointer press, defer the rebuild to avoid
+  // destroying the tab button mid-click; leave the key stale so the catch-up render applies.
+  const panelToken = `${app.reportsVersion}|${agg.doctorId}|${app.reportDoctorTab}`;
+  if (panel.dataset.renderKey === panelToken) {
+    return;
+  }
+  if (app.reportPressActive) {
+    return;
+  }
+  panel.dataset.renderKey = panelToken;
 
   panel.hidden = false;
   panel.style.setProperty("--doctor-color", identity.color);
@@ -1556,6 +1595,17 @@ function renderCompletedCycles(cycles) {
     return;
   }
 
+  // Token covers every client-side input that affects cycle row HTML:
+  //   reportsVersion — new payload arrived; sedation — filter changes visible rows.
+  // grouping does not affect cycle rows (it only affects insight summaries).
+  const token = `${app.reportsVersion}|${app.reportFilters.sedation}`;
+  if (body.dataset.renderKey === token) {
+    return;
+  }
+  if (app.reportPressActive) {
+    return;
+  }
+  body.dataset.renderKey = token;
   body.innerHTML = cycles.length
     ? cycles.map(renderCycleRow).join("")
     : `<tr><td colspan="23">${escapeHtml(noMatchMessage("No completed room cycles yet."))}</td></tr>`;
@@ -1630,6 +1680,11 @@ function renderProcedureSummaries(summaries) {
     return;
   }
 
+  const token = `${app.reportsVersion}|${app.reportFilters.sedation}`;
+  if (body.dataset.renderKey === token) {
+    return;
+  }
+  body.dataset.renderKey = token;
   body.innerHTML = summaries.length
     ? summaries.map(renderProcedureSummaryRow).join("")
     : `<tr><td colspan="8">${escapeHtml(noMatchMessage("No procedure baselines yet."))}</td></tr>`;
@@ -1656,6 +1711,14 @@ function renderExceptionCycles(exceptions) {
     return;
   }
 
+  const token = `${app.reportsVersion}|${app.reportFilters.sedation}`;
+  if (body.dataset.renderKey === token) {
+    return;
+  }
+  if (app.reportPressActive) {
+    return;
+  }
+  body.dataset.renderKey = token;
   body.innerHTML = exceptions.length
     ? exceptions.map(renderExceptionRow).join("")
     : `<tr><td colspan="12">${escapeHtml(noMatchMessage("No exceptions requiring review."))}</td></tr>`;
@@ -1746,6 +1809,49 @@ function wireReportFilters() {
       renderReports();
     }
   });
+}
+
+// Sets app.reportPressActive while a pointer is held on an interactive reports element
+// (doctor card, tab button, or table action button). This defers innerHTML writes so a
+// mid-press DOM rebuild cannot orphan the pressed element and silently drop the click.
+// Mirrors the tilePressActive / wireRoomPanel pattern used for room tile interactions.
+function wireReportPressGuard() {
+  const shell = document.querySelector(".reports-shell");
+  if (!shell) {
+    return;
+  }
+
+  shell.addEventListener("pointerdown", event => {
+    if (!event.target.closest("[data-report-doctor-id], [data-report-doctor-tab], .report-table button")) {
+      return;
+    }
+    app.reportPressActive = true;
+    clearTimeout(reportPressFailsafe);
+    reportPressFailsafe = window.setTimeout(() => {
+      app.reportPressActive = false;
+      reportPressFailsafe = null;
+    }, 3000);
+  });
+
+  // On pointerup/cancel, lift the guard and immediately run a catch-up render so any
+  // data that arrived during the press is shown without waiting for the next 1-second tick.
+  // This catch-up fires before the click event, so the click's own renderReports() call
+  // (triggered by handleReportsActionClick) still runs after with the freshly updated
+  // app state (e.g. new reportDoctorId) and is not blocked.
+  const clearPress = () => {
+    clearTimeout(reportPressFailsafe);
+    reportPressFailsafe = null;
+    if (!app.reportPressActive) {
+      return;
+    }
+    app.reportPressActive = false;
+    if (app.reports) {
+      renderReports();
+    }
+  };
+
+  document.addEventListener("pointerup", clearPress);
+  document.addEventListener("pointercancel", clearPress);
 }
 
 async function handleReportsActionClick(event) {
@@ -3124,6 +3230,7 @@ function wireRoomPanel() {
 // can't strand the interaction. Only one pointer press is tracked at a time.
 let pendingTilePress = null;
 let tilePressFailsafe = null;
+let reportPressFailsafe = null;
 // Upper bound on the interaction lock. A deliberate slow press is ~1-2s; this is well
 // clear of that but short enough that a missing pointerup/cancel can never freeze tile
 // rendering indefinitely.
