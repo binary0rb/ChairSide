@@ -1268,6 +1268,7 @@ button:not(:disabled):active {
 
 .report-table-wrap {
   overflow-x: auto;
+  max-width: 100%;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.9);
@@ -1742,6 +1743,10 @@ body[data-view="reports"] .report-disclosure {
   border: 1px solid var(--line);
   border-radius: 12px;
   background: var(--panel);
+  /* Prevent grid-item min-width:auto from propagating the table's intrinsic minimum
+     width up through the grid track and triggering a page-level horizontal scrollbar.
+     With this set, overflow-x:auto on .report-table-wrap correctly creates local scroll. */
+  min-width: 0;
 }
 
 body[data-view="reports"] .report-disclosure > summary {
