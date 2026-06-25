@@ -597,7 +597,8 @@ public sealed class DemoBoardStore
                 range.StartDateText,
                 range.EndDateText,
                 range.Label,
-                totalCompletedAllTime);
+                totalCompletedAllTime,
+                BuildDoctorDailyAllocationSeries(standardCycles));
         }
     }
 
@@ -1671,6 +1672,30 @@ public sealed class DemoBoardStore
             .ThenBy(summary => summary.AssignedDoctor)
             .ToList();
 
+    // Groups allocation-calculable standard cycles by (doctor, UTC calendar day of DoctorCompleteAt)
+    // and produces a daily allocation-balance series per doctor. NetVarianceMinutes is the sum of each
+    // day's per-cycle AllocationVarianceMinutes (measured case flow - expected allocation), the same
+    // values BuildAllocationVarianceSummary nets, so a day's points roll up to the doctor's report
+    // total. Only cycles with a calculable variance contribute (DoctorCompleteAt present and a positive
+    // expected allocation), matching the card's "Cases" metric population. CaseCount is the number of
+    // those calculable cycles on that day, so caseCount and netVarianceMinutes always share a population.
+    private static IReadOnlyList<DoctorDailyAllocation> BuildDoctorDailyAllocationSeries(IReadOnlyList<CompletedRoomCycle> cycles) =>
+        cycles
+            .Where(cycle => cycle.AllocationVarianceMinutes.HasValue && cycle.DoctorCompleteAt.HasValue)
+            .GroupBy(cycle => cycle.AssignedDoctor)
+            .Select(doctorGroup => new DoctorDailyAllocation(
+                doctorGroup.Key,
+                doctorGroup
+                    .GroupBy(cycle => DateOnly.FromDateTime(cycle.DoctorCompleteAt!.Value.UtcDateTime))
+                    .OrderBy(dateGroup => dateGroup.Key)
+                    .Select(dateGroup => new DoctorDailyAllocationPoint(
+                        dateGroup.Key.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+                        dateGroup.Count(),
+                        dateGroup.Sum(cycle => cycle.AllocationVarianceMinutes!.Value)))
+                    .ToList()))
+            .OrderBy(item => item.DoctorId)
+            .ToList();
+
     // Groups normal, non-exception completed cycles by procedure code and produces a per-procedure
     // baseline. The supplied cycles are the same normalCompletedCycles already used by the global
     // report, so exception and reviewed-exception cycles are excluded upstream, and the occupied /
@@ -2100,7 +2125,14 @@ public sealed record ReportsSnapshot(
     string? RangeStartDate = null,
     string? RangeEndDate = null,
     string RangeLabel = "All time",
-    int TotalCompletedCycleCount = 0);
+    int TotalCompletedCycleCount = 0,
+    // Per-doctor daily allocation balance for the selected report range, used for sparklines on
+    // doctor cards. Each point carries the day's net allocation variance minutes (measured case
+    // flow - expected allocation) and case count over that day's allocation-calculable cycles.
+    // Derived from the same standard (non-exception, non-reporting-exception) cycle population as
+    // DoctorSummaries and respects the active date filter, so points are never capped or truncated.
+    // Null when not yet populated (additive; existing callers unaffected).
+    IReadOnlyList<DoctorDailyAllocation>? DoctorDailyAllocationSeries = null);
 
 /// <summary>
 /// A completed-cycle reporting window. Dates are interpreted as whole UTC calendar days (start
@@ -2385,6 +2417,16 @@ public sealed record SeedReportDataResult(
     int ProcedureFamiliesRepresented,
     int ExpectedAllocationCases,
     int ExceptionsExpected);
+
+/// <summary>
+/// One day's allocation balance for a single doctor, for sparkline rendering. NetVarianceMinutes is
+/// measured case flow minus expected allocation, summed over that day's allocation-calculable cycles
+/// (positive = over expected, negative = under). CaseCount is the number of those cycles.
+/// </summary>
+public sealed record DoctorDailyAllocationPoint(string Date, int CaseCount, int NetVarianceMinutes);
+
+/// <summary>Ordered daily allocation-balance series for one doctor within the selected report range.</summary>
+public sealed record DoctorDailyAllocation(string DoctorId, IReadOnlyList<DoctorDailyAllocationPoint> Points);
 
 /// <summary>Non-PHI before/after summary returned by the maintenance reset commands.</summary>
 public sealed record MaintenanceResetResult(

@@ -890,7 +890,7 @@ function renderDoctorReportDashboard(r, hasData) {
 
   syncSelectedReportDoctor(doctors);
   grid.innerHTML = doctors.length
-    ? doctors.map(renderDoctorAllocationCard).join("")
+    ? doctors.map(agg => renderDoctorAllocationCard(agg, r)).join("")
     : `<p class="report-empty-note">No doctor report data for this range.</p>`;
   renderSelectedDoctorPanel(r, doctors);
 }
@@ -1037,7 +1037,7 @@ const doctorReportIdentity = {
   schroeder: { initials: "NDS", color: "#eab308" }
 };
 
-function renderDoctorAllocationCard(agg) {
+function renderDoctorAllocationCard(agg, report) {
   const doctor = (app.snapshot?.doctors || []).find(item => item.id === agg.doctorId);
   const name = doctor ? doctor.name : doctorName(agg.doctorId);
   const identity = doctorReportIdentity[agg.doctorId] || {
@@ -1047,9 +1047,13 @@ function renderDoctorAllocationCard(agg) {
   const count = agg.count || 0;
   const average = count > 0 ? agg.net / count : Number.NaN;
   const selected = agg.doctorId === app.reportDoctorId;
+  const sparkPoints = (report?.doctorDailyAllocationSeries || []).find(item => item.doctorId === agg.doctorId)?.points;
 
+  // The whole card is the selection control (role="button", focusable). The "View details" affordance
+  // is a non-interactive visual cue (aria-hidden span) so we never nest interactive controls; clicks
+  // anywhere in the card and Enter/Space on the focused card both resolve to data-report-doctor-id.
   return `
-    <article class="doctor-report-card ${count === 0 ? "is-empty" : ""} ${selected ? "is-selected" : ""}" style="--doctor-color: ${escapeAttribute(identity.color)}">
+    <article class="doctor-report-card ${count === 0 ? "is-empty" : ""} ${selected ? "is-selected" : ""}" style="--doctor-color: ${escapeAttribute(identity.color)}" data-report-doctor-id="${escapeAttribute(agg.doctorId)}" role="button" tabindex="0" aria-pressed="${selected ? "true" : "false"}" aria-label="${escapeAttribute(`Show report details for ${name}`)}">
       <header class="doctor-report-card-head">
         <span class="doctor-report-initials" aria-hidden="true">${escapeHtml(identity.initials)}</span>
         <div class="doctor-report-identity">
@@ -1075,10 +1079,54 @@ function renderDoctorAllocationCard(agg) {
           <dd>${escapeHtml(`${agg.over} / ${agg.under} / ${agg.at}`)}</dd>
         </div>
       </dl>
-      <button class="doctor-report-detail-link" type="button" data-report-doctor-id="${escapeAttribute(agg.doctorId)}" aria-pressed="${selected ? "true" : "false"}">
+      ${renderDoctorSparkline(sparkPoints)}
+      <span class="doctor-report-detail-link" aria-hidden="true">
         ${selected ? "Viewing details" : "View details"}
-      </button>
+      </span>
     </article>`;
+}
+
+// Plots daily net allocation variance minutes (measured case flow - expected allocation) for one
+// doctor. Zero variance sits on a centered neutral baseline; positive (over expected) rises above it
+// and negative (under expected) drops below, scaled symmetrically by the largest absolute day so the
+// baseline stays meaningful. Honest by construction: a flat run of equal values renders flat, a single
+// day renders a short level mark, and no manufactured wobble is added.
+//
+// preserveAspectRatio="none" lets the SVG stretch to the full card width (matching the metric slab)
+// instead of meet-fitting to its height and floating as a narrow centered line; vector-effect
+// "non-scaling-stroke" keeps the stroke a crisp, uniform weight despite the non-uniform scaling.
+function renderDoctorSparkline(points) {
+  const w = 100, h = 32, pad = 3;
+  const mid = (h / 2).toFixed(1);
+  const open = `<svg class="doctor-sparkline" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" aria-hidden="true">`;
+  const baseline = `<line x1="${pad}" y1="${mid}" x2="${(w - pad).toFixed(1)}" y2="${mid}" stroke="var(--doctor-color)" stroke-width="0.75" vector-effect="non-scaling-stroke" opacity="0.25"/>`;
+
+  if (!points || points.length === 0) {
+    return `${open}${baseline}</svg>`;
+  }
+
+  const sorted = [...points].sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+  const values = sorted.map(p => Number(p.netVarianceMinutes) || 0);
+  const maxAbs = Math.max(1, ...values.map(v => Math.abs(v)));
+  const half = (h - 2 * pad) / 2;
+  const zeroY = h / 2;
+  const yOf = v => zeroY - (v / maxAbs) * half;
+
+  if (sorted.length === 1) {
+    const y = yOf(values[0]).toFixed(1);
+    return `${open}${baseline}<line x1="${(w / 2 - 18).toFixed(1)}" y1="${y}" x2="${(w / 2 + 18).toFixed(1)}" y2="${y}" stroke="var(--doctor-color)" stroke-width="1.5" stroke-linecap="round" vector-effect="non-scaling-stroke" opacity="0.85"/></svg>`;
+  }
+
+  const minMs = new Date(sorted[0].date).getTime();
+  const maxMs = new Date(sorted[sorted.length - 1].date).getTime();
+  const msRange = maxMs - minMs || 1;
+  const xScale = w - 2 * pad;
+  const coords = sorted.map((p, i) => {
+    const x = (pad + ((new Date(p.date).getTime() - minMs) / msRange) * xScale).toFixed(1);
+    const y = yOf(values[i]).toFixed(1);
+    return `${x},${y}`;
+  }).join(" ");
+  return `${open}${baseline}<polyline points="${coords}" fill="none" stroke="var(--doctor-color)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke" opacity="0.85"/></svg>`;
 }
 
 function doctorAllocationSummary(agg) {
@@ -1645,9 +1693,31 @@ function renderExceptionRow(cycle) {
 // ---------------------------------------------------------------------------
 
 function wireReportsActions() {
-  // One-time delegated listener on the document. The completed cycles tbody is
-  // re-rendered on every poll, so we cannot attach to individual buttons.
+  // One-time delegated listeners on the document. The reports views are re-rendered
+  // on every poll, so we cannot attach to individual elements.
   document.addEventListener("click", handleReportsActionClick);
+  // Keyboard activation for the role="button" doctor cards (clicks are already covered above).
+  document.addEventListener("keydown", handleReportsCardKeydown);
+}
+
+function handleReportsCardKeydown(event) {
+  if (event.key !== "Enter" && event.key !== " " && event.key !== "Spacebar") {
+    return;
+  }
+  if (!(event.target instanceof Element)) {
+    return;
+  }
+  // Only act when the focused element is the card itself (it carries the doctor id and tabindex).
+  const card = event.target.closest(".doctor-report-card[data-report-doctor-id]");
+  if (!card || card !== event.target) {
+    return;
+  }
+  event.preventDefault();
+  app.reportDoctorId = card.dataset.reportDoctorId;
+  app.reportDoctorTab = "overview";
+  if (app.reports) {
+    renderReports();
+  }
 }
 
 // Wires the static filter chips. Filter state lives in app.reportFilters (not the DOM), so a
