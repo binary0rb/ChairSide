@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ChairSide Board - Workshop</title>
+  <link rel="stylesheet" href="/styles.css?v=20260626-workshop-shell">
+</head>
+<body data-view="workshop">
+  <header class="app-header compact">
+    <div>
+      <div class="brand-lockup compact-brand">
+        <img class="brand-logo" src="/assets/aos-logo.svg" alt="AOS logo">
+        <div>
+          <span class="brand-kicker">AOS ChairSide</span>
+          <h1>Workshop</h1>
+        </div>
+      </div>
+      <p>Planned projection and schedule-fit tools. No patient data.</p>
+    </div>
+    <nav class="primary-nav" aria-label="Primary views">
+      <a class="nav-pill" href="/master.html" data-nav="master">Master</a>
+      <div class="nav-item" data-nav="doctor">
+        <button type="button" class="nav-pill nav-pill-toggle" id="doctorViewToggle" aria-haspopup="true" aria-expanded="false" aria-controls="doctorViewMenu">
+          <span id="doctorViewToggleLabel">Doctor View</span>
+          <span class="nav-caret" aria-hidden="true"></span>
+        </button>
+        <div class="nav-menu" id="doctorViewMenu" role="menu" aria-label="Choose a doctor" hidden></div>
+      </div>
+      <a class="nav-pill" href="/reports.html" data-nav="reports">Reports</a>
+      <a class="nav-pill" href="/workshop.html" data-nav="workshop">Workshop</a>
+    </nav>
+  </header>
+
+  <main class="workshop-shell">
+    <section class="workshop-intro" aria-label="About Workshop">
+      <span class="layer-pill layer-pill--allocation">Workshop</span>
+      <h2>Where future scheduling tools will live</h2>
+      <p>
+        Workshop is where future schedule replay, projection, and schedule-fit tools will live.
+        These tools will use historical ChairSide timing data to model possible scheduling
+        tradeoffs without changing live records or production behavior.
+      </p>
+      <p class="workshop-note">
+        Everything below is planned. Each tool is a projection that explores scenarios and soft
+        suggestions only &mdash; nothing here changes the live board, reporting, or production data.
+      </p>
+    </section>
+
+    <section class="workshop-section" aria-label="Planned tools">
+      <h3>Planned tools</h3>
+      <div class="workshop-grid">
+        <article class="workshop-card">
+          <header class="workshop-card-head">
+            <h4>Projection Sandbox / Schedule Replay</h4>
+            <span class="workshop-status">Planned</span>
+          </header>
+          <p>
+            Replay historical timing data under different schedule assumptions, so you can explore
+            how a day might have unfolded under a different plan. Every run is a projection, never a
+            change to live records.
+          </p>
+        </article>
+
+        <article class="workshop-card">
+          <header class="workshop-card-head">
+            <h4>Balanced Flow</h4>
+            <span class="workshop-status">Planned</span>
+          </header>
+          <p>
+            Look for gentle schedule-fit improvements that keep a day balanced, without aggressively
+            compressing time or over-protecting it. Results are framed as soft suggestions to weigh,
+            not rules to follow.
+          </p>
+        </article>
+
+        <article class="workshop-card">
+          <header class="workshop-card-head">
+            <h4>More Throughput</h4>
+            <span class="workshop-status">Planned</span>
+          </header>
+          <p>
+            Estimate whether repeatable slack in the schedule could convert into additional usable
+            appointment capacity. Presented as a projection and a tradeoff, so the team can decide
+            what fits.
+          </p>
+        </article>
+
+        <article class="workshop-card">
+          <header class="workshop-card-head">
+            <h4>More Recovery</h4>
+            <span class="workshop-status">Planned</span>
+          </header>
+          <p>
+            Estimate whether protected time could reduce schedule debt and late-day catch-up. A
+            scenario for balancing recovery against pace, on purpose rather than by accident.
+          </p>
+        </article>
+
+        <article class="workshop-card">
+          <header class="workshop-card-head">
+            <h4>Case-Mix Insights</h4>
+            <span class="workshop-status">Planned</span>
+          </header>
+          <p>
+            Identify procedure combinations that tend to create schedule debt or flow friction, so
+            case-mix can be planned with those patterns in mind. Descriptive context, not a verdict
+            on any doctor or day.
+          </p>
+        </article>
+
+        <article class="workshop-card">
+          <header class="workshop-card-head">
+            <h4>Similar-Day Comparison</h4>
+            <span class="workshop-status">Planned</span>
+          </header>
+          <p>
+            Compare a day against prior days with similar doctor, procedure, sedation, and volume
+            patterns. A like-for-like reference that keeps projections fair and grounded.
+          </p>
+        </article>
+      </div>
+    </section>
+  </main>
+
+  <script src="/signalr-lite.js"></script>
+  <script src="/board.js?v=20260626-workshop-shell"></script>
+</body>
+</html>

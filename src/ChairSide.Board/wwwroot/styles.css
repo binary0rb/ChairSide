@@ -120,6 +120,7 @@ select {
    toggle button inside its wrapper. */
 body[data-view="master"] .primary-nav [data-nav="master"],
 body[data-view="reports"] .primary-nav [data-nav="reports"],
+body[data-view="workshop"] .primary-nav [data-nav="workshop"],
 body[data-view="doctor"] .primary-nav [data-nav="doctor"] .nav-pill-toggle {
   background: var(--ink);
   color: #ffffff;
@@ -3197,4 +3198,104 @@ body[data-view="room"] .corrections-panel button {
   touch-action: manipulation;
   -webkit-user-select: none;
   user-select: none;
+}
+
+/* Workshop: summary-first landing shell for planned projection / schedule-fit tools.
+   Reuses the shared tokens and the allocation (indigo) accent already used by reports,
+   and stays inside the width-constrained shell to avoid any horizontal overflow. */
+body[data-view="workshop"] .workshop-shell {
+  width: min(1540px, calc(100vw - 36px));
+  margin: 0 auto;
+  display: grid;
+  gap: 18px;
+  padding-top: 18px;
+}
+
+body[data-view="workshop"] .workshop-intro {
+  display: grid;
+  gap: 10px;
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-left: 4px solid #6366f1;
+  border-radius: 12px;
+  background: var(--panel);
+}
+
+body[data-view="workshop"] .workshop-intro h2 {
+  margin: 0;
+  font-size: 22px;
+  letter-spacing: 0;
+}
+
+body[data-view="workshop"] .workshop-intro p {
+  margin: 0;
+  max-width: 72ch;
+  color: var(--ink);
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+body[data-view="workshop"] .workshop-note {
+  color: var(--muted);
+  font-weight: 700;
+}
+
+body[data-view="workshop"] .workshop-section {
+  display: grid;
+  gap: 12px;
+}
+
+body[data-view="workshop"] .workshop-section h3 {
+  margin: 0;
+  font-size: 16px;
+  letter-spacing: 0;
+}
+
+body[data-view="workshop"] .workshop-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 14px;
+}
+
+body[data-view="workshop"] .workshop-card {
+  display: grid;
+  gap: 10px;
+  align-content: start;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel);
+}
+
+body[data-view="workshop"] .workshop-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+body[data-view="workshop"] .workshop-card-head h4 {
+  margin: 0;
+  font-size: 16px;
+  line-height: 1.25;
+  letter-spacing: 0;
+}
+
+body[data-view="workshop"] .workshop-status {
+  flex-shrink: 0;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: #e0e7ff;
+  color: #3730a3;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+body[data-view="workshop"] .workshop-card p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.45;
 }
