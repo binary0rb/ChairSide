@@ -2726,6 +2726,16 @@ body[data-view="master"] .room-timer span {
 @media (min-width: 981px) {
   body[data-view="master"] .room-grid {
     grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-auto-rows: 1fr;
+  }
+
+  /* Equal-height rows: every row track gets the same height, and each tile
+     stretches to fill it, so a row of compact active cards keeps the same
+     footprint as a row containing taller OPEN cards. The compact min-height
+     stays as the floor; height:100% fills the rest of the track. Scoped to the
+     master board only — doctor-list and room-panel large cards are untouched. */
+  body[data-view="master"] .room-tile {
+    height: 100%;
   }
 }
 
