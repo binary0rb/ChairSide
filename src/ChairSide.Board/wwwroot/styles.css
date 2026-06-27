@@ -3299,3 +3299,57 @@ body[data-view="workshop"] .workshop-card p {
   font-size: 14px;
   line-height: 1.45;
 }
+
+/* Current Reality: a calm read-out of recent schedule fit. Deliberately softer than the Reports
+   metric cards (smaller values, muted tone) so it reads as gentle context, not a staff scorecard. */
+body[data-view="workshop"] .workshop-reality-body {
+  display: grid;
+  gap: 14px;
+}
+
+body[data-view="workshop"] .workshop-reality-window {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+body[data-view="workshop"] .workshop-reality-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 12px;
+}
+
+body[data-view="workshop"] .workshop-stat {
+  display: grid;
+  gap: 6px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-left: 3px solid #6366f1;
+  border-radius: 12px;
+  background: var(--panel);
+}
+
+body[data-view="workshop"] .workshop-stat-label {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+body[data-view="workshop"] .workshop-stat-value {
+  color: var(--ink);
+  font-size: 20px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+}
+
+body[data-view="workshop"] .workshop-reality-explainer {
+  margin: 0;
+  max-width: 72ch;
+  color: var(--ink);
+  font-size: 14px;
+  line-height: 1.5;
+}

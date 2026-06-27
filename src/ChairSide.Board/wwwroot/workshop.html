@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>ChairSide Board - Workshop</title>
-  <link rel="stylesheet" href="/styles.css?v=20260626-workshop-shell">
+  <link rel="stylesheet" href="/styles.css?v=20260628-workshop-current-reality">
 </head>
 <body data-view="workshop">
   <header class="app-header compact">
@@ -45,6 +45,13 @@
         Everything below is planned. Each tool is a projection that explores scenarios and soft
         suggestions only &mdash; nothing here changes the live board, reporting, or production data.
       </p>
+    </section>
+
+    <section class="workshop-section workshop-reality" aria-label="Current Reality">
+      <h3>Current Reality</h3>
+      <div id="workshopCurrentReality" class="workshop-reality-body" role="status" aria-live="polite">
+        <p class="workshop-note">Loading current reality&hellip;</p>
+      </div>
     </section>
 
     <section class="workshop-section" aria-label="Planned tools">
@@ -124,6 +131,6 @@
   </main>
 
   <script src="/signalr-lite.js"></script>
-  <script src="/board.js?v=20260626-workshop-shell"></script>
+  <script src="/board.js?v=20260628-workshop-current-reality"></script>
 </body>
 </html>

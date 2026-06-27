@@ -118,6 +118,16 @@ async function boot() {
     wireDoctorCockpitPressGuard();
   }
 
+  if (document.body.dataset.view === "workshop") {
+    // Current Reality summarizes a recent, stable window. last30 is current enough to read as
+    // "now" while carrying enough completed cases to be meaningful. app.dateRange is set before
+    // loadReports() so reportsRequestUrl() bounds the completed-cycle population to that window.
+    const last30 = computePresetRange("last30");
+    app.dateRange = { preset: "last30", start: last30.start, end: last30.end };
+    loadReports();
+    window.setInterval(loadReports, 60_000);
+  }
+
   wireDoctorViewMenu();
   connectRealtime();
   app.pollHandle = window.setInterval(loadBoard, 5000);
@@ -458,6 +468,10 @@ function render() {
 
   if (view === "reports") {
     renderReports();
+  }
+
+  if (view === "workshop") {
+    renderWorkshop();
   }
 }
 
@@ -2081,6 +2095,82 @@ async function handleConfirmExclusionClick(button) {
     alert("Confirm exclusion failed. Please try again.");
     button.disabled = false;
   }
+}
+
+// Workshop "Current Reality": a gentle, plain-English summary of recent schedule fit, read from the
+// same /api/reports payload (scheduleFit) the Reports page consumes. View-gated - only ever called
+// for the Workshop view, and it only writes into its own #workshopCurrentReality container.
+function renderWorkshop() {
+  const target = document.getElementById("workshopCurrentReality");
+  if (!target) {
+    return;
+  }
+
+  // Unavailable: reports failed to load, or internal admin access is required (no reports payload).
+  // The Reports access prompt is reports-page-only; Workshop shows a calm fallback and recovers on
+  // the next 60s refresh.
+  if (!app.reports) {
+    target.innerHTML = `<p class="workshop-note">Current Reality couldn't load right now.</p>`;
+    return;
+  }
+
+  const fit = app.reports.scheduleFit;
+  const rangeLabel = app.reports.rangeLabel || "the selected window";
+
+  // Empty: no completed cases carrying expected allocation in this window, so there is nothing to
+  // summarize. Framed gently, never as a problem.
+  if (!fit || !fit.overall || (fit.scheduleFitCycleCount || 0) === 0) {
+    target.innerHTML = `
+      <p class="workshop-reality-window">${escapeHtml(rangeLabel)}</p>
+      <p class="workshop-note">No completed cases with expected allocation in this window yet, so there's nothing to summarize.</p>
+    `;
+    return;
+  }
+
+  const overall = fit.overall;
+  const utilization = formatUtilizationPercent(overall.utilizationRatio);
+  const stats = [
+    ["Cases analyzed", `${fit.scheduleFitCycleCount} of ${fit.includedCycleCount}`],
+    ["Expected blocks", formatBlocks(overall.totalExpectedBlocks)],
+    ["Actual case-flow blocks", formatBlocks(overall.totalActualBlocks)],
+    ["Schedule debt", formatWholeMinutes(overall.totalDebtMinutes)],
+    ["Raw slack observed", formatWholeMinutes(overall.totalSlackMinutes)],
+    ["Utilization vs expected", utilization]
+  ];
+
+  const tiles = stats.map(([label, value]) => `
+    <div class="workshop-stat">
+      <span class="workshop-stat-label">${escapeHtml(label)}</span>
+      <strong class="workshop-stat-value">${escapeHtml(value)}</strong>
+    </div>
+  `).join("");
+
+  target.innerHTML = `
+    <p class="workshop-reality-window">${escapeHtml(rangeLabel)}</p>
+    <div class="workshop-reality-grid">${tiles}</div>
+    <p class="workshop-reality-explainer">
+      Across these cases, measured case flow ran about ${escapeHtml(utilization)}.
+      &ldquo;Schedule debt&rdquo; is time cases ran over their expected allocation; &ldquo;raw slack
+      observed&rdquo; is time they ran under &mdash; raw slack is an observation here, not capacity
+      that can automatically be reclaimed.
+    </p>
+  `;
+}
+
+// Minutes as a whole number (e.g. "45 min"). Non-finite input degrades to an em dash.
+function formatWholeMinutes(value) {
+  return Number.isFinite(value) ? `${Math.round(value)} min` : "—";
+}
+
+// Blocks to one decimal (e.g. "8.0 blocks"). Non-finite input degrades to an em dash.
+function formatBlocks(value) {
+  return Number.isFinite(value) ? `${(Math.round(value * 10) / 10).toFixed(1)} blocks` : "—";
+}
+
+// Utilization ratio (measured / expected) as a whole percent (e.g. "112% of expected"). Null or
+// non-finite ratio degrades to an em dash.
+function formatUtilizationPercent(ratio) {
+  return Number.isFinite(ratio) ? `${Math.round(ratio * 100)}% of expected` : "—";
 }
 
 function renderReportsAccessPrompt(statusCode) {
