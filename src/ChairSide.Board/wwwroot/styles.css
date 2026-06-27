@@ -3353,3 +3353,61 @@ body[data-view="workshop"] .workshop-reality-explainer {
   font-size: 14px;
   line-height: 1.5;
 }
+
+/* Projection preset selection (planned, explanatory only). Selectable cards get a pointer + focus
+   ring; the selected card gets a soft indigo accent - calm context, never an "active executable"
+   look. The shared detail panel reuses the same restrained indigo as the rest of Workshop. */
+body[data-view="workshop"] .workshop-card[data-preset-id] {
+  cursor: pointer;
+}
+
+body[data-view="workshop"] .workshop-card[data-preset-id]:focus-visible {
+  outline: 3px solid color-mix(in srgb, #6366f1 55%, transparent);
+  outline-offset: 2px;
+}
+
+body[data-view="workshop"] .workshop-card[data-preset-id].is-selected {
+  border-color: color-mix(in srgb, #6366f1 45%, var(--line));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, #6366f1 30%, transparent);
+  background: color-mix(in srgb, #6366f1 5%, var(--panel));
+}
+
+body[data-view="workshop"] .workshop-preset-detail {
+  display: grid;
+  gap: 10px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-left: 3px solid #6366f1;
+  border-radius: 12px;
+  background: var(--panel);
+}
+
+body[data-view="workshop"] .workshop-preset-detail-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+body[data-view="workshop"] .workshop-preset-detail-title {
+  margin: 0;
+  font-size: 16px;
+  letter-spacing: 0;
+}
+
+body[data-view="workshop"] .workshop-preset-detail-text {
+  margin: 0;
+  max-width: 72ch;
+  color: var(--ink);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+body[data-view="workshop"] .workshop-preset-detail-disclaimer {
+  margin: 0;
+  max-width: 72ch;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.45;
+}
