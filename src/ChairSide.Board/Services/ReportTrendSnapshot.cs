@@ -4,21 +4,24 @@ namespace ChairSide.Board.Services;
 
 /// <summary>
 /// Additive report trend read model for historical operational timing. This first slice is
-/// summary-only: weekly seated-to-doctor wait buckets, no charts, no scoring, no projections.
+/// summary-only: weekly timing buckets, no charts, no scoring, no projections.
 /// </summary>
 public sealed record ReportTrendSnapshot(
     string BucketSize,
     IReadOnlyList<ReportTrendBucket> Buckets);
 
 /// <summary>
-/// One Monday-start UTC week of completed-cycle wait timing. <see cref="EndDate"/> is exclusive.
+/// One Monday-start UTC week of completed-cycle timing. <see cref="EndDate"/> is exclusive.
 /// </summary>
 public sealed record ReportTrendBucket(
     string StartDate,
     string EndDate,
     int CompletedCycleCount,
     double MedianSeatedToDoctorSeconds,
-    double AverageSeatedToDoctorSeconds);
+    double AverageSeatedToDoctorSeconds,
+    int TurnoverCycleCount,
+    double MedianTurnoverSeconds,
+    double AverageTurnoverSeconds);
 
 /// <summary>
 /// Builds report trend snapshots over a caller-supplied standard/included completed-cycle population.
@@ -29,6 +32,10 @@ public static class ReportTrendSnapshotBuilder
 {
     public const string WeeklyBucketSize = "Week";
 
+    // Weekly trend buckets are anchored by DoctorCompleteAt for consistency with the report date
+    // filter. Turnover values summarize eligible cycles inside that same report bucket. A future
+    // "room became available this week" report would need a separately named model if grouped by
+    // RoomAvailableAt.
     public static ReportTrendSnapshot BuildWeekly(IEnumerable<CompletedRoomCycle> cycles)
     {
         ArgumentNullException.ThrowIfNull(cycles);
@@ -49,14 +56,22 @@ public static class ReportTrendSnapshotBuilder
             .OrderBy(group => group.Key)
             .Select(group =>
             {
-                var values = group.Select(cycle => cycle.SeatedToDoctorSeconds).Order().ToList();
-                var average = values.Count == 0 ? 0 : values.Average();
+                var waitValues = group.Select(cycle => cycle.SeatedToDoctorSeconds).Order().ToList();
+                var turnoverValues = group
+                    .Select(cycle => cycle.TurnoverSeconds)
+                    .Where(value => value is >= 0)
+                    .Select(value => value!.Value)
+                    .Order()
+                    .ToList();
                 return new ReportTrendBucket(
                     FormatDate(group.Key),
                     FormatDate(group.Key.AddDays(7)),
-                    values.Count,
-                    Median(values),
-                    average);
+                    waitValues.Count,
+                    Median(waitValues),
+                    Average(waitValues),
+                    turnoverValues.Count,
+                    Median(turnoverValues),
+                    Average(turnoverValues));
             })
             .ToList();
 
@@ -71,6 +86,9 @@ public static class ReportTrendSnapshotBuilder
 
     private static string FormatDate(DateOnly day) =>
         day.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+
+    private static double Average(IReadOnlyList<int> orderedValues) =>
+        orderedValues.Count == 0 ? 0 : orderedValues.Average();
 
     private static double Median(IReadOnlyList<int> orderedValues)
     {
