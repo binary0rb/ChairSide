@@ -76,6 +76,48 @@ public sealed class ReportTrendSnapshotTests
     }
 
     [Fact]
+    public void Median_turnover_is_correct()
+    {
+        var bucket = SingleTurnoverBucket(
+            300,
+            900,
+            600,
+            1200);
+
+        Assert.Equal(750, bucket.MedianTurnoverSeconds);
+    }
+
+    [Fact]
+    public void Average_turnover_is_correct()
+    {
+        var bucket = SingleTurnoverBucket(
+            300,
+            900,
+            600);
+
+        Assert.Equal(600, bucket.AverageTurnoverSeconds);
+    }
+
+    [Fact]
+    public void Turnover_count_uses_only_cycles_with_usable_turnover_values()
+    {
+        var snapshot = ReportTrendSnapshotBuilder.BuildWeekly(
+        [
+            Cycle(completeAt: Utc(2026, 6, 8, 9), seatedToDoctorSeconds: 300, turnoverSeconds: 120),
+            Cycle(completeAt: Utc(2026, 6, 9, 9), seatedToDoctorSeconds: 600, turnoverSeconds: null),
+            Cycle(completeAt: Utc(2026, 6, 10, 9), seatedToDoctorSeconds: 900, turnoverSeconds: -1),
+            Cycle(completeAt: Utc(2026, 6, 11, 9), seatedToDoctorSeconds: 1200, turnoverSeconds: 240)
+        ]);
+
+        var bucket = Assert.Single(snapshot.Buckets);
+        Assert.Equal(4, bucket.CompletedCycleCount);
+        Assert.Equal(750, bucket.MedianSeatedToDoctorSeconds);
+        Assert.Equal(2, bucket.TurnoverCycleCount);
+        Assert.Equal(180, bucket.MedianTurnoverSeconds);
+        Assert.Equal(180, bucket.AverageTurnoverSeconds);
+    }
+
+    [Fact]
     public void Completed_cycle_count_per_bucket_is_the_eligible_cycle_count()
     {
         var snapshot = ReportTrendSnapshotBuilder.BuildWeekly(
@@ -96,16 +138,21 @@ public sealed class ReportTrendSnapshotTests
     {
         var forbiddenNameFragments = new[]
         {
+            "Performance",
             "PerformanceScore",
+            "Score",
             "Best",
             "Worst",
             "Ranking",
+            "Capacity",
             "CapacityGained",
             "ExtraAppointments",
             "Recoverable",
+            "Projection",
             "Forecast",
             "Prediction",
-            "Roi"
+            "Roi",
+            "Blame"
         };
 
         var publicMemberNames = PublicModelMemberNames();
@@ -163,11 +210,24 @@ public sealed class ReportTrendSnapshotTests
         return Assert.Single(snapshot.Buckets);
     }
 
-    private static CompletedRoomCycle Cycle(DateTimeOffset completeAt, int seatedToDoctorSeconds) =>
+    private static ReportTrendBucket SingleTurnoverBucket(params int[] turnoverSeconds)
+    {
+        var snapshot = ReportTrendSnapshotBuilder.BuildWeekly(
+            turnoverSeconds.Select(value =>
+                Cycle(completeAt: Utc(2026, 6, 10, 9), seatedToDoctorSeconds: 300, turnoverSeconds: value)));
+
+        return Assert.Single(snapshot.Buckets);
+    }
+
+    private static CompletedRoomCycle Cycle(
+        DateTimeOffset completeAt,
+        int seatedToDoctorSeconds,
+        int? turnoverSeconds = null) =>
         new()
         {
             DoctorCompleteAt = completeAt,
-            SeatedToDoctorSeconds = seatedToDoctorSeconds
+            SeatedToDoctorSeconds = seatedToDoctorSeconds,
+            TurnoverSeconds = turnoverSeconds
         };
 
     private static DateTimeOffset Utc(int year, int month, int day, int hour) =>

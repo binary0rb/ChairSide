@@ -4449,12 +4449,18 @@ public sealed class BoardStoreTests
                 Assert.Equal(2, first.CompletedCycleCount);
                 Assert.Equal(900, first.MedianSeatedToDoctorSeconds);
                 Assert.Equal(900, first.AverageSeatedToDoctorSeconds);
+                Assert.Equal(2, first.TurnoverCycleCount);
+                Assert.Equal(300, first.MedianTurnoverSeconds);
+                Assert.Equal(300, first.AverageTurnoverSeconds);
             },
             second =>
             {
                 Assert.Equal("2026-06-15", second.StartDate);
                 Assert.Equal("2026-06-22", second.EndDate);
                 Assert.Equal(1, second.CompletedCycleCount);
+                Assert.Equal(1, second.TurnoverCycleCount);
+                Assert.Equal(300, second.MedianTurnoverSeconds);
+                Assert.Equal(300, second.AverageTurnoverSeconds);
             });
     }
 
@@ -4477,6 +4483,9 @@ public sealed class BoardStoreTests
         Assert.Equal("2026-06-08", bucket.StartDate);
         Assert.Equal("2026-06-15", bucket.EndDate);
         Assert.Equal(1, bucket.CompletedCycleCount);
+        Assert.Equal(1, bucket.TurnoverCycleCount);
+        Assert.Equal(300, bucket.MedianTurnoverSeconds);
+        Assert.Equal(300, bucket.AverageTurnoverSeconds);
     }
 
     [Fact]
@@ -4498,6 +4507,7 @@ public sealed class BoardStoreTests
 
         var bucket = Assert.Single(reports.Trends!.Buckets);
         Assert.Equal(1, bucket.CompletedCycleCount);
+        Assert.Equal(1, bucket.TurnoverCycleCount);
     }
 
     // -------------------------------------------------------------------------
