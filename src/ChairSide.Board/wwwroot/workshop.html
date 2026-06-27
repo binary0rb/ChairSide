@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>ChairSide Board - Workshop</title>
-  <link rel="stylesheet" href="/styles.css?v=20260629-workshop-preset-selection">
+  <link rel="stylesheet" href="/styles.css?v=20260630-workshop-projection-readiness">
 </head>
 <body data-view="workshop">
   <header class="app-header compact">
@@ -77,6 +77,10 @@
             changes reduce friction without padding the day? Anything surfaced would be options to
             consider, never targets to hit.
           </div>
+          <div class="workshop-preset-assumption-source" hidden>
+            This lens would need assumptions about how much unevenness the team is willing to smooth
+            without padding the day.
+          </div>
         </article>
 
         <article class="workshop-card" data-preset-id="more-throughput" role="button" tabindex="0" aria-pressed="false">
@@ -94,6 +98,10 @@
             for additional appointments. It is a tradeoff lens, not a promise of capacity &mdash;
             observed slack is not automatically free time, and anything surfaced stays a scheduling
             decision for the team to weigh.
+          </div>
+          <div class="workshop-preset-assumption-source" hidden>
+            This lens would need an explicit, conservative assumption about whether any observed
+            slack is usable. It must never treat all raw slack as free appointment time.
           </div>
         </article>
 
@@ -113,6 +121,10 @@
             weighing it against pace &mdash; a description of a tradeoff, not a recommendation to
             follow.
           </div>
+          <div class="workshop-preset-assumption-source" hidden>
+            This lens would need assumptions about how much protected catch-up or recovery time the
+            team wants to preserve, and where that time can safely sit.
+          </div>
         </article>
 
         <article class="workshop-card" data-preset-id="patient-experience-protected" role="button" tabindex="0" aria-pressed="false">
@@ -131,6 +143,10 @@
             picturing a calmer-paced day and what it would trade against &mdash; offered to weigh,
             not to adopt.
           </div>
+          <div class="workshop-preset-assumption-source" hidden>
+            This lens would need assumptions about which visit types need extra breathing room,
+            especially longer or sedation cases.
+          </div>
         </article>
 
         <article class="workshop-card" data-preset-id="reset-admin-buffer-protected" role="button" tabindex="0" aria-pressed="false">
@@ -148,6 +164,10 @@
             and admin time between cases instead of absorbing it. It is a lens for protecting the
             behind-the-scenes time a smooth day depends on, and seeing what that protection would
             cost elsewhere.
+          </div>
+          <div class="workshop-preset-assumption-source" hidden>
+            This lens would need assumptions about turnover, reset, documentation, and admin time
+            that should be protected instead of absorbed.
           </div>
         </article>
       </div>
@@ -203,6 +223,6 @@
   </main>
 
   <script src="/signalr-lite.js"></script>
-  <script src="/board.js?v=20260629-workshop-preset-selection"></script>
+  <script src="/board.js?v=20260630-workshop-projection-readiness"></script>
 </body>
 </html>

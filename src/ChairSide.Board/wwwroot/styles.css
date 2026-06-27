@@ -3411,3 +3411,44 @@ body[data-view="workshop"] .workshop-preset-detail-disclaimer {
   font-weight: 700;
   line-height: 1.45;
 }
+
+/* Projection readiness scaffold: the four-part observed / assumptions / no-output-yet / unknowable
+   separation. Calm, documentary styling - it must read as explanation, never as a runnable control.
+   A light gridded surface keeps the four buckets distinct without looking like an executable panel. */
+body[data-view="workshop"] .workshop-readiness {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+
+body[data-view="workshop"] .workshop-readiness-bucket {
+  display: grid;
+  gap: 6px;
+  align-content: start;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--bg);
+}
+
+body[data-view="workshop"] .workshop-readiness-heading {
+  margin: 0;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+body[data-view="workshop"] .workshop-readiness-bucket p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+/* The one preset-specific assumption line: slightly stronger than the fixed copy so the reader sees
+   what changes per preset, but still calm and non-promissory. */
+body[data-view="workshop"] .workshop-readiness-assumption {
+  color: var(--ink);
+  font-weight: 700;
+}

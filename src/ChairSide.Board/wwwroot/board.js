@@ -2230,8 +2230,10 @@ function selectWorkshopPreset(card) {
   }
 
   const title = card.querySelector(".workshop-card-head h4")?.textContent?.trim() || "Preset";
-  const detailSource = card.querySelector(".workshop-preset-detail-source");
-  const detail = detailSource ? detailSource.textContent.trim().replace(/\s+/g, " ") : "";
+  const detail = readPresetSource(card, ".workshop-preset-detail-source");
+  // The only preset-specific projection content. The four readiness buckets below are
+  // preset-agnostic UI copy, so they stay inline rather than in a per-preset definition map.
+  const assumption = readPresetSource(card, ".workshop-preset-assumption-source");
 
   panel.innerHTML = `
     <header class="workshop-preset-detail-head">
@@ -2239,7 +2241,47 @@ function selectWorkshopPreset(card) {
       <span class="workshop-status">Planned</span>
     </header>
     <p class="workshop-preset-detail-text">${escapeHtml(detail)}</p>
+    ${renderProjectionReadiness(assumption)}
     <p class="workshop-preset-detail-disclaimer">Planned: selecting this preset shows this explanation only. It does not run a projection, change the schedule, or alter any live data.</p>
+  `;
+}
+
+// Reads and normalizes the whitespace of a hidden source block inside a preset card.
+function readPresetSource(card, selector) {
+  const source = card.querySelector(selector);
+  return source ? source.textContent.trim().replace(/\s+/g, " ") : "";
+}
+
+// Projection readiness scaffold: the four-part honesty separation the design principle requires.
+// Display-only and computes nothing - it explains what a scenario would need and is explicit that
+// no output is produced. The first three buckets are fixed UI copy; the "assumptions" bucket adds
+// the selected preset's one assumption line. Raw slack observed is never treated as recoverable
+// capacity here, and there is no run/apply/generate affordance.
+function renderProjectionReadiness(assumption) {
+  const presetAssumption = assumption
+    ? `<p class="workshop-readiness-assumption">${escapeHtml(assumption)}</p>`
+    : "";
+
+  return `
+    <div class="workshop-readiness" aria-label="Projection readiness">
+      <section class="workshop-readiness-bucket">
+        <h5 class="workshop-readiness-heading">Observed today</h5>
+        <p>ChairSide can show completed-case schedule-fit data for the selected report window: expected blocks, actual case-flow blocks, schedule debt, raw slack observed, and utilization versus expected allocation.</p>
+      </section>
+      <section class="workshop-readiness-bucket">
+        <h5 class="workshop-readiness-heading">Assumptions a projection would require</h5>
+        <p>A real scenario would need explicit assumptions before any output could be trusted: future demand, room/staff availability, turnover and sedation-recovery constraints, slack contiguity, and a chosen policy for whether any observed slack is usable.</p>
+        ${presetAssumption}
+      </section>
+      <section class="workshop-readiness-bucket">
+        <h5 class="workshop-readiness-heading">Scenario output &mdash; not computed yet</h5>
+        <p>This preset does not compute an outcome yet. Selecting it only explains the lens and the assumptions a future scenario would need.</p>
+      </section>
+      <section class="workshop-readiness-bucket">
+        <h5 class="workshop-readiness-heading">What ChairSide cannot know</h5>
+        <p>ChairSide cannot know whether observed slack was contiguous, bookable, staffed, clinically appropriate, or desirable to reuse. The team would need to decide those assumptions before any scenario output could be meaningful.</p>
+      </section>
+    </div>
   `;
 }
 
