@@ -4421,6 +4421,86 @@ public sealed class BoardStoreTests
     }
 
     // -------------------------------------------------------------------------
+    // Weekly wait trend read model exposed on the report snapshot
+    // -------------------------------------------------------------------------
+
+    [Fact]
+    public void Reports_expose_weekly_wait_trends_over_standard_completed_population()
+    {
+        using var workspace = TestWorkspace.Create();
+        var databasePath = workspace.ProductionDatabasePath();
+        var seed = StoreContext.Create(workspace, environmentName: Environments.Production, databasePath: databasePath);
+
+        SaveCleanCycle(seed, room: 1, doctor: "otte", code: "EXT", completeAt: Utc(2026, 6, 8, 9), expectedUnits: 2);
+        SaveCleanCycle(seed, room: 2, doctor: "otte", code: "EXT", completeAt: Utc(2026, 6, 14, 9), expectedUnits: 2);
+        SaveCleanCycle(seed, room: 3, doctor: "otte", code: "EXT", completeAt: Utc(2026, 6, 15, 9), expectedUnits: 2);
+
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production, databasePath: databasePath);
+        var trends = context.Store.GetReports().Trends;
+
+        Assert.NotNull(trends);
+        Assert.Equal(ReportTrendSnapshotBuilder.WeeklyBucketSize, trends.BucketSize);
+        Assert.Collection(
+            trends.Buckets,
+            first =>
+            {
+                Assert.Equal("2026-06-08", first.StartDate);
+                Assert.Equal("2026-06-15", first.EndDate);
+                Assert.Equal(2, first.CompletedCycleCount);
+                Assert.Equal(900, first.MedianSeatedToDoctorSeconds);
+                Assert.Equal(900, first.AverageSeatedToDoctorSeconds);
+            },
+            second =>
+            {
+                Assert.Equal("2026-06-15", second.StartDate);
+                Assert.Equal("2026-06-22", second.EndDate);
+                Assert.Equal(1, second.CompletedCycleCount);
+            });
+    }
+
+    [Fact]
+    public void Reports_wait_trends_respect_date_range_filter()
+    {
+        using var workspace = TestWorkspace.Create();
+        var databasePath = workspace.ProductionDatabasePath();
+        var seed = StoreContext.Create(workspace, environmentName: Environments.Production, databasePath: databasePath);
+
+        SaveCleanCycle(seed, room: 1, doctor: "otte", code: "EXT", completeAt: Utc(2026, 6, 10, 14), expectedUnits: 2);
+        SaveCleanCycle(seed, room: 2, doctor: "otte", code: "EXT", completeAt: Utc(2026, 6, 20, 14), expectedUnits: 2);
+
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production, databasePath: databasePath);
+        var reports = context.Store.GetReports(ReportDateRange.FromDateStrings("2026-06-08", "2026-06-12"));
+
+        var trends = reports.Trends;
+        Assert.NotNull(trends);
+        var bucket = Assert.Single(trends.Buckets);
+        Assert.Equal("2026-06-08", bucket.StartDate);
+        Assert.Equal("2026-06-15", bucket.EndDate);
+        Assert.Equal(1, bucket.CompletedCycleCount);
+    }
+
+    [Fact]
+    public void Reports_wait_trends_exclude_reporting_exception_cycles()
+    {
+        using var workspace = TestWorkspace.Create();
+        var databasePath = workspace.ProductionDatabasePath();
+        var seed = StoreContext.Create(workspace, environmentName: Environments.Production, databasePath: databasePath);
+
+        SaveCleanCycle(seed, room: 1, doctor: "otte", code: "EXT", completeAt: Utc(2026, 6, 10, 9), expectedUnits: 2);
+        SaveCleanCycle(seed, room: 2, doctor: "otte", code: "UNKNOWN", completeAt: Utc(2026, 6, 11, 9), expectedUnits: 2);
+
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production, databasePath: databasePath);
+        var reports = context.Store.GetReports();
+
+        Assert.Equal(2, reports.CompletedRoomCyclesCount);
+        Assert.Equal(1, reports.IncludedCompletedCycleCount);
+        Assert.Equal(1, reports.ExcludedCompletedCycleCount);
+
+        var bucket = Assert.Single(reports.Trends!.Buckets);
+        Assert.Equal(1, bucket.CompletedCycleCount);
+    }
+
+    // -------------------------------------------------------------------------
     // Schedule-fit read model exposed on the report snapshot
     //
     // SaveCleanCycle fixes measured case flow at 30 min, so each cycle's variance is

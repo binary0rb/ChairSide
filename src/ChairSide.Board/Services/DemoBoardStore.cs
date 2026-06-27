@@ -599,7 +599,8 @@ public sealed class DemoBoardStore
                 range.Label,
                 totalCompletedAllTime,
                 BuildDoctorDailyAllocationSeries(standardCycles),
-                ScheduleFitReportBuilder.Build(standardCompletedCycles));
+                ScheduleFitReportBuilder.Build(standardCompletedCycles),
+                ReportTrendSnapshotBuilder.BuildWeekly(standardCompletedCycles));
         }
     }
 
@@ -2139,7 +2140,10 @@ public sealed record ReportsSnapshot(
     // so the two always agree on shared totals. A bridge for future Reports/Workshop UI; no UI consumes
     // it yet. GetReports always populates this; the nullable default only keeps the positional record
     // contract additive (existing callers unaffected).
-    ScheduleFitReport? ScheduleFit = null);
+    ScheduleFitReport? ScheduleFit = null,
+    // Weekly historical wait trend over the same standard completed-cycle population as the main
+    // report aggregates. Additive, summary-only, and not rendered by the frontend yet.
+    ReportTrendSnapshot? Trends = null);
 
 /// <summary>
 /// A completed-cycle reporting window. Dates are interpreted as whole UTC calendar days (start
