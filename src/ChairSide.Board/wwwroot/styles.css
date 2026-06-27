@@ -1370,41 +1370,51 @@ body[data-view="reports"] .report-empty-state p {
   font-weight: 700;
 }
 
-body[data-view="reports"] .wait-trend-panel[hidden] {
+body[data-view="reports"] .report-trend-panel[hidden] {
   display: none;
 }
 
-body[data-view="reports"] .wait-trend-card {
+body[data-view="reports"] .report-trend-panel {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+body[data-view="reports"] .report-trend-card {
   display: grid;
   gap: 14px;
   border-left: 4px solid #2563eb;
 }
 
-body[data-view="reports"] .wait-trend-card.is-empty {
+body[data-view="reports"] .report-trend-card.turnover-trend-card {
+  border-left-color: #0f766e;
+}
+
+body[data-view="reports"] .report-trend-card.is-empty {
   border-left-color: var(--line);
 }
 
-body[data-view="reports"] .wait-trend-header {
+body[data-view="reports"] .report-trend-header {
   display: flex;
   align-items: start;
   justify-content: space-between;
   gap: 18px;
 }
 
-body[data-view="reports"] .wait-trend-header h2 {
+body[data-view="reports"] .report-trend-header h2 {
   margin: 8px 0 4px;
   font-size: 22px;
   letter-spacing: 0;
 }
 
-body[data-view="reports"] .wait-trend-header p,
-body[data-view="reports"] .wait-trend-note {
+body[data-view="reports"] .report-trend-header p,
+body[data-view="reports"] .report-trend-note {
   margin: 0;
   color: var(--muted);
   font-weight: 700;
 }
 
-body[data-view="reports"] .wait-trend-value {
+body[data-view="reports"] .report-trend-value {
   flex: 0 0 auto;
   color: var(--ink);
   font-size: clamp(32px, 4vw, 46px);
@@ -1414,14 +1424,14 @@ body[data-view="reports"] .wait-trend-value {
   white-space: nowrap;
 }
 
-body[data-view="reports"] .wait-trend-facts {
+body[data-view="reports"] .report-trend-facts {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px;
   margin: 0;
 }
 
-body[data-view="reports"] .wait-trend-facts > div {
+body[data-view="reports"] .report-trend-facts > div {
   min-width: 0;
   padding: 10px 12px;
   border: 1px solid var(--line);
@@ -1429,7 +1439,7 @@ body[data-view="reports"] .wait-trend-facts > div {
   background: var(--bg);
 }
 
-body[data-view="reports"] .wait-trend-facts dt {
+body[data-view="reports"] .report-trend-facts dt {
   color: var(--muted);
   font-size: 12px;
   font-weight: 900;
@@ -1437,7 +1447,7 @@ body[data-view="reports"] .wait-trend-facts dt {
   text-transform: uppercase;
 }
 
-body[data-view="reports"] .wait-trend-facts dd {
+body[data-view="reports"] .report-trend-facts dd {
   margin: 3px 0 0;
   color: var(--ink);
   font-size: 18px;
@@ -1445,7 +1455,7 @@ body[data-view="reports"] .wait-trend-facts dd {
   font-variant-numeric: tabular-nums;
 }
 
-body[data-view="reports"] .wait-trend-comparison {
+body[data-view="reports"] .report-trend-comparison {
   margin: 0;
   padding: 11px 12px;
   border: 1px solid var(--line);
@@ -1455,13 +1465,13 @@ body[data-view="reports"] .wait-trend-comparison {
   font-weight: 800;
 }
 
-body[data-view="reports"] .wait-trend-comparison.is-improved {
+body[data-view="reports"] .report-trend-comparison.is-improved {
   border-color: #bbf7d0;
   background: #f0fdf4;
   color: #166534;
 }
 
-body[data-view="reports"] .wait-trend-comparison.is-increased {
+body[data-view="reports"] .report-trend-comparison.is-increased {
   border-color: #fed7aa;
   background: #fff7ed;
   color: #9a3412;
@@ -2522,11 +2532,11 @@ button:disabled {
     grid-template-columns: 1fr;
   }
 
-  body[data-view="reports"] .wait-trend-header {
+  body[data-view="reports"] .report-trend-header {
     display: grid;
   }
 
-  body[data-view="reports"] .wait-trend-facts {
+  body[data-view="reports"] .report-trend-facts {
     grid-template-columns: 1fr;
   }
 }
@@ -2556,6 +2566,10 @@ button:disabled {
   body[data-view="reports"] .doctor-report-dashboard-head {
     display: grid;
     align-items: start;
+  }
+
+  body[data-view="reports"] .report-trend-panel {
+    grid-template-columns: 1fr;
   }
 }
 
