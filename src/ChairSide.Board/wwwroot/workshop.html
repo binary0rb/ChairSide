@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>ChairSide Board - Workshop</title>
-  <link rel="stylesheet" href="/styles.css?v=20260628-workshop-current-reality">
+  <link rel="stylesheet" href="/styles.css?v=20260629-workshop-preset-selection">
 </head>
 <body data-view="workshop">
   <header class="app-header compact">
@@ -61,7 +61,7 @@
         change the live board, and none assume observed slack can be automatically reclaimed.
       </p>
       <div class="workshop-grid">
-        <article class="workshop-card">
+        <article class="workshop-card" data-preset-id="balanced-flow" role="button" tabindex="0" aria-pressed="false">
           <header class="workshop-card-head">
             <h4>Balanced Flow</h4>
             <span class="workshop-status">Planned</span>
@@ -71,9 +71,15 @@
             projection lens for weighing evenness against pace, offered as options to consider
             rather than targets to hit.
           </p>
+          <div class="workshop-preset-detail-source" hidden>
+            Balanced Flow would explore schedule shapes that keep a day steady &mdash; neither rushed
+            nor padded. It is a lens for weighing evenness against pace: where might small spacing
+            changes reduce friction without padding the day? Anything surfaced would be options to
+            consider, never targets to hit.
+          </div>
         </article>
 
-        <article class="workshop-card">
+        <article class="workshop-card" data-preset-id="more-throughput" role="button" tabindex="0" aria-pressed="false">
           <header class="workshop-card-head">
             <h4>More Throughput</h4>
             <span class="workshop-status">Planned</span>
@@ -83,9 +89,15 @@
             a tradeoff lens, not a promise of capacity: observed slack is not automatically free
             time, and any change stays a scheduling decision for the team.
           </p>
+          <div class="workshop-preset-detail-source" hidden>
+            More Throughput would explore whether repeatable patterns in past days might leave room
+            for additional appointments. It is a tradeoff lens, not a promise of capacity &mdash;
+            observed slack is not automatically free time, and anything surfaced stays a scheduling
+            decision for the team to weigh.
+          </div>
         </article>
 
-        <article class="workshop-card">
+        <article class="workshop-card" data-preset-id="more-recovery" role="button" tabindex="0" aria-pressed="false">
           <header class="workshop-card-head">
             <h4>More Recovery</h4>
             <span class="workshop-status">Planned</span>
@@ -95,9 +107,15 @@
             debt. A scenario for choosing recovery on purpose, weighed against pace &mdash; not a
             recommendation.
           </p>
+          <div class="workshop-preset-detail-source" hidden>
+            More Recovery would explore whether deliberately protected time could ease late-day
+            catch-up and schedule debt. It is a scenario for choosing recovery on purpose and
+            weighing it against pace &mdash; a description of a tradeoff, not a recommendation to
+            follow.
+          </div>
         </article>
 
-        <article class="workshop-card">
+        <article class="workshop-card" data-preset-id="patient-experience-protected" role="button" tabindex="0" aria-pressed="false">
           <header class="workshop-card-head">
             <h4>Patient Experience Protected</h4>
             <span class="workshop-status">Planned</span>
@@ -107,9 +125,15 @@
             around longer or sedation cases. A projection lens for a calmer-paced day, offered as a
             tradeoff to weigh.
           </p>
+          <div class="workshop-preset-detail-source" hidden>
+            Patient Experience Protected would explore schedule shapes that prioritize predictable,
+            unhurried visits, protecting time around longer or sedation cases. It is a lens for
+            picturing a calmer-paced day and what it would trade against &mdash; offered to weigh,
+            not to adopt.
+          </div>
         </article>
 
-        <article class="workshop-card">
+        <article class="workshop-card" data-preset-id="reset-admin-buffer-protected" role="button" tabindex="0" aria-pressed="false">
           <header class="workshop-card-head">
             <h4>Reset/Admin Buffer Protected</h4>
             <span class="workshop-status">Planned</span>
@@ -119,7 +143,21 @@
             instead of absorbing it. This protects the behind-the-scenes time a smooth day depends
             on.
           </p>
+          <div class="workshop-preset-detail-source" hidden>
+            Reset/Admin Buffer Protected would explore schedule shapes that preserve turnover, reset,
+            and admin time between cases instead of absorbing it. It is a lens for protecting the
+            behind-the-scenes time a smooth day depends on, and seeing what that protection would
+            cost elsewhere.
+          </div>
         </article>
+      </div>
+
+      <div id="workshopPresetDetail" class="workshop-preset-detail" role="region" aria-live="polite" aria-label="Selected preset detail">
+        <p class="workshop-note">
+          Select a preset above to read what it would explore. Every preset here is planned and
+          explanatory only &mdash; selecting one shows its description and changes nothing on the
+          live board.
+        </p>
       </div>
     </section>
 
@@ -165,6 +203,6 @@
   </main>
 
   <script src="/signalr-lite.js"></script>
-  <script src="/board.js?v=20260628-workshop-current-reality"></script>
+  <script src="/board.js?v=20260629-workshop-preset-selection"></script>
 </body>
 </html>

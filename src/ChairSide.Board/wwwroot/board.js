@@ -126,6 +126,7 @@ async function boot() {
     app.dateRange = { preset: "last30", start: last30.start, end: last30.end };
     loadReports();
     window.setInterval(loadReports, 60_000);
+    wireWorkshopPresetSelection();
   }
 
   wireDoctorViewMenu();
@@ -2171,6 +2172,75 @@ function formatBlocks(value) {
 // non-finite ratio degrades to an em dash.
 function formatUtilizationPercent(ratio) {
   return Number.isFinite(ratio) ? `${Math.round(ratio * 100)}% of expected` : "—";
+}
+
+// ---------------------------------------------------------------------------
+// Workshop projection preset selection (progressive enhancement, planned/explanatory only).
+// The five preset cards are static HTML and stay useful with no JS. This only ADDS selection:
+// clicking or keyboard-activating a card reveals that preset's hidden detail copy in the shared
+// #workshopPresetDetail panel, with a Planned badge and a fixed disclaimer. It never runs a
+// projection, mutates state, calls an API, or writes outside the Workshop preset panel. Wired
+// only from the Workshop boot branch, so these listeners never exist on other pages.
+// ---------------------------------------------------------------------------
+function wireWorkshopPresetSelection() {
+  // Cards are static and never re-rendered, but delegated listeners keep this consistent with the
+  // rest of board.js and robust to any future re-render. Scoped by the data-preset-id selector.
+  document.addEventListener("click", handleWorkshopPresetActivate);
+  document.addEventListener("keydown", handleWorkshopPresetKeydown);
+}
+
+function handleWorkshopPresetActivate(event) {
+  if (!(event.target instanceof Element)) {
+    return;
+  }
+  const card = event.target.closest('.workshop-card[data-preset-id]');
+  if (!card) {
+    return;
+  }
+  selectWorkshopPreset(card);
+}
+
+function handleWorkshopPresetKeydown(event) {
+  if (event.key !== "Enter" && event.key !== " " && event.key !== "Spacebar") {
+    return;
+  }
+  if (!(event.target instanceof Element)) {
+    return;
+  }
+  // Only the focused card itself activates (it carries role="button" and tabindex).
+  const card = event.target.closest('.workshop-card[data-preset-id]');
+  if (!card || card !== event.target) {
+    return;
+  }
+  event.preventDefault(); // Space must not scroll the page; Enter must not double-fire.
+  selectWorkshopPreset(card);
+}
+
+function selectWorkshopPreset(card) {
+  const cards = document.querySelectorAll('.workshop-card[data-preset-id]');
+  cards.forEach(item => {
+    const selected = item === card;
+    item.classList.toggle("is-selected", selected);
+    item.setAttribute("aria-pressed", selected ? "true" : "false");
+  });
+
+  const panel = document.getElementById("workshopPresetDetail");
+  if (!panel) {
+    return;
+  }
+
+  const title = card.querySelector(".workshop-card-head h4")?.textContent?.trim() || "Preset";
+  const detailSource = card.querySelector(".workshop-preset-detail-source");
+  const detail = detailSource ? detailSource.textContent.trim().replace(/\s+/g, " ") : "";
+
+  panel.innerHTML = `
+    <header class="workshop-preset-detail-head">
+      <h4 class="workshop-preset-detail-title">${escapeHtml(title)}</h4>
+      <span class="workshop-status">Planned</span>
+    </header>
+    <p class="workshop-preset-detail-text">${escapeHtml(detail)}</p>
+    <p class="workshop-preset-detail-disclaimer">Planned: selecting this preset shows this explanation only. It does not run a projection, change the schedule, or alter any live data.</p>
+  `;
 }
 
 function renderReportsAccessPrompt(statusCode) {
