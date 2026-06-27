@@ -57,8 +57,8 @@ public static class ProjectionAssumptionChecklistBuilder
         string? reportWindowLabel,
         ScheduleFitReport? scheduleFit)
     {
-        ArgumentNullException.ThrowIfNull(presetId);
-        ArgumentNullException.ThrowIfNull(presetName);
+        presetId = RequireNonBlank(presetId, nameof(presetId));
+        presetName = RequireNonBlank(presetName, nameof(presetName));
 
         return new ProjectionAssumptionChecklist(
             presetId,
@@ -69,6 +69,17 @@ public static class ProjectionAssumptionChecklistBuilder
             BuildMissingInputs(scheduleFit),
             NotComputedStatus,
             SafetyWarningText);
+    }
+
+    private static string RequireNonBlank(string value, string parameterName)
+    {
+        ArgumentNullException.ThrowIfNull(value, parameterName);
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            throw new ArgumentException("Value must not be blank.", parameterName);
+        }
+
+        return value;
     }
 
     private static ObservedScheduleFitInputSummary BuildObservedSummary(ScheduleFitReport? scheduleFit)
