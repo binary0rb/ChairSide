@@ -7,6 +7,64 @@ namespace ChairSide.Board.Tests;
 public sealed class ProjectionAssumptionChecklistTests
 {
     [Fact]
+    public void Build_rejects_null_preset_id()
+    {
+        var exception = Assert.Throws<ArgumentNullException>(() =>
+            ProjectionAssumptionChecklistBuilder.Build(
+                null!,
+                "Balanced Flow",
+                "Today",
+                ScheduleFitReport()));
+
+        Assert.Equal("presetId", exception.ParamName);
+    }
+
+    [Fact]
+    public void Build_rejects_blank_preset_id()
+    {
+        foreach (var presetId in new[] { "", "   " })
+        {
+            var exception = Assert.Throws<ArgumentException>(() =>
+                ProjectionAssumptionChecklistBuilder.Build(
+                    presetId,
+                    "Balanced Flow",
+                    "Today",
+                    ScheduleFitReport()));
+
+            Assert.Equal("presetId", exception.ParamName);
+        }
+    }
+
+    [Fact]
+    public void Build_rejects_null_preset_name()
+    {
+        var exception = Assert.Throws<ArgumentNullException>(() =>
+            ProjectionAssumptionChecklistBuilder.Build(
+                "balanced-flow",
+                null!,
+                "Today",
+                ScheduleFitReport()));
+
+        Assert.Equal("presetName", exception.ParamName);
+    }
+
+    [Fact]
+    public void Build_rejects_blank_preset_name()
+    {
+        foreach (var presetName in new[] { "", "   " })
+        {
+            var exception = Assert.Throws<ArgumentException>(() =>
+                ProjectionAssumptionChecklistBuilder.Build(
+                    "balanced-flow",
+                    presetName,
+                    "Today",
+                    ScheduleFitReport()));
+
+            Assert.Equal("presetName", exception.ParamName);
+        }
+    }
+
+    [Fact]
     public void Output_status_is_always_not_computed()
     {
         var withFit = ProjectionAssumptionChecklistBuilder.Build(
