@@ -67,6 +67,8 @@ const cancelableStates = new Set(["seated", "ready-for-doctor", "aging", "stale"
 // States where "Doctor Arrived" is enabled - all ready-for-doctor phase states.
 const doctorArrivedStates = new Set(["ready-for-doctor", "aging", "stale"]);
 const staffLoungeRoomNumber = 99;
+const waitTrendMinimumComparisonCases = 3;
+const waitTrendAboutSameThresholdSeconds = 60;
 const adminAccess = {
   storageKey: "chairside-admin-token",
   headerName: "X-ChairSide-Admin-Token"
@@ -913,6 +915,7 @@ function renderReports() {
   renderReportWindow(r);
   syncDateRangeControls();
   renderReportHeadline(r, hasData);
+  renderWaitTrendCard(r);
   renderDoctorReportDashboard(r, hasData);
   syncReportFilterButtons();
   renderReportFilterBar(hasData);
@@ -961,6 +964,163 @@ function renderHeadlineCard(label, value) {
       <strong>${escapeHtml(value)}</strong>
     </article>
   `;
+}
+
+function renderWaitTrendCard(r) {
+  const panel = document.getElementById("waitTrendPanel");
+  if (!panel) {
+    return;
+  }
+
+  panel.hidden = false;
+  const buckets = waitTrendBucketsWithCases(r?.trends?.buckets);
+  const latest = buckets[buckets.length - 1];
+
+  if (!latest) {
+    panel.innerHTML = `
+      <article class="report-card wait-trend-card is-empty">
+        <div>
+          <span class="layer-pill layer-pill--population">Wait Trend</span>
+          <h2>Wait trend</h2>
+          <p>Not enough trend data yet.</p>
+        </div>
+        <p class="wait-trend-note">Weekly median seated-to-doctor waits will appear here as completed room cycles accumulate.</p>
+      </article>
+    `;
+    return;
+  }
+
+  const previous = buckets.length > 1 ? buckets[buckets.length - 2] : null;
+  const comparison = describeWaitTrendComparison(latest, previous);
+  const latestRange = formatWaitTrendBucketRange(latest);
+  const previousRange = previous ? formatWaitTrendBucketRange(previous) : "";
+
+  panel.innerHTML = `
+    <article class="report-card wait-trend-card">
+      <div class="wait-trend-header">
+        <div>
+          <span class="layer-pill layer-pill--population">Wait Trend</span>
+          <h2>Wait trend</h2>
+          <p>Median seated-to-doctor for the latest weekly bucket.</p>
+        </div>
+        <strong class="wait-trend-value">${escapeHtml(formatWaitTrendMinutes(latest.medianSeatedToDoctorSeconds))}</strong>
+      </div>
+      <dl class="wait-trend-facts">
+        <div>
+          <dt>Latest bucket</dt>
+          <dd>${escapeHtml(latestRange)}</dd>
+        </div>
+        <div>
+          <dt>Cases in bucket</dt>
+          <dd>${escapeHtml(String(latest.completedCycleCount || 0))}</dd>
+        </div>
+        <div>
+          <dt>Compared with previous week with cases</dt>
+          <dd>${escapeHtml(previousRange || "Unavailable")}</dd>
+        </div>
+      </dl>
+      <p class="wait-trend-comparison ${escapeAttribute(comparison.tone)}">${escapeHtml(comparison.text)}</p>
+    </article>
+  `;
+}
+
+function waitTrendBucketsWithCases(buckets) {
+  if (!Array.isArray(buckets)) {
+    return [];
+  }
+
+  return buckets
+    .filter(bucket => {
+      const count = Number(bucket?.completedCycleCount);
+      const median = Number(bucket?.medianSeatedToDoctorSeconds);
+      return count > 0 && Number.isFinite(median) && median >= 0;
+    })
+    .slice()
+    .sort((a, b) => String(a.startDate || "").localeCompare(String(b.startDate || "")));
+}
+
+function describeWaitTrendComparison(latest, previous) {
+  if (!previous) {
+    return {
+      tone: "is-neutral",
+      text: "Not enough prior trend data for a week-to-week comparison yet."
+    };
+  }
+
+  const latestCount = Number(latest.completedCycleCount || 0);
+  const previousCount = Number(previous.completedCycleCount || 0);
+  if (latestCount < waitTrendMinimumComparisonCases || previousCount < waitTrendMinimumComparisonCases) {
+    return {
+      tone: "is-neutral",
+      text: "More cases are needed for a reliable week-to-week comparison."
+    };
+  }
+
+  const differenceSeconds = Number(latest.medianSeatedToDoctorSeconds) - Number(previous.medianSeatedToDoctorSeconds);
+  if (!Number.isFinite(differenceSeconds)) {
+    return {
+      tone: "is-neutral",
+      text: "Not enough trend data yet."
+    };
+  }
+
+  if (Math.abs(differenceSeconds) < waitTrendAboutSameThresholdSeconds) {
+    return {
+      tone: "is-neutral",
+      text: "Median seated-to-doctor was about the same compared with the previous week with cases."
+    };
+  }
+
+  const amount = formatWaitTrendMinutes(Math.abs(differenceSeconds));
+  return differenceSeconds < 0
+    ? {
+        tone: "is-improved",
+        text: `Median seated-to-doctor improved by ${amount} compared with the previous week with cases.`
+      }
+    : {
+        tone: "is-increased",
+        text: `Median seated-to-doctor increased by ${amount} compared with the previous week with cases.`
+      };
+}
+
+function formatWaitTrendMinutes(totalSeconds) {
+  const seconds = Math.max(0, Number(totalSeconds) || 0);
+  const roundedMinutes = Math.round((seconds / 60) * 10) / 10;
+  return Number.isInteger(roundedMinutes)
+    ? `${roundedMinutes.toFixed(0)} min`
+    : `${roundedMinutes.toFixed(1)} min`;
+}
+
+function formatWaitTrendBucketRange(bucket) {
+  const start = parseReportDateOnly(bucket?.startDate);
+  const endExclusive = parseReportDateOnly(bucket?.endDate);
+  if (!start || !endExclusive) {
+    return "Unknown week";
+  }
+
+  const endInclusive = new Date(endExclusive.getTime() - 86_400_000);
+  return `${formatReportDateOnly(start)} - ${formatReportDateOnly(endInclusive)}`;
+}
+
+function parseReportDateOnly(value) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value || ""));
+  if (!match) {
+    return null;
+  }
+
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function formatReportDateOnly(value) {
+  return new Intl.DateTimeFormat(undefined, {
+    month: "short",
+    day: "numeric",
+    timeZone: "UTC"
+  }).format(value);
 }
 
 function renderDoctorReportDashboard(r, hasData) {
@@ -2310,7 +2470,7 @@ function renderReportsAccessPrompt(statusCode) {
       <button type="button" class="secondary-button utility-button" id="clearReportAccessToken">Clear Saved Token</button>
     </article>
   `;
-  ["reportFilterBar", "reportInsights", "reportMetrics", "reportDetail"].forEach(id => {
+  ["waitTrendPanel", "reportFilterBar", "reportInsights", "reportMetrics", "reportDetail"].forEach(id => {
     const element = document.getElementById(id);
     if (element) {
       element.hidden = true;
