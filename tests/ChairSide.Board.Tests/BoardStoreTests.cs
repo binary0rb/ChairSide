@@ -4420,6 +4420,96 @@ public sealed class BoardStoreTests
         Assert.Equal(reports.AllocationVariance!.NetAllocationVarianceMinutes, dailySum);
     }
 
+    // -------------------------------------------------------------------------
+    // Schedule-fit read model exposed on the report snapshot
+    //
+    // SaveCleanCycle fixes measured case flow at 30 min, so each cycle's variance is
+    // 30 - expectedUnits * 10. ScheduleFit is computed over the standard completed-cycle
+    // population, the same set that feeds AllocationVariance, so shared totals must agree.
+    // -------------------------------------------------------------------------
+
+    [Fact]
+    public void Reports_expose_schedule_fit_over_standard_completed_population()
+    {
+        using var workspace = TestWorkspace.Create();
+        var databasePath = workspace.ProductionDatabasePath();
+        var seed = StoreContext.Create(workspace, environmentName: Environments.Production, databasePath: databasePath);
+
+        // Three clean cycles; measured 30 each. Expected 20, 20, 40 => variance +10, +10, -10 => net +10.
+        SaveCleanCycle(seed, room: 1, doctor: "otte", code: "EXT", completeAt: Utc(2026, 6, 10, 9), expectedUnits: 2);
+        SaveCleanCycle(seed, room: 2, doctor: "otte", code: "EXT", completeAt: Utc(2026, 6, 11, 9), expectedUnits: 2);
+        SaveCleanCycle(seed, room: 3, doctor: "otte", code: "IMP", completeAt: Utc(2026, 6, 12, 9), expectedUnits: 4);
+
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production, databasePath: databasePath);
+        var reports = context.Store.GetReports();
+
+        var scheduleFit = reports.ScheduleFit;
+        Assert.NotNull(scheduleFit);
+
+        // All three are standard completed cycles and allocation-calculable.
+        Assert.Equal(3, scheduleFit.IncludedCycleCount);
+        Assert.Equal(3, scheduleFit.ScheduleFitCycleCount);
+        Assert.Equal(3, scheduleFit.Overall.CycleCount);
+
+        // expected 20+20+40 = 80; measured 30*3 = 90; variance = 90 - 80 = +10.
+        Assert.Equal(80, scheduleFit.Overall.TotalExpectedMinutes);
+        Assert.Equal(90, scheduleFit.Overall.TotalMeasuredMinutes);
+        Assert.Equal(10, scheduleFit.Overall.TotalVarianceMinutes);
+
+        // Shared totals must agree with the allocation variance summary over the same population.
+        var allocation = reports.AllocationVariance;
+        Assert.NotNull(allocation);
+        Assert.Equal(allocation.AllocationVarianceCycleCount, scheduleFit.Overall.CycleCount);
+        Assert.Equal(allocation.TotalExpectedAllocationMinutes, scheduleFit.Overall.TotalExpectedMinutes);
+        Assert.Equal(allocation.TotalMeasuredCaseFlowMinutes, scheduleFit.Overall.TotalMeasuredMinutes);
+        Assert.Equal(allocation.NetAllocationVarianceMinutes, scheduleFit.Overall.TotalVarianceMinutes);
+    }
+
+    [Fact]
+    public void Reports_schedule_fit_present_and_zero_when_no_completed_cycles()
+    {
+        using var workspace = TestWorkspace.Create();
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production);
+
+        var scheduleFit = context.Store.GetReports().ScheduleFit;
+
+        // Always populated, even with no data: the builder returns a zero report, not null.
+        Assert.NotNull(scheduleFit);
+        Assert.Equal(0, scheduleFit.IncludedCycleCount);
+        Assert.Equal(0, scheduleFit.ScheduleFitCycleCount);
+        Assert.Equal(0, scheduleFit.Overall.CycleCount);
+        Assert.Equal(0, scheduleFit.Overall.TotalExpectedMinutes);
+        Assert.Equal(0, scheduleFit.Overall.TotalMeasuredMinutes);
+        Assert.Equal(0, scheduleFit.Overall.TotalVarianceMinutes);
+        Assert.Equal(0, scheduleFit.Overall.TotalSlackMinutes);
+        Assert.Equal(0, scheduleFit.Overall.TotalDebtMinutes);
+        Assert.Null(scheduleFit.Overall.UtilizationRatio);
+    }
+
+    [Fact]
+    public void Reports_schedule_fit_respects_date_range_filter()
+    {
+        using var workspace = TestWorkspace.Create();
+        var databasePath = workspace.ProductionDatabasePath();
+        var seed = StoreContext.Create(workspace, environmentName: Environments.Production, databasePath: databasePath);
+
+        // One cycle in range (Jun 10, expected 20, +10 variance), one outside the window (Jun 20).
+        SaveCleanCycle(seed, room: 1, doctor: "otte", code: "EXT", completeAt: Utc(2026, 6, 10, 14), expectedUnits: 2);
+        SaveCleanCycle(seed, room: 2, doctor: "otte", code: "EXT", completeAt: Utc(2026, 6, 20, 14), expectedUnits: 2);
+
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production, databasePath: databasePath);
+        var reports = context.Store.GetReports(ReportDateRange.FromDateStrings("2026-06-08", "2026-06-12"));
+
+        // Only the in-range cycle feeds schedule fit; the out-of-range cycle is filtered upstream.
+        var scheduleFit = reports.ScheduleFit;
+        Assert.NotNull(scheduleFit);
+        Assert.Equal(1, scheduleFit.IncludedCycleCount);
+        Assert.Equal(1, scheduleFit.ScheduleFitCycleCount);
+        Assert.Equal(20, scheduleFit.Overall.TotalExpectedMinutes);
+        Assert.Equal(30, scheduleFit.Overall.TotalMeasuredMinutes);
+        Assert.Equal(10, scheduleFit.Overall.TotalVarianceMinutes);
+    }
+
     private static DateTimeOffset Utc(int year, int month, int day, int hour, int minute = 0) =>
         new(year, month, day, hour, minute, 0, TimeSpan.Zero);
 

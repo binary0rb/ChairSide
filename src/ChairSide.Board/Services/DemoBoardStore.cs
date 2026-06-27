@@ -598,7 +598,8 @@ public sealed class DemoBoardStore
                 range.EndDateText,
                 range.Label,
                 totalCompletedAllTime,
-                BuildDoctorDailyAllocationSeries(standardCycles));
+                BuildDoctorDailyAllocationSeries(standardCycles),
+                ScheduleFitReportBuilder.Build(standardCompletedCycles));
         }
     }
 
@@ -2132,7 +2133,13 @@ public sealed record ReportsSnapshot(
     // Derived from the same standard (non-exception, non-reporting-exception) cycle population as
     // DoctorSummaries and respects the active date filter, so points are never capped or truncated.
     // Null when not yet populated (additive; existing callers unaffected).
-    IReadOnlyList<DoctorDailyAllocation>? DoctorDailyAllocationSeries = null);
+    IReadOnlyList<DoctorDailyAllocation>? DoctorDailyAllocationSeries = null,
+    // Schedule-fit read model (expected vs measured case flow expressed as minutes, blocks, slack,
+    // debt, and utilization) over the same standard completed-cycle population as AllocationVariance,
+    // so the two always agree on shared totals. A bridge for future Reports/Workshop UI; no UI consumes
+    // it yet. GetReports always populates this; the nullable default only keeps the positional record
+    // contract additive (existing callers unaffected).
+    ScheduleFitReport? ScheduleFit = null);
 
 /// <summary>
 /// A completed-cycle reporting window. Dates are interpreted as whole UTC calendar days (start
