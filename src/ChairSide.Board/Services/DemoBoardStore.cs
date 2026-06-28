@@ -2108,7 +2108,8 @@ public sealed record ReportsSnapshot(
     // computed server-side over the same normal completed-cycle population as
     // ProcedureSummaries so the frontend never has to approximate from RecentCompletedCycles
     // or recombine per-variant averages/medians. SedationCaseCount + NonSedationCaseCount
-    // equals CompletedRoomCyclesCount.
+    // equals IncludedCompletedCycleCount; reporting-exception completed cycles are excluded
+    // from this included partition.
     int SedationCaseCount,
     int NonSedationCaseCount,
     IReadOnlyList<ProcedureCycleSummary> BaseProcedureSummaries,
