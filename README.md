@@ -438,6 +438,16 @@ Reporting should stay operational, non-punitive, and team-process oriented. Avoi
 
 Workshop and projection language should frame outputs as scenario exploration, not prediction. Do not imply ChairSide can perfectly predict capacity or that observed slack is automatically recoverable time.
 
+### Report time windows
+
+Report date filters currently use whole UTC calendar days. Weekly report trend buckets use Monday-start UTC weeks. Completed-cycle reporting populations are anchored on `DoctorCompleteAt` for date-window filtering.
+
+This is separate from room expiration behavior. The after-hours room-expiration sweep uses the configured clinic timezone, currently `America/Chicago`, while report windows remain UTC-based.
+
+For AOS Peoria / Central Time, evening cases completed after the UTC day rollover may appear under the next UTC report day. This affects date and week bucket boundaries only; it should not be treated as a performance or capacity judgment.
+
+A future `ReportTimeZoneOptions` design could align report windows to clinic-local days and weeks. That behavior is not currently implemented.
+
 ## Demo Aging
 
 Room panels include a `Demo Timer` select outside Production. Use `Start now`, `Simulate aging wait`, or `Simulate stale wait` before seating a room to test the aging and stale board states without waiting for the configured thresholds. In Production, the Demo Timer is hidden/disabled unless `BoardUiOptions:DemoTimerEnabled` is explicitly set to `true`. Direct API submissions of demo elapsed minutes are ignored when the setting is disabled.
