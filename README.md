@@ -19,6 +19,7 @@ Each room tracks only non-PHI operational state:
 - `procedureCode`
 - `state`
 - `seatedAt`
+- `readyForDoctorAt`
 - `agingStartedAt`
 - `staleStartedAt`
 - `doctorArrivedAt`
@@ -31,10 +32,13 @@ Completed room cycles are persisted for reporting with:
 - `assignedDoctor`
 - `procedureCode`
 - `seatedAt`
+- `readyForDoctorAt`
 - `doctorArrivedAt`
 - `doctorCompleteAt`
 - `roomAvailableAt`
 - `seatedToDoctorSeconds`
+- `prepSeconds`
+- `readyToDoctorSeconds`
 - `doctorInRoomSeconds`
 - `turnoverSeconds`
 - `totalRoomCycleSeconds`
@@ -44,18 +48,19 @@ Completed room cycles are persisted for reporting with:
 
 Default server-side thresholds:
 
-- Aging starts 7 minutes after `seatedAt`
-- Stale starts 12 minutes after `seatedAt`
+- Aging starts 7 minutes after `readyForDoctorAt`
+- Stale starts 12 minutes after `readyForDoctorAt`
 
 The room lifecycle is:
 
 - Available
-- Seated, Aging, or Stale
+- In Prep
+- Ready, Aging, or Stale
 - Doctor In Room
 - Turnover
 - Available
 
-`Seat Room` starts the seated-to-doctor timer and records only doctor, procedure, and operational timestamps. `Doctor Arrived` is available only for seated, aging, or stale rooms; it records `doctorArrivedAt`, calculates `seatedToDoctorSeconds`, and moves the room to Doctor In Room. `Doctor Complete` is available only while the doctor is in the room; it records `doctorCompleteAt` and starts Turnover. `Room Available` is available only during Turnover; it records `roomAvailableAt`, calculates turnover and total cycle durations, and resets the active room card to available.
+`Seat Room` starts the room cycle and records only doctor, procedure, and operational timestamps. `Ready for Doctor` is available while the room is in prep; it records `readyForDoctorAt` and starts the ready-to-doctor wait window. `Doctor Arrived` is available only for ready, aging, or stale rooms; it records `doctorArrivedAt`, calculates `readyToDoctorSeconds` and `seatedToDoctorSeconds`, and moves the room to Doctor In Room. `Doctor Complete` is available only while the doctor is in the room; it records `doctorCompleteAt` and starts Turnover. `Room Available` is available only during Turnover; it records `roomAvailableAt`, calculates turnover and total cycle durations, and resets the active room card to available.
 
 Before `Doctor Arrived`, staff can safely correct common seating mistakes:
 
@@ -64,10 +69,11 @@ Before `Doctor Arrived`, staff can safely correct common seating mistakes:
 
 After `Doctor Arrived`, correction actions are blocked. Seated-to-doctor reporting is recorded only at `Doctor Arrived`.
 
-The server calculates the seated wait state from `seatedAt`, `agingStartedAt`, `staleStartedAt`, and the configured thresholds:
+The server calculates the ready wait state from `readyForDoctorAt`, `agingStartedAt`, `staleStartedAt`, and the configured thresholds:
 
 - Available when there is no active `seatedAt`
-- Seated before the configured aging threshold
+- In Prep after seating and before `Ready for Doctor`
+- Ready before the configured aging threshold
 - Aging from the configured aging threshold until the stale threshold
 - Stale after the configured stale threshold
 - Doctor In Room after `doctorArrivedAt`
@@ -75,12 +81,15 @@ The server calculates the seated wait state from `seatedAt`, `agingStartedAt`, `
 
 Visual state rules:
 
-- Available = gray
-- Seated = solid doctor color
-- Aging = yellow pulsing border
-- Stale = red pulsing border
-- Doctor In Room = stable doctor color with IN ROOM badge
-- Turnover = diagonal gray/black stripe
+- AVAILABLE = slate
+- IN PREP = blue
+- READY = gold
+- AGING = orange
+- STALE = red
+- IN ROOM = green
+- TURNOVER = purple
+
+Room cards preserve doctor identity while using status labels, badges, and border/accent treatments for operational state. Aging and stale alerts use status accents rather than whole-card white flashing.
 
 The room panel is touch-first for tablet use. Doctor and procedure choices render as large selectable tiles with configured doctor names/colors, procedure icons, procedure codes, and procedure labels. Lifecycle buttons are large touch targets and remain keyboard/mouse compatible.
 
@@ -126,7 +135,7 @@ Thresholds are configured in `src/ChairSide.Board/appsettings.json`:
         "Id": "otte",
         "DisplayName": "Dr. Otte",
         "ShortName": "Otte",
-        "Color": "#2563eb",
+        "Color": "#dc2626",
         "Active": true
       }
     ]
@@ -156,6 +165,8 @@ dotnet run --project .\src\ChairSide.Board\ChairSide.Board.csproj --BoardPersist
 
 The app creates the SQLite database and schema on startup if they do not exist. Persisted data remains non-PHI and is limited to room assignments, procedure categories, lifecycle state, operational timestamps, and completed-cycle durations.
 
+Startup schema creation and additive migrations fail fast on unexpected SQLite errors; only duplicate-column cases are treated as benign idempotent startup repeats.
+
 Doctor and procedure rosters are configured through `DoctorRosterOptions` and `ProcedureRosterOptions`. Doctors require unique nonblank `Id` values, `DisplayName`, `ShortName`, and a hex `Color`. Procedures require unique nonblank `Code` values, `Label`, and `Icon`. At least one doctor and one procedure must be active. Set `Active` to `false` to remove a doctor or procedure from room-panel selection while still allowing existing active rooms and historical reports to display safely. Do not put PHI in roster names or procedure labels.
 
 Room-device binding is a first-pass operational control for room tablets. When `RoomDeviceBindingOptions:Enabled` is `true`, room-local mutation actions require the configured token for that room:
@@ -163,11 +174,14 @@ Room-device binding is a first-pass operational control for room tablets. When `
 - Seat Room
 - Update Assignment
 - Cancel Seating
+- Ready for Doctor
 - Doctor Arrived
 - Doctor Complete
 - Room Available
 
 Read-only board views and APIs remain open for the internal board: `/master.html`, `/doctor.html`, and board state reads do not require room tokens. `/reports.html` is an unauthenticated browser shell, but report data can be protected separately with admin/report access protection. Room mutation API calls must send the token in the `X-ChairSide-Room-Token` header. Do not place room tokens in URLs. URLs may be logged by IIS, browsers, proxies, network tools, and browser history.
+
+Doctor-arrival conflict resolution preserves the room-local workflow: resolving from the new room can auto-complete the previous room into Turnover only after the server confirms the same doctor conflict. The resolving room and auto-completed room are both audit-logged.
 
 Production tokens must not use the `dev-room-*-token` sample values. Supply production tokens through environment-specific configuration or deployment-time configuration, and do not commit real room tokens as source-controlled secrets.
 
@@ -251,10 +265,10 @@ Backups do not contain PHI if the app is used as intended, but they do contain o
 
 Doctors:
 
-- Dr. Otte = blue
-- Dr. Pledger = green
-- Dr. Gibson = orange
-- Dr. Schroeder = purple
+- Dr. Otte = red, initials `LDO`
+- Dr. Pledger = green, initials `JWP`
+- Dr. Gibson = purple, initials `JEG`
+- Dr. Schroeder = gold / yellow, initials `NDS`
 
 Rooms:
 
@@ -396,9 +410,13 @@ Demo room states are only seeded when a non-Production database is brand new. Pr
 
 ## Reports
 
-The reports page shows completed room cycle count, seated-to-doctor average and median, doctor-in-room average and median, turnover average and median, aging event count, stale event count, and recent completed cycles. Active room state and completed cycles are stored in SQLite and survive app restarts.
+The reports page shows completed room cycle count, prep timing, ready-to-doctor timing, seated-to-doctor timing, doctor-in-room average and median, turnover average and median, aging event count, stale event count, trend summaries, and recent completed cycles. Active room state and completed cycles are stored in SQLite and survive app restarts.
 
 The underlying completed-cycle records include assigned doctor and completion timestamps so monthly doctor-level reporting can be added later without introducing PHI.
+
+Reporting should stay operational, non-punitive, and team-process oriented. Avoid doctor or staff rankings, best/worst framing, scoreboards, awards, shame language, or productivity theater. Use summary cards, plain-English explanations, progressive disclosure, and operational questions.
+
+Workshop and projection language should frame outputs as scenario exploration, not prediction. Do not imply ChairSide can perfectly predict capacity or that observed slack is automatically recoverable time.
 
 ## Demo Aging
 
@@ -407,15 +425,15 @@ Room panels include a `Demo Timer` select outside Production. Use `Start now`, `
 ## Demo Script
 
 1. Open `http://localhost:5000/master.html` and `http://localhost:5000/room.html?roomId=1`.
-2. On the Room 1 panel, choose `Start now` and click `Seat Room`. Expected result: Room 1 appears on the master board as a solid doctor-color card with a seated timer.
+2. On the Room 1 panel, choose `Start now` and click `Seat Room`. Expected result: Room 1 appears on the master board as an in-prep room with a seated timer.
 3. Change the selected doctor or procedure and click `Update Assignment`. Expected result: Room 1 keeps the same seated timer but updates doctor/procedure on the master board.
 4. Click `Cancel Seating` and confirm. Expected result: Room 1 returns to available without creating a report entry.
-5. Choose `Simulate aging wait` and click `Seat Room`. Expected result: Room 1 appears as a solid doctor-color card with a slow pulsing yellow border.
+5. Choose `Simulate aging wait`, click `Seat Room`, then click `Ready for Doctor`. Expected result: Room 1 appears with the aging status treatment.
 6. Click `Doctor Arrived`, `Doctor Complete`, then `Room Available` to reset Room 1 again.
-7. Choose `Simulate stale wait` and click `Seat Room`. Expected result: Room 1 appears as a solid doctor-color card with a faster pulsing red border.
+7. Choose `Simulate stale wait`, click `Seat Room`, then click `Ready for Doctor`. Expected result: Room 1 appears with the stale status treatment.
 8. Click `Doctor Arrived`. Expected result: Room 1 changes to stable doctor color with the `IN ROOM` badge, and seated-to-doctor metrics are recorded.
 9. Click `Doctor Complete`. Expected result: Room 1 changes to the neutral diagonal stripe turnover card with the `TURNOVER` badge.
-10. Click `Room Available`. Expected result: Room 1 returns to the gray available state.
+10. Click `Room Available`. Expected result: Room 1 returns to the slate available state.
 11. Open `http://localhost:5000/reports.html`. Expected result: reports show non-PHI room-flow metrics and completed Room 1 cycles.
 
 ## Persistence

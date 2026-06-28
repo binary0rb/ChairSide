@@ -104,9 +104,9 @@ non-zero. The maintenance CLI never starts the web server.
 1. Confirm the app pool is running and browse `http://chairside/reports.html`.
 2. **Data Quality** card: `0 excluded`, `0 reporting exceptions`.
 3. **Allocation Balance**: many calculable cases.
-4. **Doctor Allocation Balance**: visibly different profiles per doctor (not identical).
+4. **Doctor Allocation Balance**: synthetic doctor examples load with varied, non-identical operational patterns.
 5. **Procedure Family Allocation Balance**: multiple families.
-6. Variance shows red (over) / green (under) / neutral (at) examples.
+6. Variance examples show over / under / at-expected cases without ranking doctors or staff.
 7. No standalone Sedation procedure and no "sedation time" metric.
 
 ## Verifying after an EmptyBeta reset

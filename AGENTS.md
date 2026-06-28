@@ -70,10 +70,10 @@ A useful project mantra:
 
 Use the following doctors in mockups, seed data, and UI examples:
 
-- Dr. Otte = blue
-- Dr. Pledger = green
-- Dr. Gibson = orange
-- Dr. Schroeder = purple
+- Dr. Otte = red, initials `LDO`
+- Dr. Pledger = green, initials `JWP`
+- Dr. Gibson = purple, initials `JEG`
+- Dr. Schroeder = gold / yellow, initials `NDS`
 
 Keep doctor-color assignments consistent.
 
@@ -98,13 +98,15 @@ The master view should be a responsive grid of room cards showing the configured
 
 Room states:
 
-- Gray = empty / inactive
-- Solid doctor color = patient seated for that doctor
-- Slow pulse in doctor color = aging wait state
-- Doctor color alternating with white = stale wait state
-- Procedure icon remains stable and readable during all states
+- AVAILABLE = slate
+- IN PREP = blue
+- READY = gold
+- AGING = orange
+- STALE = red
+- IN ROOM = green
+- TURNOVER = purple
 
-Do not use red for normal stale states. Red should be avoided because the office handles true emergencies physically by grabbing a doctor and following emergency protocol.
+Current board cards keep doctor identity visible while using status labels, borders, and badges for operational urgency. Aging and stale alerts should not rely on whole-card white flashing.
 
 The board should answer at a glance:
 
@@ -123,18 +125,18 @@ Rooms should be configurable, with the default early prototype using:
 
 ## Core workflow
 
-1. Staff mark a patient seated from the room tablet.
+1. Staff seat a room from the room tablet.
 2. Staff select assigned doctor and procedure category.
-3. The room appears on the master display in the doctor’s color.
-4. The room timer starts.
-5. When elapsed time crosses the aging threshold, the room slowly pulses.
-6. When elapsed time crosses the stale threshold, the room alternates doctor color and white.
-7. When the doctor physically enters the room, the request/state is cleared from the in-room tablet.
-8. The system logs seated-to-doctor time.
+3. Before `Doctor Arrived`, staff may use `Update Assignment` or `Cancel Seating` for safe corrections.
+4. `Ready for Doctor` marks the room ready and starts the ready-to-doctor wait window.
+5. `Doctor Arrived` records timing and moves the room to `IN ROOM`.
+6. `Doctor Complete` starts `TURNOVER`.
+7. `Room Available` returns the room to `AVAILABLE`.
+8. The system logs non-PHI operational timing.
 
 Doctors should be able to view room status from a phone or workstation, but they should not be able to acknowledge or clear the room remotely.
 
-Room clearing should occur from the room-local tablet/panel only.
+Room lifecycle mutation should occur from the room-local tablet/panel only. When doctor-arrival conflict resolution is used, the server revalidates the conflict, auto-completes the previous room into turnover, and writes audit entries for both affected rooms.
 
 ## Metrics and reporting
 
@@ -144,17 +146,23 @@ The primary metric is:
 
 Definition:
 
-- The elapsed time between when a patient is marked seated and when the doctor physically arrives and clears the room from the in-room panel.
+- The elapsed time between when a room is seated and when the doctor physically arrives.
 
 Track:
 
-- PatientSeatedAt
+- SeatedAt
+- ReadyForDoctorAt
 - AgingStartedAt
 - StaleStartedAt
-- DoctorArrivedAt / ClearedAt
+- DoctorArrivedAt
+- DoctorCompleteAt
+- RoomAvailableAt
 - Total seated-to-doctor duration
-- Above-threshold duration
-- Stale duration
+- Prep duration
+- Ready-to-doctor duration
+- Doctor-in-room duration
+- Turnover duration
+- Total room-cycle duration
 
 Reports should eventually include:
 
@@ -165,12 +173,9 @@ Reports should eventually include:
 - Total above-threshold wait time
 - Trends by doctor, room, procedure, and time of day
 
-Optional monthly recognition:
+Reports should be operational, non-punitive, and team-process oriented. Avoid doctor or staff rankings, best/worst framing, scoreboards, awards, shame language, or productivity theater. Use summary cards, median/average timing context, plain-English explanations, progressive disclosure, and operational questions.
 
-- Golden Forceps Award
-- Awarded monthly for best room-flow performance based on seated-to-doctor time, low stale-room rate, and consistency
-
-Use median seated-to-doctor time as the main performance metric rather than only average.
+Workshop and projection language should frame outputs as scenario exploration, not prediction. Do not imply ChairSide can perfectly predict capacity or that observed slack is automatically recoverable time.
 
 ## MVP features
 
@@ -183,7 +188,7 @@ Build the MVP around:
 - Distinctive procedure icons
 - Seated timer
 - Aging and stale states
-- Room-local clearing
+- Room-local lifecycle actions
 - Event logging
 - Basic reporting
 
