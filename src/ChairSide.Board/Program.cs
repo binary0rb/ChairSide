@@ -100,8 +100,16 @@ _ = app.Services.GetRequiredService<DemoBoardStore>();
 
 var roomDeviceBindingOptions = app.Services.GetRequiredService<IOptions<RoomDeviceBindingOptions>>().Value;
 var adminAccessOptions = app.Services.GetRequiredService<IOptions<AdminAccessOptions>>().Value;
+var roomExpirationOptions = app.Services.GetRequiredService<IOptions<RoomExpirationOptions>>().Value;
 app.Logger.LogInformation("Room device binding enabled: {Enabled}", roomDeviceBindingOptions.Enabled);
 app.Logger.LogInformation("Admin/report access protection enabled: {Enabled}", adminAccessOptions.Enabled);
+app.Logger.LogInformation(
+    "Room expiration enabled: {Enabled}; max active duration hours: {MaxActiveDurationHours}; after-hours sweep enabled: {AfterHoursSweepEnabled}; after-hours sweep time: {AfterHoursSweepTime}; timezone: {TimeZone}",
+    roomExpirationOptions.Enabled,
+    roomExpirationOptions.MaxActiveDurationHours,
+    roomExpirationOptions.AfterHoursSweepEnabled,
+    roomExpirationOptions.AfterHoursSweepTime,
+    roomExpirationOptions.TimeZone);
 if (app.Environment.IsProduction())
 {
     if (!roomDeviceBindingOptions.Enabled)
