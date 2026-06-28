@@ -31,7 +31,8 @@ public sealed class RoomExpirationOptions
     /// <summary>
     /// IANA or Windows timezone identifier used for after-hours sweep scheduling.
     /// Examples: "America/Chicago" (IANA), "Central Standard Time" (Windows).
-    /// Defaults to UTC if the provided identifier cannot be resolved.
+    /// Invalid non-UTC identifiers suppress the after-hours sweep instead of
+    /// falling back to UTC.
     /// </summary>
     public string TimeZone { get; set; } = "America/Chicago";
 }

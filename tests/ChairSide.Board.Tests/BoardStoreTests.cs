@@ -2528,6 +2528,18 @@ public sealed class BoardStoreTests
     // -----------------------------------------------------------------------
 
     [Fact]
+    public void Room_expiration_options_defaults_are_locked()
+    {
+        var options = new RoomExpirationOptions();
+
+        Assert.True(options.Enabled);
+        Assert.Equal(8, options.MaxActiveDurationHours);
+        Assert.True(options.AfterHoursSweepEnabled);
+        Assert.Equal("19:00", options.AfterHoursSweepTime);
+        Assert.Equal("America/Chicago", options.TimeZone);
+    }
+
+    [Fact]
     public void Manual_mark_as_exception_moves_cycle_from_normal_to_exceptions()
     {
         // The admin marks a completed cycle as ManualReview - it should disappear from

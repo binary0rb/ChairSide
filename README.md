@@ -214,6 +214,26 @@ On startup, ChairSide logs whether room-device binding and admin/report access p
 
 The room-panel Demo Timer is available by default outside Production and hidden/disabled by default in Production. To explicitly enable it for a controlled production demo, set `BoardUiOptions:DemoTimerEnabled` to `true` through environment-specific configuration. The server also enforces this setting: when disabled, submitted demo elapsed values are ignored; when enabled, server-side demo elapsed values remain clamped.
 
+Room expiration:
+
+ChairSide automatically protects against abandoned active room cycles. By default, room expiration is enabled, active rooms older than 8 hours are archived as exception cycles, and an after-hours sweep expires any still-active rooms once per clinic day at 19:00 in the configured clinic timezone. Expired rooms return to available and the exception cycles remain non-PHI operational records for review.
+
+Configure or disable this behavior with `RoomExpirationOptions` if needed:
+
+```json
+{
+  "RoomExpirationOptions": {
+    "Enabled": true,
+    "MaxActiveDurationHours": 8,
+    "AfterHoursSweepEnabled": true,
+    "AfterHoursSweepTime": "19:00",
+    "TimeZone": "America/Chicago"
+  }
+}
+```
+
+`AfterHoursSweepTime` uses `HH:mm` 24-hour time. `TimeZone` accepts an IANA or Windows timezone identifier. If a non-UTC timezone cannot be resolved, the after-hours sweep is suppressed rather than run at the wrong local time.
+
 Production database guidance:
 
 - Recommended path: `C:\ChairSide\Data\chairside.db`

@@ -35,6 +35,7 @@ Use this checklist for a small internal pilot. Do not enter PHI.
 - [ ] Do not commit `.\publish`.
 - [ ] Review `appsettings.Production.json`.
 - [ ] Confirm `BoardPersistenceOptions:DatabasePath` is `C:\ChairSide\Data\chairside.db`.
+- [ ] Review and accept `RoomExpirationOptions`: active rooms expire after the configured max duration, and the after-hours sweep expires still-active rooms once per clinic day at the configured local time.
 - [ ] Confirm production secrets/tokens are environment-specific or deployment-time values.
 - [ ] Confirm no real tokens are committed to source control.
 
