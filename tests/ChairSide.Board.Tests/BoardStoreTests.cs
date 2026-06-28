@@ -880,6 +880,158 @@ public sealed class BoardStoreTests
         Assert.Equal(reports.CompletedRoomCyclesCount, reports.SedationCaseCount + reports.NonSedationCaseCount);
     }
 
+    // -------------------------------------------------------------------------
+    // Reporting population semantics (characterization) - locks the two intended
+    // population axes so future work does not accidentally normalize them into a
+    // regression. These assert CURRENT behavior; they are not aspirational.
+    //
+    //   Completion axis: finalized phase timings (seated-to-doctor / ready-to-doctor /
+    //   prep / doctor-in-room) are reported as soon as that phase finalizes - before the
+    //   room is fully completed (Room Available). Throughput/allocation/schedule-fit/trend
+    //   metrics intentionally use only fully-completed (Room Available) cycles.
+    //
+    //   Hygiene axis: a fully-completed cycle can still be a reporting exception, counted in
+    //   CompletedRoomCyclesCount but excluded from the standard/included partition.
+    // -------------------------------------------------------------------------
+
+    [Fact]
+    public void Doctor_arrived_only_cycle_reports_finalized_waits_but_is_not_a_completed_cycle()
+    {
+        // Drive only to Doctor Arrived (no Doctor Complete / Room Available). The seated-to-doctor,
+        // prep, and ready-to-doctor phases are finalized at arrival and must be reported now, even
+        // though the room cycle is not complete. This locks the intended completion-axis split.
+        using var workspace = TestWorkspace.Create();
+        var baseTime = new DateTimeOffset(2026, 6, 1, 8, 0, 0, TimeSpan.Zero);
+        var clock = new ManualTimeProvider(baseTime);
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production, timeProvider: clock);
+
+        Assert.NotNull(context.Store.SeatRoom(1, "otte", "EXT", expectedAllocationUnits: 3));
+        clock.SetUtcNow(baseTime.AddMinutes(5));   // Ready for Doctor: prep = 5 min
+        Assert.NotNull(context.Store.MarkReadyForDoctor(1));
+        clock.SetUtcNow(baseTime.AddMinutes(15));  // Doctor Arrived: ready-to-doctor = 10 min, seated-to-doctor = 15 min
+        Assert.NotNull(context.Store.MarkDoctorArrived(1));
+
+        var reports = context.Store.GetReports();
+
+        // Completion axis: not a completed cycle yet (no Room Available).
+        Assert.Equal(0, reports.CompletedRoomCyclesCount);
+        Assert.Equal(0, reports.IncludedCompletedCycleCount);
+
+        // Finalized phase timings ARE reported for this in-progress case.
+        Assert.Equal(15 * 60, reports.AverageSeatedToDoctorSeconds);
+        Assert.Equal(15 * 60, reports.MedianSeatedToDoctorSeconds);
+        Assert.Equal(5 * 60, reports.AveragePrepSeconds);
+        Assert.Equal(10 * 60, reports.AverageReadyToDoctorSeconds);
+
+        // Phases that finalize only at/after Doctor Complete contribute nothing yet (null-skipped).
+        Assert.Equal(0, reports.AverageDoctorInRoomSeconds);
+        Assert.Equal(0, reports.AverageTurnoverSeconds);
+
+        // Fully-completed-cycle populations exclude the in-progress case.
+        Assert.Equal(0, reports.AllocationVariance!.AllocationVarianceCycleCount);
+        Assert.Equal(0, reports.ScheduleFit!.ScheduleFitCycleCount);
+        Assert.Empty(reports.Trends!.Buckets);
+    }
+
+    [Fact]
+    public void Turnover_not_available_cycle_reports_doctor_in_room_but_not_completed_populations()
+    {
+        // Drive through Doctor Complete but NOT Room Available. Doctor-in-room finalizes at Complete
+        // and is reported; turnover only finalizes at Room Available, so it contributes nothing yet;
+        // and the cycle is still excluded from fully-completed populations.
+        using var workspace = TestWorkspace.Create();
+        var baseTime = new DateTimeOffset(2026, 6, 1, 8, 0, 0, TimeSpan.Zero);
+        var clock = new ManualTimeProvider(baseTime);
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production, timeProvider: clock);
+
+        Assert.NotNull(context.Store.SeatRoom(1, "otte", "EXT", expectedAllocationUnits: 3));
+        clock.SetUtcNow(baseTime.AddMinutes(5));
+        Assert.NotNull(context.Store.MarkReadyForDoctor(1));
+        clock.SetUtcNow(baseTime.AddMinutes(15));
+        Assert.NotNull(context.Store.MarkDoctorArrived(1));
+        clock.SetUtcNow(baseTime.AddMinutes(25));  // Doctor Complete: doctor-in-room = 10 min
+        Assert.NotNull(context.Store.MarkDoctorComplete(1));
+
+        var reports = context.Store.GetReports();
+
+        // Completion axis: still not a fully-completed (Room Available) cycle.
+        Assert.Equal(0, reports.CompletedRoomCyclesCount);
+        Assert.Equal(0, reports.IncludedCompletedCycleCount);
+
+        // Finalized phases contribute: seated-to-doctor (15 min) and doctor-in-room (10 min).
+        Assert.Equal(15 * 60, reports.AverageSeatedToDoctorSeconds);
+        Assert.Equal(10 * 60, reports.AverageDoctorInRoomSeconds);
+        // Turnover finalizes only at Room Available, so it contributes nothing yet.
+        Assert.Equal(0, reports.AverageTurnoverSeconds);
+
+        // Fully-completed-cycle populations all exclude it.
+        Assert.Equal(0, reports.AllocationVariance!.AllocationVarianceCycleCount);
+        Assert.Equal(0, reports.ScheduleFit!.ScheduleFitCycleCount);
+        Assert.Empty(reports.Trends!.Buckets);
+    }
+
+    [Fact]
+    public void Reporting_exception_completed_cycle_is_counted_but_excluded_from_included_partition()
+    {
+        // Two clean fully-completed cycles plus one fully-completed reporting-exception cycle (a
+        // legacy standalone "SED" record). All three are completed (Room Available), so all three are
+        // counted in CompletedRoomCyclesCount - but the legacy one is excluded from the standard /
+        // included partition. This locks the TRUE invariant: the sedation/non-sedation split
+        // partitions IncludedCompletedCycleCount, not the raw completed count.
+        using var workspace = TestWorkspace.Create();
+        var databasePath = workspace.ProductionDatabasePath();
+        var baseTime = new DateTimeOffset(2026, 6, 1, 8, 0, 0, TimeSpan.Zero);
+        var clock = new ManualTimeProvider(baseTime);
+
+        var first = StoreContext.Create(
+            workspace, environmentName: Environments.Production, databasePath: databasePath, timeProvider: clock);
+
+        RunProcedureCycle(first, clock, baseTime, 1, "otte", "EXT", prepMin: 5, readyMin: 10, doctorMin: 10, turnoverMin: 5);
+        RunProcedureCycle(first, clock, baseTime.AddHours(1), 2, "otte", "EXT", prepMin: 5, readyMin: 10, doctorMin: 10, turnoverMin: 5, sedation: true);
+
+        // Legacy standalone "SED" is a reporting exception (no longer an active procedure family) but
+        // is still a fully-completed cycle with Room Available set.
+        var legacyCycle = new CompletedRoomCycle
+        {
+            RoomId = 3,
+            AssignedDoctor = "otte",
+            ProcedureCode = "SED",
+            SeatedAt = baseTime.AddHours(2),
+            ReadyForDoctorAt = baseTime.AddHours(2).AddMinutes(5),
+            DoctorArrivedAt = baseTime.AddHours(2).AddMinutes(15),
+            DoctorCompleteAt = baseTime.AddHours(2).AddMinutes(25),
+            RoomAvailableAt = baseTime.AddHours(2).AddMinutes(30),
+            SeatedToDoctorSeconds = 900,
+            PrepSeconds = 300,
+            ReadyToDoctorSeconds = 600,
+            DoctorInRoomSeconds = 600,
+            TurnoverSeconds = 300,
+            TotalRoomCycleSeconds = 1800,
+            FinalWaitState = "ready-for-doctor"
+        };
+        first.Repository.SaveCompletedCycle(legacyCycle, first.Doctors, first.Procedures);
+
+        var second = StoreContext.Create(workspace, environmentName: Environments.Production, databasePath: databasePath);
+        var reports = second.Store.GetReports();
+
+        // Hygiene axis: all three are completed (counted); the legacy one is excluded from standard.
+        Assert.Equal(3, reports.CompletedRoomCyclesCount);
+        Assert.Equal(2, reports.IncludedCompletedCycleCount);
+        Assert.Equal(1, reports.ExcludedCompletedCycleCount);
+
+        // True invariant: sedation + non-sedation partitions the INCLUDED population.
+        Assert.Equal(1, reports.SedationCaseCount);
+        Assert.Equal(1, reports.NonSedationCaseCount);
+        Assert.Equal(reports.IncludedCompletedCycleCount, reports.SedationCaseCount + reports.NonSedationCaseCount);
+
+        // And that sum is strictly less than the raw completed count when a reporting-exception
+        // completed cycle is present (the older "equals CompletedRoomCyclesCount" framing only holds
+        // for fully-clean data).
+        Assert.True(
+            reports.SedationCaseCount + reports.NonSedationCaseCount < reports.CompletedRoomCyclesCount,
+            "A reporting-exception completed cycle must make the sedation partition smaller than the raw completed count.");
+    }
+
     [Fact]
     public void Legacy_standalone_sedation_completed_cycle_is_flagged_excluded_but_readable()
     {
