@@ -75,6 +75,7 @@ Use this checklist for a small internal pilot. Do not enter PHI.
 - [ ] Configure the admin/report shared token outside source control.
 - [ ] Confirm admin/report tokens are never placed in URLs.
 - [ ] Confirm reports access is limited to approved internal operators.
+- [ ] Confirm reports are used for operational/team-process review, not doctor or staff rankings, scoreboards, awards, or punitive performance framing.
 
 ## Rosters
 
