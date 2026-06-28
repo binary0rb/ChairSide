@@ -1,5 +1,7 @@
 using System.Globalization;
+using System.Text.Json;
 
+using ChairSide.Board.Hubs;
 using ChairSide.Board.Options;
 using ChairSide.Board.Services;
 using Microsoft.AspNetCore.Http;
@@ -8,6 +10,7 @@ using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
+using Microsoft.AspNetCore.SignalR;
 
 namespace ChairSide.Board.Tests;
 
@@ -2222,6 +2225,87 @@ public sealed class BoardStoreTests
         Assert.Contains("headers[\"X-ChairSide-Room-Token\"] = app.roomToken", boardScript);
         Assert.Contains("Room access token required", boardScript);
         Assert.DoesNotContain("roomToken=", boardScript);
+    }
+
+    [Fact]
+    public async Task Resolve_conflict_endpoint_writes_audit_entries_for_resolving_and_auto_completed_rooms()
+    {
+        using var workspace = TestWorkspace.Create();
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production);
+        var logger = CreateDiagnosticLogger(Path.Combine(workspace.DataRoot, "logs"), workspace.ContentRoot);
+        var httpContext = NewResolveConflictHttpContext(roomNumber: 2, token: "room-2-token");
+
+        DriveRoomToDoctorInRoom(context, 1, "otte", "CON");
+        Assert.NotNull(context.Store.SeatRoom(2, "otte", "EXT"));
+        Assert.NotNull(context.Store.MarkReadyForDoctor(2));
+
+        var response = await global::DoctorArrivalConflictEndpointHandler.ResolveAsync(
+            2,
+            new ResolveDoctorArrivalConflictRequest(1),
+            httpContext,
+            CreateBindingValidator(enabled: true),
+            context.Store,
+            logger,
+            new NoopBoardHubContext());
+
+        Assert.Equal(200, await ExecuteBindingResult(response));
+
+        var oldRoom = context.Store.GetRoom(1)!;
+        Assert.Equal(RoomStates.Turnover, oldRoom.State);
+        Assert.NotNull(oldRoom.DoctorCompleteAt);
+        Assert.Null(oldRoom.RoomAvailableAt);
+
+        var newRoom = context.Store.GetRoom(2)!;
+        Assert.Equal(RoomStates.DoctorInRoom, newRoom.State);
+        Assert.NotNull(newRoom.DoctorArrivedAt);
+
+        var entries = await ReadRoomAuditEntries(Path.Combine(workspace.DataRoot, "logs"));
+        Assert.Contains(entries, entry =>
+            entry.Action == "doctor-arrived-resolve"
+            && entry.RoomNumber == 2
+            && entry.Success);
+        var autocomplete = Assert.Single(entries, entry => entry.Action == "doctor-arrived-resolve-autocomplete");
+        Assert.Equal(1, autocomplete.RoomNumber);
+        Assert.Equal(RoomStates.DoctorInRoom, autocomplete.PreviousState);
+        Assert.Equal(RoomStates.Turnover, autocomplete.NewState);
+        Assert.Equal("otte", autocomplete.DoctorId);
+        Assert.Equal("CON", autocomplete.ProcedureCode);
+        Assert.Equal("auto-completed-by-resolving-room-2", autocomplete.Reason);
+    }
+
+    [Fact]
+    public async Task Resolve_conflict_endpoint_does_not_write_autocomplete_audit_for_stale_conflict()
+    {
+        using var workspace = TestWorkspace.Create();
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production);
+        var logger = CreateDiagnosticLogger(Path.Combine(workspace.DataRoot, "logs"), workspace.ContentRoot);
+        var httpContext = NewResolveConflictHttpContext(roomNumber: 2, token: "room-2-token");
+
+        DriveRoomToDoctorInRoom(context, 1, "otte", "CON");
+        Assert.NotNull(context.Store.SeatRoom(2, "otte", "EXT"));
+        Assert.NotNull(context.Store.MarkReadyForDoctor(2));
+        Assert.NotNull(context.Store.MarkDoctorComplete(1));
+
+        var response = await global::DoctorArrivalConflictEndpointHandler.ResolveAsync(
+            2,
+            new ResolveDoctorArrivalConflictRequest(1),
+            httpContext,
+            CreateBindingValidator(enabled: true),
+            context.Store,
+            logger,
+            new NoopBoardHubContext());
+
+        Assert.Equal(409, await ExecuteBindingResult(response));
+        Assert.Equal(RoomStates.Turnover, context.Store.GetRoom(1)!.State);
+        Assert.Equal(RoomStates.ReadyForDoctor, context.Store.GetRoom(2)!.State);
+
+        var entries = await ReadRoomAuditEntries(Path.Combine(workspace.DataRoot, "logs"));
+        Assert.DoesNotContain(entries, entry => entry.Action == "doctor-arrived-resolve-autocomplete");
+        Assert.Contains(entries, entry =>
+            entry.Action == "doctor-arrived-resolve"
+            && entry.RoomNumber == 2
+            && !entry.Success
+            && entry.Reason == "conflict-stale");
     }
 
     [Fact]
@@ -5021,6 +5105,45 @@ public sealed class BoardStoreTests
             }),
             new TestWebHostEnvironment(contentRoot, Environments.Production));
 
+    private static DefaultHttpContext NewResolveConflictHttpContext(int roomNumber, string? token)
+    {
+        var context = new DefaultHttpContext();
+        context.Request.Path = $"/api/rooms/{roomNumber}/doctor-arrived/resolve-conflict";
+        if (token is not null)
+        {
+            context.Request.Headers[RoomDeviceTokenValidator.HeaderName] = token;
+        }
+
+        return context;
+    }
+
+    private static async Task<IReadOnlyList<RoomAuditEntry>> ReadRoomAuditEntries(string logDirectory)
+    {
+        var logPath = Path.Combine(logDirectory, "room-audit.log");
+        if (!File.Exists(logPath))
+        {
+            return [];
+        }
+
+        var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+        var entries = new List<RoomAuditEntry>();
+        foreach (var line in await File.ReadAllLinesAsync(logPath))
+        {
+            if (string.IsNullOrWhiteSpace(line))
+            {
+                continue;
+            }
+
+            var entry = JsonSerializer.Deserialize<RoomAuditEntry>(line, options);
+            if (entry is not null)
+            {
+                entries.Add(entry);
+            }
+        }
+
+        return entries;
+    }
+
     private static ValidateOptionsResult ValidateDoctorRoster(DoctorRosterOptions options) =>
         new DoctorRosterOptionsValidator().Validate(null, options);
 
@@ -5247,4 +5370,49 @@ internal sealed class ManualTimeProvider(DateTimeOffset utcNow) : TimeProvider
     public override DateTimeOffset GetUtcNow() => _utcNow;
 
     public void SetUtcNow(DateTimeOffset utcNow) => _utcNow = utcNow;
+}
+
+internal sealed class NoopBoardHubContext : IHubContext<BoardHub>
+{
+    public IHubClients Clients { get; } = new NoopHubClients();
+
+    public IGroupManager Groups { get; } = new NoopGroupManager();
+}
+
+internal sealed class NoopHubClients : IHubClients
+{
+    private static readonly IClientProxy Proxy = new NoopClientProxy();
+
+    public IClientProxy All => Proxy;
+
+    public IClientProxy AllExcept(IReadOnlyList<string> excludedConnectionIds) => Proxy;
+
+    public IClientProxy Client(string connectionId) => Proxy;
+
+    public IClientProxy Clients(IReadOnlyList<string> connectionIds) => Proxy;
+
+    public IClientProxy Group(string groupName) => Proxy;
+
+    public IClientProxy GroupExcept(string groupName, IReadOnlyList<string> excludedConnectionIds) => Proxy;
+
+    public IClientProxy Groups(IReadOnlyList<string> groupNames) => Proxy;
+
+    public IClientProxy User(string userId) => Proxy;
+
+    public IClientProxy Users(IReadOnlyList<string> userIds) => Proxy;
+}
+
+internal sealed class NoopGroupManager : IGroupManager
+{
+    public Task AddToGroupAsync(string connectionId, string groupName, CancellationToken cancellationToken = default) =>
+        Task.CompletedTask;
+
+    public Task RemoveFromGroupAsync(string connectionId, string groupName, CancellationToken cancellationToken = default) =>
+        Task.CompletedTask;
+}
+
+internal sealed class NoopClientProxy : IClientProxy
+{
+    public Task SendCoreAsync(string method, object?[] args, CancellationToken cancellationToken = default) =>
+        Task.CompletedTask;
 }
