@@ -482,7 +482,8 @@ public sealed class SqliteBoardRepository
         }
 
         // Migration: add new columns to existing databases that predate this schema version.
-        // Each ALTER TABLE is attempted independently; failure means the column already exists.
+        // Each ALTER TABLE is attempted independently. Duplicate-column failures are benign
+        // idempotency signals; every other SQLite error should stop startup with context.
         TryAddColumn(connection, "ALTER TABLE active_rooms ADD COLUMN ready_for_doctor_at TEXT NULL");
         TryAddColumn(connection, "ALTER TABLE completed_room_cycles ADD COLUMN ready_for_doctor_at TEXT NULL");
         TryAddColumn(connection, "ALTER TABLE completed_room_cycles ADD COLUMN prep_seconds INTEGER NULL");
@@ -835,11 +836,21 @@ public sealed class SqliteBoardRepository
             command.CommandText = alterTableSql;
             command.ExecuteNonQuery();
         }
-        catch (SqliteException)
+        catch (SqliteException ex) when (IsDuplicateColumnError(ex))
         {
             // Column already exists on fresh databases - no action needed.
         }
+        catch (SqliteException ex)
+        {
+            throw new InvalidOperationException(
+                $"SQLite migration failed while applying additive column migration: {alterTableSql}",
+                ex);
+        }
     }
+
+    private static bool IsDuplicateColumnError(SqliteException ex) =>
+        ex.SqliteErrorCode == 1
+        && ex.Message.Contains("duplicate column name", StringComparison.OrdinalIgnoreCase);
 
     private void SaveRoom(
         SqliteConnection connection,

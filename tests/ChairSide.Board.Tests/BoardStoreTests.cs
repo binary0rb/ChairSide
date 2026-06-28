@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Reflection;
 
 using ChairSide.Board.Options;
 using ChairSide.Board.Services;
@@ -1554,6 +1555,33 @@ public sealed class BoardStoreTests
         command.CommandText = "PRAGMA journal_mode;";
 
         Assert.Equal("wal", (string)command.ExecuteScalar()!);
+    }
+
+    [Fact]
+    public void Additive_column_migration_ignores_duplicate_column_errors()
+    {
+        using var connection = new SqliteConnection("Data Source=:memory:");
+        connection.Open();
+        ExecuteSql(connection, "CREATE TABLE migration_test (id INTEGER PRIMARY KEY, existing_col TEXT NULL);");
+
+        InvokeTryAddColumn(connection, "ALTER TABLE migration_test ADD COLUMN existing_col TEXT NULL");
+
+        var columns = GetColumnNames(connection, "migration_test");
+        Assert.Contains("existing_col", columns);
+    }
+
+    [Fact]
+    public void Additive_column_migration_throws_non_duplicate_errors_with_context()
+    {
+        using var connection = new SqliteConnection("Data Source=:memory:");
+        connection.Open();
+        const string alterTableSql = "ALTER TABLE missing_table ADD COLUMN new_col TEXT NULL";
+
+        var ex = Assert.Throws<InvalidOperationException>(() => InvokeTryAddColumn(connection, alterTableSql));
+
+        Assert.Contains("SQLite migration failed", ex.Message);
+        Assert.Contains(alterTableSql, ex.Message);
+        Assert.IsType<SqliteException>(ex.InnerException);
     }
 
     [Fact]
@@ -4963,6 +4991,31 @@ public sealed class BoardStoreTests
         }
 
         return columns;
+    }
+
+    private static void ExecuteSql(SqliteConnection connection, string sql)
+    {
+        using var command = connection.CreateCommand();
+        command.CommandText = sql;
+        command.ExecuteNonQuery();
+    }
+
+    private static void InvokeTryAddColumn(SqliteConnection connection, string alterTableSql)
+    {
+        var method = typeof(SqliteBoardRepository).GetMethod(
+            "TryAddColumn",
+            BindingFlags.NonPublic | BindingFlags.Static);
+        Assert.NotNull(method);
+
+        try
+        {
+            method.Invoke(null, [connection, alterTableSql]);
+        }
+        catch (TargetInvocationException ex) when (ex.InnerException is not null)
+        {
+            System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(ex.InnerException).Throw();
+            throw;
+        }
     }
 
     private static SqliteConnection OpenConnection(string databasePath)
