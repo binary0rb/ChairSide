@@ -2057,7 +2057,7 @@
                   {
                       "path":  "tools/knowledge-graph/New-ChairSideKnowledgeGraph.ps1",
                       "kind":  "PowerShell",
-                      "sizeBytes":  11656,
+                      "sizeBytes":  11660,
                       "typeSymbols":  [
 
                                       ],
