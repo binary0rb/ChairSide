@@ -6,7 +6,7 @@ This file is mechanical output from `tools/knowledge-graph/New-ChairSideKnowledg
 
 | Path | Kind | Discovered symbols | Routes / hubs |
 | --- | --- | --- | --- |
-| `AGENTS.md` | Markdown | headings: AGENTS, ChairSide Project Brief, Project name, Purpose, Scope, Critical privacy rule, Doctors and colors, Procedure categories and icons | - |
+| `AGENTS.md` | Markdown | headings: AGENTS, ChairSide Project Brief, Project name, Purpose, Scope, Private development knowledge graph, Critical privacy rule, Doctors and colors | - |
 | `ChairSide.Board.sln` | Solution | - | - |
 | `docs/executive-summary.md` | Markdown | headings: Executive Summary | - |
 | `docs/knowledge-graph/backlog-signals.md` | Markdown | headings: ChairSide knowledge graph backlog signals, High-value future graph expansions, Risks to preserve, Candidate relationships to add later | - |

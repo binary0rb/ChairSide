@@ -35,6 +35,29 @@ Preferred deployment target:
 - Internal DNS name, for example `chairside.local` or `chairside.aospeoria.local`
 - Browser-based room panels, master display, and doctor views
 
+## Private development knowledge graph
+
+ChairSide includes a private development knowledge graph under `docs/knowledge-graph/`.
+
+Use it as durable project memory for:
+- architecture relationships
+- reporting semantics
+- lifecycle invariants
+- deployment assumptions
+- UI/UX constraints
+- deferred ideas and backlog signals
+
+Before planning non-trivial changes, review:
+- `docs/knowledge-graph/README.md`
+- `docs/knowledge-graph/chairside.graph.md`
+- `docs/knowledge-graph/decisions.md`
+- `docs/knowledge-graph/backlog-signals.md`
+
+After meaningful source or documentation changes, run:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\tools\knowledge-graph\New-ChairSideKnowledgeGraph.ps1
+
 ## Critical privacy rule
 
 Do not store, display, request, import, or infer PHI.

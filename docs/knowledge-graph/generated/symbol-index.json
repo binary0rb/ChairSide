@@ -6,7 +6,7 @@
                   {
                       "path":  "AGENTS.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  7669,
+                      "sizeBytes":  8391,
                       "typeSymbols":  [
 
                                       ],
@@ -31,6 +31,7 @@
                                        "Project name",
                                        "Purpose",
                                        "Scope",
+                                       "Private development knowledge graph",
                                        "Critical privacy rule",
                                        "Doctors and colors",
                                        "Procedure categories and icons",
