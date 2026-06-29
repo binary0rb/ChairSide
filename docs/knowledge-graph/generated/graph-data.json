@@ -1,0 +1,2005 @@
+﻿{
+    "generatedAtUtc":  "2026-06-29T00:22:02Z",
+    "description":  "Mechanical ChairSide repo graph generated from source files. Use docs/knowledge-graph/chairside.graph.md for human-authored architecture intent.",
+    "nodes":  [
+                  {
+                      "id":  "file:AGENTS.md",
+                      "label":  "AGENTS.md",
+                      "type":  "File",
+                      "path":  "AGENTS.md"
+                  },
+                  {
+                      "id":  "file:ChairSide.Board.sln",
+                      "label":  "ChairSide.Board.sln",
+                      "type":  "File",
+                      "path":  "ChairSide.Board.sln"
+                  },
+                  {
+                      "id":  "file:docs/executive-summary.md",
+                      "label":  "docs/executive-summary.md",
+                      "type":  "File",
+                      "path":  "docs/executive-summary.md"
+                  },
+                  {
+                      "id":  "file:docs/knowledge-graph/backlog-signals.md",
+                      "label":  "docs/knowledge-graph/backlog-signals.md",
+                      "type":  "File",
+                      "path":  "docs/knowledge-graph/backlog-signals.md"
+                  },
+                  {
+                      "id":  "file:docs/knowledge-graph/chairside.graph.md",
+                      "label":  "docs/knowledge-graph/chairside.graph.md",
+                      "type":  "File",
+                      "path":  "docs/knowledge-graph/chairside.graph.md"
+                  },
+                  {
+                      "id":  "file:docs/knowledge-graph/decisions.md",
+                      "label":  "docs/knowledge-graph/decisions.md",
+                      "type":  "File",
+                      "path":  "docs/knowledge-graph/decisions.md"
+                  },
+                  {
+                      "id":  "file:docs/knowledge-graph/generated/README.md",
+                      "label":  "docs/knowledge-graph/generated/README.md",
+                      "type":  "File",
+                      "path":  "docs/knowledge-graph/generated/README.md"
+                  },
+                  {
+                      "id":  "file:docs/knowledge-graph/README.md",
+                      "label":  "docs/knowledge-graph/README.md",
+                      "type":  "File",
+                      "path":  "docs/knowledge-graph/README.md"
+                  },
+                  {
+                      "id":  "file:docs/Production-Pilot-Checklist.md",
+                      "label":  "docs/Production-Pilot-Checklist.md",
+                      "type":  "File",
+                      "path":  "docs/Production-Pilot-Checklist.md"
+                  },
+                  {
+                      "id":  "file:docs/TrainingDataReset.md",
+                      "label":  "docs/TrainingDataReset.md",
+                      "type":  "File",
+                      "path":  "docs/TrainingDataReset.md"
+                  },
+                  {
+                      "id":  "file:docs/visual-language.md",
+                      "label":  "docs/visual-language.md",
+                      "type":  "File",
+                      "path":  "docs/visual-language.md"
+                  },
+                  {
+                      "id":  "file:docs/workflow.md",
+                      "label":  "docs/workflow.md",
+                      "type":  "File",
+                      "path":  "docs/workflow.md"
+                  },
+                  {
+                      "id":  "file:README.md",
+                      "label":  "README.md",
+                      "type":  "File",
+                      "path":  "README.md"
+                  },
+                  {
+                      "id":  "file:scripts/Backup-ChairSideSqlite.ps1",
+                      "label":  "scripts/Backup-ChairSideSqlite.ps1",
+                      "type":  "File",
+                      "path":  "scripts/Backup-ChairSideSqlite.ps1"
+                  },
+                  {
+                      "id":  "file:scripts/Reset-ChairSideTrainingData.ps1",
+                      "label":  "scripts/Reset-ChairSideTrainingData.ps1",
+                      "type":  "File",
+                      "path":  "scripts/Reset-ChairSideTrainingData.ps1"
+                  },
+                  {
+                      "id":  "file:scripts/Restore-ChairSideSqlite.ps1",
+                      "label":  "scripts/Restore-ChairSideSqlite.ps1",
+                      "type":  "File",
+                      "path":  "scripts/Restore-ChairSideSqlite.ps1"
+                  },
+                  {
+                      "id":  "file:src/ChairSide.Board/appsettings.json",
+                      "label":  "src/ChairSide.Board/appsettings.json",
+                      "type":  "File",
+                      "path":  "src/ChairSide.Board/appsettings.json"
+                  },
+                  {
+                      "id":  "file:src/ChairSide.Board/appsettings.Production.json",
+                      "label":  "src/ChairSide.Board/appsettings.Production.json",
+                      "type":  "File",
+                      "path":  "src/ChairSide.Board/appsettings.Production.json"
+                  },
+                  {
+                      "id":  "file:src/ChairSide.Board/ChairSide.Board.csproj",
+                      "label":  "src/ChairSide.Board/ChairSide.Board.csproj",
+                      "type":  "File",
+                      "path":  "src/ChairSide.Board/ChairSide.Board.csproj"
+                  },
+                  {
+                      "id":  "file:src/ChairSide.Board/Hubs/BoardHub.cs",
+                      "label":  "src/ChairSide.Board/Hubs/BoardHub.cs",
+                      "type":  "File",
+                      "path":  "src/ChairSide.Board/Hubs/BoardHub.cs"
+                  },
+                  {
+                      "id":  "file:src/ChairSide.Board/Options/AdminAccessOptions.cs",
+                      "label":  "src/ChairSide.Board/Options/AdminAccessOptions.cs",
+                      "type":  "File",
+                      "path":  "src/ChairSide.Board/Options/AdminAccessOptions.cs"
+                  },
+                  {
+                      "id":  "file:src/ChairSide.Board/Options/BoardOptions.cs",
+                      "label":  "src/ChairSide.Board/Options/BoardOptions.cs",
+                      "type":  "File",
+                      "path":  "src/ChairSide.Board/Options/BoardOptions.cs"
+                  },
+                  {
+                      "id":  "file:src/ChairSide.Board/Options/BoardPersistenceOptions.cs",
+                      "label":  "src/ChairSide.Board/Options/BoardPersistenceOptions.cs",
+                      "type":  "File",
+                      "path":  "src/ChairSide.Board/Options/BoardPersistenceOptions.cs"
+                  },
+                  {
+                      "id":  "file:src/ChairSide.Board/Options/BoardThresholdOptions.cs",
+                      "label":  "src/ChairSide.Board/Options/BoardThresholdOptions.cs",
+                      "type":  "File",
+                      "path":  "src/ChairSide.Board/Options/BoardThresholdOptions.cs"
+                  },
+                  {
+                      "id":  "file:src/ChairSide.Board/Options/BoardUiOptions.cs",
+                      "label":  "src/ChairSide.Board/Options/BoardUiOptions.cs",
+                      "type":  "File",
+                      "path":  "src/ChairSide.Board/Options/BoardUiOptions.cs"
+                  },
+                  {
+                      "id":  "file:src/ChairSide.Board/Options/DiagnosticOptions.cs",
+                      "label":  "src/ChairSide.Board/Options/DiagnosticOptions.cs",
+                      "type":  "File",
+                      "path":  "src/ChairSide.Board/Options/DiagnosticOptions.cs"
+                  },
+                  {
+                      "id":  "file:src/ChairSide.Board/Options/DoctorRosterOptions.cs",
+                      "label":  "src/ChairSide.Board/Options/DoctorRosterOptions.cs",
+                      "type":  "File",
+                      "path":  "src/ChairSide.Board/Options/DoctorRosterOptions.cs"
+                  },
+                  {
+                      "id":  "file:src/ChairSide.Board/Options/ProcedureRosterOptions.cs",
+                      "label":  "src/ChairSide.Board/Options/ProcedureRosterOptions.cs",
+                      "type":  "File",
+                      "path":  "src/ChairSide.Board/Options/ProcedureRosterOptions.cs"
+                  },
+                  {
+                      "id":  "file:src/ChairSide.Board/Options/RoomDeviceBindingOptions.cs",
+                      "label":  "src/ChairSide.Board/Options/RoomDeviceBindingOptions.cs",
+                      "type":  "File",
+                      "path":  "src/ChairSide.Board/Options/RoomDeviceBindingOptions.cs"
+                  },
+                  {
+                      "id":  "file:src/ChairSide.Board/Options/RoomDeviceBindingOptionsValidator.cs",
+                      "label":  "src/ChairSide.Board/Options/RoomDeviceBindingOptionsValidator.cs",
+                      "type":  "File",
+                      "path":  "src/ChairSide.Board/Options/RoomDeviceBindingOptionsValidator.cs"
+                  },
+                  {
+                      "id":  "file:src/ChairSide.Board/Options/RoomExpirationOptions.cs",
+                      "label":  "src/ChairSide.Board/Options/RoomExpirationOptions.cs",
+                      "type":  "File",
+                      "path":  "src/ChairSide.Board/Options/RoomExpirationOptions.cs"
+                  },
+                  {
+                      "id":  "file:src/ChairSide.Board/Program.cs",
+                      "label":  "src/ChairSide.Board/Program.cs",
+                      "type":  "File",
+                      "path":  "src/ChairSide.Board/Program.cs"
+                  },
+                  {
+                      "id":  "file:src/ChairSide.Board/Services/AdminAccessGuard.cs",
+                      "label":  "src/ChairSide.Board/Services/AdminAccessGuard.cs",
+                      "type":  "File",
+                      "path":  "src/ChairSide.Board/Services/AdminAccessGuard.cs"
+                  },
+                  {
+                      "id":  "file:src/ChairSide.Board/Services/AdminAccessTokenValidator.cs",
+                      "label":  "src/ChairSide.Board/Services/AdminAccessTokenValidator.cs",
+                      "type":  "File",
+                      "path":  "src/ChairSide.Board/Services/AdminAccessTokenValidator.cs"
+                  },
+                  {
+                      "id":  "file:src/ChairSide.Board/Services/ClientErrorRateLimiter.cs",
+                      "label":  "src/ChairSide.Board/Services/ClientErrorRateLimiter.cs",
+                      "type":  "File",
+                      "path":  "src/ChairSide.Board/Services/ClientErrorRateLimiter.cs"
+                  },
+                  {
+                      "id":  "file:src/ChairSide.Board/Services/DemoBoardStore.cs",
+                      "label":  "src/ChairSide.Board/Services/DemoBoardStore.cs",
+                      "type":  "File",
+                      "path":  "src/ChairSide.Board/Services/DemoBoardStore.cs"
+                  },
+                  {
+                      "id":  "file:src/ChairSide.Board/Services/DiagnosticLogger.cs",
+                      "label":  "src/ChairSide.Board/Services/DiagnosticLogger.cs",
+                      "type":  "File",
+                      "path":  "src/ChairSide.Board/Services/DiagnosticLogger.cs"
+                  },
+                  {
+                      "id":  "file:src/ChairSide.Board/Services/MaintenanceCommands.cs",
+                      "label":  "src/ChairSide.Board/Services/MaintenanceCommands.cs",
+                      "type":  "File",
+                      "path":  "src/ChairSide.Board/Services/MaintenanceCommands.cs"
+                  },
+                  {
+                      "id":  "file:src/ChairSide.Board/Services/ProjectionAssumptionChecklist.cs",
+                      "label":  "src/ChairSide.Board/Services/ProjectionAssumptionChecklist.cs",
+                      "type":  "File",
+                      "path":  "src/ChairSide.Board/Services/ProjectionAssumptionChecklist.cs"
+                  },
+                  {
+                      "id":  "file:src/ChairSide.Board/Services/ReportTrendSnapshot.cs",
+                      "label":  "src/ChairSide.Board/Services/ReportTrendSnapshot.cs",
+                      "type":  "File",
+                      "path":  "src/ChairSide.Board/Services/ReportTrendSnapshot.cs"
+                  },
+                  {
+                      "id":  "file:src/ChairSide.Board/Services/RoomDeviceBindingGuard.cs",
+                      "label":  "src/ChairSide.Board/Services/RoomDeviceBindingGuard.cs",
+                      "type":  "File",
+                      "path":  "src/ChairSide.Board/Services/RoomDeviceBindingGuard.cs"
+                  },
+                  {
+                      "id":  "file:src/ChairSide.Board/Services/RoomDeviceTokenValidator.cs",
+                      "label":  "src/ChairSide.Board/Services/RoomDeviceTokenValidator.cs",
+                      "type":  "File",
+                      "path":  "src/ChairSide.Board/Services/RoomDeviceTokenValidator.cs"
+                  },
+                  {
+                      "id":  "file:src/ChairSide.Board/Services/RoomExpirationService.cs",
+                      "label":  "src/ChairSide.Board/Services/RoomExpirationService.cs",
+                      "type":  "File",
+                      "path":  "src/ChairSide.Board/Services/RoomExpirationService.cs"
+                  },
+                  {
+                      "id":  "file:src/ChairSide.Board/Services/RoomMutationRequestValidator.cs",
+                      "label":  "src/ChairSide.Board/Services/RoomMutationRequestValidator.cs",
+                      "type":  "File",
+                      "path":  "src/ChairSide.Board/Services/RoomMutationRequestValidator.cs"
+                  },
+                  {
+                      "id":  "file:src/ChairSide.Board/Services/ScheduleFitCalculator.cs",
+                      "label":  "src/ChairSide.Board/Services/ScheduleFitCalculator.cs",
+                      "type":  "File",
+                      "path":  "src/ChairSide.Board/Services/ScheduleFitCalculator.cs"
+                  },
+                  {
+                      "id":  "file:src/ChairSide.Board/Services/ScheduleFitReport.cs",
+                      "label":  "src/ChairSide.Board/Services/ScheduleFitReport.cs",
+                      "type":  "File",
+                      "path":  "src/ChairSide.Board/Services/ScheduleFitReport.cs"
+                  },
+                  {
+                      "id":  "file:src/ChairSide.Board/Services/SqliteBoardRepository.cs",
+                      "label":  "src/ChairSide.Board/Services/SqliteBoardRepository.cs",
+                      "type":  "File",
+                      "path":  "src/ChairSide.Board/Services/SqliteBoardRepository.cs"
+                  },
+                  {
+                      "id":  "file:src/ChairSide.Board/wwwroot/assets/icons/README.md",
+                      "label":  "src/ChairSide.Board/wwwroot/assets/icons/README.md",
+                      "type":  "File",
+                      "path":  "src/ChairSide.Board/wwwroot/assets/icons/README.md"
+                  },
+                  {
+                      "id":  "file:src/ChairSide.Board/wwwroot/board.js",
+                      "label":  "src/ChairSide.Board/wwwroot/board.js",
+                      "type":  "File",
+                      "path":  "src/ChairSide.Board/wwwroot/board.js"
+                  },
+                  {
+                      "id":  "file:src/ChairSide.Board/wwwroot/doctor.html",
+                      "label":  "src/ChairSide.Board/wwwroot/doctor.html",
+                      "type":  "File",
+                      "path":  "src/ChairSide.Board/wwwroot/doctor.html"
+                  },
+                  {
+                      "id":  "file:src/ChairSide.Board/wwwroot/index.html",
+                      "label":  "src/ChairSide.Board/wwwroot/index.html",
+                      "type":  "File",
+                      "path":  "src/ChairSide.Board/wwwroot/index.html"
+                  },
+                  {
+                      "id":  "file:src/ChairSide.Board/wwwroot/master.html",
+                      "label":  "src/ChairSide.Board/wwwroot/master.html",
+                      "type":  "File",
+                      "path":  "src/ChairSide.Board/wwwroot/master.html"
+                  },
+                  {
+                      "id":  "file:src/ChairSide.Board/wwwroot/reports.html",
+                      "label":  "src/ChairSide.Board/wwwroot/reports.html",
+                      "type":  "File",
+                      "path":  "src/ChairSide.Board/wwwroot/reports.html"
+                  },
+                  {
+                      "id":  "file:src/ChairSide.Board/wwwroot/room.html",
+                      "label":  "src/ChairSide.Board/wwwroot/room.html",
+                      "type":  "File",
+                      "path":  "src/ChairSide.Board/wwwroot/room.html"
+                  },
+                  {
+                      "id":  "file:src/ChairSide.Board/wwwroot/room-1.html",
+                      "label":  "src/ChairSide.Board/wwwroot/room-1.html",
+                      "type":  "File",
+                      "path":  "src/ChairSide.Board/wwwroot/room-1.html"
+                  },
+                  {
+                      "id":  "file:src/ChairSide.Board/wwwroot/signalr-lite.js",
+                      "label":  "src/ChairSide.Board/wwwroot/signalr-lite.js",
+                      "type":  "File",
+                      "path":  "src/ChairSide.Board/wwwroot/signalr-lite.js"
+                  },
+                  {
+                      "id":  "file:src/ChairSide.Board/wwwroot/styles.css",
+                      "label":  "src/ChairSide.Board/wwwroot/styles.css",
+                      "type":  "File",
+                      "path":  "src/ChairSide.Board/wwwroot/styles.css"
+                  },
+                  {
+                      "id":  "file:src/ChairSide.Board/wwwroot/workshop.html",
+                      "label":  "src/ChairSide.Board/wwwroot/workshop.html",
+                      "type":  "File",
+                      "path":  "src/ChairSide.Board/wwwroot/workshop.html"
+                  },
+                  {
+                      "id":  "file:tests/ChairSide.Board.Tests/BoardStoreTests.cs",
+                      "label":  "tests/ChairSide.Board.Tests/BoardStoreTests.cs",
+                      "type":  "File",
+                      "path":  "tests/ChairSide.Board.Tests/BoardStoreTests.cs"
+                  },
+                  {
+                      "id":  "file:tests/ChairSide.Board.Tests/ChairSide.Board.Tests.csproj",
+                      "label":  "tests/ChairSide.Board.Tests/ChairSide.Board.Tests.csproj",
+                      "type":  "File",
+                      "path":  "tests/ChairSide.Board.Tests/ChairSide.Board.Tests.csproj"
+                  },
+                  {
+                      "id":  "file:tests/ChairSide.Board.Tests/ProjectionAssumptionChecklistTests.cs",
+                      "label":  "tests/ChairSide.Board.Tests/ProjectionAssumptionChecklistTests.cs",
+                      "type":  "File",
+                      "path":  "tests/ChairSide.Board.Tests/ProjectionAssumptionChecklistTests.cs"
+                  },
+                  {
+                      "id":  "file:tests/ChairSide.Board.Tests/ReportTrendSnapshotTests.cs",
+                      "label":  "tests/ChairSide.Board.Tests/ReportTrendSnapshotTests.cs",
+                      "type":  "File",
+                      "path":  "tests/ChairSide.Board.Tests/ReportTrendSnapshotTests.cs"
+                  },
+                  {
+                      "id":  "file:tests/ChairSide.Board.Tests/ScheduleFitCalculatorTests.cs",
+                      "label":  "tests/ChairSide.Board.Tests/ScheduleFitCalculatorTests.cs",
+                      "type":  "File",
+                      "path":  "tests/ChairSide.Board.Tests/ScheduleFitCalculatorTests.cs"
+                  },
+                  {
+                      "id":  "file:tests/ChairSide.Board.Tests/ScheduleFitReportTests.cs",
+                      "label":  "tests/ChairSide.Board.Tests/ScheduleFitReportTests.cs",
+                      "type":  "File",
+                      "path":  "tests/ChairSide.Board.Tests/ScheduleFitReportTests.cs"
+                  },
+                  {
+                      "id":  "file:tools/knowledge-graph/New-ChairSideKnowledgeGraph.ps1",
+                      "label":  "tools/knowledge-graph/New-ChairSideKnowledgeGraph.ps1",
+                      "type":  "File",
+                      "path":  "tools/knowledge-graph/New-ChairSideKnowledgeGraph.ps1"
+                  },
+                  {
+                      "id":  "hub:BoardHub",
+                      "label":  "BoardHub",
+                      "type":  "SignalRHub",
+                      "path":  "src/ChairSide.Board/Program.cs"
+                  },
+                  {
+                      "id":  "repo:chairside",
+                      "label":  "ChairSide repository",
+                      "type":  "Repository",
+                      "path":  ""
+                  },
+                  {
+                      "id":  "route:/api/board",
+                      "label":  "/api/board",
+                      "type":  "Route",
+                      "path":  "src/ChairSide.Board/Program.cs"
+                  },
+                  {
+                      "id":  "route:/api/client-errors",
+                      "label":  "/api/client-errors",
+                      "type":  "Route",
+                      "path":  "src/ChairSide.Board/Program.cs"
+                  },
+                  {
+                      "id":  "route:/api/dev/seed-report-data",
+                      "label":  "/api/dev/seed-report-data",
+                      "type":  "Route",
+                      "path":  "src/ChairSide.Board/Program.cs"
+                  },
+                  {
+                      "id":  "route:/api/reports",
+                      "label":  "/api/reports",
+                      "type":  "Route",
+                      "path":  "src/ChairSide.Board/Program.cs"
+                  },
+                  {
+                      "id":  "route:/api/reports/cycles/{completedCycleId:long}/confirm-exclusion",
+                      "label":  "/api/reports/cycles/{completedCycleId:long}/confirm-exclusion",
+                      "type":  "Route",
+                      "path":  "src/ChairSide.Board/Program.cs"
+                  },
+                  {
+                      "id":  "route:/api/reports/cycles/mark-exception",
+                      "label":  "/api/reports/cycles/mark-exception",
+                      "type":  "Route",
+                      "path":  "src/ChairSide.Board/Program.cs"
+                  },
+                  {
+                      "id":  "route:/api/rooms/{roomNumber:int}",
+                      "label":  "/api/rooms/{roomNumber:int}",
+                      "type":  "Route",
+                      "path":  "src/ChairSide.Board/Program.cs"
+                  },
+                  {
+                      "id":  "route:/api/rooms/{roomNumber:int}/assignment",
+                      "label":  "/api/rooms/{roomNumber:int}/assignment",
+                      "type":  "Route",
+                      "path":  "src/ChairSide.Board/Program.cs"
+                  },
+                  {
+                      "id":  "route:/api/rooms/{roomNumber:int}/available",
+                      "label":  "/api/rooms/{roomNumber:int}/available",
+                      "type":  "Route",
+                      "path":  "src/ChairSide.Board/Program.cs"
+                  },
+                  {
+                      "id":  "route:/api/rooms/{roomNumber:int}/cancel-seating",
+                      "label":  "/api/rooms/{roomNumber:int}/cancel-seating",
+                      "type":  "Route",
+                      "path":  "src/ChairSide.Board/Program.cs"
+                  },
+                  {
+                      "id":  "route:/api/rooms/{roomNumber:int}/doctor-arrived",
+                      "label":  "/api/rooms/{roomNumber:int}/doctor-arrived",
+                      "type":  "Route",
+                      "path":  "src/ChairSide.Board/Program.cs"
+                  },
+                  {
+                      "id":  "route:/api/rooms/{roomNumber:int}/doctor-arrived/resolve-conflict",
+                      "label":  "/api/rooms/{roomNumber:int}/doctor-arrived/resolve-conflict",
+                      "type":  "Route",
+                      "path":  "src/ChairSide.Board/Program.cs"
+                  },
+                  {
+                      "id":  "route:/api/rooms/{roomNumber:int}/doctor-complete",
+                      "label":  "/api/rooms/{roomNumber:int}/doctor-complete",
+                      "type":  "Route",
+                      "path":  "src/ChairSide.Board/Program.cs"
+                  },
+                  {
+                      "id":  "route:/api/rooms/{roomNumber:int}/ready-for-doctor",
+                      "label":  "/api/rooms/{roomNumber:int}/ready-for-doctor",
+                      "type":  "Route",
+                      "path":  "src/ChairSide.Board/Program.cs"
+                  },
+                  {
+                      "id":  "route:/api/rooms/{roomNumber:int}/seat",
+                      "label":  "/api/rooms/{roomNumber:int}/seat",
+                      "type":  "Route",
+                      "path":  "src/ChairSide.Board/Program.cs"
+                  },
+                  {
+                      "id":  "route:/boardHub",
+                      "label":  "/boardHub",
+                      "type":  "Route",
+                      "path":  "src/ChairSide.Board/Program.cs"
+                  },
+                  {
+                      "id":  "symbol:type:AdminAccessGuard",
+                      "label":  "AdminAccessGuard",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/AdminAccessGuard.cs"
+                  },
+                  {
+                      "id":  "symbol:type:AdminAccessOptions",
+                      "label":  "AdminAccessOptions",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Options/AdminAccessOptions.cs"
+                  },
+                  {
+                      "id":  "symbol:type:AdminAccessOptionsValidator",
+                      "label":  "AdminAccessOptionsValidator",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Options/AdminAccessOptions.cs"
+                  },
+                  {
+                      "id":  "symbol:type:AdminAccessTokenValidationResult",
+                      "label":  "AdminAccessTokenValidationResult",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/AdminAccessTokenValidator.cs"
+                  },
+                  {
+                      "id":  "symbol:type:AdminAccessTokenValidator",
+                      "label":  "AdminAccessTokenValidator",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/AdminAccessTokenValidator.cs"
+                  },
+                  {
+                      "id":  "symbol:type:AllocationBehaviors",
+                      "label":  "AllocationBehaviors",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Options/ProcedureRosterOptions.cs"
+                  },
+                  {
+                      "id":  "symbol:type:AllocationVarianceSummary",
+                      "label":  "AllocationVarianceSummary",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/DemoBoardStore.cs"
+                  },
+                  {
+                      "id":  "symbol:type:AuditRequestContext",
+                      "label":  "AuditRequestContext",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Program.cs"
+                  },
+                  {
+                      "id":  "symbol:type:BoardHub",
+                      "label":  "BoardHub",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Hubs/BoardHub.cs"
+                  },
+                  {
+                      "id":  "symbol:type:BoardOptions",
+                      "label":  "BoardOptions",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Options/BoardOptions.cs"
+                  },
+                  {
+                      "id":  "symbol:type:BoardPersistenceOptions",
+                      "label":  "BoardPersistenceOptions",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Options/BoardPersistenceOptions.cs"
+                  },
+                  {
+                      "id":  "symbol:type:BoardSnapshot",
+                      "label":  "BoardSnapshot",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/DemoBoardStore.cs"
+                  },
+                  {
+                      "id":  "symbol:type:BoardStoreTests",
+                      "label":  "BoardStoreTests",
+                      "type":  "CodeType",
+                      "path":  "tests/ChairSide.Board.Tests/BoardStoreTests.cs"
+                  },
+                  {
+                      "id":  "symbol:type:BoardThresholdOptions",
+                      "label":  "BoardThresholdOptions",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Options/BoardThresholdOptions.cs"
+                  },
+                  {
+                      "id":  "symbol:type:BoardUiOptions",
+                      "label":  "BoardUiOptions",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Options/BoardUiOptions.cs"
+                  },
+                  {
+                      "id":  "symbol:type:Bucket",
+                      "label":  "Bucket",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/ClientErrorRateLimiter.cs"
+                  },
+                  {
+                      "id":  "symbol:type:ClientErrorEntry",
+                      "label":  "ClientErrorEntry",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/DiagnosticLogger.cs"
+                  },
+                  {
+                      "id":  "symbol:type:ClientErrorRateLimiter",
+                      "label":  "ClientErrorRateLimiter",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/ClientErrorRateLimiter.cs"
+                  },
+                  {
+                      "id":  "symbol:type:ClientErrorRequest",
+                      "label":  "ClientErrorRequest",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Program.cs"
+                  },
+                  {
+                      "id":  "symbol:type:CompletedRoomCycle",
+                      "label":  "CompletedRoomCycle",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/DemoBoardStore.cs"
+                  },
+                  {
+                      "id":  "symbol:type:DemoBoardStore",
+                      "label":  "DemoBoardStore",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/DemoBoardStore.cs"
+                  },
+                  {
+                      "id":  "symbol:type:DemoSeedPattern",
+                      "label":  "DemoSeedPattern",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/DemoBoardStore.cs"
+                  },
+                  {
+                      "id":  "symbol:type:DiagnosticLogger",
+                      "label":  "DiagnosticLogger",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/DiagnosticLogger.cs"
+                  },
+                  {
+                      "id":  "symbol:type:DiagnosticOptions",
+                      "label":  "DiagnosticOptions",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Options/DiagnosticOptions.cs"
+                  },
+                  {
+                      "id":  "symbol:type:Doctor",
+                      "label":  "Doctor",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/DemoBoardStore.cs"
+                  },
+                  {
+                      "id":  "symbol:type:DoctorArrivalConflict",
+                      "label":  "DoctorArrivalConflict",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/DemoBoardStore.cs"
+                  },
+                  {
+                      "id":  "symbol:type:DoctorArrivalConflictEndpointHandler",
+                      "label":  "DoctorArrivalConflictEndpointHandler",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Program.cs"
+                  },
+                  {
+                      "id":  "symbol:type:DoctorArrivalOutcome",
+                      "label":  "DoctorArrivalOutcome",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/DemoBoardStore.cs"
+                  },
+                  {
+                      "id":  "symbol:type:DoctorArrivedConflictResponse",
+                      "label":  "DoctorArrivedConflictResponse",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Program.cs"
+                  },
+                  {
+                      "id":  "symbol:type:DoctorCycleSummary",
+                      "label":  "DoctorCycleSummary",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/DemoBoardStore.cs"
+                  },
+                  {
+                      "id":  "symbol:type:DoctorDailyAllocation",
+                      "label":  "DoctorDailyAllocation",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/DemoBoardStore.cs"
+                  },
+                  {
+                      "id":  "symbol:type:DoctorDailyAllocationPoint",
+                      "label":  "DoctorDailyAllocationPoint",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/DemoBoardStore.cs"
+                  },
+                  {
+                      "id":  "symbol:type:DoctorRosterItem",
+                      "label":  "DoctorRosterItem",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Options/DoctorRosterOptions.cs"
+                  },
+                  {
+                      "id":  "symbol:type:DoctorRosterOptions",
+                      "label":  "DoctorRosterOptions",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Options/DoctorRosterOptions.cs"
+                  },
+                  {
+                      "id":  "symbol:type:DoctorRosterOptionsValidator",
+                      "label":  "DoctorRosterOptionsValidator",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Options/DoctorRosterOptions.cs"
+                  },
+                  {
+                      "id":  "symbol:type:DoctorStyleProfile",
+                      "label":  "DoctorStyleProfile",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/DemoBoardStore.cs"
+                  },
+                  {
+                      "id":  "symbol:type:ExceptionReasons",
+                      "label":  "ExceptionReasons",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/DemoBoardStore.cs"
+                  },
+                  {
+                      "id":  "symbol:type:ExceptionReviewers",
+                      "label":  "ExceptionReviewers",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/DemoBoardStore.cs"
+                  },
+                  {
+                      "id":  "symbol:type:is",
+                      "label":  "is",
+                      "type":  "CodeType",
+                      "path":  "tests/ChairSide.Board.Tests/BoardStoreTests.cs"
+                  },
+                  {
+                      "id":  "symbol:type:MaintenanceCommands",
+                      "label":  "MaintenanceCommands",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/MaintenanceCommands.cs"
+                  },
+                  {
+                      "id":  "symbol:type:MaintenanceOutcome",
+                      "label":  "MaintenanceOutcome",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/MaintenanceCommands.cs"
+                  },
+                  {
+                      "id":  "symbol:type:MaintenanceResetResult",
+                      "label":  "MaintenanceResetResult",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/DemoBoardStore.cs"
+                  },
+                  {
+                      "id":  "symbol:type:MaintenanceResolution",
+                      "label":  "MaintenanceResolution",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/MaintenanceCommands.cs"
+                  },
+                  {
+                      "id":  "symbol:type:ManualTimeProvider",
+                      "label":  "ManualTimeProvider",
+                      "type":  "CodeType",
+                      "path":  "tests/ChairSide.Board.Tests/BoardStoreTests.cs"
+                  },
+                  {
+                      "id":  "symbol:type:MarkExceptionRequest",
+                      "label":  "MarkExceptionRequest",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Program.cs"
+                  },
+                  {
+                      "id":  "symbol:type:NoopBoardHubContext",
+                      "label":  "NoopBoardHubContext",
+                      "type":  "CodeType",
+                      "path":  "tests/ChairSide.Board.Tests/BoardStoreTests.cs"
+                  },
+                  {
+                      "id":  "symbol:type:NoopClientProxy",
+                      "label":  "NoopClientProxy",
+                      "type":  "CodeType",
+                      "path":  "tests/ChairSide.Board.Tests/BoardStoreTests.cs"
+                  },
+                  {
+                      "id":  "symbol:type:NoopGroupManager",
+                      "label":  "NoopGroupManager",
+                      "type":  "CodeType",
+                      "path":  "tests/ChairSide.Board.Tests/BoardStoreTests.cs"
+                  },
+                  {
+                      "id":  "symbol:type:NoopHubClients",
+                      "label":  "NoopHubClients",
+                      "type":  "CodeType",
+                      "path":  "tests/ChairSide.Board.Tests/BoardStoreTests.cs"
+                  },
+                  {
+                      "id":  "symbol:type:ObservedScheduleFitInputSummary",
+                      "label":  "ObservedScheduleFitInputSummary",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/ProjectionAssumptionChecklist.cs"
+                  },
+                  {
+                      "id":  "symbol:type:persisted",
+                      "label":  "persisted",
+                      "type":  "CodeType",
+                      "path":  "tests/ChairSide.Board.Tests/BoardStoreTests.cs"
+                  },
+                  {
+                      "id":  "symbol:type:ProcedureCategory",
+                      "label":  "ProcedureCategory",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/DemoBoardStore.cs"
+                  },
+                  {
+                      "id":  "symbol:type:ProcedureCycleSummary",
+                      "label":  "ProcedureCycleSummary",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/DemoBoardStore.cs"
+                  },
+                  {
+                      "id":  "symbol:type:ProcedureRosterItem",
+                      "label":  "ProcedureRosterItem",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Options/ProcedureRosterOptions.cs"
+                  },
+                  {
+                      "id":  "symbol:type:ProcedureRosterOptions",
+                      "label":  "ProcedureRosterOptions",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Options/ProcedureRosterOptions.cs"
+                  },
+                  {
+                      "id":  "symbol:type:ProcedureRosterOptionsValidator",
+                      "label":  "ProcedureRosterOptionsValidator",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Options/ProcedureRosterOptions.cs"
+                  },
+                  {
+                      "id":  "symbol:type:ProjectionAssumptionChecklist",
+                      "label":  "ProjectionAssumptionChecklist",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/ProjectionAssumptionChecklist.cs"
+                  },
+                  {
+                      "id":  "symbol:type:ProjectionAssumptionChecklistBuilder",
+                      "label":  "ProjectionAssumptionChecklistBuilder",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/ProjectionAssumptionChecklist.cs"
+                  },
+                  {
+                      "id":  "symbol:type:ProjectionAssumptionChecklistTests",
+                      "label":  "ProjectionAssumptionChecklistTests",
+                      "type":  "CodeType",
+                      "path":  "tests/ChairSide.Board.Tests/ProjectionAssumptionChecklistTests.cs"
+                  },
+                  {
+                      "id":  "symbol:type:ProjectionAssumptionRequirement",
+                      "label":  "ProjectionAssumptionRequirement",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/ProjectionAssumptionChecklist.cs"
+                  },
+                  {
+                      "id":  "symbol:type:ReportingExceptionReasons",
+                      "label":  "ReportingExceptionReasons",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/DemoBoardStore.cs"
+                  },
+                  {
+                      "id":  "symbol:type:ReportsSnapshot",
+                      "label":  "ReportsSnapshot",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/DemoBoardStore.cs"
+                  },
+                  {
+                      "id":  "symbol:type:ReportTrendBucket",
+                      "label":  "ReportTrendBucket",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/ReportTrendSnapshot.cs"
+                  },
+                  {
+                      "id":  "symbol:type:ReportTrendSnapshot",
+                      "label":  "ReportTrendSnapshot",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/ReportTrendSnapshot.cs"
+                  },
+                  {
+                      "id":  "symbol:type:ReportTrendSnapshotBuilder",
+                      "label":  "ReportTrendSnapshotBuilder",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/ReportTrendSnapshot.cs"
+                  },
+                  {
+                      "id":  "symbol:type:ReportTrendSnapshotTests",
+                      "label":  "ReportTrendSnapshotTests",
+                      "type":  "CodeType",
+                      "path":  "tests/ChairSide.Board.Tests/ReportTrendSnapshotTests.cs"
+                  },
+                  {
+                      "id":  "symbol:type:ResolveDoctorArrivalConflictRequest",
+                      "label":  "ResolveDoctorArrivalConflictRequest",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Program.cs"
+                  },
+                  {
+                      "id":  "symbol:type:ReviewExceptionOutcome",
+                      "label":  "ReviewExceptionOutcome",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/DemoBoardStore.cs"
+                  },
+                  {
+                      "id":  "symbol:type:ReviewStatuses",
+                      "label":  "ReviewStatuses",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/DemoBoardStore.cs"
+                  },
+                  {
+                      "id":  "symbol:type:RoomAuditEntry",
+                      "label":  "RoomAuditEntry",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/DiagnosticLogger.cs"
+                  },
+                  {
+                      "id":  "symbol:type:RoomDeviceBindingGuard",
+                      "label":  "RoomDeviceBindingGuard",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/RoomDeviceBindingGuard.cs"
+                  },
+                  {
+                      "id":  "symbol:type:RoomDeviceBindingOptions",
+                      "label":  "RoomDeviceBindingOptions",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Options/RoomDeviceBindingOptions.cs"
+                  },
+                  {
+                      "id":  "symbol:type:RoomDeviceBindingOptionsValidator",
+                      "label":  "RoomDeviceBindingOptionsValidator",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Options/RoomDeviceBindingOptionsValidator.cs"
+                  },
+                  {
+                      "id":  "symbol:type:RoomDeviceTokenValidationResult",
+                      "label":  "RoomDeviceTokenValidationResult",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/RoomDeviceTokenValidator.cs"
+                  },
+                  {
+                      "id":  "symbol:type:RoomDeviceTokenValidator",
+                      "label":  "RoomDeviceTokenValidator",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/RoomDeviceTokenValidator.cs"
+                  },
+                  {
+                      "id":  "symbol:type:RoomEvent",
+                      "label":  "RoomEvent",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/DemoBoardStore.cs"
+                  },
+                  {
+                      "id":  "symbol:type:RoomExpirationOptions",
+                      "label":  "RoomExpirationOptions",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Options/RoomExpirationOptions.cs"
+                  },
+                  {
+                      "id":  "symbol:type:RoomExpirationService",
+                      "label":  "RoomExpirationService",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/RoomExpirationService.cs"
+                  },
+                  {
+                      "id":  "symbol:type:RoomMutationRequestValidator",
+                      "label":  "RoomMutationRequestValidator",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/RoomMutationRequestValidator.cs"
+                  },
+                  {
+                      "id":  "symbol:type:RoomState",
+                      "label":  "RoomState",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/DemoBoardStore.cs"
+                  },
+                  {
+                      "id":  "symbol:type:RoomStates",
+                      "label":  "RoomStates",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/DemoBoardStore.cs"
+                  },
+                  {
+                      "id":  "symbol:type:RoomStatus",
+                      "label":  "RoomStatus",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/DemoBoardStore.cs"
+                  },
+                  {
+                      "id":  "symbol:type:ScheduleFitCalculator",
+                      "label":  "ScheduleFitCalculator",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/ScheduleFitCalculator.cs"
+                  },
+                  {
+                      "id":  "symbol:type:ScheduleFitCalculatorTests",
+                      "label":  "ScheduleFitCalculatorTests",
+                      "type":  "CodeType",
+                      "path":  "tests/ChairSide.Board.Tests/ScheduleFitCalculatorTests.cs"
+                  },
+                  {
+                      "id":  "symbol:type:ScheduleFitReport",
+                      "label":  "ScheduleFitReport",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/ScheduleFitReport.cs"
+                  },
+                  {
+                      "id":  "symbol:type:ScheduleFitReportBuilder",
+                      "label":  "ScheduleFitReportBuilder",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/ScheduleFitReport.cs"
+                  },
+                  {
+                      "id":  "symbol:type:ScheduleFitReportTests",
+                      "label":  "ScheduleFitReportTests",
+                      "type":  "CodeType",
+                      "path":  "tests/ChairSide.Board.Tests/ScheduleFitReportTests.cs"
+                  },
+                  {
+                      "id":  "symbol:type:ScheduleFitResult",
+                      "label":  "ScheduleFitResult",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/ScheduleFitCalculator.cs"
+                  },
+                  {
+                      "id":  "symbol:type:SeatRoomRequest",
+                      "label":  "SeatRoomRequest",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Program.cs"
+                  },
+                  {
+                      "id":  "symbol:type:SeedReportDataResult",
+                      "label":  "SeedReportDataResult",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/DemoBoardStore.cs"
+                  },
+                  {
+                      "id":  "symbol:type:SqliteBoardRepository",
+                      "label":  "SqliteBoardRepository",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/SqliteBoardRepository.cs"
+                  },
+                  {
+                      "id":  "symbol:type:StoreContext",
+                      "label":  "StoreContext",
+                      "type":  "CodeType",
+                      "path":  "tests/ChairSide.Board.Tests/BoardStoreTests.cs"
+                  },
+                  {
+                      "id":  "symbol:type:struct",
+                      "label":  "struct",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/DemoBoardStore.cs"
+                  },
+                  {
+                      "id":  "symbol:type:SyntheticFamily",
+                      "label":  "SyntheticFamily",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/DemoBoardStore.cs"
+                  },
+                  {
+                      "id":  "symbol:type:SyntheticJitter",
+                      "label":  "SyntheticJitter",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/DemoBoardStore.cs"
+                  },
+                  {
+                      "id":  "symbol:type:TestOptionsMonitor",
+                      "label":  "TestOptionsMonitor",
+                      "type":  "CodeType",
+                      "path":  "tests/ChairSide.Board.Tests/BoardStoreTests.cs"
+                  },
+                  {
+                      "id":  "symbol:type:TestWebHostEnvironment",
+                      "label":  "TestWebHostEnvironment",
+                      "type":  "CodeType",
+                      "path":  "tests/ChairSide.Board.Tests/BoardStoreTests.cs"
+                  },
+                  {
+                      "id":  "symbol:type:TestWorkspace",
+                      "label":  "TestWorkspace",
+                      "type":  "CodeType",
+                      "path":  "tests/ChairSide.Board.Tests/BoardStoreTests.cs"
+                  },
+                  {
+                      "id":  "symbol:type:UpdateAssignmentRequest",
+                      "label":  "UpdateAssignmentRequest",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Program.cs"
+                  }
+              ],
+    "edges":  [
+                  {
+                      "from":  "file:src/ChairSide.Board/Hubs/BoardHub.cs",
+                      "to":  "symbol:type:BoardHub",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Options/AdminAccessOptions.cs",
+                      "to":  "symbol:type:AdminAccessOptions",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Options/AdminAccessOptions.cs",
+                      "to":  "symbol:type:AdminAccessOptionsValidator",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Options/BoardOptions.cs",
+                      "to":  "symbol:type:BoardOptions",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Options/BoardPersistenceOptions.cs",
+                      "to":  "symbol:type:BoardPersistenceOptions",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Options/BoardThresholdOptions.cs",
+                      "to":  "symbol:type:BoardThresholdOptions",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Options/BoardUiOptions.cs",
+                      "to":  "symbol:type:BoardUiOptions",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Options/DiagnosticOptions.cs",
+                      "to":  "symbol:type:DiagnosticOptions",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Options/DoctorRosterOptions.cs",
+                      "to":  "symbol:type:DoctorRosterItem",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Options/DoctorRosterOptions.cs",
+                      "to":  "symbol:type:DoctorRosterOptions",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Options/DoctorRosterOptions.cs",
+                      "to":  "symbol:type:DoctorRosterOptionsValidator",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Options/ProcedureRosterOptions.cs",
+                      "to":  "symbol:type:AllocationBehaviors",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Options/ProcedureRosterOptions.cs",
+                      "to":  "symbol:type:ProcedureRosterItem",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Options/ProcedureRosterOptions.cs",
+                      "to":  "symbol:type:ProcedureRosterOptions",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Options/ProcedureRosterOptions.cs",
+                      "to":  "symbol:type:ProcedureRosterOptionsValidator",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Options/RoomDeviceBindingOptions.cs",
+                      "to":  "symbol:type:RoomDeviceBindingOptions",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Options/RoomDeviceBindingOptionsValidator.cs",
+                      "to":  "symbol:type:RoomDeviceBindingOptionsValidator",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Options/RoomExpirationOptions.cs",
+                      "to":  "symbol:type:RoomExpirationOptions",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Program.cs",
+                      "to":  "hub:BoardHub",
+                      "label":  "maps-hub"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Program.cs",
+                      "to":  "route:/api/board",
+                      "label":  "maps"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Program.cs",
+                      "to":  "route:/api/client-errors",
+                      "label":  "maps"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Program.cs",
+                      "to":  "route:/api/dev/seed-report-data",
+                      "label":  "maps"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Program.cs",
+                      "to":  "route:/api/reports",
+                      "label":  "maps"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Program.cs",
+                      "to":  "route:/api/reports/cycles/{completedCycleId:long}/confirm-exclusion",
+                      "label":  "maps"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Program.cs",
+                      "to":  "route:/api/reports/cycles/mark-exception",
+                      "label":  "maps"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Program.cs",
+                      "to":  "route:/api/rooms/{roomNumber:int}",
+                      "label":  "maps"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Program.cs",
+                      "to":  "route:/api/rooms/{roomNumber:int}/assignment",
+                      "label":  "maps"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Program.cs",
+                      "to":  "route:/api/rooms/{roomNumber:int}/available",
+                      "label":  "maps"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Program.cs",
+                      "to":  "route:/api/rooms/{roomNumber:int}/cancel-seating",
+                      "label":  "maps"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Program.cs",
+                      "to":  "route:/api/rooms/{roomNumber:int}/doctor-arrived",
+                      "label":  "maps"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Program.cs",
+                      "to":  "route:/api/rooms/{roomNumber:int}/doctor-arrived/resolve-conflict",
+                      "label":  "maps"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Program.cs",
+                      "to":  "route:/api/rooms/{roomNumber:int}/doctor-complete",
+                      "label":  "maps"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Program.cs",
+                      "to":  "route:/api/rooms/{roomNumber:int}/ready-for-doctor",
+                      "label":  "maps"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Program.cs",
+                      "to":  "route:/api/rooms/{roomNumber:int}/seat",
+                      "label":  "maps"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Program.cs",
+                      "to":  "route:/boardHub",
+                      "label":  "maps"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Program.cs",
+                      "to":  "symbol:type:AuditRequestContext",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Program.cs",
+                      "to":  "symbol:type:ClientErrorRequest",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Program.cs",
+                      "to":  "symbol:type:DoctorArrivalConflictEndpointHandler",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Program.cs",
+                      "to":  "symbol:type:DoctorArrivedConflictResponse",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Program.cs",
+                      "to":  "symbol:type:MarkExceptionRequest",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Program.cs",
+                      "to":  "symbol:type:ResolveDoctorArrivalConflictRequest",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Program.cs",
+                      "to":  "symbol:type:SeatRoomRequest",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Program.cs",
+                      "to":  "symbol:type:UpdateAssignmentRequest",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/AdminAccessGuard.cs",
+                      "to":  "symbol:type:AdminAccessGuard",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/AdminAccessTokenValidator.cs",
+                      "to":  "symbol:type:AdminAccessTokenValidationResult",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/AdminAccessTokenValidator.cs",
+                      "to":  "symbol:type:AdminAccessTokenValidator",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/ClientErrorRateLimiter.cs",
+                      "to":  "symbol:type:Bucket",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/ClientErrorRateLimiter.cs",
+                      "to":  "symbol:type:ClientErrorRateLimiter",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/DemoBoardStore.cs",
+                      "to":  "symbol:type:AllocationVarianceSummary",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/DemoBoardStore.cs",
+                      "to":  "symbol:type:BoardSnapshot",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/DemoBoardStore.cs",
+                      "to":  "symbol:type:CompletedRoomCycle",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/DemoBoardStore.cs",
+                      "to":  "symbol:type:DemoBoardStore",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/DemoBoardStore.cs",
+                      "to":  "symbol:type:DemoSeedPattern",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/DemoBoardStore.cs",
+                      "to":  "symbol:type:Doctor",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/DemoBoardStore.cs",
+                      "to":  "symbol:type:DoctorArrivalConflict",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/DemoBoardStore.cs",
+                      "to":  "symbol:type:DoctorArrivalOutcome",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/DemoBoardStore.cs",
+                      "to":  "symbol:type:DoctorCycleSummary",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/DemoBoardStore.cs",
+                      "to":  "symbol:type:DoctorDailyAllocation",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/DemoBoardStore.cs",
+                      "to":  "symbol:type:DoctorDailyAllocationPoint",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/DemoBoardStore.cs",
+                      "to":  "symbol:type:DoctorStyleProfile",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/DemoBoardStore.cs",
+                      "to":  "symbol:type:ExceptionReasons",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/DemoBoardStore.cs",
+                      "to":  "symbol:type:ExceptionReviewers",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/DemoBoardStore.cs",
+                      "to":  "symbol:type:MaintenanceResetResult",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/DemoBoardStore.cs",
+                      "to":  "symbol:type:ProcedureCategory",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/DemoBoardStore.cs",
+                      "to":  "symbol:type:ProcedureCycleSummary",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/DemoBoardStore.cs",
+                      "to":  "symbol:type:ReportingExceptionReasons",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/DemoBoardStore.cs",
+                      "to":  "symbol:type:ReportsSnapshot",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/DemoBoardStore.cs",
+                      "to":  "symbol:type:ReviewExceptionOutcome",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/DemoBoardStore.cs",
+                      "to":  "symbol:type:ReviewStatuses",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/DemoBoardStore.cs",
+                      "to":  "symbol:type:RoomEvent",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/DemoBoardStore.cs",
+                      "to":  "symbol:type:RoomState",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/DemoBoardStore.cs",
+                      "to":  "symbol:type:RoomStates",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/DemoBoardStore.cs",
+                      "to":  "symbol:type:RoomStatus",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/DemoBoardStore.cs",
+                      "to":  "symbol:type:SeedReportDataResult",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/DemoBoardStore.cs",
+                      "to":  "symbol:type:struct",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/DemoBoardStore.cs",
+                      "to":  "symbol:type:SyntheticFamily",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/DemoBoardStore.cs",
+                      "to":  "symbol:type:SyntheticJitter",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/DiagnosticLogger.cs",
+                      "to":  "symbol:type:ClientErrorEntry",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/DiagnosticLogger.cs",
+                      "to":  "symbol:type:DiagnosticLogger",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/DiagnosticLogger.cs",
+                      "to":  "symbol:type:RoomAuditEntry",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/MaintenanceCommands.cs",
+                      "to":  "symbol:type:MaintenanceCommands",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/MaintenanceCommands.cs",
+                      "to":  "symbol:type:MaintenanceOutcome",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/MaintenanceCommands.cs",
+                      "to":  "symbol:type:MaintenanceResolution",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/ProjectionAssumptionChecklist.cs",
+                      "to":  "symbol:type:ObservedScheduleFitInputSummary",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/ProjectionAssumptionChecklist.cs",
+                      "to":  "symbol:type:ProjectionAssumptionChecklist",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/ProjectionAssumptionChecklist.cs",
+                      "to":  "symbol:type:ProjectionAssumptionChecklistBuilder",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/ProjectionAssumptionChecklist.cs",
+                      "to":  "symbol:type:ProjectionAssumptionRequirement",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/ReportTrendSnapshot.cs",
+                      "to":  "symbol:type:ReportTrendBucket",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/ReportTrendSnapshot.cs",
+                      "to":  "symbol:type:ReportTrendSnapshot",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/ReportTrendSnapshot.cs",
+                      "to":  "symbol:type:ReportTrendSnapshotBuilder",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/RoomDeviceBindingGuard.cs",
+                      "to":  "symbol:type:RoomDeviceBindingGuard",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/RoomDeviceTokenValidator.cs",
+                      "to":  "symbol:type:RoomDeviceTokenValidationResult",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/RoomDeviceTokenValidator.cs",
+                      "to":  "symbol:type:RoomDeviceTokenValidator",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/RoomExpirationService.cs",
+                      "to":  "symbol:type:RoomExpirationService",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/RoomMutationRequestValidator.cs",
+                      "to":  "symbol:type:RoomMutationRequestValidator",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/ScheduleFitCalculator.cs",
+                      "to":  "symbol:type:ScheduleFitCalculator",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/ScheduleFitCalculator.cs",
+                      "to":  "symbol:type:ScheduleFitResult",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/ScheduleFitReport.cs",
+                      "to":  "symbol:type:ScheduleFitReport",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/ScheduleFitReport.cs",
+                      "to":  "symbol:type:ScheduleFitReportBuilder",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/SqliteBoardRepository.cs",
+                      "to":  "symbol:type:SqliteBoardRepository",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:tests/ChairSide.Board.Tests/BoardStoreTests.cs",
+                      "to":  "symbol:type:BoardStoreTests",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:tests/ChairSide.Board.Tests/BoardStoreTests.cs",
+                      "to":  "symbol:type:is",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:tests/ChairSide.Board.Tests/BoardStoreTests.cs",
+                      "to":  "symbol:type:ManualTimeProvider",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:tests/ChairSide.Board.Tests/BoardStoreTests.cs",
+                      "to":  "symbol:type:NoopBoardHubContext",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:tests/ChairSide.Board.Tests/BoardStoreTests.cs",
+                      "to":  "symbol:type:NoopClientProxy",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:tests/ChairSide.Board.Tests/BoardStoreTests.cs",
+                      "to":  "symbol:type:NoopGroupManager",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:tests/ChairSide.Board.Tests/BoardStoreTests.cs",
+                      "to":  "symbol:type:NoopHubClients",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:tests/ChairSide.Board.Tests/BoardStoreTests.cs",
+                      "to":  "symbol:type:persisted",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:tests/ChairSide.Board.Tests/BoardStoreTests.cs",
+                      "to":  "symbol:type:StoreContext",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:tests/ChairSide.Board.Tests/BoardStoreTests.cs",
+                      "to":  "symbol:type:TestOptionsMonitor",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:tests/ChairSide.Board.Tests/BoardStoreTests.cs",
+                      "to":  "symbol:type:TestWebHostEnvironment",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:tests/ChairSide.Board.Tests/BoardStoreTests.cs",
+                      "to":  "symbol:type:TestWorkspace",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:tests/ChairSide.Board.Tests/ProjectionAssumptionChecklistTests.cs",
+                      "to":  "symbol:type:ProjectionAssumptionChecklistTests",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:tests/ChairSide.Board.Tests/ReportTrendSnapshotTests.cs",
+                      "to":  "symbol:type:ReportTrendSnapshotTests",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:tests/ChairSide.Board.Tests/ScheduleFitCalculatorTests.cs",
+                      "to":  "symbol:type:ScheduleFitCalculatorTests",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:tests/ChairSide.Board.Tests/ScheduleFitReportTests.cs",
+                      "to":  "symbol:type:ScheduleFitReportTests",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:AGENTS.md",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:ChairSide.Board.sln",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:docs/executive-summary.md",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:docs/knowledge-graph/backlog-signals.md",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:docs/knowledge-graph/chairside.graph.md",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:docs/knowledge-graph/decisions.md",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:docs/knowledge-graph/generated/README.md",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:docs/knowledge-graph/README.md",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:docs/Production-Pilot-Checklist.md",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:docs/TrainingDataReset.md",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:docs/visual-language.md",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:docs/workflow.md",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:README.md",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:scripts/Backup-ChairSideSqlite.ps1",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:scripts/Reset-ChairSideTrainingData.ps1",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:scripts/Restore-ChairSideSqlite.ps1",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:src/ChairSide.Board/appsettings.json",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:src/ChairSide.Board/appsettings.Production.json",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:src/ChairSide.Board/ChairSide.Board.csproj",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:src/ChairSide.Board/Hubs/BoardHub.cs",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:src/ChairSide.Board/Options/AdminAccessOptions.cs",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:src/ChairSide.Board/Options/BoardOptions.cs",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:src/ChairSide.Board/Options/BoardPersistenceOptions.cs",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:src/ChairSide.Board/Options/BoardThresholdOptions.cs",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:src/ChairSide.Board/Options/BoardUiOptions.cs",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:src/ChairSide.Board/Options/DiagnosticOptions.cs",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:src/ChairSide.Board/Options/DoctorRosterOptions.cs",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:src/ChairSide.Board/Options/ProcedureRosterOptions.cs",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:src/ChairSide.Board/Options/RoomDeviceBindingOptions.cs",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:src/ChairSide.Board/Options/RoomDeviceBindingOptionsValidator.cs",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:src/ChairSide.Board/Options/RoomExpirationOptions.cs",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:src/ChairSide.Board/Program.cs",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:src/ChairSide.Board/Services/AdminAccessGuard.cs",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:src/ChairSide.Board/Services/AdminAccessTokenValidator.cs",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:src/ChairSide.Board/Services/ClientErrorRateLimiter.cs",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:src/ChairSide.Board/Services/DemoBoardStore.cs",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:src/ChairSide.Board/Services/DiagnosticLogger.cs",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:src/ChairSide.Board/Services/MaintenanceCommands.cs",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:src/ChairSide.Board/Services/ProjectionAssumptionChecklist.cs",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:src/ChairSide.Board/Services/ReportTrendSnapshot.cs",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:src/ChairSide.Board/Services/RoomDeviceBindingGuard.cs",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:src/ChairSide.Board/Services/RoomDeviceTokenValidator.cs",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:src/ChairSide.Board/Services/RoomExpirationService.cs",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:src/ChairSide.Board/Services/RoomMutationRequestValidator.cs",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:src/ChairSide.Board/Services/ScheduleFitCalculator.cs",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:src/ChairSide.Board/Services/ScheduleFitReport.cs",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:src/ChairSide.Board/Services/SqliteBoardRepository.cs",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:src/ChairSide.Board/wwwroot/assets/icons/README.md",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:src/ChairSide.Board/wwwroot/board.js",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:src/ChairSide.Board/wwwroot/doctor.html",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:src/ChairSide.Board/wwwroot/index.html",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:src/ChairSide.Board/wwwroot/master.html",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:src/ChairSide.Board/wwwroot/reports.html",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:src/ChairSide.Board/wwwroot/room.html",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:src/ChairSide.Board/wwwroot/room-1.html",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:src/ChairSide.Board/wwwroot/signalr-lite.js",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:src/ChairSide.Board/wwwroot/styles.css",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:src/ChairSide.Board/wwwroot/workshop.html",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:tests/ChairSide.Board.Tests/BoardStoreTests.cs",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:tests/ChairSide.Board.Tests/ChairSide.Board.Tests.csproj",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:tests/ChairSide.Board.Tests/ProjectionAssumptionChecklistTests.cs",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:tests/ChairSide.Board.Tests/ReportTrendSnapshotTests.cs",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:tests/ChairSide.Board.Tests/ScheduleFitCalculatorTests.cs",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:tests/ChairSide.Board.Tests/ScheduleFitReportTests.cs",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:tools/knowledge-graph/New-ChairSideKnowledgeGraph.ps1",
+                      "label":  "contains"
+                  }
+              ]
+}

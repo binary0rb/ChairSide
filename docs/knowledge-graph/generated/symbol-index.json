@@ -1,0 +1,2110 @@
+﻿{
+    "generatedAtUtc":  "2026-06-29T00:22:02Z",
+    "root":  "C:\\Users\\JP\\Desktop\\ChairSide-current",
+    "fileCount":  65,
+    "files":  [
+                  {
+                      "path":  "AGENTS.md",
+                      "kind":  "Markdown",
+                      "sizeBytes":  7669,
+                      "typeSymbols":  [
+
+                                      ],
+                      "methodSymbols":  [
+
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+                                       "AGENTS",
+                                       "ChairSide Project Brief",
+                                       "Project name",
+                                       "Purpose",
+                                       "Scope",
+                                       "Critical privacy rule",
+                                       "Doctors and colors",
+                                       "Procedure categories and icons",
+                                       "Visual language",
+                                       "Rooms",
+                                       "Core workflow",
+                                       "Metrics and reporting",
+                                       "MVP features",
+                                       "Suggested technical direction",
+                                       "Development priorities",
+                                       "UX rules",
+                                       "Testing expectations"
+                                   ]
+                  },
+                  {
+                      "path":  "ChairSide.Board.sln",
+                      "kind":  "Solution",
+                      "sizeBytes":  1722,
+                      "typeSymbols":  [
+
+                                      ],
+                      "methodSymbols":  [
+
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
+                      "path":  "docs/executive-summary.md",
+                      "kind":  "Markdown",
+                      "sizeBytes":  58,
+                      "typeSymbols":  [
+
+                                      ],
+                      "methodSymbols":  [
+
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+                                       "Executive Summary"
+                                   ]
+                  },
+                  {
+                      "path":  "docs/knowledge-graph/backlog-signals.md",
+                      "kind":  "Markdown",
+                      "sizeBytes":  1502,
+                      "typeSymbols":  [
+
+                                      ],
+                      "methodSymbols":  [
+
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+                                       "ChairSide knowledge graph backlog signals",
+                                       "High-value future graph expansions",
+                                       "Risks to preserve",
+                                       "Candidate relationships to add later"
+                                   ]
+                  },
+                  {
+                      "path":  "docs/knowledge-graph/chairside.graph.md",
+                      "kind":  "Markdown",
+                      "sizeBytes":  4864,
+                      "typeSymbols":  [
+
+                                      ],
+                      "methodSymbols":  [
+
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+                                       "ChairSide knowledge graph",
+                                       "Conceptual graph",
+                                       "Core invariants",
+                                       "Current reporting semantics captured by the graph",
+                                       "Known development affordances"
+                                   ]
+                  },
+                  {
+                      "path":  "docs/knowledge-graph/decisions.md",
+                      "kind":  "Markdown",
+                      "sizeBytes":  2171,
+                      "typeSymbols":  [
+
+                                      ],
+                      "methodSymbols":  [
+
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+                                       "ChairSide durable decisions",
+                                       "Knowledge graph scope",
+                                       "Runtime isolation",
+                                       "Human-readable first",
+                                       "Non-PHI boundary",
+                                       "Reporting UI philosophy",
+                                       "Reporting population semantics"
+                                   ]
+                  },
+                  {
+                      "path":  "docs/knowledge-graph/generated/README.md",
+                      "kind":  "Markdown",
+                      "sizeBytes":  687,
+                      "typeSymbols":  [
+
+                                      ],
+                      "methodSymbols":  [
+
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+                                       "Generated knowledge graph artifacts"
+                                   ]
+                  },
+                  {
+                      "path":  "docs/knowledge-graph/README.md",
+                      "kind":  "Markdown",
+                      "sizeBytes":  3177,
+                      "typeSymbols":  [
+
+                                      ],
+                      "methodSymbols":  [
+
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+                                       "ChairSide private knowledge graph",
+                                       "What lives here",
+                                       "What does not live here",
+                                       "Node types",
+                                       "Edge labels",
+                                       "Update rule"
+                                   ]
+                  },
+                  {
+                      "path":  "docs/Production-Pilot-Checklist.md",
+                      "kind":  "Markdown",
+                      "sizeBytes":  6720,
+                      "typeSymbols":  [
+
+                                      ],
+                      "methodSymbols":  [
+
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+                                       "ChairSide Board Production Pilot Checklist",
+                                       "Server Layout",
+                                       "IIS",
+                                       "Permissions",
+                                       "Publish And Config",
+                                       "Backup And Restore",
+                                       "Access Control Decisions",
+                                       "Room Tablets",
+                                       "Reports Access",
+                                       "Rosters",
+                                       "No-PHI Signoff",
+                                       "Startup Log Review",
+                                       "Smoke Test",
+                                       "Rollback",
+                                       "Accepted Pilot Risks"
+                                   ]
+                  },
+                  {
+                      "path":  "docs/TrainingDataReset.md",
+                      "kind":  "Markdown",
+                      "sizeBytes":  5831,
+                      "typeSymbols":  [
+
+                                      ],
+                      "methodSymbols":  [
+
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+                                       "ChairSide Training Data Reset Runbook",
+                                       "Data lifecycle",
+                                       "What the two modes do",
+                                       "What gets backed up",
+                                       "What gets cleared / seeded",
+                                       "Prerequisites",
+                                       "Usage",
+                                       "Training fixture reset (seed synthetic data)",
+                                       "Official beta reset (empty board)",
+                                       "Overriding defaults",
+                                       "Direct CLI (advanced / already-stopped app)",
+                                       "Verifying after a TrainingSeed reset",
+                                       "Verifying after an EmptyBeta reset",
+                                       "Suggested operator sequence",
+                                       "Safety notes"
+                                   ]
+                  },
+                  {
+                      "path":  "docs/visual-language.md",
+                      "kind":  "Markdown",
+                      "sizeBytes":  69,
+                      "typeSymbols":  [
+
+                                      ],
+                      "methodSymbols":  [
+
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+                                       "Visual Language"
+                                   ]
+                  },
+                  {
+                      "path":  "docs/workflow.md",
+                      "kind":  "Markdown",
+                      "sizeBytes":  51,
+                      "typeSymbols":  [
+
+                                      ],
+                      "methodSymbols":  [
+
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+                                       "Workflow"
+                                   ]
+                  },
+                  {
+                      "path":  "README.md",
+                      "kind":  "Markdown",
+                      "sizeBytes":  27002,
+                      "typeSymbols":  [
+
+                                      ],
+                      "methodSymbols":  [
+
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+                                       "ChairSide Board",
+                                       "Scaffold",
+                                       "Seed Data",
+                                       "Run Locally",
+                                       "IIS Deployment",
+                                       "Reset Demo Data",
+                                       "Reports",
+                                       "Report time windows",
+                                       "Demo Aging",
+                                       "Demo Script",
+                                       "Persistence"
+                                   ]
+                  },
+                  {
+                      "path":  "scripts/Backup-ChairSideSqlite.ps1",
+                      "kind":  "PowerShell",
+                      "sizeBytes":  3765,
+                      "typeSymbols":  [
+
+                                      ],
+                      "methodSymbols":  [
+
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
+                      "path":  "scripts/Reset-ChairSideTrainingData.ps1",
+                      "kind":  "PowerShell",
+                      "sizeBytes":  6256,
+                      "typeSymbols":  [
+
+                                      ],
+                      "methodSymbols":  [
+
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
+                      "path":  "scripts/Restore-ChairSideSqlite.ps1",
+                      "kind":  "PowerShell",
+                      "sizeBytes":  6293,
+                      "typeSymbols":  [
+
+                                      ],
+                      "methodSymbols":  [
+
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
+                      "path":  "src/ChairSide.Board/appsettings.json",
+                      "kind":  "Json",
+                      "sizeBytes":  4125,
+                      "typeSymbols":  [
+
+                                      ],
+                      "methodSymbols":  [
+
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
+                      "path":  "src/ChairSide.Board/appsettings.Production.json",
+                      "kind":  "Json",
+                      "sizeBytes":  175,
+                      "typeSymbols":  [
+
+                                      ],
+                      "methodSymbols":  [
+
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
+                      "path":  "src/ChairSide.Board/ChairSide.Board.csproj",
+                      "kind":  "Project",
+                      "sizeBytes":  373,
+                      "typeSymbols":  [
+
+                                      ],
+                      "methodSymbols":  [
+
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
+                      "path":  "src/ChairSide.Board/Hubs/BoardHub.cs",
+                      "kind":  "CSharp",
+                      "sizeBytes":  111,
+                      "typeSymbols":  [
+                                          "BoardHub"
+                                      ],
+                      "methodSymbols":  [
+
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
+                      "path":  "src/ChairSide.Board/Options/AdminAccessOptions.cs",
+                      "kind":  "CSharp",
+                      "sizeBytes":  1311,
+                      "typeSymbols":  [
+                                          "AdminAccessOptions",
+                                          "AdminAccessOptionsValidator"
+                                      ],
+                      "methodSymbols":  [
+                                            "Validate"
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
+                      "path":  "src/ChairSide.Board/Options/BoardOptions.cs",
+                      "kind":  "CSharp",
+                      "sizeBytes":  181,
+                      "typeSymbols":  [
+                                          "BoardOptions"
+                                      ],
+                      "methodSymbols":  [
+
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
+                      "path":  "src/ChairSide.Board/Options/BoardPersistenceOptions.cs",
+                      "kind":  "CSharp",
+                      "sizeBytes":  232,
+                      "typeSymbols":  [
+                                          "BoardPersistenceOptions"
+                                      ],
+                      "methodSymbols":  [
+
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
+                      "path":  "src/ChairSide.Board/Options/BoardThresholdOptions.cs",
+                      "kind":  "CSharp",
+                      "sizeBytes":  406,
+                      "typeSymbols":  [
+                                          "BoardThresholdOptions"
+                                      ],
+                      "methodSymbols":  [
+
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
+                      "path":  "src/ChairSide.Board/Options/BoardUiOptions.cs",
+                      "kind":  "CSharp",
+                      "sizeBytes":  188,
+                      "typeSymbols":  [
+                                          "BoardUiOptions"
+                                      ],
+                      "methodSymbols":  [
+
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
+                      "path":  "src/ChairSide.Board/Options/DiagnosticOptions.cs",
+                      "kind":  "CSharp",
+                      "sizeBytes":  1124,
+                      "typeSymbols":  [
+                                          "DiagnosticOptions"
+                                      ],
+                      "methodSymbols":  [
+
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
+                      "path":  "src/ChairSide.Board/Options/DoctorRosterOptions.cs",
+                      "kind":  "CSharp",
+                      "sizeBytes":  3272,
+                      "typeSymbols":  [
+                                          "DoctorRosterOptions",
+                                          "DoctorRosterItem",
+                                          "DoctorRosterOptionsValidator"
+                                      ],
+                      "methodSymbols":  [
+                                            "DefaultDoctors",
+                                            "Validate"
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
+                      "path":  "src/ChairSide.Board/Options/ProcedureRosterOptions.cs",
+                      "kind":  "CSharp",
+                      "sizeBytes":  9870,
+                      "typeSymbols":  [
+                                          "AllocationBehaviors",
+                                          "ProcedureRosterOptions",
+                                          "ProcedureRosterItem",
+                                          "ProcedureRosterOptionsValidator"
+                                      ],
+                      "methodSymbols":  [
+                                            "IsValid",
+                                            "DefaultProcedures",
+                                            "Validate"
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
+                      "path":  "src/ChairSide.Board/Options/RoomDeviceBindingOptions.cs",
+                      "kind":  "CSharp",
+                      "sizeBytes":  270,
+                      "typeSymbols":  [
+                                          "RoomDeviceBindingOptions"
+                                      ],
+                      "methodSymbols":  [
+
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
+                      "path":  "src/ChairSide.Board/Options/RoomDeviceBindingOptionsValidator.cs",
+                      "kind":  "CSharp",
+                      "sizeBytes":  1586,
+                      "typeSymbols":  [
+                                          "RoomDeviceBindingOptionsValidator"
+                                      ],
+                      "methodSymbols":  [
+                                            "Validate"
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
+                      "path":  "src/ChairSide.Board/Options/RoomExpirationOptions.cs",
+                      "kind":  "CSharp",
+                      "sizeBytes":  1436,
+                      "typeSymbols":  [
+                                          "RoomExpirationOptions"
+                                      ],
+                      "methodSymbols":  [
+
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
+                      "path":  "src/ChairSide.Board/Program.cs",
+                      "kind":  "CSharp",
+                      "sizeBytes":  38573,
+                      "typeSymbols":  [
+                                          "SeatRoomRequest",
+                                          "UpdateAssignmentRequest",
+                                          "MarkExceptionRequest",
+                                          "DoctorArrivedConflictResponse",
+                                          "ResolveDoctorArrivalConflictRequest",
+                                          "ClientErrorRequest",
+                                          "DoctorArrivalConflictEndpointHandler",
+                                          "AuditRequestContext"
+                                      ],
+                      "methodSymbols":  [
+                                            "From",
+                                            "Build"
+                                        ],
+                      "routes":  [
+                                     "/boardHub",
+                                     "/api/board",
+                                     "/api/reports",
+                                     "/api/dev/seed-report-data",
+                                     "/api/reports/cycles/mark-exception",
+                                     "/api/reports/cycles/{completedCycleId:long}/confirm-exclusion",
+                                     "/api/rooms/{roomNumber:int}",
+                                     "/api/client-errors",
+                                     "/api/rooms/{roomNumber:int}/seat",
+                                     "/api/rooms/{roomNumber:int}/assignment",
+                                     "/api/rooms/{roomNumber:int}/cancel-seating",
+                                     "/api/rooms/{roomNumber:int}/ready-for-doctor",
+                                     "/api/rooms/{roomNumber:int}/doctor-arrived",
+                                     "/api/rooms/{roomNumber:int}/doctor-arrived/resolve-conflict",
+                                     "/api/rooms/{roomNumber:int}/doctor-complete",
+                                     "/api/rooms/{roomNumber:int}/available"
+                                 ],
+                      "hubs":  [
+                                   "BoardHub"
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
+                      "path":  "src/ChairSide.Board/Services/AdminAccessGuard.cs",
+                      "kind":  "CSharp",
+                      "sizeBytes":  857,
+                      "typeSymbols":  [
+                                          "AdminAccessGuard"
+                                      ],
+                      "methodSymbols":  [
+                                            "IsProtectedPath",
+                                            "ValidateRequest"
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
+                      "path":  "src/ChairSide.Board/Services/AdminAccessTokenValidator.cs",
+                      "kind":  "CSharp",
+                      "sizeBytes":  1339,
+                      "typeSymbols":  [
+                                          "AdminAccessTokenValidator",
+                                          "AdminAccessTokenValidationResult"
+                                      ],
+                      "methodSymbols":  [
+                                            "Validate",
+                                            "FixedTimeEquals"
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
+                      "path":  "src/ChairSide.Board/Services/ClientErrorRateLimiter.cs",
+                      "kind":  "CSharp",
+                      "sizeBytes":  2255,
+                      "typeSymbols":  [
+                                          "ClientErrorRateLimiter",
+                                          "Bucket"
+                                      ],
+                      "methodSymbols":  [
+                                            "IsAllowed"
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
+                      "path":  "src/ChairSide.Board/Services/DemoBoardStore.cs",
+                      "kind":  "CSharp",
+                      "sizeBytes":  114573,
+                      "typeSymbols":  [
+                                          "ExceptionReasons",
+                                          "ReportingExceptionReasons",
+                                          "DemoBoardStore",
+                                          "BoardSnapshot",
+                                          "Doctor",
+                                          "ProcedureCategory",
+                                          "RoomStatus",
+                                          "RoomEvent",
+                                          "ReportsSnapshot",
+                                          "struct",
+                                          "CompletedRoomCycle",
+                                          "DoctorCycleSummary",
+                                          "AllocationVarianceSummary",
+                                          "ProcedureCycleSummary",
+                                          "DemoSeedPattern",
+                                          "DoctorStyleProfile",
+                                          "SyntheticFamily",
+                                          "SyntheticJitter",
+                                          "SeedReportDataResult",
+                                          "DoctorDailyAllocationPoint",
+                                          "DoctorDailyAllocation",
+                                          "MaintenanceResetResult",
+                                          "RoomState",
+                                          "RoomStates",
+                                          "ReviewStatuses",
+                                          "ExceptionReviewers",
+                                          "ReviewExceptionOutcome",
+                                          "DoctorArrivalOutcome",
+                                          "DoctorArrivalConflict"
+                                      ],
+                      "methodSymbols":  [
+                                            "GetSnapshot",
+                                            "GetRoom",
+                                            "IsConfiguredRoom",
+                                            "SeatRoom",
+                                            "UpdateAssignment",
+                                            "CancelSeating",
+                                            "MarkReadyForDoctor",
+                                            "MarkDoctorArrived",
+                                            "TryMarkDoctorArrived",
+                                            "ResolveDoctorArrivalConflict",
+                                            "PrepareDoctorArrived",
+                                            "ApplyDoctorArrived",
+                                            "FindActiveDoctorRoom",
+                                            "ResolveDoctorDisplayName",
+                                            "MarkDoctorComplete",
+                                            "MarkRoomAvailable",
+                                            "GetReports",
+                                            "ResetAndSeedSyntheticTrainingData",
+                                            "ResetAllDataForEmptyBeta",
+                                            "ClearCompletedAndResetRoomsLocked",
+                                            "SeedSyntheticReportData",
+                                            "UpsertSyntheticCycle",
+                                            "DeterministicSeed",
+                                            "CasesForDayOffset",
+                                            "MarkCycleAsException",
+                                            "MarkCycleAsExceptionById",
+                                            "ReviewExceptionCycleById",
+                                            "CheckAndExpireActiveCycles",
+                                            "TryRunAfterHoursSweep",
+                                            "ExpireRoom",
+                                            "ResolveTimeZone",
+                                            "TryParseSweepTime",
+                                            "ToRoomStatus",
+                                            "UpdateRoomState",
+                                            "FindProcedure",
+                                            "FindActiveProcedure",
+                                            "HasSedationModifier",
+                                            "StripSedationModifier",
+                                            "ComposeProcedureCode",
+                                            "IsSedationProcedureCode"
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
+                      "path":  "src/ChairSide.Board/Services/DiagnosticLogger.cs",
+                      "kind":  "CSharp",
+                      "sizeBytes":  6029,
+                      "typeSymbols":  [
+                                          "DiagnosticLogger",
+                                          "ClientErrorEntry",
+                                          "RoomAuditEntry"
+                                      ],
+                      "methodSymbols":  [
+                                            "LogClientErrorAsync",
+                                            "LogRoomAuditAsync",
+                                            "TryRotate",
+                                            "TryCreateDirectory",
+                                            "ResolveLogDirectory"
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
+                      "path":  "src/ChairSide.Board/Services/MaintenanceCommands.cs",
+                      "kind":  "CSharp",
+                      "sizeBytes":  3581,
+                      "typeSymbols":  [
+                                          "MaintenanceOutcome",
+                                          "MaintenanceResolution",
+                                          "MaintenanceCommands"
+                                      ],
+                      "methodSymbols":  [
+                                            "Resolve",
+                                            "GetFlagValue"
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
+                      "path":  "src/ChairSide.Board/Services/ProjectionAssumptionChecklist.cs",
+                      "kind":  "CSharp",
+                      "sizeBytes":  6150,
+                      "typeSymbols":  [
+                                          "ProjectionAssumptionChecklist",
+                                          "ObservedScheduleFitInputSummary",
+                                          "ProjectionAssumptionRequirement",
+                                          "ProjectionAssumptionChecklistBuilder"
+                                      ],
+                      "methodSymbols":  [
+                                            "Build",
+                                            "RequireNonBlank",
+                                            "BuildObservedSummary",
+                                            "BuildRequiredAssumptions",
+                                            "BuildMissingInputs"
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
+                      "path":  "src/ChairSide.Board/Services/ReportTrendSnapshot.cs",
+                      "kind":  "CSharp",
+                      "sizeBytes":  3942,
+                      "typeSymbols":  [
+                                          "ReportTrendSnapshot",
+                                          "ReportTrendBucket",
+                                          "ReportTrendSnapshotBuilder"
+                                      ],
+                      "methodSymbols":  [
+                                            "BuildWeekly",
+                                            "WeekStart",
+                                            "FormatDate",
+                                            "Average",
+                                            "Median"
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
+                      "path":  "src/ChairSide.Board/Services/RoomDeviceBindingGuard.cs",
+                      "kind":  "CSharp",
+                      "sizeBytes":  753,
+                      "typeSymbols":  [
+                                          "RoomDeviceBindingGuard"
+                                      ],
+                      "methodSymbols":  [
+                                            "ValidateMutationRequest"
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
+                      "path":  "src/ChairSide.Board/Services/RoomDeviceTokenValidator.cs",
+                      "kind":  "CSharp",
+                      "sizeBytes":  1587,
+                      "typeSymbols":  [
+                                          "RoomDeviceTokenValidator",
+                                          "RoomDeviceTokenValidationResult"
+                                      ],
+                      "methodSymbols":  [
+                                            "Validate",
+                                            "FixedTimeEquals"
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
+                      "path":  "src/ChairSide.Board/Services/RoomExpirationService.cs",
+                      "kind":  "CSharp",
+                      "sizeBytes":  3170,
+                      "typeSymbols":  [
+                                          "RoomExpirationService"
+                                      ],
+                      "methodSymbols":  [
+                                            "CheckExpirationsAsync"
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
+                      "path":  "src/ChairSide.Board/Services/RoomMutationRequestValidator.cs",
+                      "kind":  "CSharp",
+                      "sizeBytes":  909,
+                      "typeSymbols":  [
+                                          "RoomMutationRequestValidator"
+                                      ],
+                      "methodSymbols":  [
+                                            "ValidateDoctorAndProcedure"
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
+                      "path":  "src/ChairSide.Board/Services/ScheduleFitCalculator.cs",
+                      "kind":  "CSharp",
+                      "sizeBytes":  5286,
+                      "typeSymbols":  [
+                                          "ScheduleFitCalculator",
+                                          "ScheduleFitResult"
+                                      ],
+                      "methodSymbols":  [
+                                            "Calculate"
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
+                      "path":  "src/ChairSide.Board/Services/ScheduleFitReport.cs",
+                      "kind":  "CSharp",
+                      "sizeBytes":  2951,
+                      "typeSymbols":  [
+                                          "ScheduleFitReport",
+                                          "ScheduleFitReportBuilder"
+                                      ],
+                      "methodSymbols":  [
+                                            "Build"
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
+                      "path":  "src/ChairSide.Board/Services/SqliteBoardRepository.cs",
+                      "kind":  "CSharp",
+                      "sizeBytes":  48433,
+                      "typeSymbols":  [
+                                          "SqliteBoardRepository"
+                                      ],
+                      "methodSymbols":  [
+                                            "HasAnyRoomRows",
+                                            "LoadRooms",
+                                            "EnsureConfiguredRooms",
+                                            "ClearCompletedCycles",
+                                            "ResetActiveRooms",
+                                            "SaveRooms",
+                                            "SaveRoom",
+                                            "LoadCompletedCycles",
+                                            "SaveCompletedCycle",
+                                            "Initialize",
+                                            "EnsureCompletedCycleIdColumn",
+                                            "MigrateNullableDoctorArrivedAt",
+                                            "TableExists",
+                                            "GetColumnNames",
+                                            "Execute",
+                                            "TryAddColumn",
+                                            "IsDuplicateColumnError",
+                                            "OpenConnection",
+                                            "ValidateDatabasePath",
+                                            "IsPathInsideContentRoot",
+                                            "NormalizeDirectoryPath",
+                                            "VerifyDirectoryWritable",
+                                            "ResolveDatabasePath",
+                                            "FormatDateTimeOffset",
+                                            "ToDbValue",
+                                            "ReadNullableString",
+                                            "ReadNullableInt32",
+                                            "ReadNullableDateTimeOffset",
+                                            "ReadRequiredDateTimeOffset"
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
+                      "path":  "src/ChairSide.Board/wwwroot/assets/icons/README.md",
+                      "kind":  "Markdown",
+                      "sizeBytes":  1715,
+                      "typeSymbols":  [
+
+                                      ],
+                      "methodSymbols":  [
+
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+                                       "Procedure icons",
+                                       "Tabler Icons license (MIT)",
+                                       "Note"
+                                   ]
+                  },
+                  {
+                      "path":  "src/ChairSide.Board/wwwroot/board.js",
+                      "kind":  "JavaScript",
+                      "sizeBytes":  157963,
+                      "typeSymbols":  [
+
+                                      ],
+                      "methodSymbols":  [
+
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+                                              "getRoomNumber",
+                                              "getRoomToken",
+                                              "boot",
+                                              "loadBoard",
+                                              "loadReports",
+                                              "initDateRange",
+                                              "reportsRequestUrl",
+                                              "utcDateString",
+                                              "computePresetRange",
+                                              "selectDateRangePreset",
+                                              "applyCustomDateRange",
+                                              "syncDateRangeControls",
+                                              "wireDateRange",
+                                              "renderReportWindow",
+                                              "connectRealtime",
+                                              "markRealtimeDegraded",
+                                              "scheduleRealtimeRetry",
+                                              "render",
+                                              "applySnapshot",
+                                              "boardNowMs",
+                                              "ensureConnectionStatusIndicator",
+                                              "formatSnapshotAge",
+                                              "getConnectionStatusDetails",
+                                              "setConnectionStatus",
+                                              "updateConnectionStatus",
+                                              "renderLegend",
+                                              "updateDoctorViewToggleLabel",
+                                              "populateDoctorViewMenu",
+                                              "wireDoctorViewMenu",
+                                              "renderMaster",
+                                              "renderRoomPanel",
+                                              "isStaffLoungeRoom",
+                                              "renderStaffLoungePanel",
+                                              "wireStaffLoungePanel",
+                                              "renderDoctorView",
+                                              "renderDoctorCockpit",
+                                              "renderReports",
+                                              "renderReportHeadline",
+                                              "renderHeadlineCard",
+                                              "renderReportTrendCards",
+                                              "renderWaitTrendCard",
+                                              "renderTurnoverTrendCard",
+                                              "renderTrendCard",
+                                              "trendBucketsWithCases",
+                                              "describeTrendComparison",
+                                              "formatTrendMinutes",
+                                              "formatTrendBucketRange",
+                                              "parseReportDateOnly",
+                                              "formatReportDateOnly",
+                                              "renderDoctorReportDashboard",
+                                              "syncSelectedReportDoctor",
+                                              "renderAllocationReports",
+                                              "renderAllocationBalanceCard",
+                                              "renderDataQualityCard",
+                                              "renderDoctorAllocation",
+                                              "aggregateAllocationByDoctor",
+                                              "renderDoctorCardBody",
+                                              "renderDoctorAllocationCard",
+                                              "renderDoctorSparkline",
+                                              "doctorAllocationSummary",
+                                              "mainPressurePoint",
+                                              "renderSelectedDoctorPanel",
+                                              "renderDoctorReportTabButton",
+                                              "renderSelectedDoctorTabContent",
+                                              "renderSelectedDoctorOverview",
+                                              "renderSelectedDoctorAudit",
+                                              "initialsFromDoctorName",
+                                              "formatAbsoluteMinutes",
+                                              "formatSignedMinutes",
+                                              "renderDoctorAllocationRow",
+                                              "renderProcedureAllocation",
+                                              "renderProcedureAllocationRow",
+                                              "describeAllocation",
+                                              "formatAverageVariancePerCase",
+                                              "varianceClass",
+                                              "renderVarianceBadge",
+                                              "renderAverageVarianceBadge",
+                                              "renderReportFilterBar",
+                                              "syncReportFilterButtons",
+                                              "getInsightSummaries"
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
+                      "path":  "src/ChairSide.Board/wwwroot/doctor.html",
+                      "kind":  "Html",
+                      "sizeBytes":  2121,
+                      "typeSymbols":  [
+
+                                      ],
+                      "methodSymbols":  [
+
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
+                      "path":  "src/ChairSide.Board/wwwroot/index.html",
+                      "kind":  "Html",
+                      "sizeBytes":  2712,
+                      "typeSymbols":  [
+
+                                      ],
+                      "methodSymbols":  [
+
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
+                      "path":  "src/ChairSide.Board/wwwroot/master.html",
+                      "kind":  "Html",
+                      "sizeBytes":  2712,
+                      "typeSymbols":  [
+
+                                      ],
+                      "methodSymbols":  [
+
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
+                      "path":  "src/ChairSide.Board/wwwroot/reports.html",
+                      "kind":  "Html",
+                      "sizeBytes":  9888,
+                      "typeSymbols":  [
+
+                                      ],
+                      "methodSymbols":  [
+
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
+                      "path":  "src/ChairSide.Board/wwwroot/room.html",
+                      "kind":  "Html",
+                      "sizeBytes":  5465,
+                      "typeSymbols":  [
+
+                                      ],
+                      "methodSymbols":  [
+
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
+                      "path":  "src/ChairSide.Board/wwwroot/room-1.html",
+                      "kind":  "Html",
+                      "sizeBytes":  4663,
+                      "typeSymbols":  [
+
+                                      ],
+                      "methodSymbols":  [
+
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
+                      "path":  "src/ChairSide.Board/wwwroot/signalr-lite.js",
+                      "kind":  "JavaScript",
+                      "sizeBytes":  5253,
+                      "typeSymbols":  [
+
+                                      ],
+                      "methodSymbols":  [
+
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+                                              "toWebSocketUrl"
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
+                      "path":  "src/ChairSide.Board/wwwroot/styles.css",
+                      "kind":  "Css",
+                      "sizeBytes":  79483,
+                      "typeSymbols":  [
+
+                                      ],
+                      "methodSymbols":  [
+
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+                                           "--bg",
+                                           "--ink",
+                                           "--muted",
+                                           "--line",
+                                           "--panel",
+                                           "--empty",
+                                           "--active-doctor"
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
+                      "path":  "src/ChairSide.Board/wwwroot/workshop.html",
+                      "kind":  "Html",
+                      "sizeBytes":  11421,
+                      "typeSymbols":  [
+
+                                      ],
+                      "methodSymbols":  [
+
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
+                      "path":  "tests/ChairSide.Board.Tests/BoardStoreTests.cs",
+                      "kind":  "CSharp",
+                      "sizeBytes":  269504,
+                      "typeSymbols":  [
+                                          "BoardStoreTests",
+                                          "is",
+                                          "persisted",
+                                          "StoreContext",
+                                          "TestWorkspace",
+                                          "TestWebHostEnvironment",
+                                          "TestOptionsMonitor",
+                                          "ManualTimeProvider",
+                                          "NoopBoardHubContext",
+                                          "NoopHubClients",
+                                          "NoopGroupManager",
+                                          "NoopClientProxy"
+                                      ],
+                      "methodSymbols":  [
+                                            "Lifecycle_actions_preserve_expected_state_and_report_behavior",
+                                            "Active_seated_room_survives_store_restart",
+                                            "Completed_report_survives_store_restart",
+                                            "Stale_elapsed_ready_for_doctor_room_reloads_as_stale",
+                                            "Doctor_in_room_and_turnover_rooms_survive_reload_without_wait_state_downgrade",
+                                            "Turnover_seconds_calculated_from_doctor_complete_to_room_available",
+                                            "Room_status_preserves_seated_at_through_doctor_in_room_and_turnover",
+                                            "Seated_room_does_not_escalate_to_aging_or_stale_regardless_of_elapsed_time",
+                                            "Ready_for_doctor_threshold_boundaries_resolve_deterministically",
+                                            "Production_database_path_inside_content_root_fails_fast",
+                                            "Production_fresh_database_starts_rooms_available_without_demo_activity",
+                                            "Development_fresh_database_seeds_demo_active_rooms",
+                                            "Default_rosters_load_current_doctors_and_procedures",
+                                            "Procedure_roster_exposes_allocation_behavior_and_default_expected_units",
+                                            "Procedure_allocation_behavior_classification_matches_known_and_variable_lists",
+                                            "Seating_without_units_applies_procedure_default_allocation",
+                                            "Seating_with_explicit_units_stores_final_allocation",
+                                            "Allocation_adjusted_flag_is_false_when_units_equal_default",
+                                            "Allocation_adjusted_flag_is_true_when_units_differ_from_default",
+                                            "Seating_with_zero_units_clamps_to_minimum_and_never_yields_zero_minutes",
+                                            "Seating_with_negative_units_clamps_to_minimum",
+                                            "Seating_with_units_above_maximum_clamps_to_maximum",
+                                            "Allocation_snapshot_carries_from_active_room_into_completed_cycle",
+                                            "Allocation_snapshot_survives_restart_for_active_rooms",
+                                            "Allocation_snapshot_survives_restart_for_completed_cycles",
+                                            "Sedation_variant_inherits_base_procedure_default_allocation",
+                                            "Inactive_doctors_and_procedures_are_not_selectable",
+                                            "Sedation_is_not_a_standalone_selectable_procedure",
+                                            "Eligible_procedure_seated_without_sedation_stays_a_base_procedure",
+                                            "Eligible_procedure_with_sedation_is_stored_and_displayed_as_a_variant",
+                                            "New_all_on_four_procedure_supports_sedation_modifier_and_resolves_label",
+                                            "New_all_on_four_sedation_variant_rolls_up_under_base_in_reports",
+                                            "Sedation_modifier_is_rejected_for_non_eligible_procedures",
+                                            "Sedation_modifier_can_be_added_and_removed_via_update_assignment",
+                                            "Sedation_cases_report_as_distinct_variants_from_base_procedure",
+                                            "Variant_summaries_carry_base_code_and_sedation_flag",
+                                            "Base_procedure_summaries_roll_up_variants_over_raw_cycles",
+                                            "Sedation_and_non_sedation_counts_partition_completed_cycles",
+                                            "Doctor_arrived_only_cycle_reports_finalized_waits_but_is_not_a_completed_cycle",
+                                            "Turnover_not_available_cycle_reports_doctor_in_room_but_not_completed_populations"
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
+                      "path":  "tests/ChairSide.Board.Tests/ChairSide.Board.Tests.csproj",
+                      "kind":  "Project",
+                      "sizeBytes":  792,
+                      "typeSymbols":  [
+
+                                      ],
+                      "methodSymbols":  [
+
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
+                      "path":  "tests/ChairSide.Board.Tests/ProjectionAssumptionChecklistTests.cs",
+                      "kind":  "CSharp",
+                      "sizeBytes":  9442,
+                      "typeSymbols":  [
+                                          "ProjectionAssumptionChecklistTests"
+                                      ],
+                      "methodSymbols":  [
+                                            "Build_rejects_null_preset_id",
+                                            "Build_rejects_blank_preset_id",
+                                            "Build_rejects_null_preset_name",
+                                            "Build_rejects_blank_preset_name",
+                                            "Output_status_is_always_not_computed",
+                                            "Safety_warning_states_observed_slack_is_not_automatically_usable_capacity",
+                                            "Schedule_fit_totals_are_copied_into_observed_summary_without_projection_math",
+                                            "Missing_schedule_fit_produces_empty_observed_summary_and_missing_input",
+                                            "Required_assumptions_cover_the_non_timing_inputs_needed_before_projection",
+                                            "Preset_identity_and_report_window_are_copied_but_do_not_affect_observed_calculation",
+                                            "Public_model_does_not_expose_projection_or_capacity_promise_names",
+                                            "ScheduleFitReport"
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
+                      "path":  "tests/ChairSide.Board.Tests/ReportTrendSnapshotTests.cs",
+                      "kind":  "CSharp",
+                      "sizeBytes":  7474,
+                      "typeSymbols":  [
+                                          "ReportTrendSnapshotTests"
+                                      ],
+                      "methodSymbols":  [
+                                            "Empty_population_returns_empty_weekly_snapshot",
+                                            "Cycles_group_into_monday_start_utc_weeks_by_doctor_complete_at",
+                                            "Median_seated_to_doctor_is_correct_for_odd_counts",
+                                            "Median_seated_to_doctor_is_correct_for_even_counts",
+                                            "Average_seated_to_doctor_is_correct",
+                                            "Median_turnover_is_correct",
+                                            "Average_turnover_is_correct",
+                                            "Turnover_count_uses_only_cycles_with_usable_turnover_values",
+                                            "Completed_cycle_count_per_bucket_is_the_eligible_cycle_count",
+                                            "Public_model_does_not_expose_projection_capacity_or_ranking_names",
+                                            "Public_model_does_not_expose_patient_like_field_names",
+                                            "PublicModelMemberNames",
+                                            "SingleBucket",
+                                            "SingleTurnoverBucket",
+                                            "Cycle",
+                                            "Utc"
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
+                      "path":  "tests/ChairSide.Board.Tests/ScheduleFitCalculatorTests.cs",
+                      "kind":  "CSharp",
+                      "sizeBytes":  7447,
+                      "typeSymbols":  [
+                                          "ScheduleFitCalculatorTests"
+                                      ],
+                      "methodSymbols":  [
+                                            "Cycle",
+                                            "Empty_cycle_list_returns_zero_result_and_null_utilization",
+                                            "At_expected_cycle_has_zero_variance_slack_and_debt",
+                                            "Over_expected_cycle_contributes_to_debt_not_slack",
+                                            "Under_expected_cycle_contributes_to_slack_not_debt",
+                                            "Mixed_cycles_keep_signed_net_variance_while_tracking_slack_and_debt_separately",
+                                            "Block_counts_use_the_supplied_block_size",
+                                            "Default_block_size_divides_minute_totals_by_ten",
+                                            "Utilization_ratio_is_measured_over_expected",
+                                            "Cycles_with_nonpositive_expected_minutes_are_excluded",
+                                            "Cycles_with_null_measured_case_flow_are_excluded",
+                                            "All_ineligible_cycles_yield_zero_result_with_null_utilization",
+                                            "Invalid_block_size_throws_argument_out_of_range"
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
+                      "path":  "tests/ChairSide.Board.Tests/ScheduleFitReportTests.cs",
+                      "kind":  "CSharp",
+                      "sizeBytes":  9274,
+                      "typeSymbols":  [
+                                          "ScheduleFitReportTests"
+                                      ],
+                      "methodSymbols":  [
+                                            "Cycle",
+                                            "Empty_population_returns_zero_counts_and_zero_overall_result",
+                                            "Mixed_over_and_under_cycles_delegate_to_the_calculator",
+                                            "Included_count_exceeds_fit_count_when_some_cycles_are_not_allocation_calculable",
+                                            "Null_defensive_entries_do_not_count_as_included_cycles",
+                                            "Custom_block_size_flows_through_to_overall_block_totals",
+                                            "Invalid_block_size_propagates_argument_out_of_range",
+                                            "Schedule_fit_totals_agree_with_allocation_variance_summary_for_standard_population",
+                                            "Utc",
+                                            "SeedCleanCycle"
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
+                      "path":  "tools/knowledge-graph/New-ChairSideKnowledgeGraph.ps1",
+                      "kind":  "PowerShell",
+                      "sizeBytes":  11159,
+                      "typeSymbols":  [
+
+                                      ],
+                      "methodSymbols":  [
+
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  }
+              ]
+}
