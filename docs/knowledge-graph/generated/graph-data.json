@@ -1,5 +1,5 @@
 ﻿{
-    "generatedAtUtc":  "2026-06-29T00:22:02Z",
+    "generatedStamp":  "deterministic",
     "description":  "Mechanical ChairSide repo graph generated from source files. Use docs/knowledge-graph/chairside.graph.md for human-authored architecture intent.",
     "nodes":  [
                   {
@@ -37,12 +37,6 @@
                       "label":  "docs/knowledge-graph/decisions.md",
                       "type":  "File",
                       "path":  "docs/knowledge-graph/decisions.md"
-                  },
-                  {
-                      "id":  "file:docs/knowledge-graph/generated/README.md",
-                      "label":  "docs/knowledge-graph/generated/README.md",
-                      "type":  "File",
-                      "path":  "docs/knowledge-graph/generated/README.md"
                   },
                   {
                       "id":  "file:docs/knowledge-graph/README.md",
@@ -1704,11 +1698,6 @@
                   {
                       "from":  "repo:chairside",
                       "to":  "file:docs/knowledge-graph/decisions.md",
-                      "label":  "contains"
-                  },
-                  {
-                      "from":  "repo:chairside",
-                      "to":  "file:docs/knowledge-graph/generated/README.md",
                       "label":  "contains"
                   },
                   {

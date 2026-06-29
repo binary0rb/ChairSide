@@ -1,7 +1,7 @@
 ﻿{
-    "generatedAtUtc":  "2026-06-29T00:22:02Z",
-    "root":  "C:\\Users\\JP\\Desktop\\ChairSide-current",
-    "fileCount":  65,
+    "generatedStamp":  "deterministic",
+    "root":  ".",
+    "fileCount":  64,
     "files":  [
                   {
                       "path":  "AGENTS.md",
@@ -186,32 +186,6 @@
                                        "Non-PHI boundary",
                                        "Reporting UI philosophy",
                                        "Reporting population semantics"
-                                   ]
-                  },
-                  {
-                      "path":  "docs/knowledge-graph/generated/README.md",
-                      "kind":  "Markdown",
-                      "sizeBytes":  687,
-                      "typeSymbols":  [
-
-                                      ],
-                      "methodSymbols":  [
-
-                                        ],
-                      "routes":  [
-
-                                 ],
-                      "hubs":  [
-
-                               ],
-                      "cssVariables":  [
-
-                                       ],
-                      "scriptFunctions":  [
-
-                                          ],
-                      "headings":  [
-                                       "Generated knowledge graph artifacts"
                                    ]
                   },
                   {
@@ -2083,7 +2057,7 @@
                   {
                       "path":  "tools/knowledge-graph/New-ChairSideKnowledgeGraph.ps1",
                       "kind":  "PowerShell",
-                      "sizeBytes":  11159,
+                      "sizeBytes":  11656,
                       "typeSymbols":  [
 
                                       ],
