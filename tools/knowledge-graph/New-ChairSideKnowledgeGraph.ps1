@@ -49,6 +49,10 @@ function Test-ExcludedPath {
     $normalized = Convert-ToSlashPath -Path $RelativePath
     $wrapped = "/" + $normalized + "/"
 
+    if ($normalized.StartsWith("docs/knowledge-graph/generated/", [System.StringComparison]::OrdinalIgnoreCase)) {
+        return $true
+    }
+
     $excludedSegments = @(
         "/.git/",
         "/bin/",
@@ -270,17 +274,17 @@ foreach ($file in $files) {
 $dedupedNodes = @($nodes | Group-Object -Property id | ForEach-Object { $_.Group[0] } | Sort-Object -Property id)
 $dedupedEdges = @($edges | Sort-Object -Property from, to, label -Unique)
 
-$generatedAt = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
+$generatedStamp = "deterministic"
 
 $symbolIndex = [ordered]@{
-    generatedAtUtc = $generatedAt
-    root = $rootPath
+    generatedStamp = $generatedStamp
+    root = "."
     fileCount = $index.Count
     files = @($index)
 }
 
 $graphData = [ordered]@{
-    generatedAtUtc = $generatedAt
+    generatedStamp = $generatedStamp
     description = "Mechanical ChairSide repo graph generated from source files. Use docs/knowledge-graph/chairside.graph.md for human-authored architecture intent."
     nodes = @($dedupedNodes)
     edges = @($dedupedEdges)
@@ -296,7 +300,7 @@ $graphData | ConvertTo-Json -Depth 8 | Set-Content -Path $graphJsonPath -Encodin
 $inventoryLines = @()
 $inventoryLines += "# ChairSide generated file inventory"
 $inventoryLines += ""
-$inventoryLines += "Generated UTC: $generatedAt"
+$inventoryLines += "Generated output is deterministic. No timestamp is written."
 $inventoryLines += ""
 $inventoryLines += "This file is mechanical output from ``tools/knowledge-graph/New-ChairSideKnowledgeGraph.ps1``. Review diffs before committing."
 $inventoryLines += ""
@@ -360,3 +364,5 @@ Write-Host "ChairSide knowledge graph artifacts generated:"
 Write-Host "  $fileInventoryPath"
 Write-Host "  $symbolJsonPath"
 Write-Host "  $graphJsonPath"
+
+

@@ -1,6 +1,6 @@
 ﻿# ChairSide generated file inventory
 
-Generated UTC: 2026-06-29T00:22:02Z
+Generated output is deterministic. No timestamp is written.
 
 This file is mechanical output from `tools/knowledge-graph/New-ChairSideKnowledgeGraph.ps1`. Review diffs before committing.
 
@@ -12,7 +12,6 @@ This file is mechanical output from `tools/knowledge-graph/New-ChairSideKnowledg
 | `docs/knowledge-graph/backlog-signals.md` | Markdown | headings: ChairSide knowledge graph backlog signals, High-value future graph expansions, Risks to preserve, Candidate relationships to add later | - |
 | `docs/knowledge-graph/chairside.graph.md` | Markdown | headings: ChairSide knowledge graph, Conceptual graph, Core invariants, Current reporting semantics captured by the graph, Known development affordances | - |
 | `docs/knowledge-graph/decisions.md` | Markdown | headings: ChairSide durable decisions, Knowledge graph scope, Runtime isolation, Human-readable first, Non-PHI boundary, Reporting UI philosophy, Reporting population semantics | - |
-| `docs/knowledge-graph/generated/README.md` | Markdown | headings: Generated knowledge graph artifacts | - |
 | `docs/knowledge-graph/README.md` | Markdown | headings: ChairSide private knowledge graph, What lives here, What does not live here, Node types, Edge labels, Update rule | - |
 | `docs/Production-Pilot-Checklist.md` | Markdown | headings: ChairSide Board Production Pilot Checklist, Server Layout, IIS, Permissions, Publish And Config, Backup And Restore, Access Control Decisions, Room Tablets | - |
 | `docs/TrainingDataReset.md` | Markdown | headings: ChairSide Training Data Reset Runbook, Data lifecycle, What the two modes do, What gets backed up, What gets cleared / seeded, Prerequisites, Usage, Training fixture reset (seed synthetic data) | - |
