@@ -35,6 +35,25 @@ Preferred deployment target:
 - Internal DNS name, for example `chairside.local` or `chairside.aospeoria.local`
 - Browser-based room panels, master display, and doctor views
 
+## Repository orientation and token discipline
+
+Before broad source inspection, consult the private development knowledge graph:
+
+- `docs/knowledge-graph/chairside.graph.md` for human-authored architecture intent.
+- `docs/knowledge-graph/generated/file-inventory.md` for the repo/file map.
+- `docs/knowledge-graph/generated/symbol-index.json` for symbols, routes, hubs, CSS variables, and script functions.
+- `docs/knowledge-graph/generated/graph-data.json` only when structured graph data is useful.
+
+Use the graph to identify the smallest relevant file set, then inspect only those files and their tests. Do not scan or summarize the whole repository unless the graph is insufficient or the task explicitly requires whole-repo review.
+
+For small UI/status/version tasks, start with the graph, then likely inspect:
+
+- `src/ChairSide.Board/wwwroot/board.js`
+- `src/ChairSide.Board/wwwroot/styles.css`
+- relevant shared HTML files under `src/ChairSide.Board/wwwroot/`
+
+Do not load generated graph JSON wholesale unless needed. Prefer targeted search/read of the relevant entries.
+
 ## Private development knowledge graph
 
 ChairSide includes a private development knowledge graph under `docs/knowledge-graph/`.

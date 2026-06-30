@@ -8,4 +8,16 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.8" />
   </ItemGroup>
+  <Target Name="GenerateVersionFile" AfterTargets="Publish">
+    <Exec Command="git rev-parse --short HEAD" ConsoleToMSBuild="true" IgnoreExitCode="true">
+      <Output TaskParameter="ConsoleOutput" PropertyName="GitShortHash" />
+    </Exec>
+
+    <PropertyGroup>
+      <ChairSideBuildVersion Condition="'$(GitShortHash)' != ''">$(GitShortHash)</ChairSideBuildVersion>
+      <ChairSideBuildVersion Condition="'$(GitShortHash)' == ''">local</ChairSideBuildVersion>
+    </PropertyGroup>
+
+    <WriteLinesToFile File="$(PublishDir)wwwroot\version.txt" Lines="$(ChairSideBuildVersion)" Overwrite="true" />
+  </Target>
 </Project>

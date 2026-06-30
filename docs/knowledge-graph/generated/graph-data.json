@@ -15,6 +15,12 @@
                       "path":  "ChairSide.Board.sln"
                   },
                   {
+                      "id":  "file:CLAUDE.md",
+                      "label":  "CLAUDE.md",
+                      "type":  "File",
+                      "path":  "CLAUDE.md"
+                  },
+                  {
                       "id":  "file:docs/executive-summary.md",
                       "label":  "docs/executive-summary.md",
                       "type":  "File",
@@ -1678,6 +1684,11 @@
                   {
                       "from":  "repo:chairside",
                       "to":  "file:ChairSide.Board.sln",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:CLAUDE.md",
                       "label":  "contains"
                   },
                   {
