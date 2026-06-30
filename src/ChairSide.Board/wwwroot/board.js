@@ -90,6 +90,21 @@ function getRoomToken() {
   return document.querySelector("meta[name='chairside-room-token']")?.content || getStoredRoomToken();
 }
 
+async function loadVersionBadge() {
+  try {
+    const res = await fetch("/version.txt");
+    if (!res.ok) { return; }
+    const hash = (await res.text()).trim();
+    if (!hash) { return; }
+    const badge = document.createElement("span");
+    badge.className = "build-version";
+    badge.textContent = `v ${hash}`;
+    document.body.appendChild(badge);
+  } catch {
+    // Fail silently — version.txt is only present in published deployments.
+  }
+}
+
 async function boot() {
   // Guard: intervals must never be registered more than once.
   // boot() is called once at page load, but this explicit check prevents a
@@ -141,6 +156,7 @@ async function boot() {
   if (document.body.dataset.view === "room") {
     wireRoomPanel();
   }
+  loadVersionBadge();
 }
 
 async function loadBoard() {
@@ -542,11 +558,20 @@ function getConnectionStatusDetails(status) {
 function setConnectionStatus(status) {
   app.connectionStatus = status;
   const target = ensureConnectionStatusIndicator();
-  const label = status === "live" ? "Live" : status === "reconnecting" ? "Reconnecting" : "Stale";
   const details = getConnectionStatusDetails(status);
+  let label, ariaLabel;
+  if (status === "live") {
+    label = app.lastSnapshotAt
+      ? new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit" }).format(new Date(app.lastSnapshotAt))
+      : "—";
+    ariaLabel = `Live, last updated at ${label}`;
+  } else {
+    label = status === "reconnecting" ? "Reconnecting" : "Stale";
+    ariaLabel = `${label}: ${details}`;
+  }
   target.className = `connection-status ${status}`;
   target.title = details;
-  target.setAttribute("aria-label", `${label}: ${details}`);
+  target.setAttribute("aria-label", ariaLabel);
   target.querySelector("span").textContent = label;
 }
 

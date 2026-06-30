@@ -6,8 +6,9 @@ This file is mechanical output from `tools/knowledge-graph/New-ChairSideKnowledg
 
 | Path | Kind | Discovered symbols | Routes / hubs |
 | --- | --- | --- | --- |
-| `AGENTS.md` | Markdown | headings: AGENTS, ChairSide Project Brief, Project name, Purpose, Scope, Private development knowledge graph, Critical privacy rule, Doctors and colors | - |
+| `AGENTS.md` | Markdown | headings: AGENTS, ChairSide Project Brief, Project name, Purpose, Scope, Repository orientation and token discipline, Private development knowledge graph, Critical privacy rule | - |
 | `ChairSide.Board.sln` | Solution | - | - |
+| `CLAUDE.md` | Markdown | headings: Claude Code note | - |
 | `docs/executive-summary.md` | Markdown | headings: Executive Summary | - |
 | `docs/knowledge-graph/backlog-signals.md` | Markdown | headings: ChairSide knowledge graph backlog signals, High-value future graph expansions, Risks to preserve, Candidate relationships to add later | - |
 | `docs/knowledge-graph/chairside.graph.md` | Markdown | headings: ChairSide knowledge graph, Conceptual graph, Core invariants, Current reporting semantics captured by the graph, Known development affordances | - |
@@ -53,7 +54,7 @@ This file is mechanical output from `tools/knowledge-graph/New-ChairSideKnowledg
 | `src/ChairSide.Board/Services/ScheduleFitReport.cs` | CSharp | types: ScheduleFitReport, ScheduleFitReportBuilder<br>methods: Build | - |
 | `src/ChairSide.Board/Services/SqliteBoardRepository.cs` | CSharp | types: SqliteBoardRepository<br>methods: HasAnyRoomRows, LoadRooms, EnsureConfiguredRooms, ClearCompletedCycles, ResetActiveRooms, SaveRooms, SaveRoom, LoadCompletedCycles | - |
 | `src/ChairSide.Board/wwwroot/assets/icons/README.md` | Markdown | headings: Procedure icons, Tabler Icons license (MIT), Note | - |
-| `src/ChairSide.Board/wwwroot/board.js` | JavaScript | functions: getRoomNumber, getRoomToken, boot, loadBoard, loadReports, initDateRange, reportsRequestUrl, utcDateString | - |
+| `src/ChairSide.Board/wwwroot/board.js` | JavaScript | functions: getRoomNumber, getRoomToken, loadVersionBadge, boot, loadBoard, loadReports, initDateRange, reportsRequestUrl | - |
 | `src/ChairSide.Board/wwwroot/doctor.html` | Html | - | - |
 | `src/ChairSide.Board/wwwroot/index.html` | Html | - | - |
 | `src/ChairSide.Board/wwwroot/master.html` | Html | - | - |

@@ -1,12 +1,12 @@
 ﻿{
     "generatedStamp":  "deterministic",
     "root":  ".",
-    "fileCount":  64,
+    "fileCount":  65,
     "files":  [
                   {
                       "path":  "AGENTS.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  8391,
+                      "sizeBytes":  9490,
                       "typeSymbols":  [
 
                                       ],
@@ -31,6 +31,7 @@
                                        "Project name",
                                        "Purpose",
                                        "Scope",
+                                       "Repository orientation and token discipline",
                                        "Private development knowledge graph",
                                        "Critical privacy rule",
                                        "Doctors and colors",
@@ -70,6 +71,32 @@
                                           ],
                       "headings":  [
 
+                                   ]
+                  },
+                  {
+                      "path":  "CLAUDE.md",
+                      "kind":  "Markdown",
+                      "sizeBytes":  478,
+                      "typeSymbols":  [
+
+                                      ],
+                      "methodSymbols":  [
+
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+                                       "Claude Code note"
                                    ]
                   },
                   {
@@ -521,7 +548,7 @@
                   {
                       "path":  "src/ChairSide.Board/ChairSide.Board.csproj",
                       "kind":  "Project",
-                      "sizeBytes":  373,
+                      "sizeBytes":  997,
                       "typeSymbols":  [
 
                                       ],
@@ -1460,7 +1487,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/board.js",
                       "kind":  "JavaScript",
-                      "sizeBytes":  157963,
+                      "sizeBytes":  158737,
                       "typeSymbols":  [
 
                                       ],
@@ -1479,6 +1506,7 @@
                       "scriptFunctions":  [
                                               "getRoomNumber",
                                               "getRoomToken",
+                                              "loadVersionBadge",
                                               "boot",
                                               "loadBoard",
                                               "loadReports",
@@ -1555,8 +1583,7 @@
                                               "renderVarianceBadge",
                                               "renderAverageVarianceBadge",
                                               "renderReportFilterBar",
-                                              "syncReportFilterButtons",
-                                              "getInsightSummaries"
+                                              "syncReportFilterButtons"
                                           ],
                       "headings":  [
 
@@ -1565,7 +1592,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/doctor.html",
                       "kind":  "Html",
-                      "sizeBytes":  2121,
+                      "sizeBytes":  2133,
                       "typeSymbols":  [
 
                                       ],
@@ -1591,7 +1618,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/index.html",
                       "kind":  "Html",
-                      "sizeBytes":  2712,
+                      "sizeBytes":  2726,
                       "typeSymbols":  [
 
                                       ],
@@ -1617,7 +1644,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/master.html",
                       "kind":  "Html",
-                      "sizeBytes":  2712,
+                      "sizeBytes":  2726,
                       "typeSymbols":  [
 
                                       ],
@@ -1643,7 +1670,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/reports.html",
                       "kind":  "Html",
-                      "sizeBytes":  9888,
+                      "sizeBytes":  9898,
                       "typeSymbols":  [
 
                                       ],
@@ -1669,7 +1696,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/room.html",
                       "kind":  "Html",
-                      "sizeBytes":  5465,
+                      "sizeBytes":  5479,
                       "typeSymbols":  [
 
                                       ],
@@ -1695,7 +1722,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/room-1.html",
                       "kind":  "Html",
-                      "sizeBytes":  4663,
+                      "sizeBytes":  4677,
                       "typeSymbols":  [
 
                                       ],
@@ -1747,7 +1774,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/styles.css",
                       "kind":  "Css",
-                      "sizeBytes":  79483,
+                      "sizeBytes":  79708,
                       "typeSymbols":  [
 
                                       ],
@@ -1779,7 +1806,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/workshop.html",
                       "kind":  "Html",
-                      "sizeBytes":  11421,
+                      "sizeBytes":  11411,
                       "typeSymbols":  [
 
                                       ],
@@ -2058,7 +2085,7 @@
                   {
                       "path":  "tools/knowledge-graph/New-ChairSideKnowledgeGraph.ps1",
                       "kind":  "PowerShell",
-                      "sizeBytes":  11660,
+                      "sizeBytes":  11682,
                       "typeSymbols":  [
 
                                       ],
