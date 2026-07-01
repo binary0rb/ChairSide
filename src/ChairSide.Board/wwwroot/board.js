@@ -1622,11 +1622,34 @@ function renderSelectedDoctorTabContent(tab, r, agg) {
     return renderSelectedDoctorFlow(r, agg);
   }
 
-  const messages = {
-    trends: "Trend lines need full-range per-day case data. The current payload only guarantees the 25 most recent completed cycles, so this view is intentionally left blank for now.",
-    procedures: "Procedure mix by selected doctor is not included in the current report payload."
-  };
-  return `<p class="report-empty-note">${escapeHtml(messages[tab] || "Not enough data in the current payload.")}</p>`;
+  if (tab === "trends") {
+    return renderSelectedDoctorEmptyState(
+      "Trends",
+      "Trend charts are planned for this doctor view. Once enabled, this tab will show week-to-week or month-to-month movement for timing and flow metrics."
+    );
+  }
+
+  if (tab === "procedures") {
+    return renderSelectedDoctorEmptyState(
+      "Procedure Mix",
+      "Procedure-level doctor detail is planned for this view. For now, procedure mix is summarized in the overall report and Workshop views."
+    );
+  }
+
+  return renderSelectedDoctorEmptyState("Not Available", "This section isn't available with the current report payload.");
+}
+
+// Shared empty/placeholder card for selected-doctor tabs: a heading (with optional help bubble)
+// plus a plain-English note, reusing the same markup as the populated tab sections so an empty
+// tab still reads as an intentional part of the report rather than a broken or missing view.
+function renderSelectedDoctorEmptyState(title, body, helpText) {
+  return `
+    <section class="selected-doctor-overview">
+      <div class="selected-doctor-summary">
+        <h3>${escapeHtml(title)}${helpText ? renderHelpIcon(helpText) : ""}</h3>
+        <p class="report-empty-note">${escapeHtml(body)}</p>
+      </div>
+    </section>`;
 }
 
 function renderSelectedDoctorOverview(r, agg) {
@@ -1656,13 +1679,11 @@ function observedLoadNumber(value) {
 function renderSelectedDoctorFlow(r, agg) {
   const days = (r.observedDoctorDays || []).filter(day => day.doctorId === agg.doctorId);
   if (!days.length) {
-    return `
-      <section class="selected-doctor-overview">
-        <div class="selected-doctor-summary">
-          <h3>Observed Load${renderHelpIcon("Shows the doctor's observed room-flow load for the selected range. Descriptive only; not a ranking or score.")}</h3>
-          <p class="report-empty-note">No observed load data for this doctor in the current report payload.</p>
-        </div>
-      </section>`;
+    return renderSelectedDoctorEmptyState(
+      "Observed Load",
+      "No observed load data is available for this doctor in the current report range. This usually means there are no completed cycles for this doctor/date selection yet.",
+      "Shows the doctor's observed room-flow load for the selected range. Descriptive only; not a ranking or score."
+    );
   }
 
   const sorted = [...days].sort((a, b) => String(b.reportDate || "").localeCompare(String(a.reportDate || "")));
@@ -1756,7 +1777,10 @@ function describePeakActiveLoad(maxActiveRoomCount) {
 function renderSelectedDoctorAudit(r, doctorId) {
   const cycles = (r.recentCompletedCycles || []).filter(cycle => cycle.assignedDoctor === doctorId);
   if (!cycles.length) {
-    return `<p class="report-empty-note">No recent completed cycles for this doctor are available in the current payload.</p>`;
+    return renderSelectedDoctorEmptyState(
+      "Case Audit",
+      "No completed cycles are available for this doctor in the selected range yet. They'll appear here once cases wrap up."
+    );
   }
 
   return `
