@@ -693,6 +693,12 @@
                       "path":  "src/ChairSide.Board/Services/DemoBoardStore.cs"
                   },
                   {
+                      "id":  "symbol:type:DoctorProcedureMixRow",
+                      "label":  "DoctorProcedureMixRow",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/DemoBoardStore.cs"
+                  },
+                  {
                       "id":  "symbol:type:DoctorRosterItem",
                       "label":  "DoctorRosterItem",
                       "type":  "CodeType",
@@ -793,6 +799,12 @@
                       "label":  "NoopHubClients",
                       "type":  "CodeType",
                       "path":  "tests/ChairSide.Board.Tests/BoardStoreTests.cs"
+                  },
+                  {
+                      "id":  "symbol:type:ObservedDoctorDay",
+                      "label":  "ObservedDoctorDay",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/DemoBoardStore.cs"
                   },
                   {
                       "id":  "symbol:type:ObservedScheduleFitInputSummary",
@@ -1393,6 +1405,11 @@
                   },
                   {
                       "from":  "file:src/ChairSide.Board/Services/DemoBoardStore.cs",
+                      "to":  "symbol:type:DoctorProcedureMixRow",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/DemoBoardStore.cs",
                       "to":  "symbol:type:DoctorStyleProfile",
                       "label":  "declares"
                   },
@@ -1409,6 +1426,11 @@
                   {
                       "from":  "file:src/ChairSide.Board/Services/DemoBoardStore.cs",
                       "to":  "symbol:type:MaintenanceResetResult",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/DemoBoardStore.cs",
+                      "to":  "symbol:type:ObservedDoctorDay",
                       "label":  "declares"
                   },
                   {

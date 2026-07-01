@@ -76,7 +76,7 @@
                   {
                       "path":  "CLAUDE.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  478,
+                      "sizeBytes":  486,
                       "typeSymbols":  [
 
                                       ],
@@ -157,7 +157,7 @@
                   {
                       "path":  "docs/knowledge-graph/chairside.graph.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  4864,
+                      "sizeBytes":  6096,
                       "typeSymbols":  [
 
                                       ],
@@ -1026,7 +1026,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/DemoBoardStore.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  114573,
+                      "sizeBytes":  123649,
                       "typeSymbols":  [
                                           "ExceptionReasons",
                                           "ReportingExceptionReasons",
@@ -1037,6 +1037,8 @@
                                           "RoomStatus",
                                           "RoomEvent",
                                           "ReportsSnapshot",
+                                          "DoctorProcedureMixRow",
+                                          "ObservedDoctorDay",
                                           "struct",
                                           "CompletedRoomCycle",
                                           "DoctorCycleSummary",
@@ -1487,7 +1489,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/board.js",
                       "kind":  "JavaScript",
-                      "sizeBytes":  158737,
+                      "sizeBytes":  169379,
                       "typeSymbols":  [
 
                                       ],
@@ -1569,21 +1571,21 @@
                                               "renderSelectedDoctorPanel",
                                               "renderDoctorReportTabButton",
                                               "renderSelectedDoctorTabContent",
+                                              "renderSelectedDoctorEmptyState",
                                               "renderSelectedDoctorOverview",
+                                              "observedLoadNumber",
+                                              "renderSelectedDoctorFlow",
+                                              "formatObservedDayDate",
+                                              "describePeakActiveLoad",
+                                              "renderSelectedDoctorProcedures",
+                                              "formatProcedureShare",
                                               "renderSelectedDoctorAudit",
                                               "initialsFromDoctorName",
                                               "formatAbsoluteMinutes",
                                               "formatSignedMinutes",
                                               "renderDoctorAllocationRow",
                                               "renderProcedureAllocation",
-                                              "renderProcedureAllocationRow",
-                                              "describeAllocation",
-                                              "formatAverageVariancePerCase",
-                                              "varianceClass",
-                                              "renderVarianceBadge",
-                                              "renderAverageVarianceBadge",
-                                              "renderReportFilterBar",
-                                              "syncReportFilterButtons"
+                                              "renderProcedureAllocationRow"
                                           ],
                       "headings":  [
 
@@ -1774,7 +1776,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/styles.css",
                       "kind":  "Css",
-                      "sizeBytes":  79708,
+                      "sizeBytes":  81867,
                       "typeSymbols":  [
 
                                       ],
@@ -1832,7 +1834,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/BoardStoreTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  269504,
+                      "sizeBytes":  283083,
                       "typeSymbols":  [
                                           "BoardStoreTests",
                                           "is",
@@ -1884,10 +1886,10 @@
                                             "Sedation_modifier_can_be_added_and_removed_via_update_assignment",
                                             "Sedation_cases_report_as_distinct_variants_from_base_procedure",
                                             "Variant_summaries_carry_base_code_and_sedation_flag",
-                                            "Base_procedure_summaries_roll_up_variants_over_raw_cycles",
-                                            "Sedation_and_non_sedation_counts_partition_completed_cycles",
-                                            "Doctor_arrived_only_cycle_reports_finalized_waits_but_is_not_a_completed_cycle",
-                                            "Turnover_not_available_cycle_reports_doctor_in_room_but_not_completed_populations"
+                                            "Doctor_procedure_mix_groups_by_doctor_and_variant_with_shares",
+                                            "Doctor_procedure_mix_isolates_rows_and_denominators_per_doctor",
+                                            "Doctor_procedure_mix_excludes_incomplete_and_reporting_exception_cycles",
+                                            "Doctor_procedure_mix_skips_cycles_with_blank_doctor"
                                         ],
                       "routes":  [
 
