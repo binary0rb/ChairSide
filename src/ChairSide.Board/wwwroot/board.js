@@ -1630,10 +1630,7 @@ function renderSelectedDoctorTabContent(tab, r, agg) {
   }
 
   if (tab === "procedures") {
-    return renderSelectedDoctorEmptyState(
-      "Procedure Mix",
-      "Procedure-level doctor detail is planned for this view. For now, procedure mix is summarized in the overall report and Workshop views."
-    );
+    return renderSelectedDoctorProcedures(r, agg);
   }
 
   return renderSelectedDoctorEmptyState("Not Available", "This section isn't available with the current report payload.");
@@ -1772,6 +1769,56 @@ function describePeakActiveLoad(maxActiveRoomCount) {
     return "2 rooms active";
   }
   return "3+ rooms active";
+}
+
+// Selected-doctor Procedure Mix: the doctor's completed-case procedure breakdown for the range,
+// filtered from the additive doctorProcedureMix payload. Rows are variant-level (sedation shown as
+// a modifier chip, not a separate procedure); Share is each procedure's portion of this doctor's
+// completed cases. Light by design - a summary line plus a compact table, no charts.
+function renderSelectedDoctorProcedures(r, agg) {
+  const rows = (r.doctorProcedureMix || []).filter(row => row.doctorId === agg.doctorId);
+  if (!rows.length) {
+    return renderSelectedDoctorEmptyState(
+      "Procedure Mix",
+      "No procedure mix is available for this doctor in the current report range. This usually means there are no completed cases for this doctor/date selection yet.",
+      "Share is each procedure's portion of this doctor's completed cases in the selected range."
+    );
+  }
+
+  const totalCases = rows[0].doctorCompletedCaseCount || rows.reduce((sum, row) => sum + (row.caseCount || 0), 0);
+  const distinct = rows.length;
+
+  return `
+    <section class="selected-doctor-overview">
+      <div class="selected-doctor-summary">
+        <h3>Procedure Mix${renderHelpIcon("Share is each procedure's portion of this doctor's completed cases in the selected range. Sedation is shown as a modifier of the base procedure, not a separate procedure.")}</h3>
+        <p>${escapeHtml(String(totalCases))} completed case${totalCases === 1 ? "" : "s"} across ${escapeHtml(String(distinct))} procedure type${distinct === 1 ? "" : "s"} for this doctor in the selected range.</p>
+      </div>
+    </section>
+    <div class="selected-doctor-audit">
+      <table class="report-table">
+        <thead>
+          <tr>
+            <th>Procedure</th>
+            <th>Cases</th>
+            <th>Share</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rows.map(row => `
+            <tr>
+              <td>${escapeHtml(row.procedureLabel || row.procedureCode || "Unknown")}${row.isSedationCase ? ` <span class="sedation-chip">Sedation</span>` : ""}</td>
+              <td>${escapeHtml(String(row.caseCount ?? 0))}</td>
+              <td>${escapeHtml(formatProcedureShare(row.shareOfDoctorCases))}</td>
+            </tr>
+          `).join("")}
+        </tbody>
+      </table>
+    </div>`;
+}
+
+function formatProcedureShare(share) {
+  return Number.isFinite(share) ? `${Math.round(share * 100)}%` : "--";
 }
 
 function renderSelectedDoctorAudit(r, doctorId) {

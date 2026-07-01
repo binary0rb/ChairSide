@@ -601,7 +601,8 @@ public sealed class DemoBoardStore
                 BuildDoctorDailyAllocationSeries(standardCycles),
                 ScheduleFitReportBuilder.Build(standardCompletedCycles),
                 ReportTrendSnapshotBuilder.BuildWeekly(standardCompletedCycles),
-                BuildObservedDoctorDays(standardCompletedCycles));
+                BuildObservedDoctorDays(standardCompletedCycles),
+                BuildDoctorProcedureMix(standardCompletedCycles));
         }
     }
 
@@ -1860,6 +1861,39 @@ public sealed class DemoBoardStore
             .ThenBy(summary => summary.ProcedureLabel, StringComparer.OrdinalIgnoreCase)
             .ToList();
 
+    // Per-doctor procedure-variant mix over the same standard completed-cycle population as
+    // BuildProcedureSummaries / BuildObservedDoctorDays. Grouping is variant-level (matching
+    // BuildProcedureSummaries), so "EXT" and "EXT+SED" stay separate rows with sedation carried
+    // as a modifier via IsSedationCase + BaseProcedureCode - never a separately timed component.
+    // Cycles with a blank doctor are dropped (no doctor to attribute a share to). Each row's
+    // DoctorCompletedCaseCount is that doctor's total rows in this population, so per-doctor shares
+    // sum to 1. This only counts and groups existing cycles; it computes no timing metric.
+    private IReadOnlyList<DoctorProcedureMixRow> BuildDoctorProcedureMix(IReadOnlyList<CompletedRoomCycle> cycles) =>
+        cycles
+            .Where(cycle => !string.IsNullOrWhiteSpace(cycle.AssignedDoctor))
+            .GroupBy(cycle => cycle.AssignedDoctor!, StringComparer.OrdinalIgnoreCase)
+            .SelectMany(doctorGroup =>
+            {
+                var doctorCompletedCaseCount = doctorGroup.Count();
+                return doctorGroup
+                    .GroupBy(cycle => cycle.ProcedureCode ?? "", StringComparer.OrdinalIgnoreCase)
+                    .Select(procedureGroup => new DoctorProcedureMixRow(
+                        doctorGroup.Key,
+                        procedureGroup.Key,
+                        ResolveProcedureLabel(procedureGroup.Key),
+                        ResolveBaseProcedureCode(procedureGroup.Key),
+                        IsSedationProcedureCode(procedureGroup.Key),
+                        procedureGroup.Count(),
+                        doctorCompletedCaseCount,
+                        doctorCompletedCaseCount == 0
+                            ? 0d
+                            : (double)procedureGroup.Count() / doctorCompletedCaseCount));
+            })
+            .OrderBy(row => row.DoctorId, StringComparer.OrdinalIgnoreCase)
+            .ThenByDescending(row => row.CaseCount)
+            .ThenBy(row => row.ProcedureLabel, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
     // Resolves a display label for a procedure code: prefer the roster label, then the raw code,
     // then "Unknown". Never throws on a blank or unknown code so reports cannot crash.
     private string ResolveProcedureLabel(string procedureCode)
@@ -2251,7 +2285,25 @@ public sealed record ReportsSnapshot(
     // Observed doctor/day load over the same standard completed-cycle population as ScheduleFit and
     // Trends. Derived only from ChairSide room events; does not infer true schedule availability or
     // appointment-book columns.
-    IReadOnlyList<ObservedDoctorDay>? ObservedDoctorDays = null);
+    IReadOnlyList<ObservedDoctorDay>? ObservedDoctorDays = null,
+    // Per-doctor procedure-variant mix over the same standard completed-cycle population. Additive
+    // read model for the selected-doctor Procedure Mix tab; no existing metric semantics change.
+    IReadOnlyList<DoctorProcedureMixRow>? DoctorProcedureMix = null);
+
+public sealed record DoctorProcedureMixRow(
+    string DoctorId,
+    // Variant-level code ("EXT" vs "EXT+SED"). BaseProcedureCode strips the sedation modifier and
+    // IsSedationCase marks the "+SED"/legacy "SED" variants, so sedation stays a modifier of the
+    // primary procedure rather than a separate row concept.
+    string ProcedureCode,
+    string ProcedureLabel,
+    string BaseProcedureCode,
+    bool IsSedationCase,
+    int CaseCount,
+    // That doctor's total included completed cases in this population; per-doctor rows' CaseCounts
+    // sum to it, and ShareOfDoctorCases = CaseCount / DoctorCompletedCaseCount (0..1).
+    int DoctorCompletedCaseCount,
+    double ShareOfDoctorCases);
 
 public sealed record ObservedDoctorDay(
     string DoctorId,
