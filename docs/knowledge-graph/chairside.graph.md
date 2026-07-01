@@ -50,10 +50,15 @@ flowchart LR
     PhaseTimings["ReportMetric: Phase-complete timings"] --> Reports
     FullyCompletedPopulation["ReportMetric: Fully completed population"] --> Reports
     ReportingException["ReportMetric: Reporting exception count"] --> Reports
+    ReportsBuilder --> ProcedureMix["ReportMetric: Doctor procedure mix"]
+    FullyCompletedPopulation --> ProcedureMix
+    SedationModifier --> ProcedureMix
+    ProcedureMix --> ProcedureMixTab["UiSurface: Procedure Mix tab"]
 
     ReportingTests["TestGuard: Reporting semantics tests"] --> PhaseTimings
     ReportingTests --> FullyCompletedPopulation
     ReportingTests --> CompletedWindow
+    ReportingTests --> ProcedureMix
     ReportingDocs["TestGuard: Reporting time-window docs"] --> UtcDays
     ReportingDocs --> MondayWeeks
 
@@ -78,6 +83,8 @@ flowchart LR
 - Phase-complete timings can contribute before full Room Available completion.
 - Fully completed throughput, allocation, schedule-fit, and trend populations exclude incomplete cycles.
 - Exception completed cycles can affect relationships between total completed cycles and included completed cycle counts.
+- Selected-doctor procedure mix (`ReportsSnapshot.DoctorProcedureMix`, built by `BuildDoctorProcedureMix` in `DemoBoardStore.cs`) is an additive read model over the same standard/included completed-cycle population (`standardCompletedCycles`) as the other calculated metrics. It groups by doctor + procedure variant so sedation variants such as `EXT+SED` stay separate from the base `EXT`, keeping sedation a modifier of the primary procedure via `BaseProcedureCode`/`IsSedationCase`; each `DoctorProcedureMixRow` carries the case count, the doctor's completed-case denominator, and that procedure's share of the doctor's cases.
+- Procedure mix renders in the selected-doctor detail panel's `Procedure Mix` tab through `renderSelectedDoctorProcedures` in `board.js`, is guarded by `BoardStoreTests.cs` tests (grouping/shares, per-doctor denominators, excluded/incomplete cycles, blank-doctor skip), and introduced no schema or existing-metric-semantics changes.
 
 ## Known development affordances
 
