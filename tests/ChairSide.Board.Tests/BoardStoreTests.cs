@@ -4876,6 +4876,76 @@ public sealed class BoardStoreTests
         Assert.Equal(10, scheduleFit.Overall.TotalVarianceMinutes);
     }
 
+    [Fact]
+    public void Reports_observed_doctor_days_report_span_fields_for_included_completed_cycles()
+    {
+        using var workspace = TestWorkspace.Create();
+        var databasePath = workspace.ProductionDatabasePath();
+        var seed = StoreContext.Create(workspace, environmentName: Environments.Production, databasePath: databasePath);
+
+        var seatedAt = Utc(2026, 6, 10, 8);
+        SaveObservedCycle(
+            seed,
+            room: 1,
+            doctor: "otte",
+            code: "CON",
+            seatedAt: seatedAt,
+            readyForDoctorAt: seatedAt.AddMinutes(5),
+            doctorArrivedAt: seatedAt.AddMinutes(10),
+            doctorCompleteAt: seatedAt.AddMinutes(30),
+            roomAvailableAt: seatedAt.AddMinutes(40),
+            expectedUnits: 3);
+
+        SaveObservedCycle(
+            seed,
+            room: 2,
+            doctor: "otte",
+            code: "EXT",
+            seatedAt: seatedAt.AddMinutes(60),
+            readyForDoctorAt: seatedAt.AddMinutes(65),
+            doctorArrivedAt: seatedAt.AddMinutes(80),
+            doctorCompleteAt: seatedAt.AddMinutes(105),
+            roomAvailableAt: seatedAt.AddMinutes(115),
+            expectedUnits: 4);
+
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production, databasePath: databasePath);
+        var reports = context.Store.GetReports(ReportDateRange.FromDateStrings("2026-06-10", "2026-06-10"));
+
+        var day = Assert.Single(reports.ObservedDoctorDays!);
+        Assert.Equal("otte", day.DoctorId);
+        Assert.False(string.IsNullOrWhiteSpace(day.DoctorName));
+        Assert.Equal("2026-06-10", day.ReportDate);
+        Assert.Equal(2, day.EncounterCount);
+        Assert.Equal(seatedAt, day.FirstSeatedAt);
+        Assert.Equal(seatedAt.AddMinutes(10), day.FirstDoctorArrivedAt);
+        Assert.Equal(seatedAt.AddMinutes(105), day.LastDoctorCompleteAt);
+        Assert.Equal(seatedAt.AddMinutes(115), day.LastRoomAvailableAt);
+        Assert.Equal(105, day.ObservedClinicalSpanMinutes);
+        Assert.Equal(115, day.ObservedTeamSpanMinutes);
+    }
+
+    [Fact]
+    public void Reports_observed_doctor_days_bucket_active_room_minutes_by_concurrency()
+    {
+        using var workspace = TestWorkspace.Create();
+        var databasePath = workspace.ProductionDatabasePath();
+        var seed = StoreContext.Create(workspace, environmentName: Environments.Production, databasePath: databasePath);
+
+        var baseTime = Utc(2026, 6, 10, 8);
+        SaveObservedCycle(seed, room: 1, doctor: "otte", code: "CON", seatedAt: baseTime, readyForDoctorAt: baseTime.AddMinutes(5), doctorArrivedAt: baseTime.AddMinutes(10), doctorCompleteAt: baseTime.AddMinutes(30), roomAvailableAt: baseTime.AddMinutes(35), expectedUnits: 3);
+        SaveObservedCycle(seed, room: 2, doctor: "otte", code: "EXT", seatedAt: baseTime.AddMinutes(10), readyForDoctorAt: baseTime.AddMinutes(15), doctorArrivedAt: baseTime.AddMinutes(20), doctorCompleteAt: baseTime.AddMinutes(40), roomAvailableAt: baseTime.AddMinutes(45), expectedUnits: 3);
+        SaveObservedCycle(seed, room: 3, doctor: "otte", code: "IMP", seatedAt: baseTime.AddMinutes(20), readyForDoctorAt: baseTime.AddMinutes(25), doctorArrivedAt: baseTime.AddMinutes(30), doctorCompleteAt: baseTime.AddMinutes(50), roomAvailableAt: baseTime.AddMinutes(55), expectedUnits: 3);
+
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production, databasePath: databasePath);
+        var reports = context.Store.GetReports(ReportDateRange.FromDateStrings("2026-06-10", "2026-06-10"));
+
+        var day = Assert.Single(reports.ObservedDoctorDays!);
+        Assert.Equal(20, day.MinutesWithOneActiveRoom);
+        Assert.Equal(20, day.MinutesWithTwoActiveRooms);
+        Assert.Equal(10, day.MinutesWithThreeOrMoreActiveRooms);
+        Assert.Equal(3, day.MaxActiveRoomCount);
+    }
+
     private static DateTimeOffset Utc(int year, int month, int day, int hour, int minute = 0) =>
         new(year, month, day, hour, minute, 0, TimeSpan.Zero);
 
@@ -4906,6 +4976,43 @@ public sealed class BoardStoreTests
             ExpectedAllocationUnits = expectedUnits,
             ExpectedAllocationMinutes = expectedUnits * 10
         };
+        context.Repository.SaveCompletedCycle(cycle, context.Doctors, context.Procedures);
+    }
+
+    private static void SaveObservedCycle(
+        StoreContext context,
+        int room,
+        string doctor,
+        string code,
+        DateTimeOffset seatedAt,
+        DateTimeOffset readyForDoctorAt,
+        DateTimeOffset doctorArrivedAt,
+        DateTimeOffset doctorCompleteAt,
+        DateTimeOffset roomAvailableAt,
+        int expectedUnits)
+    {
+        var cycle = new CompletedRoomCycle
+        {
+            RoomId = room,
+            AssignedDoctor = doctor,
+            ProcedureCode = code,
+            SeatedAt = seatedAt,
+            ReadyForDoctorAt = readyForDoctorAt,
+            DoctorArrivedAt = doctorArrivedAt,
+            DoctorCompleteAt = doctorCompleteAt,
+            RoomAvailableAt = roomAvailableAt,
+            SeatedToDoctorSeconds = (int)(doctorArrivedAt - seatedAt).TotalSeconds,
+            PrepSeconds = (int)(readyForDoctorAt - seatedAt).TotalSeconds,
+            ReadyToDoctorSeconds = (int)(doctorArrivedAt - readyForDoctorAt).TotalSeconds,
+            DoctorInRoomSeconds = (int)(doctorCompleteAt - doctorArrivedAt).TotalSeconds,
+            TurnoverSeconds = (int)(roomAvailableAt - doctorCompleteAt).TotalSeconds,
+            TotalRoomCycleSeconds = (int)(roomAvailableAt - seatedAt).TotalSeconds,
+            FinalWaitState = "ready-for-doctor",
+            OriginalDefaultExpectedUnits = expectedUnits,
+            ExpectedAllocationUnits = expectedUnits,
+            ExpectedAllocationMinutes = expectedUnits * 10
+        };
+
         context.Repository.SaveCompletedCycle(cycle, context.Doctors, context.Procedures);
     }
 

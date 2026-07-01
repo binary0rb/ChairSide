@@ -600,7 +600,8 @@ public sealed class DemoBoardStore
                 totalCompletedAllTime,
                 BuildDoctorDailyAllocationSeries(standardCycles),
                 ScheduleFitReportBuilder.Build(standardCompletedCycles),
-                ReportTrendSnapshotBuilder.BuildWeekly(standardCompletedCycles));
+                ReportTrendSnapshotBuilder.BuildWeekly(standardCompletedCycles),
+                BuildObservedDoctorDays(standardCompletedCycles));
         }
     }
 
@@ -1698,6 +1699,108 @@ public sealed class DemoBoardStore
             .OrderBy(item => item.DoctorId)
             .ToList();
 
+    // Groups included completed cycles by (doctor, UTC calendar day of DoctorCompleteAt) and reports
+    // the observed clinical-day shape from ChairSide events only. This intentionally does not infer
+    // true schedule availability, vacation/meeting blocks, or appointment-book columns.
+    private IReadOnlyList<ObservedDoctorDay> BuildObservedDoctorDays(IReadOnlyList<CompletedRoomCycle> cycles) =>
+        cycles
+            .Where(cycle => cycle.DoctorCompleteAt.HasValue && cycle.RoomAvailableAt.HasValue)
+            .GroupBy(cycle => new
+            {
+                DoctorId = cycle.AssignedDoctor ?? "",
+                ReportDate = DateOnly.FromDateTime(cycle.DoctorCompleteAt!.Value.UtcDateTime)
+            })
+            .Select(group =>
+            {
+                var dayCycles = group.ToList();
+                var firstSeatedAt = dayCycles.Min(cycle => cycle.SeatedAt);
+                var firstDoctorArrivedAt = dayCycles
+                    .Where(cycle => cycle.DoctorArrivedAt.HasValue)
+                    .Select(cycle => (DateTimeOffset?)cycle.DoctorArrivedAt!.Value)
+                    .OrderBy(value => value)
+                    .FirstOrDefault();
+                var lastDoctorCompleteAt = dayCycles.Max(cycle => cycle.DoctorCompleteAt!.Value);
+                var lastRoomAvailableAt = dayCycles.Max(cycle => cycle.RoomAvailableAt!.Value);
+                var concurrency = BuildObservedRoomConcurrency(dayCycles);
+
+                return new ObservedDoctorDay(
+                    group.Key.DoctorId,
+                    ResolveDoctorDisplayName(group.Key.DoctorId) ?? group.Key.DoctorId,
+                    group.Key.ReportDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+                    dayCycles.Count,
+                    firstSeatedAt,
+                    firstDoctorArrivedAt,
+                    lastDoctorCompleteAt,
+                    lastRoomAvailableAt,
+                    ObservedLoadWholeMinutesBetween(firstSeatedAt, lastDoctorCompleteAt),
+                    ObservedLoadWholeMinutesBetween(firstSeatedAt, lastRoomAvailableAt),
+                    concurrency.MinutesWithOneActiveRoom,
+                    concurrency.MinutesWithTwoActiveRooms,
+                    concurrency.MinutesWithThreeOrMoreActiveRooms,
+                    concurrency.MaxActiveRoomCount);
+            })
+            .OrderBy(day => day.ReportDate, StringComparer.Ordinal)
+            .ThenBy(day => day.DoctorId, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+    private static ObservedRoomConcurrency BuildObservedRoomConcurrency(IReadOnlyList<CompletedRoomCycle> cycles)
+    {
+        var events = new List<(DateTimeOffset At, int Delta)>();
+        foreach (var cycle in cycles)
+        {
+            if (!cycle.DoctorCompleteAt.HasValue || cycle.DoctorCompleteAt.Value <= cycle.SeatedAt)
+            {
+                continue;
+            }
+
+            events.Add((cycle.SeatedAt, 1));
+            events.Add((cycle.DoctorCompleteAt.Value, -1));
+        }
+
+        var activeRoomCount = 0;
+        var maxActiveRoomCount = 0;
+        var minutesWithOneActiveRoom = 0;
+        var minutesWithTwoActiveRooms = 0;
+        var minutesWithThreeOrMoreActiveRooms = 0;
+        DateTimeOffset? previousAt = null;
+
+        foreach (var point in events
+            .GroupBy(item => item.At)
+            .OrderBy(group => group.Key)
+            .Select(group => new { At = group.Key, Delta = group.Sum(item => item.Delta) }))
+        {
+            if (previousAt.HasValue && point.At > previousAt.Value && activeRoomCount > 0)
+            {
+                var minutes = ObservedLoadWholeMinutesBetween(previousAt.Value, point.At);
+                if (activeRoomCount == 1)
+                {
+                    minutesWithOneActiveRoom += minutes;
+                }
+                else if (activeRoomCount == 2)
+                {
+                    minutesWithTwoActiveRooms += minutes;
+                }
+                else
+                {
+                    minutesWithThreeOrMoreActiveRooms += minutes;
+                }
+            }
+
+            activeRoomCount = Math.Max(0, activeRoomCount + point.Delta);
+            maxActiveRoomCount = Math.Max(maxActiveRoomCount, activeRoomCount);
+            previousAt = point.At;
+        }
+
+        return new ObservedRoomConcurrency(
+            minutesWithOneActiveRoom,
+            minutesWithTwoActiveRooms,
+            minutesWithThreeOrMoreActiveRooms,
+            maxActiveRoomCount);
+    }
+
+    private static int ObservedLoadWholeMinutesBetween(DateTimeOffset start, DateTimeOffset end) =>
+        end <= start ? 0 : Math.Max(0, (int)(end - start).TotalMinutes);
+
     // Groups normal, non-exception completed cycles by procedure code and produces a per-procedure
     // baseline. The supplied cycles are the same normalCompletedCycles already used by the global
     // report, so exception and reviewed-exception cycles are excluded upstream, and the occupied /
@@ -2144,7 +2247,33 @@ public sealed record ReportsSnapshot(
     ScheduleFitReport? ScheduleFit = null,
     // Weekly historical wait trend over the same standard completed-cycle population as the main
     // report aggregates. Additive, summary-only, and not rendered by the frontend yet.
-    ReportTrendSnapshot? Trends = null);
+    ReportTrendSnapshot? Trends = null,
+    // Observed doctor/day load over the same standard completed-cycle population as ScheduleFit and
+    // Trends. Derived only from ChairSide room events; does not infer true schedule availability or
+    // appointment-book columns.
+    IReadOnlyList<ObservedDoctorDay>? ObservedDoctorDays = null);
+
+public sealed record ObservedDoctorDay(
+    string DoctorId,
+    string DoctorName,
+    string ReportDate,
+    int EncounterCount,
+    DateTimeOffset FirstSeatedAt,
+    DateTimeOffset? FirstDoctorArrivedAt,
+    DateTimeOffset LastDoctorCompleteAt,
+    DateTimeOffset LastRoomAvailableAt,
+    int ObservedClinicalSpanMinutes,
+    int ObservedTeamSpanMinutes,
+    int MinutesWithOneActiveRoom,
+    int MinutesWithTwoActiveRooms,
+    int MinutesWithThreeOrMoreActiveRooms,
+    int MaxActiveRoomCount);
+
+internal readonly record struct ObservedRoomConcurrency(
+    int MinutesWithOneActiveRoom,
+    int MinutesWithTwoActiveRooms,
+    int MinutesWithThreeOrMoreActiveRooms,
+    int MaxActiveRoomCount);
 
 /// <summary>
 /// A completed-cycle reporting window. Dates are interpreted as whole UTC calendar days (start
