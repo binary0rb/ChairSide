@@ -977,15 +977,15 @@ function renderReportHeadline(r, hasData) {
     renderHeadlineCard("Completed Cases", String(r.completedRoomCyclesCount ?? 0)),
     renderHeadlineCard("Avg Total to Doctor", formatDuration(r.averageSeatedToDoctorSeconds)),
     renderHeadlineCard("Avg Doctor Time", formatDuration(r.averageDoctorInRoomSeconds)),
-    renderHeadlineCard("Exceptions to Review", String(exceptions)),
-    renderHeadlineCard("Sedation Cases", `${r.sedationCaseCount ?? 0} / ${r.completedRoomCyclesCount ?? 0}`)
+    renderHeadlineCard("Exceptions to Review", String(exceptions), "Completed cycles excluded or flagged because they do not fit normal reporting assumptions."),
+    renderHeadlineCard("Sedation Cases", `${r.sedationCaseCount ?? 0} / ${r.completedRoomCyclesCount ?? 0}`, "Separates cases where sedation was selected from non-sedation cases for reporting context.")
   ].join("");
 }
 
-function renderHeadlineCard(label, value) {
+function renderHeadlineCard(label, value, helpText) {
   return `
     <article class="metric-card headline-card">
-      <span>${escapeHtml(label)}</span>
+      <span>${escapeHtml(label)}</span>${helpText ? renderHelpIcon(helpText) : ""}
       <strong>${escapeHtml(value)}</strong>
     </article>
   `;
@@ -1306,7 +1306,7 @@ function renderAllocationBalanceCard(r) {
   if (!a || (a.allocationVarianceCycleCount || 0) === 0) {
     card.innerHTML = `
       ${pill}
-      <h3>Overall Allocation Balance</h3>
+      <h3>Overall Allocation Balance${renderHelpIcon("Planned time budget based on the selected procedure mix and allocation settings.")}</h3>
       <p class="allocation-empty">No allocation variance data available for this report view.</p>`;
     return;
   }
@@ -1438,9 +1438,10 @@ function renderDoctorCardBody(agg, report, name, identity) {
         <dt>Avg</dt>
         <dd class="${escapeAttribute(varianceClass(average))}">${escapeHtml(formatSignedMinutes(average))}</dd>
       </div>
-      <div>
+      <div class="doctor-card-metric--help-corner">
         <dt>O / U / A</dt>
         <dd>${escapeHtml(`${agg.over} / ${agg.under} / ${agg.at}`)}</dd>
+        ${renderHelpIcon("O/U/A means Over, Under, or At target compared with expected procedure allocation.", "corner")}
       </div>
     </dl>
     ${renderDoctorSparkline(sparkPoints)}`;
@@ -1655,7 +1656,13 @@ function observedLoadNumber(value) {
 function renderSelectedDoctorFlow(r, agg) {
   const days = (r.observedDoctorDays || []).filter(day => day.doctorId === agg.doctorId);
   if (!days.length) {
-    return `<p class="report-empty-note">No observed load data for this doctor in the current report payload.</p>`;
+    return `
+      <section class="selected-doctor-overview">
+        <div class="selected-doctor-summary">
+          <h3>Observed Load${renderHelpIcon("Shows the doctor's observed room-flow load for the selected range. Descriptive only; not a ranking or score.")}</h3>
+          <p class="report-empty-note">No observed load data for this doctor in the current report payload.</p>
+        </div>
+      </section>`;
   }
 
   const sorted = [...days].sort((a, b) => String(b.reportDate || "").localeCompare(String(a.reportDate || "")));
@@ -1681,7 +1688,7 @@ function renderSelectedDoctorFlow(r, agg) {
   return `
     <section class="selected-doctor-overview">
       <div class="selected-doctor-summary">
-        <h3>Observed Load</h3>
+        <h3>Observed Load${renderHelpIcon("Shows the doctor's observed room-flow load for the selected range. Descriptive only; not a ranking or score.")}</h3>
         <p>Across ${escapeHtml(String(days.length))} observed day${days.length === 1 ? "" : "s"}, this doctor completed ${escapeHtml(String(completedCases))} case${completedCases === 1 ? "" : "s"} with a typical clinical span of ${escapeHtml(formatAllocationMinutes(avgClinicalSpan))} per day.</p>
         <p>${escapeHtml(overlapSentence)}</p>
         <p class="allocation-footnote">Observed Load is descriptive only: it shows room overlap and span pressure, not provider ranking or staff performance scoring.</p>
@@ -1689,8 +1696,8 @@ function renderSelectedDoctorFlow(r, agg) {
       <dl class="selected-doctor-kpis">
         <div><dt>Days observed</dt><dd>${escapeHtml(String(days.length))}</dd></div>
         <div><dt>Completed cases</dt><dd>${escapeHtml(String(completedCases))}</dd></div>
-        <div><dt>Avg clinical span</dt><dd>${escapeHtml(formatAllocationMinutes(avgClinicalSpan))}</dd></div>
-        <div><dt>Peak active load</dt><dd>${escapeHtml(describePeakActiveLoad(peakActiveRooms))}</dd></div>
+        <div><dt>Avg clinical span${renderHelpIcon("Average observed span per day from first seated case through last Doctor Complete.")}</dt><dd>${escapeHtml(formatAllocationMinutes(avgClinicalSpan))}</dd></div>
+        <div><dt>Peak active load${renderHelpIcon("Highest number of active rooms overlapping for this doctor on an observed day.")}</dt><dd>${escapeHtml(describePeakActiveLoad(peakActiveRooms))}</dd></div>
       </dl>
     </section>
     <div class="selected-doctor-audit">
@@ -2024,7 +2031,7 @@ function renderFullMetrics(r, hasData) {
 
   const dur = seconds => (hasData ? formatDuration(seconds) : "—");
   summary.innerHTML = [
-    renderMetric("Completed Cycles", r.completedRoomCyclesCount),
+    renderMetric("Completed Cycles", r.completedRoomCyclesCount, "Room cycles that reached completion and are available for reporting."),
     renderMetric("Sedation Cases", r.sedationCaseCount),
     renderMetric("Non-sedation Cases", r.nonSedationCaseCount),
     renderMetric("Exceptions Requiring Review", (r.exceptionCycles || []).length),
@@ -2032,18 +2039,18 @@ function renderFullMetrics(r, hasData) {
     renderMetric("Median Prep Time", dur(r.medianPrepSeconds)),
     renderMetric("Avg Ready-to-Doctor Wait", dur(r.averageReadyToDoctorSeconds)),
     renderMetric("Median Ready-to-Doctor Wait", dur(r.medianReadyToDoctorSeconds)),
-    renderMetric("Avg Doctor Occupied Wait", dur(r.averageDoctorOccupiedWaitSeconds)),
+    renderMetric("Avg Doctor Occupied Wait", dur(r.averageDoctorOccupiedWaitSeconds), "Time a patient was ready while the doctor was already active in another room."),
     renderMetric("Median Doctor Occupied Wait", dur(r.medianDoctorOccupiedWaitSeconds)),
-    renderMetric("Avg Doctor Available Wait", dur(r.averageDoctorAvailableWaitSeconds)),
+    renderMetric("Avg Doctor Available Wait", dur(r.averageDoctorAvailableWaitSeconds), "Time a patient was ready while the doctor was not occupied in another active room."),
     renderMetric("Median Doctor Available Wait", dur(r.medianDoctorAvailableWaitSeconds)),
     renderMetric("Avg Total to Doctor", dur(r.averageSeatedToDoctorSeconds)),
     renderMetric("Median Total to Doctor", dur(r.medianSeatedToDoctorSeconds)),
     renderMetric("Avg In Room", dur(r.averageDoctorInRoomSeconds)),
     renderMetric("Median In Room", dur(r.medianDoctorInRoomSeconds)),
-    renderMetric("Avg Turnover", dur(r.averageTurnoverSeconds)),
+    renderMetric("Avg Turnover", dur(r.averageTurnoverSeconds), "Time from Doctor Complete until the room is marked Available."),
     renderMetric("Median Turnover", dur(r.medianTurnoverSeconds)),
-    renderMetric("Aging Events", r.agingEventCount),
-    renderMetric("Stale Events", r.staleEventCount)
+    renderMetric("Aging Events", r.agingEventCount, "Ready-room wait has crossed the aging threshold and may need attention."),
+    renderMetric("Stale Events", r.staleEventCount, "Ready-room wait has crossed the stale threshold and should be treated as higher priority.")
   ].join("");
 }
 
@@ -2502,15 +2509,15 @@ function renderWorkshop() {
   const stats = [
     ["Cases analyzed", `${fit.scheduleFitCycleCount} of ${fit.includedCycleCount}`],
     ["Expected blocks", formatBlocks(overall.totalExpectedBlocks)],
-    ["Actual case-flow blocks", formatBlocks(overall.totalActualBlocks)],
-    ["Schedule debt", formatWholeMinutes(overall.totalDebtMinutes)],
-    ["Raw slack observed", formatWholeMinutes(overall.totalSlackMinutes)],
-    ["Utilization vs expected", utilization]
+    ["Actual case-flow blocks", formatBlocks(overall.totalActualBlocks), "Observed case-flow time converted into schedule-sized blocks for easier comparison."],
+    ["Schedule debt", formatWholeMinutes(overall.totalDebtMinutes), "Time cases ran over expected allocation. Useful for planning, not blame."],
+    ["Raw slack observed", formatWholeMinutes(overall.totalSlackMinutes), "Time cases ran under expected allocation. It is observed slack, not automatically reusable capacity."],
+    ["Utilization vs expected", utilization, "How observed case-flow time compares with expected allocated time for the selected range."]
   ];
 
-  const tiles = stats.map(([label, value]) => `
+  const tiles = stats.map(([label, value, helpText]) => `
     <div class="workshop-stat">
-      <span class="workshop-stat-label">${escapeHtml(label)}</span>
+      <span class="workshop-stat-label">${escapeHtml(label)}${helpText ? renderHelpIcon(helpText) : ""}</span>
       <strong class="workshop-stat-value">${escapeHtml(value)}</strong>
     </div>
   `).join("");
@@ -2805,10 +2812,10 @@ function adminRequestHeaders() {
   return token ? { [adminAccess.headerName]: token } : {};
 }
 
-function renderMetric(label, value) {
+function renderMetric(label, value, helpText) {
   return `
     <article class="metric-card">
-      <span>${escapeHtml(label)}</span>
+      <span>${escapeHtml(label)}</span>${helpText ? renderHelpIcon(helpText) : ""}
       <strong>${escapeHtml(value)}</strong>
     </article>
   `;
@@ -3197,6 +3204,18 @@ function escapeHtml(value) {
 
 function escapeAttribute(value) {
   return escapeHtml(value);
+}
+
+// Reusable inline help bubble: a small "?" badge that reveals a short explanation on hover or
+// keyboard focus. aria-label carries the full text so screen readers announce it on focus without
+// needing a separate aria-describedby wire-up.
+function renderHelpIcon(helpText, placement) {
+  const text = escapeHtml(helpText);
+  const modifier = placement === "corner" ? " help-icon--corner" : "";
+  return `<span class="help-icon${modifier}" tabindex="0" aria-label="Help: ${text}">
+    <span aria-hidden="true">?</span>
+    <span class="help-icon-bubble" aria-hidden="true">${text}</span>
+  </span>`;
 }
 
 function syncRoomSelection(room) {
