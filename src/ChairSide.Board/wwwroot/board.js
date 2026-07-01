@@ -1617,10 +1617,13 @@ function renderSelectedDoctorTabContent(tab, r, agg) {
     return renderSelectedDoctorOverview(r, agg);
   }
 
+  if (tab === "flow") {
+    return renderSelectedDoctorFlow(r, agg);
+  }
+
   const messages = {
     trends: "Trend lines need full-range per-day case data. The current payload only guarantees the 25 most recent completed cycles, so this view is intentionally left blank for now.",
-    procedures: "Procedure mix by selected doctor is not included in the current report payload.",
-    flow: "Detailed flow breakdown by selected doctor is not included in the current report payload."
+    procedures: "Procedure mix by selected doctor is not included in the current report payload."
   };
   return `<p class="report-empty-note">${escapeHtml(messages[tab] || "Not enough data in the current payload.")}</p>`;
 }
@@ -1642,6 +1645,105 @@ function renderSelectedDoctorOverview(r, agg) {
         <div><dt>Pressure point</dt><dd>${escapeHtml(mainPressurePoint(agg))}</dd></div>
       </dl>
     </section>`;
+}
+
+function observedLoadNumber(value) {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : 0;
+}
+
+function renderSelectedDoctorFlow(r, agg) {
+  const days = (r.observedDoctorDays || []).filter(day => day.doctorId === agg.doctorId);
+  if (!days.length) {
+    return `<p class="report-empty-note">No observed load data for this doctor in the current report payload.</p>`;
+  }
+
+  const sorted = [...days].sort((a, b) => String(b.reportDate || "").localeCompare(String(a.reportDate || "")));
+  const recent = sorted.slice(0, 10);
+
+  const completedCases = days.reduce((sum, day) => sum + observedLoadNumber(day.encounterCount), 0);
+  const finiteSpans = days.map(day => day.observedClinicalSpanMinutes).filter(Number.isFinite);
+  const avgClinicalSpan = finiteSpans.length
+    ? finiteSpans.reduce((sum, minutes) => sum + minutes, 0) / finiteSpans.length
+    : Number.NaN;
+  const peakActiveRooms = days.reduce(
+    (max, day) => Number.isFinite(day.maxActiveRoomCount) ? Math.max(max, day.maxActiveRoomCount) : max,
+    0
+  );
+  const oneRoomMinutes = days.reduce((sum, day) => sum + observedLoadNumber(day.minutesWithOneActiveRoom), 0);
+  const twoRoomMinutes = days.reduce((sum, day) => sum + observedLoadNumber(day.minutesWithTwoActiveRooms), 0);
+  const threePlusRoomMinutes = days.reduce((sum, day) => sum + observedLoadNumber(day.minutesWithThreeOrMoreActiveRooms), 0);
+  const stackedMinutes = twoRoomMinutes + threePlusRoomMinutes;
+  const overlapSentence = stackedMinutes > 0
+    ? `Observed active room time included ${formatAllocationMinutes(stackedMinutes)} with overlapping rooms.`
+    : "Observed active room time stayed in single-room flow for this range.";
+
+  return `
+    <section class="selected-doctor-overview">
+      <div class="selected-doctor-summary">
+        <h3>Observed Load</h3>
+        <p>Across ${escapeHtml(String(days.length))} observed day${days.length === 1 ? "" : "s"}, this doctor completed ${escapeHtml(String(completedCases))} case${completedCases === 1 ? "" : "s"} with a typical clinical span of ${escapeHtml(formatAllocationMinutes(avgClinicalSpan))} per day.</p>
+        <p>${escapeHtml(overlapSentence)}</p>
+        <p class="allocation-footnote">Observed Load is descriptive only: it shows room overlap and span pressure, not provider ranking or staff performance scoring.</p>
+      </div>
+      <dl class="selected-doctor-kpis">
+        <div><dt>Days observed</dt><dd>${escapeHtml(String(days.length))}</dd></div>
+        <div><dt>Completed cases</dt><dd>${escapeHtml(String(completedCases))}</dd></div>
+        <div><dt>Avg clinical span</dt><dd>${escapeHtml(formatAllocationMinutes(avgClinicalSpan))}</dd></div>
+        <div><dt>Peak active load</dt><dd>${escapeHtml(describePeakActiveLoad(peakActiveRooms))}</dd></div>
+      </dl>
+    </section>
+    <div class="selected-doctor-audit">
+      <table class="report-table">
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Cases</th>
+            <th>Clinical Span</th>
+            <th>Team Span</th>
+            <th>Peak Load</th>
+            <th>1 room</th>
+            <th>2 rooms</th>
+            <th>3+ rooms</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${recent.map(day => `
+            <tr>
+              <td>${escapeHtml(formatObservedDayDate(day.reportDate))}</td>
+              <td>${escapeHtml(Number.isFinite(day.encounterCount) ? String(day.encounterCount) : "--")}</td>
+              <td>${escapeHtml(formatAllocationMinutes(day.observedClinicalSpanMinutes))}</td>
+              <td>${escapeHtml(formatAllocationMinutes(day.observedTeamSpanMinutes))}</td>
+              <td>${escapeHtml(describePeakActiveLoad(day.maxActiveRoomCount))}</td>
+              <td>${escapeHtml(formatAllocationMinutes(day.minutesWithOneActiveRoom))}</td>
+              <td>${escapeHtml(formatAllocationMinutes(day.minutesWithTwoActiveRooms))}</td>
+              <td>${escapeHtml(formatAllocationMinutes(day.minutesWithThreeOrMoreActiveRooms))}</td>
+            </tr>
+          `).join("")}
+        </tbody>
+      </table>
+      ${days.length > recent.length
+        ? `<p class="allocation-footnote">Showing the ${recent.length} most recent observed days of ${days.length} total.</p>`
+        : ""}
+    </div>`;
+}
+
+function formatObservedDayDate(value) {
+  const parsed = parseReportDateOnly(value);
+  return parsed ? formatReportDateOnly(parsed) : "--";
+}
+
+function describePeakActiveLoad(maxActiveRoomCount) {
+  if (!Number.isFinite(maxActiveRoomCount) || maxActiveRoomCount < 1) {
+    return "--";
+  }
+  if (maxActiveRoomCount === 1) {
+    return "1 room active";
+  }
+  if (maxActiveRoomCount === 2) {
+    return "2 rooms active";
+  }
+  return "3+ rooms active";
 }
 
 function renderSelectedDoctorAudit(r, doctorId) {
