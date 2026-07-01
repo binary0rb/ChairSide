@@ -2115,6 +2115,78 @@ button:disabled {
   font-style: italic;
 }
 
+/* Reusable inline help bubble: small "?" badge, reveals a compact note-card explanation on
+   hover or keyboard focus. Kept deliberately calm - no animation beyond a quick fade. */
+.help-icon {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 15px;
+  height: 15px;
+  margin-left: 6px;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: #f8fafc;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1;
+  cursor: help;
+  vertical-align: middle;
+}
+
+.help-icon-bubble {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  z-index: 20;
+  width: max-content;
+  max-width: 220px;
+  padding: 8px 10px;
+  border: 1px solid #fde68a;
+  border-radius: 8px;
+  background: #fffbeb;
+  color: #78350f;
+  font-size: 12px;
+  font-weight: 500;
+  font-style: normal;
+  line-height: 1.4;
+  text-align: left;
+  text-transform: none;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.14);
+  opacity: 0;
+  visibility: hidden;
+  transform: translateX(-50%);
+  transition: opacity 0.12s ease;
+  pointer-events: none;
+}
+
+.help-icon:hover .help-icon-bubble,
+.help-icon:focus-visible .help-icon-bubble {
+  opacity: 1;
+  visibility: visible;
+}
+
+/* Corner placement: the icon sits absolutely at the lower-right of its metric cell (the cell
+   must set position: relative) instead of inline after the label, and its bubble opens upward
+   and left from there. Used where the cell is too small for the default centered-above bubble
+   to fit without clipping. */
+.help-icon--corner {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  margin-left: 0;
+}
+
+.help-icon--corner .help-icon-bubble {
+  top: auto;
+  bottom: calc(100% + 8px);
+  left: auto;
+  right: 0;
+  transform: none;
+}
+
 /* Modifier (sedation) filters tucked under a disclosure so sedation is not a primary axis. */
 .report-advanced-filters {
   border: 1px solid var(--line);
@@ -2303,6 +2375,12 @@ button:disabled {
   background: rgba(248, 250, 252, 0.86);
 }
 
+/* A corner-placed help bubble needs to render outside this grid's own bounds (into the roomier
+   card above it) rather than being clipped by the rounded-corner overflow:hidden here. */
+.doctor-report-metrics:has(.help-icon--corner) {
+  overflow: visible;
+}
+
 .doctor-report-metrics > div {
   display: grid;
   gap: 4px;
@@ -2310,6 +2388,10 @@ button:disabled {
   padding: 9px 10px;
   border-right: 1px solid #e2e8f0;
   border-bottom: 1px solid #e2e8f0;
+}
+
+.doctor-card-metric--help-corner {
+  position: relative;
 }
 
 .doctor-report-metrics > div:nth-child(even),
