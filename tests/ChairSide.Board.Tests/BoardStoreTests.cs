@@ -821,6 +821,160 @@ public sealed class BoardStoreTests
     }
 
     [Fact]
+    public void Doctor_procedure_mix_groups_by_doctor_and_variant_with_shares()
+    {
+        using var workspace = TestWorkspace.Create();
+        var baseTime = new DateTimeOffset(2026, 6, 1, 8, 0, 0, TimeSpan.Zero);
+        var clock = new ManualTimeProvider(baseTime);
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production, timeProvider: clock);
+
+        // Otte: two plain extractions and one extraction-with-sedation, so the denominator is 3 and
+        // the sedation variant stays a separate row from the plain extraction.
+        RunProcedureCycle(context, clock, baseTime, 1, "otte", "EXT", prepMin: 5, readyMin: 10, doctorMin: 10, turnoverMin: 5);
+        RunProcedureCycle(context, clock, baseTime.AddHours(1), 1, "otte", "EXT", prepMin: 5, readyMin: 10, doctorMin: 10, turnoverMin: 5);
+        RunProcedureCycle(context, clock, baseTime.AddHours(2), 2, "otte", "EXT", prepMin: 5, readyMin: 10, doctorMin: 10, turnoverMin: 5, sedation: true);
+
+        var otteRows = context.Store.GetReports().DoctorProcedureMix!
+            .Where(row => row.DoctorId == "otte")
+            .ToList();
+        Assert.Equal(2, otteRows.Count);
+
+        var plain = Assert.Single(otteRows, row => row.ProcedureCode == "EXT");
+        Assert.Equal("Extraction", plain.ProcedureLabel);
+        Assert.Equal("EXT", plain.BaseProcedureCode);
+        Assert.False(plain.IsSedationCase);
+        Assert.Equal(2, plain.CaseCount);
+        Assert.Equal(3, plain.DoctorCompletedCaseCount);
+        Assert.Equal(2d / 3d, plain.ShareOfDoctorCases, 3);
+
+        var sedationVariant = Assert.Single(otteRows, row => row.ProcedureCode == "EXT+SED");
+        Assert.Equal("EXT", sedationVariant.BaseProcedureCode);
+        Assert.True(sedationVariant.IsSedationCase);
+        Assert.Equal(1, sedationVariant.CaseCount);
+        Assert.Equal(3, sedationVariant.DoctorCompletedCaseCount);
+        Assert.Equal(1d / 3d, sedationVariant.ShareOfDoctorCases, 3);
+
+        // Ordered by case count descending within the doctor.
+        Assert.Equal("EXT", otteRows[0].ProcedureCode);
+    }
+
+    [Fact]
+    public void Doctor_procedure_mix_isolates_rows_and_denominators_per_doctor()
+    {
+        using var workspace = TestWorkspace.Create();
+        var baseTime = new DateTimeOffset(2026, 6, 1, 8, 0, 0, TimeSpan.Zero);
+        var clock = new ManualTimeProvider(baseTime);
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production, timeProvider: clock);
+
+        // Otte: two extractions. Pledger: one consult. Each doctor's denominator is its own.
+        RunProcedureCycle(context, clock, baseTime, 1, "otte", "EXT", prepMin: 5, readyMin: 10, doctorMin: 10, turnoverMin: 5);
+        RunProcedureCycle(context, clock, baseTime.AddHours(1), 1, "otte", "EXT", prepMin: 5, readyMin: 10, doctorMin: 10, turnoverMin: 5);
+        RunProcedureCycle(context, clock, baseTime.AddHours(2), 2, "pledger", "CON", prepMin: 5, readyMin: 10, doctorMin: 10, turnoverMin: 5);
+
+        var mix = context.Store.GetReports().DoctorProcedureMix!;
+
+        var otte = Assert.Single(mix, row => row.DoctorId == "otte");
+        Assert.Equal("EXT", otte.ProcedureCode);
+        Assert.Equal(2, otte.CaseCount);
+        Assert.Equal(2, otte.DoctorCompletedCaseCount);
+        Assert.Equal(1d, otte.ShareOfDoctorCases, 3);
+
+        var pledger = Assert.Single(mix, row => row.DoctorId == "pledger");
+        Assert.Equal("CON", pledger.ProcedureCode);
+        Assert.Equal(1, pledger.CaseCount);
+        Assert.Equal(1, pledger.DoctorCompletedCaseCount);
+        Assert.Equal(1d, pledger.ShareOfDoctorCases, 3);
+    }
+
+    [Fact]
+    public void Doctor_procedure_mix_excludes_incomplete_and_reporting_exception_cycles()
+    {
+        using var workspace = TestWorkspace.Create();
+        var baseTime = new DateTimeOffset(2026, 6, 1, 8, 0, 0, TimeSpan.Zero);
+        var clock = new ManualTimeProvider(baseTime);
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production, timeProvider: clock);
+
+        // One valid, completed extraction for Otte - the only case that should count.
+        RunProcedureCycle(context, clock, baseTime, 1, "otte", "EXT", prepMin: 5, readyMin: 10, doctorMin: 10, turnoverMin: 5);
+
+        // A legacy standalone-sedation completed cycle is a reporting exception (excluded from
+        // standard metrics); it must not appear in the mix nor inflate the doctor's denominator.
+        var legacyCycle = new CompletedRoomCycle
+        {
+            RoomId = 2,
+            AssignedDoctor = "otte",
+            ProcedureCode = "SED",
+            SeatedAt = baseTime.AddHours(3),
+            ReadyForDoctorAt = baseTime.AddHours(3).AddMinutes(5),
+            DoctorArrivedAt = baseTime.AddHours(3).AddMinutes(15),
+            DoctorCompleteAt = baseTime.AddHours(3).AddMinutes(25),
+            RoomAvailableAt = baseTime.AddHours(3).AddMinutes(30),
+            SeatedToDoctorSeconds = 900,
+            PrepSeconds = 300,
+            ReadyToDoctorSeconds = 600,
+            DoctorInRoomSeconds = 600,
+            TurnoverSeconds = 300,
+            TotalRoomCycleSeconds = 1800,
+            FinalWaitState = "ready-for-doctor"
+        };
+        context.Repository.SaveCompletedCycle(legacyCycle, context.Doctors, context.Procedures);
+
+        // An incomplete cycle (never reaches Room Available) must not count either.
+        clock.SetUtcNow(baseTime.AddHours(5));
+        Assert.NotNull(context.Store.SeatRoom(3, "otte", "IMP"));
+        clock.SetUtcNow(baseTime.AddHours(5).AddMinutes(5));
+        Assert.NotNull(context.Store.MarkReadyForDoctor(3));
+
+        var mix = context.Store.GetReports().DoctorProcedureMix!;
+        var otteRows = mix.Where(row => row.DoctorId == "otte").ToList();
+
+        var only = Assert.Single(otteRows);
+        Assert.Equal("EXT", only.ProcedureCode);
+        Assert.Equal(1, only.CaseCount);
+        Assert.Equal(1, only.DoctorCompletedCaseCount);
+        Assert.Equal(1d, only.ShareOfDoctorCases, 3);
+        Assert.DoesNotContain(mix, row => row.ProcedureCode == "SED");
+        Assert.DoesNotContain(mix, row => row.ProcedureCode == "IMP");
+    }
+
+    [Fact]
+    public void Doctor_procedure_mix_skips_cycles_with_blank_doctor()
+    {
+        using var workspace = TestWorkspace.Create();
+        var databasePath = workspace.ProductionDatabasePath();
+        var baseTime = new DateTimeOffset(2026, 6, 1, 8, 0, 0, TimeSpan.Zero);
+
+        var first = StoreContext.Create(workspace, environmentName: Environments.Production, databasePath: databasePath);
+
+        // A completed cycle with no assigned doctor cannot be attributed a per-doctor share, so it is
+        // dropped from the mix entirely rather than forming a blank-doctor row.
+        var orphanCycle = new CompletedRoomCycle
+        {
+            RoomId = 1,
+            AssignedDoctor = "",
+            ProcedureCode = "EXT",
+            SeatedAt = baseTime,
+            ReadyForDoctorAt = baseTime.AddMinutes(5),
+            DoctorArrivedAt = baseTime.AddMinutes(15),
+            DoctorCompleteAt = baseTime.AddMinutes(25),
+            RoomAvailableAt = baseTime.AddMinutes(30),
+            SeatedToDoctorSeconds = 900,
+            PrepSeconds = 300,
+            ReadyToDoctorSeconds = 600,
+            DoctorInRoomSeconds = 600,
+            TurnoverSeconds = 300,
+            TotalRoomCycleSeconds = 1800,
+            FinalWaitState = "ready-for-doctor"
+        };
+        first.Repository.SaveCompletedCycle(orphanCycle, first.Doctors, first.Procedures);
+
+        var second = StoreContext.Create(workspace, environmentName: Environments.Production, databasePath: databasePath);
+        var mix = second.Store.GetReports().DoctorProcedureMix!;
+
+        Assert.DoesNotContain(mix, row => string.IsNullOrWhiteSpace(row.DoctorId));
+    }
+
+    [Fact]
     public void Base_procedure_summaries_roll_up_variants_over_raw_cycles()
     {
         using var workspace = TestWorkspace.Create();
