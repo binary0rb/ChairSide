@@ -275,7 +275,8 @@ body[data-view="doctor"] .primary-nav [data-nav="doctor"] .nav-pill-toggle {
 .master-shell,
 .panel-shell,
 .doctor-shell,
-.reports-shell {
+.reports-shell,
+.workshop-shell {
   width: min(1540px, calc(100vw - 36px));
   margin: 0 auto;
 }
@@ -1516,7 +1517,11 @@ body[data-view="reports"] .report-filter-label {
   text-transform: uppercase;
 }
 
-body[data-view="reports"] .report-filter-chip {
+/* .report-filter-chip and .report-range-chip share one control style (small pill toggle,
+   min-height 40px, is-active = inverted to --ink). Kept as one merged rule set per state
+   instead of two byte-for-byte duplicate blocks. */
+body[data-view="reports"] .report-filter-chip,
+body[data-view="reports"] .report-range-chip {
   min-height: 40px;
   padding: 0 14px;
   border: 1px solid var(--line);
@@ -1529,16 +1534,19 @@ body[data-view="reports"] .report-filter-chip {
   transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
 }
 
-body[data-view="reports"] .report-filter-chip:hover {
+body[data-view="reports"] .report-filter-chip:hover,
+body[data-view="reports"] .report-range-chip:hover {
   background: color-mix(in srgb, var(--ink) 8%, transparent);
 }
 
-body[data-view="reports"] .report-filter-chip:focus-visible {
+body[data-view="reports"] .report-filter-chip:focus-visible,
+body[data-view="reports"] .report-range-chip:focus-visible {
   outline: 3px solid #2563eb;
   outline-offset: 2px;
 }
 
-body[data-view="reports"] .report-filter-chip.is-active {
+body[data-view="reports"] .report-filter-chip.is-active,
+body[data-view="reports"] .report-range-chip.is-active {
   border-color: var(--ink);
   background: var(--ink);
   color: #ffffff;
@@ -1555,34 +1563,6 @@ body[data-view="reports"] .report-daterange {
   border: 1px solid var(--line);
   border-radius: 12px;
   background: var(--panel);
-}
-
-body[data-view="reports"] .report-range-chip {
-  min-height: 40px;
-  padding: 0 14px;
-  border: 1px solid var(--line);
-  border-radius: 9px;
-  background: var(--bg);
-  color: var(--ink);
-  font-size: 15px;
-  font-weight: 800;
-  cursor: pointer;
-  transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
-}
-
-body[data-view="reports"] .report-range-chip:hover {
-  background: color-mix(in srgb, var(--ink) 8%, transparent);
-}
-
-body[data-view="reports"] .report-range-chip:focus-visible {
-  outline: 3px solid #2563eb;
-  outline-offset: 2px;
-}
-
-body[data-view="reports"] .report-range-chip.is-active {
-  border-color: var(--ink);
-  background: var(--ink);
-  color: #ffffff;
 }
 
 body[data-view="reports"] .report-range-custom {
@@ -1674,7 +1654,10 @@ body[data-view="reports"] .insight-code {
   letter-spacing: 0.02em;
 }
 
-body[data-view="reports"] .sedation-chip {
+/* Shared with the doctor cockpit: renderSelectedDoctorProcedures() (Procedure Mix tab) renders
+   this chip via the selected-doctor panel, which is reused on both reports.html and doctor.html. */
+body[data-view="reports"] .sedation-chip,
+body[data-view="doctor"] .sedation-chip {
   padding: 3px 9px;
   border: 1px solid #2563eb;
   border-radius: 999px;
@@ -2672,7 +2655,8 @@ button:disabled {
   .master-shell,
   .panel-shell,
   .doctor-shell,
-  .reports-shell {
+  .reports-shell,
+  .workshop-shell {
     width: min(100vw - 24px, 1540px);
   }
 
@@ -3417,9 +3401,9 @@ body[data-view="room"] .corrections-panel button {
 /* Workshop: summary-first landing shell for planned projection / schedule-fit tools.
    Reuses the shared tokens and the allocation (indigo) accent already used by reports,
    and stays inside the width-constrained shell to avoid any horizontal overflow. */
+/* Width/margin now come from the shared .master-shell/.panel-shell/.doctor-shell/.reports-shell/
+   .workshop-shell rule; this keeps only the layout properties specific to Workshop's own shell. */
 body[data-view="workshop"] .workshop-shell {
-  width: min(1540px, calc(100vw - 36px));
-  margin: 0 auto;
   display: grid;
   gap: 18px;
   padding-top: 18px;
