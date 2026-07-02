@@ -6,7 +6,7 @@ This file is mechanical output from `tools/knowledge-graph/New-ChairSideKnowledg
 
 | Path | Kind | Discovered symbols | Routes / hubs |
 | --- | --- | --- | --- |
-| `AGENTS.md` | Markdown | headings: AGENTS, ChairSide Project Brief, Project name, Purpose, Scope, Repository orientation and token discipline, Private development knowledge graph, Critical privacy rule | - |
+| `AGENTS.md` | Markdown | headings: AGENTS, ChairSide Project Brief, Project name, Purpose, Scope, Repository orientation and token discipline, Private development knowledge graph, Markdown and documentation formatting | - |
 | `ChairSide.Board.sln` | Solution | - | - |
 | `CLAUDE.md` | Markdown | headings: Claude Code note | - |
 | `docs/executive-summary.md` | Markdown | headings: Executive Summary | - |

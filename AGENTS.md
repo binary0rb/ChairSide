@@ -76,6 +76,26 @@ After meaningful source or documentation changes, run:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\tools\knowledge-graph\New-ChairSideKnowledgeGraph.ps1
+```
+
+## Markdown and documentation formatting
+
+Repo Markdown and other committed docs must use ASCII-safe punctuation by default.
+
+- Use "-" instead of an en dash or em dash.
+- Use straight quotes instead of curly/smart quotes.
+- Use "Section 2" instead of section-symbol references.
+- Use "24x24" instead of multiplication signs.
+- Use "..." instead of an ellipsis character.
+- Avoid decorative Unicode symbols in committed docs unless deliberately required.
+
+Before stopping after editing Markdown, scan edited Markdown files for non-ASCII characters with:
+
+```powershell
+Select-String -Path <file> -Pattern "[^\x00-\x7F]" -AllMatches
+```
+
+Replace any matches with ASCII equivalents before presenting the final diff.
 
 ## Critical privacy rule
 
