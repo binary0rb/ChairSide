@@ -63,6 +63,12 @@
                       "path":  "docs/TrainingDataReset.md"
                   },
                   {
+                      "id":  "file:docs/ui-cohesion-audit.md",
+                      "label":  "docs/ui-cohesion-audit.md",
+                      "type":  "File",
+                      "path":  "docs/ui-cohesion-audit.md"
+                  },
+                  {
                       "id":  "file:docs/visual-language.md",
                       "label":  "docs/visual-language.md",
                       "type":  "File",
@@ -1746,6 +1752,11 @@
                   {
                       "from":  "repo:chairside",
                       "to":  "file:docs/TrainingDataReset.md",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:docs/ui-cohesion-audit.md",
                       "label":  "contains"
                   },
                   {
