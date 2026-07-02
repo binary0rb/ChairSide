@@ -63,7 +63,7 @@ This file is mechanical output from `tools/knowledge-graph/New-ChairSideKnowledg
 | `src/ChairSide.Board/wwwroot/room.html` | Html | - | - |
 | `src/ChairSide.Board/wwwroot/room-1.html` | Html | - | - |
 | `src/ChairSide.Board/wwwroot/signalr-lite.js` | JavaScript | functions: toWebSocketUrl | - |
-| `src/ChairSide.Board/wwwroot/styles.css` | Css | css vars: --bg, --ink, --muted, --line, --panel, --empty, --active-doctor | - |
+| `src/ChairSide.Board/wwwroot/styles.css` | Css | css vars: --bg, --ink, --muted, --line, --panel, --empty, --active-doctor, --neutral-100 | - |
 | `src/ChairSide.Board/wwwroot/workshop.html` | Html | - | - |
 | `tests/ChairSide.Board.Tests/BoardStoreTests.cs` | CSharp | types: BoardStoreTests, is, persisted, StoreContext, TestWorkspace, TestWebHostEnvironment, TestOptionsMonitor, ManualTimeProvider<br>methods: Lifecycle_actions_preserve_expected_state_and_report_behavior, Active_seated_room_survives_store_restart, Completed_report_survives_store_restart, Stale_elapsed_ready_for_doctor_room_reloads_as_stale, Doctor_in_room_and_turnover_rooms_survive_reload_without_wait_state_downgrade, Turnover_seconds_calculated_from_doctor_complete_to_room_available, Room_status_preserves_seated_at_through_doctor_in_room_and_turnover, Seated_room_does_not_escalate_to_aging_or_stale_regardless_of_elapsed_time | - |
 | `tests/ChairSide.Board.Tests/ChairSide.Board.Tests.csproj` | Project | - | - |

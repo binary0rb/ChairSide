@@ -1812,7 +1812,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/styles.css",
                       "kind":  "Css",
-                      "sizeBytes":  82009,
+                      "sizeBytes":  84783,
                       "typeSymbols":  [
 
                                       ],
@@ -1832,7 +1832,35 @@
                                            "--line",
                                            "--panel",
                                            "--empty",
-                                           "--active-doctor"
+                                           "--active-doctor",
+                                           "--neutral-100",
+                                           "--neutral-200",
+                                           "--neutral-300",
+                                           "--neutral-400",
+                                           "--neutral-500",
+                                           "--neutral-700",
+                                           "--neutral-900",
+                                           "--accent-allocation",
+                                           "--space-1",
+                                           "--space-2",
+                                           "--space-3",
+                                           "--space-4",
+                                           "--space-5",
+                                           "--space-6",
+                                           "--font-size-body",
+                                           "--font-size-label",
+                                           "--font-size-heading-sm",
+                                           "--font-size-heading-md",
+                                           "--font-size-heading-lg",
+                                           "--radius-tile",
+                                           "--radius-soft",
+                                           "--radius-panel",
+                                           "--radius-elevated",
+                                           "--radius-pill",
+                                           "--border-thin",
+                                           "--border-thick",
+                                           "--shadow-soft",
+                                           "--shadow-elevated"
                                        ],
                       "scriptFunctions":  [
 
