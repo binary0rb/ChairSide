@@ -1,7 +1,7 @@
 ﻿{
     "generatedStamp":  "deterministic",
     "root":  ".",
-    "fileCount":  65,
+    "fileCount":  66,
     "files":  [
                   {
                       "path":  "AGENTS.md",
@@ -325,6 +325,41 @@
                                        "Verifying after an EmptyBeta reset",
                                        "Suggested operator sequence",
                                        "Safety notes"
+                                   ]
+                  },
+                  {
+                      "path":  "docs/ui-cohesion-audit.md",
+                      "kind":  "Markdown",
+                      "sizeBytes":  25418,
+                      "typeSymbols":  [
+
+                                      ],
+                      "methodSymbols":  [
+
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+                                       "ChairSide UI Cohesion Audit",
+                                       "1. Summary",
+                                       "2. Existing visual strengths",
+                                       "3. Reusable assets and patterns already available",
+                                       "4. Visual inconsistencies by category",
+                                       "5. Protected visual semantics",
+                                       "6. Reuse-first design principles",
+                                       "7. Proposed design tokens/components to standardize later",
+                                       "8. Recommended implementation sequence",
+                                       "9. Non-goals"
                                    ]
                   },
                   {

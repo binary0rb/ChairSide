@@ -16,6 +16,7 @@ This file is mechanical output from `tools/knowledge-graph/New-ChairSideKnowledg
 | `docs/knowledge-graph/README.md` | Markdown | headings: ChairSide private knowledge graph, What lives here, What does not live here, Node types, Edge labels, Update rule | - |
 | `docs/Production-Pilot-Checklist.md` | Markdown | headings: ChairSide Board Production Pilot Checklist, Server Layout, IIS, Permissions, Publish And Config, Backup And Restore, Access Control Decisions, Room Tablets | - |
 | `docs/TrainingDataReset.md` | Markdown | headings: ChairSide Training Data Reset Runbook, Data lifecycle, What the two modes do, What gets backed up, What gets cleared / seeded, Prerequisites, Usage, Training fixture reset (seed synthetic data) | - |
+| `docs/ui-cohesion-audit.md` | Markdown | headings: ChairSide UI Cohesion Audit, 1. Summary, 2. Existing visual strengths, 3. Reusable assets and patterns already available, 4. Visual inconsistencies by category, 5. Protected visual semantics, 6. Reuse-first design principles, 7. Proposed design tokens/components to standardize later | - |
 | `docs/visual-language.md` | Markdown | headings: Visual Language | - |
 | `docs/workflow.md` | Markdown | headings: Workflow | - |
 | `README.md` | Markdown | headings: ChairSide Board, Scaffold, Seed Data, Run Locally, IIS Deployment, Reset Demo Data, Reports, Report time windows | - |
