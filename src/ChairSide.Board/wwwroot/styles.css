@@ -6,6 +6,71 @@
   --panel: #ffffff;
   --empty: #7b8493;
   --active-doctor: #2563eb;
+
+  /* ------------------------------------------------------------------
+     Design-token foundation (docs/ui-cohesion-audit.md, Section 7).
+     Additive only: these name values that already recur across this file
+     so future PRs can migrate one selector at a time instead of all at
+     once. They intentionally exclude --doctor-color, --procedure-accent,
+     and every room-state/aging/stale/connection-status color, which stay
+     protected per the audit (Section 5) and are not redefined here.
+     ------------------------------------------------------------------ */
+
+  /* Neutral surface/text colors already repeated across report/workshop/
+     doctor-cockpit CSS (counts as of this PR: --neutral-200 x15,
+     --neutral-900 x11, --neutral-700 x9, --neutral-100 x6,
+     --neutral-300 x5, --neutral-500 x3, --neutral-400 x3). */
+  --neutral-100: #f8fafc;
+  --neutral-200: #e2e8f0;
+  --neutral-300: #cbd5e1;
+  --neutral-400: #94a3b8;
+  --neutral-500: #64748b;
+  --neutral-700: #334155;
+  --neutral-900: #0f172a;
+
+  /* Allocation/Workshop layer accent (indigo). Semantic to the report
+     "layer" system, not a doctor, procedure, or room-state color. */
+  --accent-allocation: #6366f1;
+
+  /* Spacing scale (4px base) matching the gap/padding values already used
+     throughout the file, so new spacing can be chosen from this set
+     instead of an ad hoc number. */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+
+  /* Typography sizes matching the ad hoc heading/body sizes already used
+     in report/workshop/doctor-cockpit component CSS. */
+  --font-size-body: 14px;
+  --font-size-label: 13px;
+  --font-size-heading-sm: 16px;
+  --font-size-heading-md: 20px;
+  --font-size-heading-lg: 24px;
+
+  /* Two intentionally distinct radius families exist today (audit,
+     Section 4): the "soft card" family (reports/workshop/doctor cockpit)
+     and the "operational tile" family (board/room-panel touch UI), plus
+     the shared pill radius. Naming them here documents the two families;
+     it does not change which family any given selector currently uses. */
+  --radius-tile: 8px;
+  --radius-soft: 10px;
+  --radius-panel: 12px;
+  --radius-elevated: 14px;
+  --radius-pill: 999px;
+
+  /* Border widths already in use: 1px for soft-card borders, 2px+ for the
+     heavier operational-tile borders (board/room panel; not changed here). */
+  --border-thin: 1px;
+  --border-thick: 2px;
+
+  /* Soft-card shadow family (reports/workshop/doctor cockpit only - never
+     used on room tiles, which explicitly set box-shadow: none for board
+     glanceability; see audit Section 5). */
+  --shadow-soft: 0 3px 10px rgba(23, 32, 51, 0.06);
+  --shadow-elevated: 0 10px 26px rgba(23, 32, 51, 0.08);
 }
 
 * {
@@ -674,7 +739,7 @@ body[data-view="doctor"] .primary-nav [data-nav="doctor"] .nav-pill-toggle {
   border: 1px solid var(--line);
   border-radius: 10px;
   background: var(--panel);
-  box-shadow: 0 3px 10px rgba(23, 32, 51, 0.06);
+  box-shadow: var(--shadow-soft);
 }
 
 label,
@@ -1750,7 +1815,7 @@ body[data-view="reports"] .selected-doctor-panel {
   border-top: 4px solid var(--doctor-color);
   border-radius: 14px;
   background: #ffffff;
-  box-shadow: 0 10px 26px rgba(23, 32, 51, 0.08);
+  box-shadow: var(--shadow-elevated);
 }
 
 body[data-view="reports"] .selected-doctor-head {
@@ -2208,7 +2273,7 @@ button:disabled {
   border-radius: 10px;
   background: var(--panel);
   padding: 14px 16px;
-  box-shadow: 0 3px 10px rgba(23, 32, 51, 0.06);
+  box-shadow: var(--shadow-soft);
 }
 
 .report-card h3 {
@@ -3128,7 +3193,7 @@ body[data-view="doctor"] .selected-doctor-panel {
   border-top: 4px solid var(--doctor-color);
   border-radius: 14px;
   background: #ffffff;
-  box-shadow: 0 10px 26px rgba(23, 32, 51, 0.08);
+  box-shadow: var(--shadow-elevated);
   /* Prevent grid-item min-width:auto from propagating the Case Audit table's
      intrinsic minimum width up through the .doctor-cockpit grid track. */
   min-width: 0;
