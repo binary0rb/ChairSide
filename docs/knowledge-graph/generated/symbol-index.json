@@ -6,7 +6,7 @@
                   {
                       "path":  "AGENTS.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  9490,
+                      "sizeBytes":  10231,
                       "typeSymbols":  [
 
                                       ],
@@ -33,6 +33,7 @@
                                        "Scope",
                                        "Repository orientation and token discipline",
                                        "Private development knowledge graph",
+                                       "Markdown and documentation formatting",
                                        "Critical privacy rule",
                                        "Doctors and colors",
                                        "Procedure categories and icons",
@@ -76,7 +77,7 @@
                   {
                       "path":  "CLAUDE.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  486,
+                      "sizeBytes":  802,
                       "typeSymbols":  [
 
                                       ],
@@ -330,7 +331,7 @@
                   {
                       "path":  "docs/ui-cohesion-audit.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  25418,
+                      "sizeBytes":  25580,
                       "typeSymbols":  [
 
                                       ],
