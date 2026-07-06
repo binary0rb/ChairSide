@@ -63,6 +63,7 @@ Project-area tags say which part of ChairSide a note is about.
 - `tests` - test suite structure, coverage intent, and characterization tests.
 - `data-persistence` - SQLite storage, restart/reload behavior, and data durability.
 - `permissions` - access tokens, admin access, device/room write authorization.
+- `privacy` - non-PHI boundaries, privacy constraints, and rules preventing patient-identifying data from entering ChairSide.
 
 ## 6. Canonical domain-concept tags
 

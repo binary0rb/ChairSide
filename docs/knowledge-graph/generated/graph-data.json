@@ -39,6 +39,42 @@
                       "path":  "docs/knowledge/_meta/tag-dictionary.md"
                   },
                   {
+                      "id":  "file:docs/knowledge/product/non-phi-boundary.md",
+                      "label":  "docs/knowledge/product/non-phi-boundary.md",
+                      "type":  "File",
+                      "path":  "docs/knowledge/product/non-phi-boundary.md"
+                  },
+                  {
+                      "id":  "file:docs/knowledge/reports/observed-load.md",
+                      "label":  "docs/knowledge/reports/observed-load.md",
+                      "type":  "File",
+                      "path":  "docs/knowledge/reports/observed-load.md"
+                  },
+                  {
+                      "id":  "file:docs/knowledge/reports/procedure-mix.md",
+                      "label":  "docs/knowledge/reports/procedure-mix.md",
+                      "type":  "File",
+                      "path":  "docs/knowledge/reports/procedure-mix.md"
+                  },
+                  {
+                      "id":  "file:docs/knowledge/reports/reporting-population.md",
+                      "label":  "docs/knowledge/reports/reporting-population.md",
+                      "type":  "File",
+                      "path":  "docs/knowledge/reports/reporting-population.md"
+                  },
+                  {
+                      "id":  "file:docs/knowledge/reports/sedation-as-modifier.md",
+                      "label":  "docs/knowledge/reports/sedation-as-modifier.md",
+                      "type":  "File",
+                      "path":  "docs/knowledge/reports/sedation-as-modifier.md"
+                  },
+                  {
+                      "id":  "file:docs/knowledge/workflow/room-lifecycle.md",
+                      "label":  "docs/knowledge/workflow/room-lifecycle.md",
+                      "type":  "File",
+                      "path":  "docs/knowledge/workflow/room-lifecycle.md"
+                  },
+                  {
                       "id":  "file:docs/knowledge-graph/backlog-signals.md",
                       "label":  "docs/knowledge-graph/backlog-signals.md",
                       "type":  "File",
@@ -1744,6 +1780,36 @@
                   {
                       "from":  "repo:chairside",
                       "to":  "file:docs/knowledge/_meta/tag-dictionary.md",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:docs/knowledge/product/non-phi-boundary.md",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:docs/knowledge/reports/observed-load.md",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:docs/knowledge/reports/procedure-mix.md",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:docs/knowledge/reports/reporting-population.md",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:docs/knowledge/reports/sedation-as-modifier.md",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:docs/knowledge/workflow/room-lifecycle.md",
                       "label":  "contains"
                   },
                   {
