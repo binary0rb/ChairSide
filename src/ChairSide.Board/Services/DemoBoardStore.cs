@@ -693,84 +693,17 @@ public sealed class DemoBoardStore
                 var casesForDay = CasesForDayOffset(dayOffset);
                 for (var caseInDay = 0; caseInDay < casesForDay; caseInDay++)
                 {
-                    // Round-robin doctors so even a small window (e.g. Today) represents all four;
-                    // the per-doctor style profile is aligned to the doctor.
-                    var doctorIndex = globalIndex % doctorIds.Count;
-                    var profile = SyntheticProfiles[doctorIndex % SyntheticProfiles.Count];
-                    var doctorId = doctorIds[doctorIndex];
-
-                    // Deterministic pseudo-randomness: the jitter stream is seeded from stable inputs
-                    // (day offset, doctor, case-in-day), so the same date always reproduces the same
-                    // cycle regardless of iteration order.
-                    var jitter = new SyntheticJitter(DeterministicSeed(dayOffset, doctorIndex, caseInDay));
-
-                    // Rotate procedure families across the whole dataset to guarantee coverage.
-                    var family = SyntheticFamilies[globalIndex % SyntheticFamilies.Count];
-                    var procedure = FindActiveProcedure(family.Code);
-                    if (procedure is null)
-                    {
-                        globalIndex++;
-                        continue;
-                    }
-
-                    var sedation = family.SedationEligible
-                        && procedure.SedationEligible
-                        && jitter.Next(0, 99) < profile.SedationChancePercent;
-                    var storedCode = ComposeProcedureCode(procedure.Code, sedation);
-
-                    // Expected allocation: roster default, nudged by doctor style (generous vs tight)
-                    // on variable families, plus a small bump for sedation burden.
-                    var defaultUnits = Math.Clamp(procedure.DefaultExpectedUnits, MinExpectedUnits, MaxExpectedUnits);
-                    var unitDelta = family.Code is "EXT" or "IMP" ? profile.VariableUnitDelta : 0;
-                    if (sedation)
-                    {
-                        unitDelta += 1;
-                    }
-                    var expectedUnits = Math.Clamp(defaultUnits + unitDelta, MinExpectedUnits, MaxExpectedUnits);
-                    var expectedMinutes = expectedUnits * 10;
-
-                    // Measured case flow: doctor bias + (family character * profile weight) + jitter,
-                    // clamped to a realistic per-family range. Always draw the jitter so the stream
-                    // stays identical whether or not this case is forced to land at expected.
-                    var minFlow = sedation ? family.MinFlowMinutes + 15 : family.MinFlowMinutes;
-                    var maxFlow = sedation ? family.MaxFlowMinutes + 15 : family.MaxFlowMinutes;
-                    var varianceJitter = jitter.Next(-profile.VarianceSpread, profile.VarianceSpread);
-                    int measuredMinutes;
-                    if (globalIndex % 9 == 0)
-                    {
-                        // Guarantee some exactly-at-expected cases for the neutral variance example.
-                        measuredMinutes = Math.Clamp(expectedMinutes, minFlow, maxFlow);
-                    }
-                    else
-                    {
-                        var lean = family.CharacterLeanMinutes * profile.FamilyLeanWeight;
-                        measuredMinutes = Math.Clamp(expectedMinutes + profile.VarianceBiasMinutes + lean + varianceJitter, minFlow, maxFlow);
-                    }
-
-                    // Split measured case flow into prep / ready / doctor minutes (doctor >= 1) so the
-                    // timestamp-derived measured flow exactly equals measuredMinutes. Seat hours stay
-                    // within the day (8am + case index) so no cycle crosses a UTC calendar day.
-                    var prepMin = Math.Clamp(measuredMinutes * 12 / 100, 2, 12);
-                    var readyMin = Math.Clamp(measuredMinutes * 18 / 100, 2, 20);
-                    if (prepMin + readyMin >= measuredMinutes)
-                    {
-                        prepMin = Math.Max(1, measuredMinutes / 4);
-                        readyMin = Math.Max(1, measuredMinutes / 4);
-                    }
-                    var doctorMin = Math.Max(1, measuredMinutes - prepMin - readyMin);
-                    var turnoverMin = jitter.Next(4, 12);
-
-                    var roomId = 1 + (caseInDay % Math.Max(1, _roomCount));
-                    var seatedAt = day.AddHours(8 + caseInDay).AddMinutes(jitter.Next(0, 11) * 5);
-
-                    UpsertSyntheticCycle(
-                        roomId, doctorId, storedCode, seatedAt,
-                        prepMin, readyMin, doctorMin, turnoverMin, defaultUnits, expectedUnits);
-
-                    written++;
-                    doctorsRepresented.Add(doctorId);
-                    familiesRepresented.Add(ResolveBaseProcedureCode(storedCode));
+                    // globalIndex advances once per slot (including skipped slots) so the doctor /
+                    // family rotation and the deterministic jitter stream are unchanged from before
+                    // this was extracted into WriteSyntheticCase.
+                    var completed = WriteSyntheticCase(doctorIds, dayOffset, day, caseInDay, globalIndex);
                     globalIndex++;
+                    if (completed is { } write)
+                    {
+                        written++;
+                        doctorsRepresented.Add(write.DoctorId);
+                        familiesRepresented.Add(write.BaseFamilyCode);
+                    }
                 }
             }
 
@@ -781,6 +714,171 @@ public sealed class DemoBoardStore
                 written,
                 0);
         }
+    }
+
+    /// <summary>
+    /// Maintenance only: clears all completed cycles and resets every active room to Available, then
+    /// seeds a larger deterministic, non-PHI synthetic completed-cycle set (default 1000, clamped to
+    /// the CLI-accepted range) so the Reports page can be evaluated at realistic volume. Every seeded
+    /// cycle stays inside the standard reporting population (mapped/active procedures, full timing, no
+    /// overnight/extreme records, expected-allocation snapshot present), so none are reporting
+    /// exceptions. Deterministic: the same requested count always reproduces the same set. Destructive
+    /// execution is gated at the CLI layer (confirmation token plus a Production hard-refusal); this
+    /// method itself is environment-independent for testability.
+    /// </summary>
+    public MaintenanceResetResult ResetAndSeedLargeSyntheticReportData(int completedCycleTarget)
+    {
+        lock (_syncRoot)
+        {
+            var clearedCompleted = ClearCompletedAndResetRoomsLocked();
+            var seed = SeedLargeSyntheticReportData(completedCycleTarget);
+            return new MaintenanceResetResult(
+                clearedCompleted,
+                _rooms.Count,
+                seed.CyclesInserted,
+                seed.DoctorsRepresented,
+                seed.ProcedureFamiliesRepresented,
+                seed.ExpectedAllocationCases,
+                seed.ExceptionsExpected);
+        }
+    }
+
+    // Seeds completedCycleTarget clean synthetic completed cycles (clamped to the CLI-accepted range
+    // as defense-in-depth). Reuses the exact per-case shaping/persistence as the small training seed
+    // via WriteSyntheticCase; the only difference is volume: a flat per-day case cap keeps every seat
+    // time inside its own UTC calendar day, and the requested total is spread across as many days
+    // back as needed. Only successful writes count toward the target, so a roster with an unmapped
+    // family still converges. Caller (ResetAndSeedLargeSyntheticReportData) already holds _syncRoot.
+    private SeedReportDataResult SeedLargeSyntheticReportData(int completedCycleTarget)
+    {
+        var doctorIds = _activeDoctors.Select(doctor => doctor.Id).ToList();
+        if (doctorIds.Count == 0)
+        {
+            return new SeedReportDataResult(0, 0, 0, 0, 0);
+        }
+
+        var target = Math.Clamp(
+            completedCycleTarget,
+            MaintenanceCommands.MinCompletedCycles,
+            MaintenanceCommands.MaxCompletedCycles);
+
+        var today = new DateTimeOffset(Now.UtcDateTime.Date, TimeSpan.Zero);
+        var written = 0;
+        var doctorsRepresented = new HashSet<string>(StringComparer.Ordinal);
+        var familiesRepresented = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var globalIndex = 0;
+
+        // Safety bound: one day per requested cycle is an unreachable-in-practice ceiling (given the
+        // flat per-day cap) that still guarantees termination if no family maps to an active procedure.
+        for (var dayOffset = 0; written < target && dayOffset <= target; dayOffset++)
+        {
+            var day = today.AddDays(-dayOffset);
+            for (var caseInDay = 0; caseInDay < LargeSyntheticCasesPerDay && written < target; caseInDay++)
+            {
+                var completed = WriteSyntheticCase(doctorIds, dayOffset, day, caseInDay, globalIndex);
+                globalIndex++;
+                if (completed is { } write)
+                {
+                    written++;
+                    doctorsRepresented.Add(write.DoctorId);
+                    familiesRepresented.Add(write.BaseFamilyCode);
+                }
+            }
+        }
+
+        return new SeedReportDataResult(
+            written,
+            doctorsRepresented.Count,
+            familiesRepresented.Count,
+            written,
+            0);
+    }
+
+    // Deterministically shapes and upserts one clean synthetic completed cycle for the given day /
+    // case slot, returning the doctor id and base procedure family written (for coverage
+    // bookkeeping), or null when the rotated family has no active procedure (the slot is skipped).
+    // Shared by both the small training seed and the large report-data seed; the jitter draw order
+    // here is load-bearing (existing small-seed output is pinned by tests).
+    private (string DoctorId, string BaseFamilyCode)? WriteSyntheticCase(
+        IReadOnlyList<string> doctorIds,
+        int dayOffset,
+        DateTimeOffset day,
+        int caseInDay,
+        int globalIndex)
+    {
+        // Round-robin doctors so even a small window (e.g. Today) represents all four; the per-doctor
+        // style profile is aligned to the doctor.
+        var doctorIndex = globalIndex % doctorIds.Count;
+        var profile = SyntheticProfiles[doctorIndex % SyntheticProfiles.Count];
+        var doctorId = doctorIds[doctorIndex];
+
+        // Deterministic pseudo-randomness: the jitter stream is seeded from stable inputs (day offset,
+        // doctor, case-in-day), so the same slot always reproduces the same cycle.
+        var jitter = new SyntheticJitter(DeterministicSeed(dayOffset, doctorIndex, caseInDay));
+
+        // Rotate procedure families across the whole dataset to guarantee coverage.
+        var family = SyntheticFamilies[globalIndex % SyntheticFamilies.Count];
+        var procedure = FindActiveProcedure(family.Code);
+        if (procedure is null)
+        {
+            return null;
+        }
+
+        var sedation = family.SedationEligible
+            && procedure.SedationEligible
+            && jitter.Next(0, 99) < profile.SedationChancePercent;
+        var storedCode = ComposeProcedureCode(procedure.Code, sedation);
+
+        // Expected allocation: roster default, nudged by doctor style (generous vs tight) on variable
+        // families, plus a small bump for sedation burden.
+        var defaultUnits = Math.Clamp(procedure.DefaultExpectedUnits, MinExpectedUnits, MaxExpectedUnits);
+        var unitDelta = family.Code is "EXT" or "IMP" ? profile.VariableUnitDelta : 0;
+        if (sedation)
+        {
+            unitDelta += 1;
+        }
+        var expectedUnits = Math.Clamp(defaultUnits + unitDelta, MinExpectedUnits, MaxExpectedUnits);
+        var expectedMinutes = expectedUnits * 10;
+
+        // Measured case flow: doctor bias + (family character * profile weight) + jitter, clamped to a
+        // realistic per-family range. Always draw the jitter so the stream stays identical whether or
+        // not this case is forced to land at expected.
+        var minFlow = sedation ? family.MinFlowMinutes + 15 : family.MinFlowMinutes;
+        var maxFlow = sedation ? family.MaxFlowMinutes + 15 : family.MaxFlowMinutes;
+        var varianceJitter = jitter.Next(-profile.VarianceSpread, profile.VarianceSpread);
+        int measuredMinutes;
+        if (globalIndex % 9 == 0)
+        {
+            // Guarantee some exactly-at-expected cases for the neutral variance example.
+            measuredMinutes = Math.Clamp(expectedMinutes, minFlow, maxFlow);
+        }
+        else
+        {
+            var lean = family.CharacterLeanMinutes * profile.FamilyLeanWeight;
+            measuredMinutes = Math.Clamp(expectedMinutes + profile.VarianceBiasMinutes + lean + varianceJitter, minFlow, maxFlow);
+        }
+
+        // Split measured case flow into prep / ready / doctor minutes (doctor >= 1) so the
+        // timestamp-derived measured flow exactly equals measuredMinutes. Seat hours stay within the
+        // day (8am + case index) so no cycle crosses a UTC calendar day.
+        var prepMin = Math.Clamp(measuredMinutes * 12 / 100, 2, 12);
+        var readyMin = Math.Clamp(measuredMinutes * 18 / 100, 2, 20);
+        if (prepMin + readyMin >= measuredMinutes)
+        {
+            prepMin = Math.Max(1, measuredMinutes / 4);
+            readyMin = Math.Max(1, measuredMinutes / 4);
+        }
+        var doctorMin = Math.Max(1, measuredMinutes - prepMin - readyMin);
+        var turnoverMin = jitter.Next(4, 12);
+
+        var roomId = 1 + (caseInDay % Math.Max(1, _roomCount));
+        var seatedAt = day.AddHours(8 + caseInDay).AddMinutes(jitter.Next(0, 11) * 5);
+
+        UpsertSyntheticCycle(
+            roomId, doctorId, storedCode, seatedAt,
+            prepMin, readyMin, doctorMin, turnoverMin, defaultUnits, expectedUnits);
+
+        return (doctorId, ResolveBaseProcedureCode(storedCode));
     }
 
     // Writes (insert or deterministic update) one clean synthetic completed cycle. Keyed by
@@ -889,6 +987,11 @@ public sealed class DemoBoardStore
     // How many calendar days back the synthetic history spans (inclusive of today). ~6 weeks so the
     // "older than 30 days" bucket is populated for All-time vs Last-30 comparisons.
     private const int SyntheticHistoryDays = 41;
+
+    // Flat per-day case cap for the large report-data seed. Kept low enough that the latest seat time
+    // (8am + this many hours, plus jitter and the longest case flow) still completes inside the same
+    // UTC calendar day, preserving the "no overnight cycle" cleanliness the reporting funnel expects.
+    private const int LargeSyntheticCasesPerDay = 12;
 
     // Deterministic, front-loaded case count per day offset from today (0 = today). Recent days carry
     // more cases than older days so every report date-range preset is meaningfully different:

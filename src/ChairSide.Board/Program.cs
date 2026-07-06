@@ -682,9 +682,31 @@ static int RunMaintenance(WebApplication maintenanceApp, MaintenanceResolution r
     Console.WriteLine($"[ChairSide Maintenance] Database:    {repository.DatabasePath}");
     Console.WriteLine($"[ChairSide Maintenance] Command:     {resolution.Command}");
 
-    var result = string.Equals(resolution.Command, MaintenanceCommands.TrainingSeedCommand, StringComparison.Ordinal)
-        ? store.ResetAndSeedSyntheticTrainingData()
-        : store.ResetAllDataForEmptyBeta();
+    // Hard refusal: the large synthetic dataset must never run against a Production database, even
+    // with a correct confirmation token. Scoped to that one command; reset-training-data and
+    // reset-empty are unchanged.
+    if (MaintenanceCommands.IsProductionForbidden(resolution.Command) && maintenanceApp.Environment.IsProduction())
+    {
+        Console.Error.WriteLine($"[ChairSide Maintenance] Refused: '{resolution.Command}' cannot run in Production.");
+        Console.Error.WriteLine("[ChairSide Maintenance] No data was changed.");
+        return 2;
+    }
+
+    MaintenanceResetResult result;
+    if (string.Equals(resolution.Command, MaintenanceCommands.TrainingSeedCommand, StringComparison.Ordinal))
+    {
+        result = store.ResetAndSeedSyntheticTrainingData();
+    }
+    else if (string.Equals(resolution.Command, MaintenanceCommands.LargeSyntheticSeedCommand, StringComparison.Ordinal))
+    {
+        var completedCycleTarget = resolution.CompletedCycles ?? MaintenanceCommands.DefaultCompletedCycles;
+        Console.WriteLine($"[ChairSide Maintenance] Completed-cycle target:    {completedCycleTarget}");
+        result = store.ResetAndSeedLargeSyntheticReportData(completedCycleTarget);
+    }
+    else
+    {
+        result = store.ResetAllDataForEmptyBeta();
+    }
 
     Console.WriteLine($"[ChairSide Maintenance] Completed cycles cleared:  {result.CompletedCyclesCleared}");
     Console.WriteLine($"[ChairSide Maintenance] Active rooms reset:        {result.ActiveRoomsReset}");
