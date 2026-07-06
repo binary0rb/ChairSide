@@ -1777,7 +1777,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/board.js",
                       "kind":  "JavaScript",
-                      "sizeBytes":  169379,
+                      "sizeBytes":  170131,
                       "typeSymbols":  [
 
                                       ],
@@ -1869,11 +1869,11 @@
                                               "formatProcedureShare",
                                               "renderSelectedDoctorAudit",
                                               "initialsFromDoctorName",
+                                              "doctorInitials",
                                               "formatAbsoluteMinutes",
                                               "formatSignedMinutes",
                                               "renderDoctorAllocationRow",
-                                              "renderProcedureAllocation",
-                                              "renderProcedureAllocationRow"
+                                              "renderProcedureAllocation"
                                           ],
                       "headings":  [
 
@@ -2064,7 +2064,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/styles.css",
                       "kind":  "Css",
-                      "sizeBytes":  85118,
+                      "sizeBytes":  86264,
                       "typeSymbols":  [
 
                                       ],

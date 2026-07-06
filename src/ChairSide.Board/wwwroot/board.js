@@ -1873,6 +1873,14 @@ function initialsFromDoctorName(name) {
   return initials || "--";
 }
 
+// Shared initials lookup for the doctor-coin pattern: prefer the curated 3-letter initials from
+// doctorReportIdentity (only its initials, never its color - callers use the room/tile's own
+// --doctor-color so the coin always agrees with the existing doctor-identity rail), falling back
+// to name-derived initials for any doctor not in that map.
+function doctorInitials(doctorId, name) {
+  return doctorReportIdentity[doctorId]?.initials || initialsFromDoctorName(name);
+}
+
 function formatAbsoluteMinutes(minutes) {
   if (!Number.isFinite(minutes)) {
     return "--";
@@ -2975,6 +2983,7 @@ function renderRoomTile(room, large = false) {
   const timer = roomTimerLabel(room);
   const fullDoctorName = room.doctor ? room.doctor.name : "Unassigned";
   const doctorDisplayName = large ? fullDoctorName : (room.doctor?.shortName || cardDoctorName(fullDoctorName));
+  const coinInitials = room.doctor ? doctorInitials(room.doctor.id, fullDoctorName) : "";
 
   const accent = procedure ? resolveProcedureAccent(room.procedureCode) : "";
   const tileStyle = `--doctor-color: ${escapeAttribute(doctorColor)}`
@@ -2991,7 +3000,10 @@ function renderRoomTile(room, large = false) {
         <span>${procedure ? escapeHtml(formatProcedureCode(procedure.code)) : "OPEN"}</span>
       </div>
       <div class="room-footer">
-        <span class="room-doctor-name" title="${escapeAttribute(fullDoctorName)}">${escapeHtml(doctorDisplayName)}</span>
+        <span class="room-doctor">
+          ${coinInitials ? `<span class="room-doctor-coin" aria-hidden="true">${escapeHtml(coinInitials)}</span>` : ""}
+          <span class="room-doctor-name" title="${escapeAttribute(fullDoctorName)}">${escapeHtml(doctorDisplayName)}</span>
+        </span>
         <time class="room-timer">
           <span>${timer.label}</span>
           <strong>${timer.value}</strong>

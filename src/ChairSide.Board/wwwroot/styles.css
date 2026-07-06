@@ -688,10 +688,45 @@ body[data-view="doctor"] .primary-nav [data-nav="doctor"] .nav-pill-toggle {
   align-items: end;
 }
 
+/* Wraps the optional doctor-coin plus the existing name text as a single flex row, so this stays
+   one grid cell and the .room-footer grid-template-columns (name column + timer column) is
+   unaffected by adding the coin. */
+.room-doctor {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
 .room-doctor-name {
   min-width: 0;
   overflow-wrap: anywhere;
   line-height: 1.08;
+}
+
+/* Small circular doctor-initial coin: the same visual recipe as .doctor-report-initials
+   (Reports/Doctor cockpit, 46px) at room-tile scale. Background reuses the tile's own
+   --doctor-color (already set inline per room), so the coin can never disagree with the existing
+   doctor-identity rail. Kept flat (no shadow) and smaller than every other cue on the card so it
+   stays subordinate to room state, aging/stale, procedure, and the timer. */
+.room-doctor-coin {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--radius-pill);
+  background: var(--doctor-color);
+  color: #ffffff;
+  font-size: 9px;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.room-tile.large .room-doctor-coin {
+  width: 30px;
+  height: 30px;
+  font-size: 12px;
 }
 
 .room-timer {
