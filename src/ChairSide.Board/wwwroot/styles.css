@@ -1882,21 +1882,21 @@ body[data-view="reports"] .selected-doctor-summary {
   align-content: start;
   gap: 8px;
   padding: 16px;
-  border: 1px solid #e2e8f0;
-  border-radius: 12px;
-  background: #f8fafc;
+  border: var(--border-thin) solid var(--neutral-200);
+  border-radius: var(--radius-panel);
+  background: var(--neutral-100);
 }
 
 body[data-view="reports"] .selected-doctor-summary h3 {
   margin: 0;
-  color: #0f172a;
+  color: var(--neutral-900);
   font-size: 17px;
   letter-spacing: 0;
 }
 
 body[data-view="reports"] .selected-doctor-summary p {
   margin: 0;
-  color: #334155;
+  color: var(--neutral-700);
   line-height: 1.45;
 }
 
@@ -3266,21 +3266,21 @@ body[data-view="doctor"] .selected-doctor-summary {
   align-content: start;
   gap: 8px;
   padding: 16px;
-  border: 1px solid #e2e8f0;
-  border-radius: 12px;
-  background: #f8fafc;
+  border: var(--border-thin) solid var(--neutral-200);
+  border-radius: var(--radius-panel);
+  background: var(--neutral-100);
 }
 
 body[data-view="doctor"] .selected-doctor-summary h3 {
   margin: 0;
-  color: #0f172a;
+  color: var(--neutral-900);
   font-size: 17px;
   letter-spacing: 0;
 }
 
 body[data-view="doctor"] .selected-doctor-summary p {
   margin: 0;
-  color: #334155;
+  color: var(--neutral-700);
   line-height: 1.45;
 }
 
@@ -3480,7 +3480,7 @@ body[data-view="workshop"] .workshop-intro {
   padding: 20px;
   border: 1px solid var(--line);
   border-left: 4px solid #6366f1;
-  border-radius: 12px;
+  border-radius: var(--radius-panel);
   background: var(--panel);
 }
 
@@ -3510,7 +3510,7 @@ body[data-view="workshop"] .workshop-section {
 
 body[data-view="workshop"] .workshop-section h3 {
   margin: 0;
-  font-size: 16px;
+  font-size: var(--font-size-heading-sm);
   letter-spacing: 0;
 }
 
@@ -3526,7 +3526,7 @@ body[data-view="workshop"] .workshop-card {
   align-content: start;
   padding: 16px;
   border: 1px solid var(--line);
-  border-radius: 12px;
+  border-radius: var(--radius-panel);
   background: var(--panel);
 }
 
@@ -3539,7 +3539,7 @@ body[data-view="workshop"] .workshop-card-head {
 
 body[data-view="workshop"] .workshop-card-head h4 {
   margin: 0;
-  font-size: 16px;
+  font-size: var(--font-size-heading-sm);
   line-height: 1.25;
   letter-spacing: 0;
 }
@@ -3559,7 +3559,7 @@ body[data-view="workshop"] .workshop-status {
 body[data-view="workshop"] .workshop-card p {
   margin: 0;
   color: var(--muted);
-  font-size: 14px;
+  font-size: var(--font-size-body);
   line-height: 1.45;
 }
 
@@ -3573,7 +3573,7 @@ body[data-view="workshop"] .workshop-reality-body {
 body[data-view="workshop"] .workshop-reality-window {
   margin: 0;
   color: var(--muted);
-  font-size: 13px;
+  font-size: var(--font-size-label);
   font-weight: 800;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -3591,7 +3591,7 @@ body[data-view="workshop"] .workshop-stat {
   padding: 14px;
   border: 1px solid var(--line);
   border-left: 3px solid #6366f1;
-  border-radius: 12px;
+  border-radius: var(--radius-panel);
   background: var(--panel);
 }
 
@@ -3603,7 +3603,7 @@ body[data-view="workshop"] .workshop-stat-label {
 
 body[data-view="workshop"] .workshop-stat-value {
   color: var(--ink);
-  font-size: 20px;
+  font-size: var(--font-size-heading-md);
   font-weight: 800;
   font-variant-numeric: tabular-nums;
   line-height: 1.1;
@@ -3641,7 +3641,7 @@ body[data-view="workshop"] .workshop-preset-detail {
   padding: 16px;
   border: 1px solid var(--line);
   border-left: 3px solid #6366f1;
-  border-radius: 12px;
+  border-radius: var(--radius-panel);
   background: var(--panel);
 }
 
@@ -3654,7 +3654,7 @@ body[data-view="workshop"] .workshop-preset-detail-head {
 
 body[data-view="workshop"] .workshop-preset-detail-title {
   margin: 0;
-  font-size: 16px;
+  font-size: var(--font-size-heading-sm);
   letter-spacing: 0;
 }
 
