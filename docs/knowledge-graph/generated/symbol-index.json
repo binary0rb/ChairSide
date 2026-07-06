@@ -1,12 +1,39 @@
 ﻿{
     "generatedStamp":  "deterministic",
     "root":  ".",
-    "fileCount":  67,
+    "fileCount":  68,
     "files":  [
+                  {
+                      "path":  ".github/pull_request_template.md",
+                      "kind":  "Markdown",
+                      "sizeBytes":  570,
+                      "typeSymbols":  [
+
+                                      ],
+                      "methodSymbols":  [
+
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+                                       "Knowledge impact",
+                                       "Validation"
+                                   ]
+                  },
                   {
                       "path":  "AGENTS.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  10375,
+                      "sizeBytes":  11645,
                       "typeSymbols":  [
 
                                       ],
@@ -33,6 +60,7 @@
                                        "Scope",
                                        "Repository orientation and token discipline",
                                        "Private development knowledge graph",
+                                       "PR knowledge-impact check",
                                        "Markdown and documentation formatting",
                                        "Critical privacy rule",
                                        "Doctors and colors",
@@ -77,7 +105,7 @@
                   {
                       "path":  "CLAUDE.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  963,
+                      "sizeBytes":  1225,
                       "typeSymbols":  [
 
                                       ],
@@ -129,7 +157,7 @@
                   {
                       "path":  "docs/knowledge/_meta/tag-dictionary.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  13542,
+                      "sizeBytes":  13698,
                       "typeSymbols":  [
 
                                       ],

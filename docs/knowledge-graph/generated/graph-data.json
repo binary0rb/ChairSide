@@ -3,6 +3,12 @@
     "description":  "Mechanical ChairSide repo graph generated from source files. Use docs/knowledge-graph/chairside.graph.md for human-authored architecture intent.",
     "nodes":  [
                   {
+                      "id":  "file:.github/pull_request_template.md",
+                      "label":  ".github/pull_request_template.md",
+                      "type":  "File",
+                      "path":  ".github/pull_request_template.md"
+                  },
+                  {
                       "id":  "file:AGENTS.md",
                       "label":  "AGENTS.md",
                       "type":  "File",
@@ -1709,6 +1715,11 @@
                       "from":  "file:tests/ChairSide.Board.Tests/ScheduleFitReportTests.cs",
                       "to":  "symbol:type:ScheduleFitReportTests",
                       "label":  "declares"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:.github/pull_request_template.md",
+                      "label":  "contains"
                   },
                   {
                       "from":  "repo:chairside",

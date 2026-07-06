@@ -78,6 +78,27 @@ After meaningful source or documentation changes, run:
 powershell -ExecutionPolicy Bypass -File .\tools\knowledge-graph\New-ChairSideKnowledgeGraph.ps1
 ```
 
+## PR knowledge-impact check
+
+Every PR must include a knowledge-impact check (see the checklist in `.github/pull_request_template.md`).
+
+Human-authored knowledge docs (`docs/knowledge/`, `docs/knowledge-graph/chairside.graph.md`, `decisions.md`, `backlog-signals.md`) are updated only when the PR changes project meaning, not merely because files changed. Meaningful changes include:
+
+- ChairSide concepts, metrics, or lifecycle rules
+- procedure behavior
+- reporting populations
+- deployment assumptions
+- UI design rules
+- the permission model
+- product-risk principles
+- canonical terminology
+
+Do not update human-authored knowledge docs for changes that do not touch any of the above (typo fixes, dependency patches, internal refactors with no behavior/meaning change, and similar).
+
+Do not invent new tags. Use only the canonical tags in `docs/knowledge/_meta/tag-dictionary.md`. If a new tag seems necessary, list it under a "Proposed new tags" heading in the note being edited, or in the task summary if no note exists, and stop for human review rather than adding it silently.
+
+Regenerate the generated knowledge graph/index files (`docs/knowledge-graph/generated/`) after meaningful source or documentation changes, per the command above.
+
 ## Markdown and documentation formatting
 
 Repo Markdown and other committed docs must use ASCII-safe punctuation by default.
