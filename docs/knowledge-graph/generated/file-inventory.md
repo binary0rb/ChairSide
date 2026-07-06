@@ -12,6 +12,12 @@ This file is mechanical output from `tools/knowledge-graph/New-ChairSideKnowledg
 | `CLAUDE.md` | Markdown | headings: Claude Code note | - |
 | `docs/executive-summary.md` | Markdown | headings: Executive Summary | - |
 | `docs/knowledge/_meta/tag-dictionary.md` | Markdown | headings: ChairSide Knowledge Tag Dictionary, 1. Title and purpose, 2. Agent reading order, 3. Source-truth relationship, 4. Canonical tag rules, 5. Canonical project-area tags, 6. Canonical domain-concept tags, 7. Canonical artifact/status tags | - |
+| `docs/knowledge/product/non-phi-boundary.md` | Markdown | headings: Non-PHI boundary, Intent, Constraints, Source anchors, Verification notes | - |
+| `docs/knowledge/reports/observed-load.md` | Markdown | headings: Observed load, Intent, What it reports, Constraints, Source anchors, Verification notes | - |
+| `docs/knowledge/reports/procedure-mix.md` | Markdown | headings: Procedure mix, Intent, What it reports, Constraints, Source anchors, Verification notes | - |
+| `docs/knowledge/reports/reporting-population.md` | Markdown | headings: Reporting population, Intent, The population funnel, Constraints, Source anchors, Verification notes | - |
+| `docs/knowledge/reports/sedation-as-modifier.md` | Markdown | headings: Sedation as a modifier, Intent, How it is represented, Constraints, Source anchors, Verification notes | - |
+| `docs/knowledge/workflow/room-lifecycle.md` | Markdown | headings: Room lifecycle, Intent, Lifecycle events and states, Mutation surface and authorization, Conflict handling, Source anchors, Verification notes | - |
 | `docs/knowledge-graph/backlog-signals.md` | Markdown | headings: ChairSide knowledge graph backlog signals, High-value future graph expansions, Risks to preserve, Candidate relationships to add later | - |
 | `docs/knowledge-graph/chairside.graph.md` | Markdown | headings: ChairSide knowledge graph, Conceptual graph, Core invariants, Current reporting semantics captured by the graph, Known development affordances | - |
 | `docs/knowledge-graph/decisions.md` | Markdown | headings: ChairSide durable decisions, Knowledge graph scope, Runtime isolation, Human-readable first, Non-PHI boundary, Reporting UI philosophy, Reporting population semantics | - |
