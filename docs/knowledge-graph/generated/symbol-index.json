@@ -195,7 +195,7 @@
                   {
                       "path":  "docs/knowledge/product/non-phi-boundary.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  2495,
+                      "sizeBytes":  2542,
                       "typeSymbols":  [
 
                                       ],
@@ -225,7 +225,7 @@
                   {
                       "path":  "docs/knowledge/reports/observed-load.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  2807,
+                      "sizeBytes":  2847,
                       "typeSymbols":  [
 
                                       ],
@@ -256,7 +256,7 @@
                   {
                       "path":  "docs/knowledge/reports/procedure-mix.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  2957,
+                      "sizeBytes":  2998,
                       "typeSymbols":  [
 
                                       ],
@@ -287,7 +287,7 @@
                   {
                       "path":  "docs/knowledge/reports/reporting-population.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  3472,
+                      "sizeBytes":  3513,
                       "typeSymbols":  [
 
                                       ],
@@ -318,7 +318,7 @@
                   {
                       "path":  "docs/knowledge/reports/sedation-as-modifier.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  3031,
+                      "sizeBytes":  3067,
                       "typeSymbols":  [
 
                                       ],
@@ -349,7 +349,7 @@
                   {
                       "path":  "docs/knowledge/workflow/room-lifecycle.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  4315,
+                      "sizeBytes":  4369,
                       "typeSymbols":  [
 
                                       ],
@@ -2064,7 +2064,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/styles.css",
                       "kind":  "Css",
-                      "sizeBytes":  84783,
+                      "sizeBytes":  85118,
                       "typeSymbols":  [
 
                                       ],
