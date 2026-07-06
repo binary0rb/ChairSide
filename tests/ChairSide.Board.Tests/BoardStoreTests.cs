@@ -4380,6 +4380,168 @@ public sealed class BoardStoreTests
         Assert.Equal(MaintenanceOutcome.Refused, MaintenanceCommands.Resolve(["--maintenance", "drop-everything", "--confirm", "x"]).Outcome);
     }
 
+    // -------------------------------------------------------------------------
+    // Large synthetic reporting dataset (maintenance-only, non-Production)
+    // -------------------------------------------------------------------------
+
+    [Fact]
+    public void Maintenance_resolve_authorizes_large_synthetic_command_with_default_count()
+    {
+        var resolution = MaintenanceCommands.Resolve(
+            ["--maintenance", "reset-large-synthetic-report-data", "--confirm", "RESET_LARGE_SYNTHETIC_REPORT_DATA"]);
+
+        Assert.Equal(MaintenanceOutcome.Authorized, resolution.Outcome);
+        Assert.Equal(MaintenanceCommands.LargeSyntheticSeedCommand, resolution.Command);
+        Assert.Equal(MaintenanceCommands.DefaultCompletedCycles, resolution.CompletedCycles);
+    }
+
+    [Fact]
+    public void Maintenance_resolve_parses_completed_cycles_argument()
+    {
+        var resolution = MaintenanceCommands.Resolve(
+            ["--maintenance", "reset-large-synthetic-report-data", "--confirm", "RESET_LARGE_SYNTHETIC_REPORT_DATA", "--completed-cycles", "500"]);
+
+        Assert.Equal(MaintenanceOutcome.Authorized, resolution.Outcome);
+        Assert.Equal(500, resolution.CompletedCycles);
+    }
+
+    [Fact]
+    public void Maintenance_resolve_refuses_large_synthetic_command_with_wrong_token()
+    {
+        var resolution = MaintenanceCommands.Resolve(
+            ["--maintenance", "reset-large-synthetic-report-data", "--confirm", "RESET_TRAINING_DATA"]);
+
+        Assert.Equal(MaintenanceOutcome.Refused, resolution.Outcome);
+        Assert.NotNull(resolution.RefusalReason);
+    }
+
+    [Theory]
+    [InlineData("99")]
+    [InlineData("10001")]
+    [InlineData("0")]
+    [InlineData("-5")]
+    [InlineData("abc")]
+    public void Maintenance_resolve_refuses_out_of_range_or_non_numeric_completed_cycles(string value)
+    {
+        var resolution = MaintenanceCommands.Resolve(
+            ["--maintenance", "reset-large-synthetic-report-data", "--confirm", "RESET_LARGE_SYNTHETIC_REPORT_DATA", "--completed-cycles", value]);
+
+        Assert.Equal(MaintenanceOutcome.Refused, resolution.Outcome);
+        Assert.NotNull(resolution.RefusalReason);
+    }
+
+    [Theory]
+    [InlineData("100", 100)]
+    [InlineData("10000", 10000)]
+    public void Maintenance_resolve_accepts_boundary_completed_cycles(string value, int expected)
+    {
+        var resolution = MaintenanceCommands.Resolve(
+            ["--maintenance", "reset-large-synthetic-report-data", "--confirm", "RESET_LARGE_SYNTHETIC_REPORT_DATA", "--completed-cycles", value]);
+
+        Assert.Equal(MaintenanceOutcome.Authorized, resolution.Outcome);
+        Assert.Equal(expected, resolution.CompletedCycles);
+    }
+
+    [Fact]
+    public void Maintenance_large_synthetic_command_is_production_forbidden_but_others_are_not()
+    {
+        Assert.True(MaintenanceCommands.IsProductionForbidden(MaintenanceCommands.LargeSyntheticSeedCommand));
+        Assert.False(MaintenanceCommands.IsProductionForbidden(MaintenanceCommands.TrainingSeedCommand));
+        Assert.False(MaintenanceCommands.IsProductionForbidden(MaintenanceCommands.EmptyBetaCommand));
+        Assert.False(MaintenanceCommands.IsProductionForbidden(null));
+    }
+
+    [Fact]
+    public void Large_synthetic_report_data_seeds_exactly_the_requested_completed_cycle_count()
+    {
+        using var workspace = TestWorkspace.Create();
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production);
+
+        var result = context.Store.ResetAndSeedLargeSyntheticReportData(1000);
+
+        Assert.Equal(1000, result.CyclesSeeded);
+        Assert.Equal(0, result.ExceptionsExpected);
+
+        var reports = context.Store.GetReports();
+        Assert.Equal(1000, reports.TotalCompletedCycleCount);
+        Assert.Equal(1000, reports.CompletedRoomCyclesCount);
+        Assert.Equal(1000, reports.IncludedCompletedCycleCount);
+        Assert.Equal(0, reports.ExcludedCompletedCycleCount);
+        Assert.Equal(0, reports.ExceptionCount);
+    }
+
+    [Fact]
+    public void Large_synthetic_report_data_populates_sedation_procedure_mix_and_observed_load()
+    {
+        using var workspace = TestWorkspace.Create();
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production);
+
+        context.Store.ResetAndSeedLargeSyntheticReportData(1000);
+        var reports = context.Store.GetReports();
+
+        // The sedation partition covers exactly the included population, with both sides represented.
+        Assert.Equal(1000, reports.SedationCaseCount + reports.NonSedationCaseCount);
+        Assert.True(reports.SedationCaseCount > 0);
+        Assert.True(reports.NonSedationCaseCount > 0);
+
+        // Procedure mix and observed load both have rows at volume.
+        Assert.NotNull(reports.DoctorProcedureMix);
+        Assert.NotEmpty(reports.DoctorProcedureMix!);
+        Assert.NotNull(reports.ObservedDoctorDays);
+        Assert.NotEmpty(reports.ObservedDoctorDays!);
+    }
+
+    [Fact]
+    public void Large_synthetic_report_data_stays_clean_with_full_timing_and_no_day_crossing()
+    {
+        using var workspace = TestWorkspace.Create();
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production);
+
+        context.Store.ResetAndSeedLargeSyntheticReportData(1000);
+
+        var cycles = context.Repository.LoadCompletedCycles();
+        Assert.Equal(1000, cycles.Count);
+        Assert.All(cycles, cycle =>
+        {
+            Assert.NotNull(cycle.DoctorArrivedAt);
+            Assert.NotNull(cycle.DoctorCompleteAt);
+            Assert.NotNull(cycle.RoomAvailableAt);
+            Assert.True(cycle.ExpectedAllocationUnits > 0);
+            // No overnight cycle: the flat per-day cap keeps seat and completion on the same UTC day.
+            Assert.Equal(cycle.SeatedAt.UtcDateTime.Date, cycle.DoctorCompleteAt!.Value.UtcDateTime.Date);
+            Assert.Equal(cycle.SeatedAt.UtcDateTime.Date, cycle.RoomAvailableAt!.Value.UtcDateTime.Date);
+        });
+    }
+
+    [Fact]
+    public void Large_synthetic_report_data_converges_without_duplicate_inflation_on_reseed()
+    {
+        using var workspace = TestWorkspace.Create();
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production);
+
+        var first = context.Store.ResetAndSeedLargeSyntheticReportData(1000);
+        var second = context.Store.ResetAndSeedLargeSyntheticReportData(1000);
+
+        Assert.Equal(1000, first.CyclesSeeded);
+        Assert.Equal(first.CyclesSeeded, second.CyclesSeeded);
+        // The second run cleared exactly what the first seeded - no accumulation across runs.
+        Assert.Equal(first.CyclesSeeded, second.CompletedCyclesCleared);
+        Assert.Equal(1000, context.Repository.LoadCompletedCycles().Count);
+        Assert.Equal(1000, context.Store.GetReports().IncludedCompletedCycleCount);
+    }
+
+    [Fact]
+    public void Large_synthetic_report_data_clamps_below_range_requests_to_the_minimum()
+    {
+        using var workspace = TestWorkspace.Create();
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production);
+
+        // Defense-in-depth: even a direct out-of-range call (bypassing the CLI validation) is clamped.
+        var result = context.Store.ResetAndSeedLargeSyntheticReportData(50);
+
+        Assert.Equal(MaintenanceCommands.MinCompletedCycles, result.CyclesSeeded);
+    }
+
     // Seats, readies, completes, and frees one room across the given minute offsets from seatedAt.
     // Each call uses a self-contained time window; keep windows non-overlapping to avoid
     // cross-cycle doctor-occupied wait when that is not under test.

@@ -1183,7 +1183,7 @@
                   {
                       "path":  "src/ChairSide.Board/Program.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  38573,
+                      "sizeBytes":  39675,
                       "typeSymbols":  [
                                           "SeatRoomRequest",
                                           "UpdateAssignmentRequest",
@@ -1314,7 +1314,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/DemoBoardStore.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  123649,
+                      "sizeBytes":  128364,
                       "typeSymbols":  [
                                           "ExceptionReasons",
                                           "ReportingExceptionReasons",
@@ -1370,6 +1370,8 @@
                                             "ResetAllDataForEmptyBeta",
                                             "ClearCompletedAndResetRoomsLocked",
                                             "SeedSyntheticReportData",
+                                            "ResetAndSeedLargeSyntheticReportData",
+                                            "SeedLargeSyntheticReportData",
                                             "UpsertSyntheticCycle",
                                             "DeterministicSeed",
                                             "CasesForDayOffset",
@@ -1386,9 +1388,7 @@
                                             "FindProcedure",
                                             "FindActiveProcedure",
                                             "HasSedationModifier",
-                                            "StripSedationModifier",
-                                            "ComposeProcedureCode",
-                                            "IsSedationProcedureCode"
+                                            "StripSedationModifier"
                                         ],
                       "routes":  [
 
@@ -1441,7 +1441,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/MaintenanceCommands.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  3581,
+                      "sizeBytes":  6730,
                       "typeSymbols":  [
                                           "MaintenanceOutcome",
                                           "MaintenanceResolution",
@@ -1449,6 +1449,7 @@
                                       ],
                       "methodSymbols":  [
                                             "Resolve",
+                                            "IsProductionForbidden",
                                             "GetFlagValue"
                                         ],
                       "routes":  [
@@ -2150,7 +2151,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/BoardStoreTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  283083,
+                      "sizeBytes":  290646,
                       "typeSymbols":  [
                                           "BoardStoreTests",
                                           "is",
