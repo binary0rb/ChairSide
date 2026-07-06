@@ -27,6 +27,12 @@
                       "path":  "docs/executive-summary.md"
                   },
                   {
+                      "id":  "file:docs/knowledge/_meta/tag-dictionary.md",
+                      "label":  "docs/knowledge/_meta/tag-dictionary.md",
+                      "type":  "File",
+                      "path":  "docs/knowledge/_meta/tag-dictionary.md"
+                  },
+                  {
                       "id":  "file:docs/knowledge-graph/backlog-signals.md",
                       "label":  "docs/knowledge-graph/backlog-signals.md",
                       "type":  "File",
@@ -1722,6 +1728,11 @@
                   {
                       "from":  "repo:chairside",
                       "to":  "file:docs/executive-summary.md",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:docs/knowledge/_meta/tag-dictionary.md",
                       "label":  "contains"
                   },
                   {

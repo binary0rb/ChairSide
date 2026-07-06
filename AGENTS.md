@@ -37,7 +37,7 @@ Preferred deployment target:
 
 ## Repository orientation and token discipline
 
-Before broad source inspection, consult the private development knowledge graph:
+Before broad source inspection, read `docs/knowledge/_meta/tag-dictionary.md` (the controlled vocabulary for ChairSide knowledge notes) right after this file and CLAUDE.md, then consult the private development knowledge graph:
 
 - `docs/knowledge-graph/chairside.graph.md` for human-authored architecture intent.
 - `docs/knowledge-graph/generated/file-inventory.md` for the repo/file map.

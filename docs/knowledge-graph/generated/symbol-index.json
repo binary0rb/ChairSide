@@ -1,12 +1,12 @@
 ﻿{
     "generatedStamp":  "deterministic",
     "root":  ".",
-    "fileCount":  66,
+    "fileCount":  67,
     "files":  [
                   {
                       "path":  "AGENTS.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  10229,
+                      "sizeBytes":  10375,
                       "typeSymbols":  [
 
                                       ],
@@ -77,7 +77,7 @@
                   {
                       "path":  "CLAUDE.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  802,
+                      "sizeBytes":  963,
                       "typeSymbols":  [
 
                                       ],
@@ -124,6 +124,44 @@
                                           ],
                       "headings":  [
                                        "Executive Summary"
+                                   ]
+                  },
+                  {
+                      "path":  "docs/knowledge/_meta/tag-dictionary.md",
+                      "kind":  "Markdown",
+                      "sizeBytes":  13542,
+                      "typeSymbols":  [
+
+                                      ],
+                      "methodSymbols":  [
+
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+                                       "ChairSide Knowledge Tag Dictionary",
+                                       "1. Title and purpose",
+                                       "2. Agent reading order",
+                                       "3. Source-truth relationship",
+                                       "4. Canonical tag rules",
+                                       "5. Canonical project-area tags",
+                                       "6. Canonical domain-concept tags",
+                                       "7. Canonical artifact/status tags",
+                                       "8. Proposed new tags process",
+                                       "9. Knowledge-impact check for PRs",
+                                       "10. Periodic delta audit guidance",
+                                       "11. last_verified_commit guidance",
+                                       "12. Expected benefit"
                                    ]
                   },
                   {
