@@ -1700,21 +1700,21 @@ function renderSelectedDoctorFlow(r, agg) {
   const threePlusRoomMinutes = days.reduce((sum, day) => sum + observedLoadNumber(day.minutesWithThreeOrMoreActiveRooms), 0);
   const stackedMinutes = twoRoomMinutes + threePlusRoomMinutes;
   const overlapSentence = stackedMinutes > 0
-    ? `Observed active room time included ${formatAllocationMinutes(stackedMinutes)} with overlapping rooms.`
+    ? `Observed active room time included ${formatDurationMinutes(stackedMinutes)} with overlapping rooms.`
     : "Observed active room time stayed in single-room flow for this range.";
 
   return `
     <section class="selected-doctor-overview">
       <div class="selected-doctor-summary">
         <h3>Observed Load${renderHelpIcon("Shows the doctor's observed room-flow load for the selected range. Descriptive only; not a ranking or score.")}</h3>
-        <p>Across ${escapeHtml(String(days.length))} observed day${days.length === 1 ? "" : "s"}, this doctor completed ${escapeHtml(String(completedCases))} case${completedCases === 1 ? "" : "s"} with a typical clinical span of ${escapeHtml(formatAllocationMinutes(avgClinicalSpan))} per day.</p>
+        <p>Across ${escapeHtml(String(days.length))} observed day${days.length === 1 ? "" : "s"}, this doctor completed ${escapeHtml(String(completedCases))} case${completedCases === 1 ? "" : "s"} with a typical clinical span of ${escapeHtml(formatApproxDurationMinutes(avgClinicalSpan))} per day.</p>
         <p>${escapeHtml(overlapSentence)}</p>
         <p class="allocation-footnote">Observed Load is descriptive only: it shows room overlap and span pressure, not provider ranking or staff performance scoring.</p>
       </div>
       <dl class="selected-doctor-kpis">
         <div><dt>Days observed</dt><dd>${escapeHtml(String(days.length))}</dd></div>
         <div><dt>Completed cases</dt><dd>${escapeHtml(String(completedCases))}</dd></div>
-        <div><dt>Avg clinical span${renderHelpIcon("Average observed span per day from first seated case through last Doctor Complete.")}</dt><dd>${escapeHtml(formatAllocationMinutes(avgClinicalSpan))}</dd></div>
+        <div><dt>Avg clinical span${renderHelpIcon("Average observed span per day from first seated case through last Doctor Complete.")}</dt><dd>${escapeHtml(formatDurationMinutes(avgClinicalSpan))}</dd></div>
         <div><dt>Peak active load${renderHelpIcon("Highest number of active rooms overlapping for this doctor on an observed day.")}</dt><dd>${escapeHtml(describePeakActiveLoad(peakActiveRooms))}</dd></div>
       </dl>
     </section>
@@ -1737,8 +1737,8 @@ function renderSelectedDoctorFlow(r, agg) {
             <tr>
               <td>${escapeHtml(formatObservedDayDate(day.reportDate))}</td>
               <td>${escapeHtml(Number.isFinite(day.encounterCount) ? String(day.encounterCount) : "--")}</td>
-              <td>${escapeHtml(formatAllocationMinutes(day.observedClinicalSpanMinutes))}</td>
-              <td>${escapeHtml(formatAllocationMinutes(day.observedTeamSpanMinutes))}</td>
+              <td>${escapeHtml(formatDurationMinutes(day.observedClinicalSpanMinutes))}</td>
+              <td>${escapeHtml(formatDurationMinutes(day.observedTeamSpanMinutes))}</td>
               <td>${escapeHtml(describePeakActiveLoad(day.maxActiveRoomCount))}</td>
               <td>${escapeHtml(formatAllocationMinutes(day.minutesWithOneActiveRoom))}</td>
               <td>${escapeHtml(formatAllocationMinutes(day.minutesWithTwoActiveRooms))}</td>
@@ -2159,6 +2159,30 @@ function renderCompletedCycles(cycles) {
 // expected/measured columns in the completed-cycle audit table.
 function formatAllocationMinutes(minutes) {
   return Number.isFinite(minutes) && minutes > 0 ? `${minutes} min` : "--";
+}
+
+// Human-readable duration from a minute value, for report copy that must never expose raw decimals
+// (e.g. a client-computed average). Non-finite/null -> "--". Always rounds to the nearest whole
+// minute. Under 90 minutes reads as "42 min"; 90 minutes or more reads as "8 hr 30 min" (or "8 hr"
+// on the hour). A negative value keeps its sign ("-1 hr 10 min") for signed metrics.
+function formatDurationMinutes(value) {
+  if (!Number.isFinite(value)) {
+    return "--";
+  }
+  const sign = value < 0 ? "-" : "";
+  const totalMinutes = Math.round(Math.abs(value));
+  if (totalMinutes < 90) {
+    return `${sign}${totalMinutes} min`;
+  }
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  return minutes === 0 ? `${sign}${hours} hr` : `${sign}${hours} hr ${minutes} min`;
+}
+
+// Approximation wording for narrative report sentences: "about 8 hr 30 min". Non-finite -> "--"
+// (no "about" prefix on an empty value).
+function formatApproxDurationMinutes(value) {
+  return Number.isFinite(value) ? `about ${formatDurationMinutes(value)}` : "--";
 }
 
 // Neutral allocation variance label. Positive = over expected, negative = under, zero = at.
