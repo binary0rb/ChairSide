@@ -17,6 +17,7 @@ This file is mechanical output from `tools/knowledge-graph/New-ChairSideKnowledg
 | `docs/knowledge/reports/procedure-mix.md` | Markdown | headings: Procedure mix, Intent, What it reports, Constraints, Source anchors, Verification notes | - |
 | `docs/knowledge/reports/reporting-population.md` | Markdown | headings: Reporting population, Intent, The population funnel, Constraints, Source anchors, Verification notes | - |
 | `docs/knowledge/reports/sedation-as-modifier.md` | Markdown | headings: Sedation as a modifier, Intent, How it is represented, Constraints, Source anchors, Verification notes | - |
+| `docs/knowledge/ui/doctor-view-operational-header.md` | Markdown | headings: Doctor View operational header, Intent, Layout rule, Current-room frame posture, Scope, Source anchors, Verification notes | - |
 | `docs/knowledge/workflow/room-lifecycle.md` | Markdown | headings: Room lifecycle, Intent, Lifecycle events and states, Mutation surface and authorization, Conflict handling, Source anchors, Verification notes | - |
 | `docs/knowledge-graph/backlog-signals.md` | Markdown | headings: ChairSide knowledge graph backlog signals, High-value future graph expansions, Risks to preserve, Candidate relationships to add later | - |
 | `docs/knowledge-graph/chairside.graph.md` | Markdown | headings: ChairSide knowledge graph, Conceptual graph, Core invariants, Current reporting semantics captured by the graph, Known development affordances | - |

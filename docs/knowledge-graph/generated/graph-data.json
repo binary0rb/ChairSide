@@ -69,6 +69,12 @@
                       "path":  "docs/knowledge/reports/sedation-as-modifier.md"
                   },
                   {
+                      "id":  "file:docs/knowledge/ui/doctor-view-operational-header.md",
+                      "label":  "docs/knowledge/ui/doctor-view-operational-header.md",
+                      "type":  "File",
+                      "path":  "docs/knowledge/ui/doctor-view-operational-header.md"
+                  },
+                  {
                       "id":  "file:docs/knowledge/workflow/room-lifecycle.md",
                       "label":  "docs/knowledge/workflow/room-lifecycle.md",
                       "type":  "File",
@@ -1805,6 +1811,11 @@
                   {
                       "from":  "repo:chairside",
                       "to":  "file:docs/knowledge/reports/sedation-as-modifier.md",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:docs/knowledge/ui/doctor-view-operational-header.md",
                       "label":  "contains"
                   },
                   {
