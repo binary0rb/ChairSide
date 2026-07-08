@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>ChairSide Board - Doctor View</title>
-  <link rel="stylesheet" href="/styles.css?v=20260630-deploy-visibility-polish">
+  <link rel="stylesheet" href="/styles.css?v=20260707-doctor-operational-header">
 </head>
 <body data-view="doctor">
   <header class="app-header compact">
@@ -33,16 +33,27 @@
   </header>
 
   <main class="doctor-shell">
-    <!-- Cockpit: non-interactive summary card + full selected-doctor detail panel with tabs.
-         Hidden until app.reports loads (silent if no admin token). -->
-    <section id="doctorCockpit" class="doctor-cockpit" hidden>
-      <div id="doctorContextCard" class="doctor-context-card"></div>
+    <!-- Operational header: live room status (upper-left) stays above the reporting detail so
+         expanding a report tab can never push current room status below the fold. Normal document
+         flow - not a viewport-fixed overlay. The reporting snapshot (upper-right) is hidden until
+         app.reports loads (silent if no admin token). -->
+    <section class="doctor-operational-header">
+      <section class="doctor-current-rooms-frame" aria-label="Current room status">
+        <h2 class="doctor-current-rooms-title">Current Room Status</h2>
+        <section class="doctor-list room-count-0" id="doctorRoomList"></section>
+      </section>
+      <section id="doctorCockpit" class="doctor-report-snapshot" hidden>
+        <div id="doctorContextCard" class="doctor-context-card"></div>
+      </section>
+    </section>
+    <!-- Reporting detail: full selected-doctor panel with tabs. Lives in its own region below the
+         operational header and may grow downward freely. -->
+    <section class="doctor-report-details">
       <section id="selectedDoctorPanel" class="selected-doctor-panel" hidden></section>
     </section>
-    <section class="doctor-list" id="doctorRoomList"></section>
   </main>
 
   <script src="/signalr-lite.js"></script>
-  <script src="/board.js?v=20260630-deploy-visibility-polish"></script>
+  <script src="/board.js?v=20260707-doctor-operational-header"></script>
 </body>
 </html>

@@ -1,7 +1,7 @@
 ﻿{
     "generatedStamp":  "deterministic",
     "root":  ".",
-    "fileCount":  74,
+    "fileCount":  75,
     "files":  [
                   {
                       "path":  ".github/pull_request_template.md",
@@ -342,6 +342,38 @@
                                        "Intent",
                                        "How it is represented",
                                        "Constraints",
+                                       "Source anchors",
+                                       "Verification notes"
+                                   ]
+                  },
+                  {
+                      "path":  "docs/knowledge/ui/doctor-view-operational-header.md",
+                      "kind":  "Markdown",
+                      "sizeBytes":  4317,
+                      "typeSymbols":  [
+
+                                      ],
+                      "methodSymbols":  [
+
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+                                       "Doctor View operational header",
+                                       "Intent",
+                                       "Layout rule",
+                                       "Current-room frame posture",
+                                       "Scope",
                                        "Source anchors",
                                        "Verification notes"
                                    ]
@@ -1778,7 +1810,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/board.js",
                       "kind":  "JavaScript",
-                      "sizeBytes":  171231,
+                      "sizeBytes":  171949,
                       "typeSymbols":  [
 
                                       ],
@@ -1831,6 +1863,7 @@
                                               "renderStaffLoungePanel",
                                               "wireStaffLoungePanel",
                                               "renderDoctorView",
+                                              "setDoctorRoomCount",
                                               "renderDoctorCockpit",
                                               "renderReports",
                                               "renderReportHeadline",
@@ -1873,8 +1906,7 @@
                                               "doctorInitials",
                                               "formatAbsoluteMinutes",
                                               "formatSignedMinutes",
-                                              "renderDoctorAllocationRow",
-                                              "renderProcedureAllocation"
+                                              "renderDoctorAllocationRow"
                                           ],
                       "headings":  [
 
@@ -1883,7 +1915,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/doctor.html",
                       "kind":  "Html",
-                      "sizeBytes":  2133,
+                      "sizeBytes":  2819,
                       "typeSymbols":  [
 
                                       ],
@@ -2065,7 +2097,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/styles.css",
                       "kind":  "Css",
-                      "sizeBytes":  86264,
+                      "sizeBytes":  89302,
                       "typeSymbols":  [
 
                                       ],

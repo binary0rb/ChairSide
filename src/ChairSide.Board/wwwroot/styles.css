@@ -1278,17 +1278,16 @@ button:not(:disabled):active {
   max-width: 420px;
 }
 
-/* Cockpit wrapper: stacks the summary card and detail panel with consistent spacing.
-   margin-bottom separates the cockpit block from the live room list below. */
-.doctor-cockpit {
-  display: grid;
-  gap: 16px;
-  margin-bottom: 24px;
+/* Reporting snapshot: the compact selected-doctor summary card, placed upper-right in the Doctor
+   View operational header. It lives in its own region, so expanding a report detail tab (below)
+   never grows it. Does NOT set its own display, so the hidden attribute still hides it naturally. */
+.doctor-report-snapshot {
+  flex: 0 1 340px;
   min-width: 0;
 }
 
 /* Prevent grid-item min-width:auto from propagating a wide table's intrinsic minimum
-   width out of the cockpit and triggering a page-level horizontal scrollbar. */
+   width out of the snapshot and triggering a page-level horizontal scrollbar. */
 .doctor-context-card {
   min-width: 0;
 }
@@ -1298,6 +1297,67 @@ button:not(:disabled):active {
   color: var(--muted);
   font-size: 13px;
   font-weight: 700;
+}
+
+/* ---------------------------------------------------------------------------
+   Doctor View operational header (PR: doctor-view-operational-header).
+   Live room status sits upper-left, the compact reporting snapshot upper-right,
+   and the expandable report detail tabs live in their own region BELOW. This
+   keeps current room status above the fold no matter how far a report tab
+   expands. Normal document flow - no position: fixed. Flexbox so that when the
+   snapshot is hidden (no report access) the room frame simply fills the row,
+   and so the header stacks (rooms first, snapshot second) on narrow widths. */
+body[data-view="doctor"] .doctor-operational-header {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: flex-start;
+  margin-bottom: 20px;
+}
+
+/* Room-status frame: grows to fill the row; wraps to the top on narrow widths. It is a normal
+   flow region (no fixed height, no scroll box) so 1-3 room cases stay fully visible and readable. */
+body[data-view="doctor"] .doctor-current-rooms-frame {
+  flex: 1 1 420px;
+  min-width: 0;
+  display: grid;
+  gap: 10px;
+  align-content: start;
+}
+
+body[data-view="doctor"] .doctor-current-rooms-title {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--font-size-label);
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+/* Report detail region below the operational header - may grow downward freely. min-width:0 keeps
+   a wide audit table from forcing page-level horizontal scroll. */
+body[data-view="doctor"] .doctor-report-details {
+  min-width: 0;
+}
+
+/* Adaptive room grid with a stable posture per active-room count: 1 room fills the frame; 2 rooms
+   split it; 3 rooms hold a 2x2 quadrant shape with the fourth quadrant left as quiet whitespace;
+   4 rooms fill the 2x2. More than 4 keep the 2-column posture and flow into further rows. */
+body[data-view="doctor"] .doctor-current-rooms-frame .doctor-list {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+body[data-view="doctor"] .doctor-current-rooms-frame .doctor-list.room-count-0,
+body[data-view="doctor"] .doctor-current-rooms-frame .doctor-list.room-count-1 {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+/* Below tablet width the two-column room posture is too tight to stay readable, so the frame drops
+   to a single column regardless of count (requirement: readable at 100%, and mobile stacking). */
+@media (max-width: 720px) {
+  body[data-view="doctor"] .doctor-current-rooms-frame .doctor-list {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 .reports-shell {
@@ -3219,6 +3279,13 @@ body[data-view="doctor"] .doctor-list .room-timer span {
    renderSelectedDoctorPanel output looks identical on both pages. The reports
    rules are left untouched; this block applies only to the doctor view.
    --------------------------------------------------------------------------- */
+
+/* Reliable hiding: both regions set their own display, which would otherwise defeat the hidden
+   attribute (same gotcha the reports page handles). Mirrors the reports-page [hidden] overrides. */
+body[data-view="doctor"] .doctor-report-snapshot[hidden],
+body[data-view="doctor"] .selected-doctor-panel[hidden] {
+  display: none;
+}
 
 body[data-view="doctor"] .selected-doctor-panel {
   display: grid;

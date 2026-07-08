@@ -854,6 +854,7 @@ function renderDoctorView() {
   // No implicit default doctor: the view is explicit about who is selected.
   if (!app.doctorId) {
     title.textContent = "Doctor View";
+    setDoctorRoomCount(target, 0);
     target.innerHTML = `<div class="empty-message">Choose a doctor from the Doctor View selector above to see their rooms.</div>`;
     return;
   }
@@ -862,6 +863,7 @@ function renderDoctorView() {
   if (!doctor) {
     const message = `Doctor "${app.doctorId}" was not found.`;
     title.textContent = "Doctor View";
+    setDoctorRoomCount(target, 0);
     target.innerHTML = `<div class="empty-message">${escapeHtml(message)}</div>`;
     return;
   }
@@ -883,9 +885,19 @@ function renderDoctorView() {
     }
   }
 
+  setDoctorRoomCount(target, rooms.length);
   target.innerHTML = rooms.length
     ? rooms.map(room => renderRoomTile(room)).join("")
     : `<div class="empty-message">No active rooms for ${escapeHtml(doctor.name)}.</div>`;
+}
+
+// Drives the Doctor View room-status frame's adaptive grid posture. The count is capped at 4 so the
+// grid holds a stable 2x2 quadrant shape for 3-4 rooms (the CSS leaves the 4th quadrant as quiet
+// whitespace for 3 rooms); more than 4 rooms keep the 2-column posture and flow into further rows.
+// Nothing is hidden - every active room tile still renders.
+function setDoctorRoomCount(target, roomCount) {
+  const capped = Math.min(Math.max(roomCount, 0), 4);
+  target.className = `doctor-list room-count-${capped}`;
 }
 
 function renderDoctorCockpit(r, doctor) {
@@ -2435,15 +2447,12 @@ function wireDoctorCockpitActions() {
   });
 }
 
-// Mirrors wireReportPressGuard but scoped to the doctor cockpit. Uses the same shared
+// Mirrors wireReportPressGuard but for the doctor-view report tabs. Uses the same shared
 // app.reportPressActive flag so renderSelectedDoctorPanel's existing press guard applies.
+// Delegated on document (the tabs live in the report-details region, not a single cockpit
+// wrapper) and filtered to tab elements, which only exist on this page.
 function wireDoctorCockpitPressGuard() {
-  const cockpit = document.querySelector(".doctor-cockpit");
-  if (!cockpit) {
-    return;
-  }
-
-  cockpit.addEventListener("pointerdown", event => {
+  document.addEventListener("pointerdown", event => {
     if (!event.target.closest("[data-report-doctor-tab]")) {
       return;
     }
