@@ -17,7 +17,8 @@ This file is mechanical output from `tools/knowledge-graph/New-ChairSideKnowledg
 | `docs/knowledge/reports/procedure-mix.md` | Markdown | headings: Procedure mix, Intent, What it reports, Constraints, Source anchors, Verification notes | - |
 | `docs/knowledge/reports/reporting-population.md` | Markdown | headings: Reporting population, Intent, The population funnel, Constraints, Source anchors, Verification notes | - |
 | `docs/knowledge/reports/sedation-as-modifier.md` | Markdown | headings: Sedation as a modifier, Intent, How it is represented, Constraints, Source anchors, Verification notes | - |
-| `docs/knowledge/ui/doctor-view-operational-header.md` | Markdown | headings: Doctor View operational header, Intent, Layout rule, Current-room frame posture, Scope, Source anchors, Verification notes | - |
+| `docs/knowledge/tests/deterministic-stress-fixtures.md` | Markdown | headings: Deterministic stress fixtures, Intent, Profiles, Constraints, Source anchors, Verification notes | - |
+| `docs/knowledge/ui/doctor-view-operational-header.md` | Markdown | headings: Doctor View operational header, Intent, Layout rule, Current-room frame posture, Room counting: assignment-based, not state-filtered, Scope, Source anchors, Verification notes | - |
 | `docs/knowledge/workflow/room-lifecycle.md` | Markdown | headings: Room lifecycle, Intent, Lifecycle events and states, Mutation surface and authorization, Conflict handling, Source anchors, Verification notes | - |
 | `docs/knowledge-graph/backlog-signals.md` | Markdown | headings: ChairSide knowledge graph backlog signals, High-value future graph expansions, Risks to preserve, Candidate relationships to add later | - |
 | `docs/knowledge-graph/chairside.graph.md` | Markdown | headings: ChairSide knowledge graph, Conceptual graph, Core invariants, Current reporting semantics captured by the graph, Known development affordances | - |
@@ -28,7 +29,7 @@ This file is mechanical output from `tools/knowledge-graph/New-ChairSideKnowledg
 | `docs/ui-cohesion-audit.md` | Markdown | headings: ChairSide UI Cohesion Audit, 1. Summary, 2. Existing visual strengths, 3. Reusable assets and patterns already available, 4. Visual inconsistencies by category, 5. Protected visual semantics, 6. Reuse-first design principles, 7. Proposed design tokens/components to standardize later | - |
 | `docs/visual-language.md` | Markdown | headings: Visual Language | - |
 | `docs/workflow.md` | Markdown | headings: Workflow | - |
-| `README.md` | Markdown | headings: ChairSide Board, Scaffold, Seed Data, Run Locally, IIS Deployment, Reset Demo Data, Reports, Report time windows | - |
+| `README.md` | Markdown | headings: ChairSide Board, Scaffold, Seed Data, Run Locally, IIS Deployment, Reset Demo Data, Deterministic Stress Fixtures (Maintenance), Reports | - |
 | `scripts/Backup-ChairSideSqlite.ps1` | PowerShell | - | - |
 | `scripts/Reset-ChairSideTrainingData.ps1` | PowerShell | - | - |
 | `scripts/Restore-ChairSideSqlite.ps1` | PowerShell | - | - |

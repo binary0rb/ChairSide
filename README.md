@@ -428,6 +428,33 @@ The development database is stored at `src/ChairSide.Board/data/chairside-dev.db
 
 Demo room states are only seeded when a non-Production database is brand new. Production starts with configured rooms in the available state and does not seed demo room activity.
 
+## Deterministic Stress Fixtures (Maintenance)
+
+`reset-stress-fixture` is a maintenance-only, non-HTTP command that seeds deterministic, non-PHI visual and reporting edge-case data, so layout and reporting-edge-case bugs (such as a board row rendering shorter than the others once all three rows are populated) can be caught deliberately instead of only surfacing under casual one- or two-room testing.
+
+Run it the same way as the other `--maintenance` commands, with `--confirm RESET_STRESS_FIXTURE` and a required `--profile`:
+
+```powershell
+dotnet run --project .\src\ChairSide.Board\ChairSide.Board.csproj -- --environment Development --BoardPersistenceOptions:DatabasePath=.\src\ChairSide.Board\data\chairside-dev.db --maintenance reset-stress-fixture --confirm RESET_STRESS_FIXTURE --profile live-board-stress
+```
+
+There is no default profile - `--profile` is required so a stress fixture can never be seeded by accident. Choose one of six profiles:
+
+- `reporting-volume` - the existing large synthetic completed-cycle dataset (the same shape as `reset-large-synthetic-report-data`), for reporting-volume testing.
+- `live-board-stress` - fills all 12 master-board room cards, with every room state (`AVAILABLE`, `IN PREP`, `READY`, `AGING`, `STALE`, `IN ROOM`, `TURNOVER`) present at least once, including sedation cases and a long-label procedure, to catch board layout regressions.
+- `doctor-view-stress` - a fixed 1/3/4/4 active-room split across the four doctors, so Doctor View's 1-room, 3-room (2x2 with a quiet fourth quadrant), and 4-room (full 2x2) postures can all be reviewed.
+- `doctor-view-overflow-stress` - one doctor with 5 active rooms (a ragged extra row), so Doctor View's beyond-4-room overflow behavior can be reviewed, alongside 3-room and 2-room postures for the other doctors.
+- `scenario-rich` - an extended multi-month completed-cycle history plus a small set of explicit edge-case cycles (one clean cycle in each of the Today, Last-7, Last-30, and older-than-Last-30 report windows; one cycle per derived reporting-exception reason; and one manual audit-review candidate), for reporting/trend/exception-review testing.
+- `full-stress` - composes `live-board-stress`'s room-state coverage (with one doctor's active rooms shaped to also exercise the Doctor View overflow case) with `scenario-rich`'s history and edge cases in a single fixture. Renders all 12 room cards - 11 assigned/active rooms plus 1 intentionally unassigned `AVAILABLE` room - not "all 12 active."
+
+`--completed-cycles` (default 1000, accepted range 100-10000) is only valid with `--profile reporting-volume`; supplying it with any other profile is refused with no mutation, so a mistyped or misremembered flag never silently seeds a different fixture than intended:
+
+```powershell
+dotnet run --project .\src\ChairSide.Board\ChairSide.Board.csproj -- --environment Development --BoardPersistenceOptions:DatabasePath=.\src\ChairSide.Board\data\chairside-dev.db --maintenance reset-stress-fixture --confirm RESET_STRESS_FIXTURE --profile reporting-volume --completed-cycles 500
+```
+
+Like `reset-large-synthetic-report-data`, this command is destructive to whatever database it targets: it clears all completed cycles and resets every active room to Available before seeding the requested fixture. Use it only against a Development/test database, never against production data. It hard-refuses to run in Production regardless of confirmation token, and there is no HTTP endpoint - it never runs as part of normal application startup or serving.
+
 ## Reports
 
 The reports page shows completed room cycle count, prep timing, ready-to-doctor timing, seated-to-doctor timing, doctor-in-room average and median, turnover average and median, aging event count, stale event count, trend summaries, and recent completed cycles. Active room state and completed cycles are stored in SQLite and survive app restarts.

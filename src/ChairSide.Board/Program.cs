@@ -682,14 +682,26 @@ static int RunMaintenance(WebApplication maintenanceApp, MaintenanceResolution r
     Console.WriteLine($"[ChairSide Maintenance] Database:    {repository.DatabasePath}");
     Console.WriteLine($"[ChairSide Maintenance] Command:     {resolution.Command}");
 
-    // Hard refusal: the large synthetic dataset must never run against a Production database, even
-    // with a correct confirmation token. Scoped to that one command; reset-training-data and
-    // reset-empty are unchanged.
+    // Hard refusal: the large synthetic dataset and the stress-fixture command must never run
+    // against a Production database, even with a correct confirmation token. Scoped to those two
+    // commands; reset-training-data and reset-empty are unchanged.
     if (MaintenanceCommands.IsProductionForbidden(resolution.Command) && maintenanceApp.Environment.IsProduction())
     {
         Console.Error.WriteLine($"[ChairSide Maintenance] Refused: '{resolution.Command}' cannot run in Production.");
         Console.Error.WriteLine("[ChairSide Maintenance] No data was changed.");
         return 2;
+    }
+
+    if (string.Equals(resolution.Command, MaintenanceCommands.StressFixtureCommand, StringComparison.Ordinal))
+    {
+        var profile = resolution.Profile
+            ?? throw new InvalidOperationException("reset-stress-fixture resolved without a profile.");
+        Console.WriteLine($"[ChairSide Maintenance] Profile:      {profile}");
+
+        var fixtureResult = store.ResetAndSeedStressFixture(profile, resolution.CompletedCycles);
+        PrintStressFixtureSummary(fixtureResult);
+        Console.WriteLine("[ChairSide Maintenance] Done. The web host was not started.");
+        return 0;
     }
 
     MaintenanceResetResult result;
@@ -718,6 +730,39 @@ static int RunMaintenance(WebApplication maintenanceApp, MaintenanceResolution r
     Console.WriteLine("[ChairSide Maintenance] Done. The web host was not started.");
     return 0;
 }
+
+// Prints the extended reset-stress-fixture summary. Every dimension always prints a line - scalar
+// counts print 0 when a profile does not seed that dimension (0 is self-explanatory for a count);
+// the nullable history-date fields and the count dictionaries print "not seeded by this profile"
+// when null/empty instead of a blank or omitted line, so a profile that intentionally does not
+// touch a dimension (e.g. live-board-stress never writes completed-cycle history) is never
+// confused with a bug that silently produced nothing.
+static void PrintStressFixtureSummary(StressFixtureResult result)
+{
+    Console.WriteLine($"[ChairSide Maintenance] Completed cycles cleared:    {result.CompletedCyclesCleared}");
+    Console.WriteLine($"[ChairSide Maintenance] Active rooms reset:          {result.ActiveRoomsReset}");
+    Console.WriteLine($"[ChairSide Maintenance] Completed cycles seeded:     {result.CyclesSeeded}");
+    Console.WriteLine($"[ChairSide Maintenance] Doctors represented:         {result.DoctorsRepresented}");
+    Console.WriteLine($"[ChairSide Maintenance] Procedure families:         {result.ProcedureFamiliesRepresented}");
+    Console.WriteLine($"[ChairSide Maintenance] Room state counts:          {FormatCounts(result.RoomStateCounts)}");
+    Console.WriteLine($"[ChairSide Maintenance] Active room doctor counts:  {FormatCounts(result.ActiveRoomDoctorCounts)}");
+    Console.WriteLine($"[ChairSide Maintenance] Derived exception reasons:  {FormatCounts(result.DerivedExceptionReasonCounts)}");
+    Console.WriteLine($"[ChairSide Maintenance] Manual audit candidates:    {result.ManualAuditCandidatesSeeded}");
+    Console.WriteLine($"[ChairSide Maintenance] In-progress cycle rows:     {result.InProgressCycleRowsSeeded}");
+    Console.WriteLine($"[ChairSide Maintenance] History earliest seated at: {FormatTimestamp(result.HistoryEarliestSeatedAt)}");
+    Console.WriteLine($"[ChairSide Maintenance] History latest seated at:   {FormatTimestamp(result.HistoryLatestSeatedAt)}");
+}
+
+// Formats a count dictionary as "key=value, key=value, ..." sorted by key for deterministic,
+// scriptable output. Empty means the profile does not seed that dimension at all.
+static string FormatCounts(IReadOnlyDictionary<string, int> counts) =>
+    counts.Count == 0
+        ? "not seeded by this profile"
+        : string.Join(", ", counts.OrderBy(pair => pair.Key, StringComparer.Ordinal).Select(pair => $"{pair.Key}={pair.Value}"));
+
+// "s" is the culture-independent sortable date/time format specifier - no CultureInfo import needed.
+static string FormatTimestamp(DateTimeOffset? timestamp) =>
+    timestamp is { } value ? value.UtcDateTime.ToString("s") + "Z" : "not seeded by this profile";
 
 app.Run();
 return 0;

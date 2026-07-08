@@ -1,7 +1,7 @@
 ﻿{
     "generatedStamp":  "deterministic",
     "root":  ".",
-    "fileCount":  75,
+    "fileCount":  76,
     "files":  [
                   {
                       "path":  ".github/pull_request_template.md",
@@ -347,9 +347,40 @@
                                    ]
                   },
                   {
+                      "path":  "docs/knowledge/tests/deterministic-stress-fixtures.md",
+                      "kind":  "Markdown",
+                      "sizeBytes":  5694,
+                      "typeSymbols":  [
+
+                                      ],
+                      "methodSymbols":  [
+
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+                                       "Deterministic stress fixtures",
+                                       "Intent",
+                                       "Profiles",
+                                       "Constraints",
+                                       "Source anchors",
+                                       "Verification notes"
+                                   ]
+                  },
+                  {
                       "path":  "docs/knowledge/ui/doctor-view-operational-header.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  4317,
+                      "sizeBytes":  5558,
                       "typeSymbols":  [
 
                                       ],
@@ -373,6 +404,7 @@
                                        "Intent",
                                        "Layout rule",
                                        "Current-room frame posture",
+                                       "Room counting: assignment-based, not state-filtered",
                                        "Scope",
                                        "Source anchors",
                                        "Verification notes"
@@ -702,7 +734,7 @@
                   {
                       "path":  "README.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  27002,
+                      "sizeBytes":  30574,
                       "typeSymbols":  [
 
                                       ],
@@ -728,6 +760,7 @@
                                        "Run Locally",
                                        "IIS Deployment",
                                        "Reset Demo Data",
+                                       "Deterministic Stress Fixtures (Maintenance)",
                                        "Reports",
                                        "Report time windows",
                                        "Demo Aging",
@@ -1215,7 +1248,7 @@
                   {
                       "path":  "src/ChairSide.Board/Program.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  39675,
+                      "sizeBytes":  43075,
                       "typeSymbols":  [
                                           "SeatRoomRequest",
                                           "UpdateAssignmentRequest",
@@ -1346,7 +1379,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/DemoBoardStore.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  128364,
+                      "sizeBytes":  170951,
                       "typeSymbols":  [
                                           "ExceptionReasons",
                                           "ReportingExceptionReasons",
@@ -1372,6 +1405,8 @@
                                           "DoctorDailyAllocationPoint",
                                           "DoctorDailyAllocation",
                                           "MaintenanceResetResult",
+                                          "LiveRoomFixture",
+                                          "StressFixtureResult",
                                           "RoomState",
                                           "RoomStates",
                                           "ReviewStatuses",
@@ -1405,22 +1440,22 @@
                                             "ResetAndSeedLargeSyntheticReportData",
                                             "SeedLargeSyntheticReportData",
                                             "UpsertSyntheticCycle",
+                                            "ResetAndSeedStressFixture",
+                                            "SeedLiveRoomFixtures",
+                                            "BuildLiveRoom",
+                                            "UpsertLiveCompletedCycle",
+                                            "UpsertExplicitCompletedCycle",
+                                            "LiveBoardStressFixtures",
+                                            "DoctorViewStressFixtures",
+                                            "DoctorViewOverflowStressFixtures",
+                                            "FullStressLiveFixtures",
+                                            "SeedScenarioRichHistory",
+                                            "SeedScenarioRichEdgeCases",
+                                            "RoomForEdgeCase",
+                                            "BuildCleanCompletedCycle",
+                                            "BuildMissingTimingCycle",
                                             "DeterministicSeed",
-                                            "CasesForDayOffset",
-                                            "MarkCycleAsException",
-                                            "MarkCycleAsExceptionById",
-                                            "ReviewExceptionCycleById",
-                                            "CheckAndExpireActiveCycles",
-                                            "TryRunAfterHoursSweep",
-                                            "ExpireRoom",
-                                            "ResolveTimeZone",
-                                            "TryParseSweepTime",
-                                            "ToRoomStatus",
-                                            "UpdateRoomState",
-                                            "FindProcedure",
-                                            "FindActiveProcedure",
-                                            "HasSedationModifier",
-                                            "StripSedationModifier"
+                                            "CasesForDayOffset"
                                         ],
                       "routes":  [
 
@@ -1473,7 +1508,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/MaintenanceCommands.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  6730,
+                      "sizeBytes":  11816,
                       "typeSymbols":  [
                                           "MaintenanceOutcome",
                                           "MaintenanceResolution",
@@ -2183,7 +2218,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/BoardStoreTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  290646,
+                      "sizeBytes":  308237,
                       "typeSymbols":  [
                                           "BoardStoreTests",
                                           "is",

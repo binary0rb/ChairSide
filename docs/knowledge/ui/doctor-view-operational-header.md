@@ -1,7 +1,7 @@
 ---
 title: Doctor View operational header
 tags: [ui-cohesion, doctors, room, design-decision, active, last-verified]
-last_verified_commit: pending-pr
+last_verified_commit: cfce40c
 ---
 
 # Doctor View operational header
@@ -32,6 +32,14 @@ The current-room frame shows up to four visible active room cards with a stable 
 - More than four active rooms keep the two-column posture and flow into further rows; nothing operationally critical is hidden.
 
 The empty fourth quadrant in the 3-room state is reserved layout capacity - quiet whitespace, not an empty-room card and not an error state. The frame is a normal-flow region, not a fixed-height scroll box, so 1 to 3 room cases stay fully visible and readable at 100% desktop zoom.
+
+## Room counting: assignment-based, not state-filtered
+
+The current-room frame's per-doctor room count is assignment-based, not state-filtered. A room counts toward a doctor's frame whenever it is assigned to that doctor, in any non-`AVAILABLE` state - including `IN ROOM` and `TURNOVER`, not just the pre-arrival wait states (`IN PREP`, `READY`, `AGING`, `STALE`). `AVAILABLE` rooms never count, but only because room reset clears the assigned doctor (the room's assignment becomes null), not because of the `AVAILABLE` state itself.
+
+This means a doctor who still has an assigned `IN ROOM` or `TURNOVER` room, in addition to newly-seated rooms, shows a higher current-room count than the pre-arrival room count alone would suggest. Deterministic stress fixtures that need an exact posture count (1, 3, 4, or 5+ rooms) keep every counted room in a pre-arrival state for that reason, so the intended count is never accidentally inflated by an assigned `IN ROOM`/`TURNOVER` room. See `docs/knowledge/tests/deterministic-stress-fixtures.md`.
+
+Source: `src/ChairSide.Board/wwwroot/board.js`, `renderDoctorView`'s room filter - `room.assignedDoctor === doctor.id || (room.doctor && room.doctor.id === doctor.id)`, with no state predicate.
 
 ## Scope
 

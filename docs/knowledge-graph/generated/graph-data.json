@@ -69,6 +69,12 @@
                       "path":  "docs/knowledge/reports/sedation-as-modifier.md"
                   },
                   {
+                      "id":  "file:docs/knowledge/tests/deterministic-stress-fixtures.md",
+                      "label":  "docs/knowledge/tests/deterministic-stress-fixtures.md",
+                      "type":  "File",
+                      "path":  "docs/knowledge/tests/deterministic-stress-fixtures.md"
+                  },
+                  {
                       "id":  "file:docs/knowledge/ui/doctor-view-operational-header.md",
                       "label":  "docs/knowledge/ui/doctor-view-operational-header.md",
                       "type":  "File",
@@ -801,6 +807,12 @@
                       "path":  "tests/ChairSide.Board.Tests/BoardStoreTests.cs"
                   },
                   {
+                      "id":  "symbol:type:LiveRoomFixture",
+                      "label":  "LiveRoomFixture",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/DemoBoardStore.cs"
+                  },
+                  {
                       "id":  "symbol:type:MaintenanceCommands",
                       "label":  "MaintenanceCommands",
                       "type":  "CodeType",
@@ -1123,6 +1135,12 @@
                       "label":  "StoreContext",
                       "type":  "CodeType",
                       "path":  "tests/ChairSide.Board.Tests/BoardStoreTests.cs"
+                  },
+                  {
+                      "id":  "symbol:type:StressFixtureResult",
+                      "label":  "StressFixtureResult",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/DemoBoardStore.cs"
                   },
                   {
                       "id":  "symbol:type:struct",
@@ -1485,6 +1503,11 @@
                   },
                   {
                       "from":  "file:src/ChairSide.Board/Services/DemoBoardStore.cs",
+                      "to":  "symbol:type:LiveRoomFixture",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/DemoBoardStore.cs",
                       "to":  "symbol:type:MaintenanceResetResult",
                       "label":  "declares"
                   },
@@ -1546,6 +1569,11 @@
                   {
                       "from":  "file:src/ChairSide.Board/Services/DemoBoardStore.cs",
                       "to":  "symbol:type:SeedReportDataResult",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/DemoBoardStore.cs",
+                      "to":  "symbol:type:StressFixtureResult",
                       "label":  "declares"
                   },
                   {
@@ -1811,6 +1839,11 @@
                   {
                       "from":  "repo:chairside",
                       "to":  "file:docs/knowledge/reports/sedation-as-modifier.md",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:docs/knowledge/tests/deterministic-stress-fixtures.md",
                       "label":  "contains"
                   },
                   {
