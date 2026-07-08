@@ -942,6 +942,731 @@ public sealed class DemoBoardStore
         PersistCycle(cycle);
     }
 
+    // ---------------------------------------------------------------------------
+    // Deterministic stress fixtures (maintenance-only, additive). These profiles never modify
+    // WriteSyntheticCase, UpsertSyntheticCycle, or the existing seeders above; they compose the
+    // same private helpers (FindActiveProcedure, ApplyExpectedAllocation, ComposeProcedureCode,
+    // UpdateRoomState, the threshold-relative Aging/Stale/EarlySeated samples, and - for
+    // scenario-rich - WriteSyntheticCase itself) plus a small set of new, purpose-built builders.
+    // See MaintenanceCommands.StressFixtureProfiles for the accepted --profile values.
+    // ---------------------------------------------------------------------------
+
+    /// <summary>
+    /// Maintenance only: clears all completed cycles and resets every active room to Available, then
+    /// seeds the requested deterministic stress-fixture profile. reporting-volume delegates to the
+    /// existing large synthetic seeder; the live-room profiles seed a fixed room allocation table
+    /// (including terminal DoctorInRoom/Turnover states, which also get a paired in-progress
+    /// completed-cycle row so a later manual Doctor Complete/Room Available click on a seeded room
+    /// still updates reporting data correctly); scenario-rich seeds an extended clean history plus a
+    /// small set of explicit edge-case cycles; full-stress composes the live-room and scenario-rich
+    /// builders with no additional bespoke logic. Deterministic: the same profile on a fixed clock
+    /// always reproduces the same fixture. Destructive execution is gated at the CLI layer
+    /// (confirmation token plus a Production hard-refusal); this method itself is environment-
+    /// independent for testability.
+    /// </summary>
+    public StressFixtureResult ResetAndSeedStressFixture(string profile, int? completedCycles)
+    {
+        lock (_syncRoot)
+        {
+            var now = Now;
+            var clearedCompleted = ClearCompletedAndResetRoomsLocked();
+
+            var cyclesSeeded = 0;
+            var doctorsRepresented = 0;
+            var proceduresRepresented = 0;
+
+            switch (profile)
+            {
+                case MaintenanceCommands.ProfileReportingVolume:
+                {
+                    var seed = SeedLargeSyntheticReportData(completedCycles ?? MaintenanceCommands.DefaultCompletedCycles);
+                    cyclesSeeded = seed.CyclesInserted;
+                    doctorsRepresented = seed.DoctorsRepresented;
+                    proceduresRepresented = seed.ProcedureFamiliesRepresented;
+                    break;
+                }
+
+                case MaintenanceCommands.ProfileLiveBoardStress:
+                    SeedLiveRoomFixtures(LiveBoardStressFixtures(), now);
+                    break;
+
+                case MaintenanceCommands.ProfileDoctorViewStress:
+                    SeedLiveRoomFixtures(DoctorViewStressFixtures(), now);
+                    break;
+
+                case MaintenanceCommands.ProfileDoctorViewOverflowStress:
+                    SeedLiveRoomFixtures(DoctorViewOverflowStressFixtures(), now);
+                    break;
+
+                case MaintenanceCommands.ProfileScenarioRich:
+                {
+                    var seed = SeedScenarioRichHistory();
+                    var edgeCasesWritten = SeedScenarioRichEdgeCases(now);
+                    cyclesSeeded = seed.CyclesInserted + edgeCasesWritten;
+                    doctorsRepresented = seed.DoctorsRepresented;
+                    proceduresRepresented = seed.ProcedureFamiliesRepresented;
+                    break;
+                }
+
+                case MaintenanceCommands.ProfileFullStress:
+                {
+                    // Composition only: the same live-room runner (with an overflow-shaped fixture
+                    // table) plus the same scenario-rich history/edge-case builders used above. No
+                    // bespoke seeding logic is introduced for this profile.
+                    SeedLiveRoomFixtures(FullStressLiveFixtures(), now);
+                    var seed = SeedScenarioRichHistory();
+                    var edgeCasesWritten = SeedScenarioRichEdgeCases(now);
+                    cyclesSeeded = seed.CyclesInserted + edgeCasesWritten;
+                    doctorsRepresented = seed.DoctorsRepresented;
+                    proceduresRepresented = seed.ProcedureFamiliesRepresented;
+                    break;
+                }
+
+                default:
+                    throw new InvalidOperationException($"Unknown stress fixture profile '{profile}'.");
+            }
+
+            // Re-derive reporting-exception metadata for the summary (mirrors what GetReports does at
+            // read time; never persisted). Harmless for profiles that seed no history: annotating an
+            // empty or in-progress-only cycle set simply yields no reasons/candidates.
+            AnnotateReportingExceptions(_completedCycles);
+
+            // Room state counts include AVAILABLE, so live-board-stress/full-stress can report their
+            // intentionally unassigned no-coin room. Doctor counts stay assigned-only.
+            var roomStateCounts = _rooms
+                .GroupBy(room => room.State, StringComparer.Ordinal)
+                .ToDictionary(group => group.Key, group => group.Count(), StringComparer.Ordinal);
+
+            var activeRoomDoctorCounts = _rooms
+                .Where(room => room.AssignedDoctor is not null)
+                .GroupBy(room => room.AssignedDoctor!, StringComparer.Ordinal)
+                .ToDictionary(group => group.Key, group => group.Count(), StringComparer.Ordinal);
+
+            // Distinguish genuinely completed historical cycles (RoomAvailableAt set) from the
+            // in-progress rows paired with a directly-seeded DoctorInRoom/Turnover room (RoomAvailableAt
+            // still null - Room Available has not been "clicked" yet). Only completed cycles count as
+            // seeded history: they drive the derived-exception/manual-audit counts and the history date
+            // range, so an in-progress live room never inflates or skews those numbers.
+            var completedHistoryCycles = _completedCycles.Where(cycle => cycle.RoomAvailableAt is not null).ToList();
+            var inProgressCycleRowsSeeded = _completedCycles.Count - completedHistoryCycles.Count;
+
+            var derivedExceptionReasonCounts = completedHistoryCycles
+                .SelectMany(cycle => cycle.ReportingExceptionReasons)
+                .GroupBy(reason => reason, StringComparer.Ordinal)
+                .ToDictionary(group => group.Key, group => group.Count(), StringComparer.Ordinal);
+
+            var manualAuditCandidates = completedHistoryCycles.Count(cycle => cycle.IsException && cycle.RequiresReview);
+
+            DateTimeOffset? earliestSeatedAt = completedHistoryCycles.Count == 0 ? null : completedHistoryCycles.Min(cycle => cycle.SeatedAt);
+            DateTimeOffset? latestSeatedAt = completedHistoryCycles.Count == 0 ? null : completedHistoryCycles.Max(cycle => cycle.SeatedAt);
+
+            return new StressFixtureResult(
+                profile,
+                clearedCompleted,
+                _rooms.Count,
+                cyclesSeeded,
+                doctorsRepresented,
+                proceduresRepresented,
+                roomStateCounts,
+                activeRoomDoctorCounts,
+                derivedExceptionReasonCounts,
+                manualAuditCandidates,
+                inProgressCycleRowsSeeded,
+                earliestSeatedAt,
+                latestSeatedAt);
+        }
+    }
+
+    // --- live-room fixture profiles -------------------------------------------------------------
+
+    // Fills every listed room from a fixed allocation table. A fixture with no doctor/procedure (or
+    // an explicit Available target) resets that room to Available; every other fixture builds a
+    // fully consistent RoomState for the requested target state via BuildLiveRoom. Room ids beyond
+    // the configured RoomCount are skipped rather than failing, so a fixture table sized for 12
+    // rooms degrades safely under a smaller configured room count. One bulk SaveRooms at the end
+    // mirrors the constructor's own demo-seeding persistence pattern.
+    private void SeedLiveRoomFixtures(IReadOnlyList<LiveRoomFixture> fixtures, DateTimeOffset now)
+    {
+        foreach (var fixture in fixtures)
+        {
+            var index = _rooms.FindIndex(room => room.RoomId == fixture.RoomId);
+            if (index < 0)
+            {
+                continue;
+            }
+
+            if (fixture.DoctorId is null
+                || fixture.ProcedureCode is null
+                || string.Equals(fixture.TargetState, RoomStates.Available, StringComparison.Ordinal))
+            {
+                ResetRoom(_rooms[index]);
+                continue;
+            }
+
+            _rooms[index] = BuildLiveRoom(fixture.RoomId, fixture.DoctorId, fixture.ProcedureCode, fixture.Sedation, fixture.TargetState, now);
+        }
+
+        _repository.SaveRooms(_rooms, _doctors, _procedures);
+    }
+
+    // Builds one fully consistent active room for a stress fixture. Seated/ReadyForDoctor/Aging/
+    // Stale timestamps are threshold-relative (via the same EarlySeatedSample/AgingSample/StaleSample
+    // helpers the first-run demo seed uses) so the derived state is correct regardless of configured
+    // AgingMinutes/StaleMinutes, then UpdateRoomState derives the final state/aging/stale fields.
+    // DoctorInRoom/Turnover are terminal for UpdateRoomState, so their timestamps are set directly
+    // from small fixed "recent" offsets - deterministic and stable across expiration/recompute
+    // (well under the default 8-hour max-active-duration sweep) - and a matching in-progress
+    // completed-cycle row is upserted so the room's reporting bookkeeping stays consistent with the
+    // real lifecycle (see UpsertLiveCompletedCycle).
+    private RoomState BuildLiveRoom(int roomId, string doctorId, string procedureCode, bool sedation, string targetState, DateTimeOffset now)
+    {
+        var thresholds = Thresholds;
+        var procedure = FindActiveProcedure(procedureCode)
+            ?? throw new InvalidOperationException($"Stress fixture procedure '{procedureCode}' is not active.");
+        var storedCode = ComposeProcedureCode(procedure.Code, sedation);
+
+        var room = new RoomState(roomId)
+        {
+            AssignedDoctor = doctorId,
+            ProcedureCode = storedCode
+        };
+        ApplyExpectedAllocation(room, procedure, expectedAllocationUnits: null);
+
+        switch (targetState)
+        {
+            case RoomStates.Seated:
+                room.SeatedAt = now - EarlySeatedSample(thresholds);
+                break;
+
+            case RoomStates.ReadyForDoctor:
+            {
+                // UpdateRoomState's "still in prep" gate only lets a room reach the ready-for-doctor
+                // escalation logic once its State is no longer Available/Seated (a fresh RoomState
+                // defaults to Available) - see ReadyForDoctorRoom for the same requirement. The exact
+                // final state (ReadyForDoctor/Aging/Stale) is re-derived from ReadyForDoctorAt below.
+                room.State = RoomStates.ReadyForDoctor;
+                var readyElapsed = EarlySeatedSample(thresholds);
+                room.ReadyForDoctorAt = now - readyElapsed;
+                room.SeatedAt = now - (readyElapsed + StressLiveSeatToReadyPad);
+                break;
+            }
+
+            case RoomStates.Aging:
+            {
+                room.State = RoomStates.ReadyForDoctor;
+                var readyElapsed = AgingSample(thresholds);
+                room.ReadyForDoctorAt = now - readyElapsed;
+                room.SeatedAt = now - (readyElapsed + StressLiveSeatToReadyPad);
+                break;
+            }
+
+            case RoomStates.Stale:
+            {
+                room.State = RoomStates.ReadyForDoctor;
+                var readyElapsed = StaleSample(thresholds);
+                room.ReadyForDoctorAt = now - readyElapsed;
+                room.SeatedAt = now - (readyElapsed + StressLiveSeatToReadyPad);
+                break;
+            }
+
+            case RoomStates.DoctorInRoom:
+                room.SeatedAt = now - StressLiveDoctorInRoomSeatedElapsed;
+                room.ReadyForDoctorAt = now - StressLiveDoctorInRoomReadyElapsed;
+                room.DoctorArrivedAt = now - StressLiveDoctorInRoomArrivedElapsed;
+                room.State = RoomStates.DoctorInRoom;
+                break;
+
+            case RoomStates.Turnover:
+                room.SeatedAt = now - StressLiveTurnoverSeatedElapsed;
+                room.ReadyForDoctorAt = now - StressLiveTurnoverReadyElapsed;
+                room.DoctorArrivedAt = now - StressLiveTurnoverArrivedElapsed;
+                room.DoctorCompleteAt = now - StressLiveTurnoverCompleteElapsed;
+                room.State = RoomStates.Turnover;
+                break;
+
+            default:
+                throw new InvalidOperationException($"Stress fixture target state '{targetState}' is not a supported live-room target state.");
+        }
+
+        UpdateRoomState(room, now);
+
+        if (room.State is RoomStates.DoctorInRoom or RoomStates.Turnover)
+        {
+            UpsertLiveCompletedCycle(room);
+        }
+
+        return room;
+    }
+
+    // Small fixed "recent" elapsed offsets for the two terminal live-room target states.
+    // UpdateRoomState never recomputes DoctorInRoom/Turnover, so these do not need to be
+    // threshold-relative like the Seated/ReadyForDoctor/Aging/Stale cases above - they only need to
+    // stay well inside the default 8-hour room-expiration ceiling, which minutes-scale offsets do.
+    private static readonly TimeSpan StressLiveSeatToReadyPad = TimeSpan.FromMinutes(5);
+    private static readonly TimeSpan StressLiveDoctorInRoomSeatedElapsed = TimeSpan.FromMinutes(40);
+    private static readonly TimeSpan StressLiveDoctorInRoomReadyElapsed = TimeSpan.FromMinutes(32);
+    private static readonly TimeSpan StressLiveDoctorInRoomArrivedElapsed = TimeSpan.FromMinutes(20);
+    private static readonly TimeSpan StressLiveTurnoverSeatedElapsed = TimeSpan.FromMinutes(70);
+    private static readonly TimeSpan StressLiveTurnoverReadyElapsed = TimeSpan.FromMinutes(60);
+    private static readonly TimeSpan StressLiveTurnoverArrivedElapsed = TimeSpan.FromMinutes(45);
+    private static readonly TimeSpan StressLiveTurnoverCompleteElapsed = TimeSpan.FromMinutes(8);
+
+    // Upserts the in-progress completed-cycle row paired with a directly-seeded DoctorInRoom/Turnover
+    // room, mirroring the fields ApplyDoctorArrived/MarkDoctorComplete would have set through the real
+    // lifecycle (RoomAvailableAt stays null - Room Available has not been clicked yet). Without this,
+    // a later manual Doctor Complete/Room Available click on a seeded room would silently no-op
+    // (UpdateCycleReport only updates a cycle that already exists for that RoomId/SeatedAt).
+    private void UpsertLiveCompletedCycle(RoomState room)
+    {
+        var seatedAt = room.SeatedAt!.Value;
+
+        // FinalWaitState/Aging/StaleThresholdReached are set once, at arrival, by ApplyDoctorArrived
+        // and are never revisited by MarkDoctorComplete/MarkRoomAvailable - so a directly-seeded room
+        // must compute the same values up front from its own ReadyForDoctorAt -> DoctorArrivedAt gap
+        // (see ComputeArrivalWaitState), not assume a fixed pre-escalation state.
+        var (finalWaitState, agingThresholdReached, staleThresholdReached) = room.ReadyForDoctorAt.HasValue
+            ? ComputeArrivalWaitState(room.ReadyForDoctorAt.Value, room.DoctorArrivedAt!.Value)
+            : (RoomStates.Seated, false, false);
+
+        UpsertExplicitCompletedCycle(new CompletedRoomCycle
+        {
+            RoomId = room.RoomId,
+            AssignedDoctor = room.AssignedDoctor!,
+            ProcedureCode = room.ProcedureCode!,
+            SeatedAt = seatedAt,
+            ReadyForDoctorAt = room.ReadyForDoctorAt,
+            DoctorArrivedAt = room.DoctorArrivedAt,
+            DoctorCompleteAt = room.DoctorCompleteAt,
+            RoomAvailableAt = null,
+            SeatedToDoctorSeconds = SecondsBetween(seatedAt, room.DoctorArrivedAt!.Value),
+            PrepSeconds = room.ReadyForDoctorAt.HasValue ? SecondsBetween(seatedAt, room.ReadyForDoctorAt.Value) : null,
+            ReadyToDoctorSeconds = room.ReadyForDoctorAt.HasValue ? SecondsBetween(room.ReadyForDoctorAt.Value, room.DoctorArrivedAt.Value) : null,
+            DoctorInRoomSeconds = room.DoctorCompleteAt.HasValue ? SecondsBetween(room.DoctorArrivedAt.Value, room.DoctorCompleteAt.Value) : null,
+            TurnoverSeconds = null,
+            TotalRoomCycleSeconds = null,
+            FinalWaitState = finalWaitState,
+            AgingThresholdReached = agingThresholdReached,
+            StaleThresholdReached = staleThresholdReached,
+            OriginalDefaultExpectedUnits = room.OriginalDefaultExpectedUnits,
+            ExpectedAllocationUnits = room.ExpectedAllocationUnits,
+            ExpectedAllocationMinutes = room.ExpectedAllocationMinutes,
+            AllocationAdjustedFromDefault = room.AllocationAdjustedFromDefault,
+            IsException = false,
+            RequiresReview = false,
+            ExceptionReason = null,
+            ReviewStatus = ReviewStatuses.PendingReview,
+            SuggestedAction = null,
+            ReviewedAt = null,
+            ReviewedBy = null
+        });
+    }
+
+    // Computes what the pre-arrival wait state and aging/stale threshold flags would have been at
+    // the moment DoctorArrivedAt occurred, using the exact same elapsed-vs-threshold comparison
+    // UpdateRoomState uses for the ready-for-doctor escalation phase (elapsed = DoctorArrivedAt -
+    // ReadyForDoctorAt, compared against AgingThreshold/StaleThreshold). AgingThresholdReached is
+    // true whenever the Stale threshold is also reached, matching UpdateRoomState's Stale branch
+    // (which sets AgingStartedAt too, not just StaleStartedAt).
+    private (string FinalWaitState, bool AgingThresholdReached, bool StaleThresholdReached) ComputeArrivalWaitState(
+        DateTimeOffset readyForDoctorAt, DateTimeOffset doctorArrivedAt)
+    {
+        var thresholds = Thresholds;
+        var elapsed = doctorArrivedAt - readyForDoctorAt;
+        if (elapsed >= thresholds.StaleThreshold)
+        {
+            return (RoomStates.Stale, true, true);
+        }
+
+        if (elapsed >= thresholds.AgingThreshold)
+        {
+            return (RoomStates.Aging, true, false);
+        }
+
+        return (RoomStates.ReadyForDoctor, false, false);
+    }
+
+    // Shared upsert (by RoomId + SeatedAt, matching every other cycle-writer in this file) for
+    // explicitly-constructed completed cycles: the live-room in-progress pairing above, and the
+    // scenario-rich clean/edge-case cycles below. Returns the stored cycle reference so callers (e.g.
+    // the manual-audit candidate) can chain a follow-up mutation against the same persisted object.
+    private CompletedRoomCycle UpsertExplicitCompletedCycle(CompletedRoomCycle template)
+    {
+        var cycle = _completedCycles.FirstOrDefault(item => item.RoomId == template.RoomId && item.SeatedAt == template.SeatedAt);
+        var isNew = cycle is null;
+        cycle ??= new CompletedRoomCycle();
+
+        cycle.RoomId = template.RoomId;
+        cycle.AssignedDoctor = template.AssignedDoctor;
+        cycle.ProcedureCode = template.ProcedureCode;
+        cycle.SeatedAt = template.SeatedAt;
+        cycle.ReadyForDoctorAt = template.ReadyForDoctorAt;
+        cycle.DoctorArrivedAt = template.DoctorArrivedAt;
+        cycle.DoctorCompleteAt = template.DoctorCompleteAt;
+        cycle.RoomAvailableAt = template.RoomAvailableAt;
+        cycle.SeatedToDoctorSeconds = template.SeatedToDoctorSeconds;
+        cycle.PrepSeconds = template.PrepSeconds;
+        cycle.ReadyToDoctorSeconds = template.ReadyToDoctorSeconds;
+        cycle.DoctorInRoomSeconds = template.DoctorInRoomSeconds;
+        cycle.TurnoverSeconds = template.TurnoverSeconds;
+        cycle.TotalRoomCycleSeconds = template.TotalRoomCycleSeconds;
+        cycle.FinalWaitState = template.FinalWaitState;
+        cycle.AgingThresholdReached = template.AgingThresholdReached;
+        cycle.StaleThresholdReached = template.StaleThresholdReached;
+        cycle.OriginalDefaultExpectedUnits = template.OriginalDefaultExpectedUnits;
+        cycle.ExpectedAllocationUnits = template.ExpectedAllocationUnits;
+        cycle.ExpectedAllocationMinutes = template.ExpectedAllocationMinutes;
+        cycle.AllocationAdjustedFromDefault = template.AllocationAdjustedFromDefault;
+        cycle.IsException = template.IsException;
+        cycle.RequiresReview = template.RequiresReview;
+        cycle.ExceptionReason = template.ExceptionReason;
+        cycle.ReviewStatus = template.ReviewStatus;
+        cycle.SuggestedAction = template.SuggestedAction;
+        cycle.ReviewedAt = template.ReviewedAt;
+        cycle.ReviewedBy = template.ReviewedBy;
+
+        if (isNew)
+        {
+            _completedCycles.Add(cycle);
+        }
+
+        PersistCycle(cycle);
+        return cycle;
+    }
+
+    // live-board-stress: all 12 rooms filled, every one of the 7 room states present at least once,
+    // one intentionally unassigned Available room (no doctor coin), two sedation cases, and one
+    // long-label procedure (PCOC) to stress card text. Mixed doctors throughout.
+    private static IReadOnlyList<LiveRoomFixture> LiveBoardStressFixtures() =>
+    [
+        new(1, null, null, RoomStates.Available),
+        new(2, "otte", "CON", RoomStates.Seated),
+        new(3, "pledger", "EXT", RoomStates.ReadyForDoctor),
+        new(4, "gibson", "IMPRES", RoomStates.Aging),
+        new(5, "schroeder", "BX", RoomStates.Stale, Sedation: true),
+        new(6, "otte", "IMP", RoomStates.DoctorInRoom),
+        new(7, "pledger", "POST", RoomStates.Turnover),
+        new(8, "gibson", "PCOC", RoomStates.Seated),
+        new(9, "schroeder", "EXT", RoomStates.ReadyForDoctor, Sedation: true),
+        new(10, "otte", "BX", RoomStates.Aging),
+        new(11, "pledger", "IMP", RoomStates.Stale),
+        new(12, "gibson", "MISC", RoomStates.DoctorInRoom)
+    ];
+
+    // doctor-view-stress: fixed 1/3/4/4 active-room split across all four doctors (Otte 1, Pledger 3,
+    // Gibson 4, Schroeder 4 = 12), every counted room in a pre-arrival state (Seated/ReadyForDoctor/
+    // Aging/Stale) so each doctor's Doctor View posture count is exact - see the assignment-based
+    // current-room-frame filter documented in docs/knowledge/ui/doctor-view-operational-header.md.
+    private static IReadOnlyList<LiveRoomFixture> DoctorViewStressFixtures() =>
+    [
+        new(1, "otte", "CON", RoomStates.Seated),
+        new(2, "pledger", "CON", RoomStates.Seated),
+        new(3, "pledger", "EXT", RoomStates.ReadyForDoctor),
+        new(4, "pledger", "IMP", RoomStates.Aging),
+        new(5, "gibson", "CON", RoomStates.Seated),
+        new(6, "gibson", "EXT", RoomStates.ReadyForDoctor),
+        new(7, "gibson", "IMP", RoomStates.Aging),
+        new(8, "gibson", "BX", RoomStates.Stale),
+        new(9, "schroeder", "CON", RoomStates.Seated),
+        new(10, "schroeder", "EXT", RoomStates.ReadyForDoctor),
+        new(11, "schroeder", "IMP", RoomStates.Aging),
+        new(12, "schroeder", "BX", RoomStates.Stale)
+    ];
+
+    // doctor-view-overflow-stress: one doctor (Otte) at 5 active rooms - the named overflow default,
+    // an odd count so the two-column posture ends in a ragged final row (the higher-risk visual
+    // case). Remaining doctors at 3/2/2 = 12 total, incidentally also covering the 3-room and
+    // 2-room postures. All counted rooms stay pre-arrival for the same reason as doctor-view-stress.
+    private static IReadOnlyList<LiveRoomFixture> DoctorViewOverflowStressFixtures() =>
+    [
+        new(1, "otte", "CON", RoomStates.Seated),
+        new(2, "otte", "EXT", RoomStates.Seated),
+        new(3, "otte", "IMP", RoomStates.ReadyForDoctor),
+        new(4, "otte", "BX", RoomStates.Aging),
+        new(5, "otte", "POST", RoomStates.Stale),
+        new(6, "pledger", "CON", RoomStates.Seated),
+        new(7, "pledger", "EXT", RoomStates.ReadyForDoctor),
+        new(8, "pledger", "IMP", RoomStates.Aging),
+        new(9, "gibson", "CON", RoomStates.Seated),
+        new(10, "gibson", "EXT", RoomStates.ReadyForDoctor),
+        new(11, "schroeder", "CON", RoomStates.Seated),
+        new(12, "schroeder", "EXT", RoomStates.ReadyForDoctor)
+    ];
+
+    // full-stress live-room component: renders all 12 room cards (11 assigned/active rooms plus 1
+    // intentionally unassigned Available room) - not "all 12 active". Reuses the doctor-view-overflow
+    // shape (Otte = 5, all pre-arrival) plus the master-board IN ROOM/TURNOVER states so the same
+    // fixture also exercises live-board-stress's state coverage. Doctor split: Otte 5, Gibson 2,
+    // Pledger 2, Schroeder 2, unassigned 1.
+    private static IReadOnlyList<LiveRoomFixture> FullStressLiveFixtures() =>
+    [
+        new(1, null, null, RoomStates.Available),
+        new(2, "otte", "CON", RoomStates.Seated),
+        new(3, "otte", "EXT", RoomStates.Seated),
+        new(4, "otte", "IMP", RoomStates.ReadyForDoctor),
+        new(5, "otte", "BX", RoomStates.Aging),
+        new(6, "otte", "POST", RoomStates.Stale),
+        new(7, "gibson", "IMPRES", RoomStates.DoctorInRoom),
+        new(8, "pledger", "POST", RoomStates.Turnover),
+        new(9, "schroeder", "PCOC", RoomStates.ReadyForDoctor),
+        new(10, "pledger", "MISC", RoomStates.Aging),
+        new(11, "gibson", "EXT", RoomStates.Stale, Sedation: true),
+        new(12, "schroeder", "BX", RoomStates.Seated)
+    ];
+
+    // --- scenario-rich history profile ----------------------------------------------------------
+
+    // Calendar days of clean synthetic history to seed (well beyond SyntheticHistoryDays=41, so
+    // Today/Last-7/Last-30/All-time all diverge and weekly trend buckets populate). Reuses
+    // WriteSyntheticCase unmodified - this is only a different orchestrating loop around it, the
+    // same relationship SeedSyntheticReportData and SeedLargeSyntheticReportData already have.
+    private const int ScenarioRichHistoryDays = 120;
+    private const int ScenarioRichCasesPerDay = 3;
+
+    private SeedReportDataResult SeedScenarioRichHistory()
+    {
+        var doctorIds = _activeDoctors.Select(doctor => doctor.Id).ToList();
+        if (doctorIds.Count == 0)
+        {
+            return new SeedReportDataResult(0, 0, 0, 0, 0);
+        }
+
+        var today = new DateTimeOffset(Now.UtcDateTime.Date, TimeSpan.Zero);
+        var written = 0;
+        var doctorsRepresented = new HashSet<string>(StringComparer.Ordinal);
+        var familiesRepresented = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var globalIndex = 0;
+
+        for (var dayOffset = 0; dayOffset <= ScenarioRichHistoryDays; dayOffset++)
+        {
+            var day = today.AddDays(-dayOffset);
+            for (var caseInDay = 0; caseInDay < ScenarioRichCasesPerDay; caseInDay++)
+            {
+                var completed = WriteSyntheticCase(doctorIds, dayOffset, day, caseInDay, globalIndex);
+                globalIndex++;
+                if (completed is { } write)
+                {
+                    written++;
+                    doctorsRepresented.Add(write.DoctorId);
+                    familiesRepresented.Add(write.BaseFamilyCode);
+                }
+            }
+        }
+
+        return new SeedReportDataResult(written, doctorsRepresented.Count, familiesRepresented.Count, written, 0);
+    }
+
+    // Seeds the explicit, deterministic edge-case cycles scenario-rich adds on top of the bulk clean
+    // history above: one clean, included cycle landing in each report date-range bucket boundary
+    // (Today; outside Today but inside Last-7; outside Last-7 but inside Last-30; older than
+    // Last-30 - offsets mirror the bucket comments already used by CasesForDayOffset), one cycle per
+    // derived reporting-exception reason engineered so only that reason's predicate is true (no
+    // accidental overlap - e.g. the ExtremeDuration cycle stays same-day, and the OvernightLifecycle
+    // cycle stays well under the extreme-duration thresholds), and one manual audit candidate flagged
+    // via the existing MarkCycleAsException path (composition, not duplicate logic). Returns the
+    // actual number of rows written (0 when there are no active doctors) rather than an assumed
+    // constant, so a caller's cycle-seeded count can never claim rows that were not written.
+    private int SeedScenarioRichEdgeCases(DateTimeOffset now)
+    {
+        var doctorIds = _activeDoctors.Select(doctor => doctor.Id).ToList();
+        if (doctorIds.Count == 0)
+        {
+            return 0;
+        }
+
+        var today = new DateTimeOffset(now.UtcDateTime.Date, TimeSpan.Zero);
+        var written = 0;
+
+        // Date-range bucket markers (Refinement 2). Each is a normal clean cycle - mapped active
+        // procedure, same-day, arrival present - so none of them trips a derived exception. The
+        // Today marker is anchored backward from `now` (with a same-day floor), never a fixed clock
+        // hour, so it is never seeded in the future regardless of what time this command runs.
+        var todayMarker = TodayMarkerTimestamps(today, now, prepMin: 6, readyMin: 8, doctorMin: 15, turnoverMin: 6);
+        UpsertExplicitCompletedCycle(BuildCleanCompletedCycle(
+            RoomForEdgeCase(1), doctorIds[0 % doctorIds.Count], "CON",
+            todayMarker.SeatedAt, todayMarker.PrepMin, todayMarker.ReadyMin, todayMarker.DoctorMin, todayMarker.TurnoverMin)); // Today
+        written++;
+
+        UpsertExplicitCompletedCycle(BuildCleanCompletedCycle(
+            RoomForEdgeCase(2), doctorIds[1 % doctorIds.Count], "EXT",
+            today.AddDays(-3).AddHours(9), prepMin: 8, readyMin: 10, doctorMin: 30, turnoverMin: 8)); // outside Today, inside Last-7
+        written++;
+
+        UpsertExplicitCompletedCycle(BuildCleanCompletedCycle(
+            RoomForEdgeCase(3), doctorIds[2 % doctorIds.Count], "IMP",
+            today.AddDays(-15).AddHours(9), prepMin: 10, readyMin: 15, doctorMin: 60, turnoverMin: 10)); // outside Last-7, inside Last-30
+        written++;
+
+        UpsertExplicitCompletedCycle(BuildCleanCompletedCycle(
+            RoomForEdgeCase(4), doctorIds[3 % doctorIds.Count], "BX",
+            today.AddDays(-40).AddHours(9), prepMin: 8, readyMin: 12, doctorMin: 25, turnoverMin: 8)); // older than Last-30
+        written++;
+
+        // One cycle per derived reporting-exception reason (Refinement 1), each isolated to only its
+        // own predicate.
+        UpsertExplicitCompletedCycle(BuildCleanCompletedCycle(
+            RoomForEdgeCase(5), doctorIds[0 % doctorIds.Count], "ZZZSTRESS",
+            today.AddDays(-2).AddHours(8), prepMin: 10, readyMin: 15, doctorMin: 35, turnoverMin: 10)); // UnmappedProcedure only
+        written++;
+
+        UpsertExplicitCompletedCycle(BuildCleanCompletedCycle(
+            RoomForEdgeCase(6), doctorIds[1 % doctorIds.Count], "SED",
+            today.AddDays(-2).AddHours(10), prepMin: 10, readyMin: 15, doctorMin: 35, turnoverMin: 10)); // LegacyProcedure only
+        written++;
+
+        UpsertExplicitCompletedCycle(BuildCleanCompletedCycle(
+            RoomForEdgeCase(7), doctorIds[2 % doctorIds.Count], "IMP",
+            today.AddDays(-2).AddHours(2), prepMin: 10, readyMin: 15, doctorMin: 245, turnoverMin: 10)); // ExtremeDuration only (case flow 4h30m, same day)
+        written++;
+
+        UpsertExplicitCompletedCycle(BuildCleanCompletedCycle(
+            RoomForEdgeCase(8), doctorIds[3 % doctorIds.Count], "EXT",
+            today.AddDays(-2).AddHours(23).AddMinutes(50), prepMin: 5, readyMin: 5, doctorMin: 15, turnoverMin: 5)); // OvernightLifecycle only (crosses midnight, tiny durations)
+        written++;
+
+        UpsertExplicitCompletedCycle(BuildMissingTimingCycle(
+            RoomForEdgeCase(9), doctorIds[0 % doctorIds.Count], "POST",
+            today.AddDays(-2).AddHours(14), completeMin: 50, turnoverMin: 10)); // MissingTiming only (no DoctorArrivedAt; DoctorCompleteAt/RoomAvailableAt set)
+        written++;
+
+        // Manual audit candidate: a normal clean cycle, then flagged through the same shared
+        // MarkCycleAsException path the real reports-page review workflow uses.
+        var manualCandidate = UpsertExplicitCompletedCycle(BuildCleanCompletedCycle(
+            RoomForEdgeCase(10), doctorIds[1 % doctorIds.Count], "BX",
+            today.AddDays(-1).AddHours(9), prepMin: 8, readyMin: 12, doctorMin: 28, turnoverMin: 8));
+        MarkCycleAsException(manualCandidate, ExceptionReasons.ManualReview, "Stress fixture: planted manual audit candidate for review-queue testing.");
+        written++;
+
+        return written;
+    }
+
+    // Deterministic room id for an edge-case cycle slot, wrapped into the configured room count so
+    // it stays a plausible room id regardless of RoomCount (historical completed-cycle rows do not
+    // need to reference a currently-configured room).
+    private int RoomForEdgeCase(int index) => 1 + (index % Math.Max(1, _roomCount));
+
+    // Computes the Today bucket marker's timestamps so it always lands on `today` and never in the
+    // future relative to `now`. A fixed clock-hour anchor (e.g. 09:00 UTC) would itself be a future
+    // timestamp whenever this command runs earlier than that, so this anchors backward from `now`
+    // instead. In the narrow edge case where `now` is within the marker's own total duration of UTC
+    // midnight, the phases are shrunk proportionally so every resulting timestamp still stays inside
+    // [today, now] - the marker is never seeded in the future, even in that edge case.
+    private static (DateTimeOffset SeatedAt, int PrepMin, int ReadyMin, int DoctorMin, int TurnoverMin) TodayMarkerTimestamps(
+        DateTimeOffset today, DateTimeOffset now, int prepMin, int readyMin, int doctorMin, int turnoverMin)
+    {
+        var totalMin = prepMin + readyMin + doctorMin + turnoverMin;
+        var elapsedTodayMin = Math.Max(0, (int)(now - today).TotalMinutes);
+        var safeTotalMin = Math.Min(totalMin, elapsedTodayMin);
+        var seatedAt = now.AddMinutes(-safeTotalMin);
+
+        if (safeTotalMin >= totalMin)
+        {
+            return (seatedAt, prepMin, readyMin, doctorMin, turnoverMin);
+        }
+
+        var scale = totalMin == 0 ? 0d : (double)safeTotalMin / totalMin;
+        var scaledPrep = (int)Math.Round(prepMin * scale);
+        var scaledReady = (int)Math.Round(readyMin * scale);
+        var scaledDoctor = (int)Math.Round(doctorMin * scale);
+        var scaledTurnover = Math.Max(0, safeTotalMin - scaledPrep - scaledReady - scaledDoctor);
+        return (seatedAt, scaledPrep, scaledReady, scaledDoctor, scaledTurnover);
+    }
+
+    // Builds a fully-completed, clean synthetic cycle with explicit minute splits (unlike
+    // WriteSyntheticCase, no jitter - every field here is directly authored so edge-case
+    // durations/day-crossings are exact and reproducible). Falls back to the procedure roster's
+    // default expected units when the code is legacy/inactive or entirely unmapped, since
+    // FindActiveProcedure would otherwise reject the two procedure-mapping edge cases outright.
+    private CompletedRoomCycle BuildCleanCompletedCycle(
+        int roomId, string doctorId, string procedureCode, DateTimeOffset seatedAt,
+        int prepMin, int readyMin, int doctorMin, int turnoverMin)
+    {
+        var defaultUnits = Math.Clamp(FindProcedure(procedureCode)?.DefaultExpectedUnits ?? MinExpectedUnits, MinExpectedUnits, MaxExpectedUnits);
+        var readyAt = seatedAt.AddMinutes(prepMin);
+        var arrivedAt = readyAt.AddMinutes(readyMin);
+        var completeAt = arrivedAt.AddMinutes(doctorMin);
+        var availableAt = completeAt.AddMinutes(turnoverMin);
+
+        return new CompletedRoomCycle
+        {
+            RoomId = roomId,
+            AssignedDoctor = doctorId,
+            ProcedureCode = procedureCode,
+            SeatedAt = seatedAt,
+            ReadyForDoctorAt = readyAt,
+            DoctorArrivedAt = arrivedAt,
+            DoctorCompleteAt = completeAt,
+            RoomAvailableAt = availableAt,
+            SeatedToDoctorSeconds = (prepMin + readyMin) * 60,
+            PrepSeconds = prepMin * 60,
+            ReadyToDoctorSeconds = readyMin * 60,
+            DoctorInRoomSeconds = doctorMin * 60,
+            TurnoverSeconds = turnoverMin * 60,
+            TotalRoomCycleSeconds = (prepMin + readyMin + doctorMin + turnoverMin) * 60,
+            FinalWaitState = RoomStates.ReadyForDoctor,
+            AgingThresholdReached = false,
+            StaleThresholdReached = false,
+            OriginalDefaultExpectedUnits = defaultUnits,
+            ExpectedAllocationUnits = defaultUnits,
+            ExpectedAllocationMinutes = defaultUnits * 10,
+            AllocationAdjustedFromDefault = false,
+            IsException = false,
+            RequiresReview = false,
+            ExceptionReason = null,
+            ReviewStatus = ReviewStatuses.PendingReview,
+            SuggestedAction = null,
+            ReviewedAt = null,
+            ReviewedBy = null
+        };
+    }
+
+    // Builds the one deliberately abnormal cycle in the edge-case set: DoctorArrivedAt stays null
+    // (the MissingTiming predicate), but unlike a genuinely in-progress room, DoctorCompleteAt and
+    // RoomAvailableAt ARE set, since report date-range windows are anchored on DoctorCompleteAt
+    // (GetReports/ReportDateRange) - a null DoctorCompleteAt would only ever surface in the All-time
+    // range. Durations that depend on arrival (SeatedToDoctorSeconds - sentinel 0, since the field is
+    // non-nullable; ReadyToDoctorSeconds; DoctorInRoomSeconds) stay null/0; TurnoverSeconds and
+    // TotalRoomCycleSeconds are still computed since they do not depend on arrival.
+    private CompletedRoomCycle BuildMissingTimingCycle(
+        int roomId, string doctorId, string procedureCode, DateTimeOffset seatedAt,
+        int completeMin, int turnoverMin)
+    {
+        var defaultUnits = Math.Clamp(FindProcedure(procedureCode)?.DefaultExpectedUnits ?? MinExpectedUnits, MinExpectedUnits, MaxExpectedUnits);
+        var completeAt = seatedAt.AddMinutes(completeMin);
+        var availableAt = completeAt.AddMinutes(turnoverMin);
+
+        return new CompletedRoomCycle
+        {
+            RoomId = roomId,
+            AssignedDoctor = doctorId,
+            ProcedureCode = procedureCode,
+            SeatedAt = seatedAt,
+            ReadyForDoctorAt = null,
+            DoctorArrivedAt = null,
+            DoctorCompleteAt = completeAt,
+            RoomAvailableAt = availableAt,
+            SeatedToDoctorSeconds = 0,
+            PrepSeconds = null,
+            ReadyToDoctorSeconds = null,
+            DoctorInRoomSeconds = null,
+            TurnoverSeconds = turnoverMin * 60,
+            TotalRoomCycleSeconds = (completeMin + turnoverMin) * 60,
+            FinalWaitState = RoomStates.Seated,
+            AgingThresholdReached = false,
+            StaleThresholdReached = false,
+            OriginalDefaultExpectedUnits = defaultUnits,
+            ExpectedAllocationUnits = defaultUnits,
+            ExpectedAllocationMinutes = defaultUnits * 10,
+            AllocationAdjustedFromDefault = false,
+            IsException = false,
+            RequiresReview = false,
+            ExceptionReason = null,
+            ReviewStatus = ReviewStatuses.PendingReview,
+            SuggestedAction = null,
+            ReviewedAt = null,
+            ReviewedBy = null
+        };
+    }
+
     // Deterministic per-doctor synthetic style profiles (no punitive meaning). The profiles give
     // each doctor a distinct, plausible allocation shape so the Reports page is not symmetrical:
     //   Otte      - buffered: generous expected units, leans under/at expected.
@@ -2733,6 +3458,45 @@ public sealed record MaintenanceResetResult(
     int ProcedureFamiliesRepresented,
     int ExpectedAllocationCases,
     int ExceptionsExpected);
+
+/// <summary>
+/// One deterministic live-room allocation for a stress-fixture profile: which room, which doctor
+/// and procedure (null for an intentionally unassigned Available room), the target room state, and
+/// whether the case is a sedation case. See DemoBoardStore.SeedLiveRoomFixtures / BuildLiveRoom.
+/// </summary>
+public sealed record LiveRoomFixture(
+    int RoomId,
+    string? DoctorId,
+    string? ProcedureCode,
+    string TargetState,
+    bool Sedation = false);
+
+/// <summary>
+/// Non-PHI summary returned by the reset-stress-fixture maintenance command. RoomStateCounts covers
+/// every configured room, including AVAILABLE (so an intentionally unassigned no-coin room is
+/// reported, not silently dropped); ActiveRoomDoctorCounts is assigned-rooms-only. Cycle-history
+/// fields (DerivedExceptionReasonCounts, ManualAuditCandidatesSeeded, HistoryEarliest/LatestSeatedAt)
+/// are computed only from completed cycles (RoomAvailableAt set) - InProgressCycleRowsSeeded reports
+/// the separate count of in-progress rows paired with a directly-seeded DoctorInRoom/Turnover room,
+/// which are not seeded history and must not be counted or dated as if they were. Dictionaries only
+/// contain keys that actually occurred; a profile that does not seed a given dimension simply
+/// contributes no entries for it, which the CLI printout renders as an explicit zero /
+/// "not seeded by this profile" rather than omitting the line.
+/// </summary>
+public sealed record StressFixtureResult(
+    string Profile,
+    int CompletedCyclesCleared,
+    int ActiveRoomsReset,
+    int CyclesSeeded,
+    int DoctorsRepresented,
+    int ProcedureFamiliesRepresented,
+    IReadOnlyDictionary<string, int> RoomStateCounts,
+    IReadOnlyDictionary<string, int> ActiveRoomDoctorCounts,
+    IReadOnlyDictionary<string, int> DerivedExceptionReasonCounts,
+    int ManualAuditCandidatesSeeded,
+    int InProgressCycleRowsSeeded,
+    DateTimeOffset? HistoryEarliestSeatedAt,
+    DateTimeOffset? HistoryLatestSeatedAt);
 
 public sealed class RoomState(int roomId)
 {

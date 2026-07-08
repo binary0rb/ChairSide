@@ -4542,6 +4542,334 @@ public sealed class BoardStoreTests
         Assert.Equal(MaintenanceCommands.MinCompletedCycles, result.CyclesSeeded);
     }
 
+    // -------------------------------------------------------------------------
+    // Deterministic stress fixtures (reset-stress-fixture)
+    // -------------------------------------------------------------------------
+
+    [Fact]
+    public void Maintenance_resolve_authorizes_stress_fixture_command_with_valid_profile()
+    {
+        var resolution = MaintenanceCommands.Resolve(
+            ["--maintenance", "reset-stress-fixture", "--confirm", "RESET_STRESS_FIXTURE", "--profile", "live-board-stress"]);
+
+        Assert.Equal(MaintenanceOutcome.Authorized, resolution.Outcome);
+        Assert.Equal(MaintenanceCommands.StressFixtureCommand, resolution.Command);
+        Assert.Equal(MaintenanceCommands.ProfileLiveBoardStress, resolution.Profile);
+        Assert.Null(resolution.CompletedCycles);
+    }
+
+    [Fact]
+    public void Maintenance_resolve_refuses_stress_fixture_command_with_wrong_token()
+    {
+        var resolution = MaintenanceCommands.Resolve(
+            ["--maintenance", "reset-stress-fixture", "--confirm", "RESET_LARGE_SYNTHETIC_REPORT_DATA", "--profile", "live-board-stress"]);
+
+        Assert.Equal(MaintenanceOutcome.Refused, resolution.Outcome);
+        Assert.NotNull(resolution.RefusalReason);
+    }
+
+    [Fact]
+    public void Maintenance_resolve_refuses_stress_fixture_command_without_profile()
+    {
+        var resolution = MaintenanceCommands.Resolve(
+            ["--maintenance", "reset-stress-fixture", "--confirm", "RESET_STRESS_FIXTURE"]);
+
+        Assert.Equal(MaintenanceOutcome.Refused, resolution.Outcome);
+        Assert.NotNull(resolution.RefusalReason);
+    }
+
+    [Fact]
+    public void Maintenance_resolve_refuses_stress_fixture_command_with_unknown_profile()
+    {
+        var resolution = MaintenanceCommands.Resolve(
+            ["--maintenance", "reset-stress-fixture", "--confirm", "RESET_STRESS_FIXTURE", "--profile", "not-a-real-profile"]);
+
+        Assert.Equal(MaintenanceOutcome.Refused, resolution.Outcome);
+        Assert.NotNull(resolution.RefusalReason);
+    }
+
+    [Theory]
+    [InlineData("reporting-volume")]
+    [InlineData("live-board-stress")]
+    [InlineData("doctor-view-stress")]
+    [InlineData("doctor-view-overflow-stress")]
+    [InlineData("scenario-rich")]
+    [InlineData("full-stress")]
+    public void Maintenance_resolve_accepts_all_six_stress_fixture_profiles(string profile)
+    {
+        var resolution = MaintenanceCommands.Resolve(
+            ["--maintenance", "reset-stress-fixture", "--confirm", "RESET_STRESS_FIXTURE", "--profile", profile]);
+
+        Assert.Equal(MaintenanceOutcome.Authorized, resolution.Outcome);
+        Assert.Equal(profile, resolution.Profile);
+    }
+
+    [Fact]
+    public void Maintenance_resolve_accepts_completed_cycles_only_for_reporting_volume_profile()
+    {
+        var resolution = MaintenanceCommands.Resolve(
+            ["--maintenance", "reset-stress-fixture", "--confirm", "RESET_STRESS_FIXTURE",
+             "--profile", "reporting-volume", "--completed-cycles", "500"]);
+
+        Assert.Equal(MaintenanceOutcome.Authorized, resolution.Outcome);
+        Assert.Equal(500, resolution.CompletedCycles);
+    }
+
+    [Fact]
+    public void Maintenance_resolve_authorizes_reporting_volume_profile_with_default_completed_cycles_when_omitted()
+    {
+        var resolution = MaintenanceCommands.Resolve(
+            ["--maintenance", "reset-stress-fixture", "--confirm", "RESET_STRESS_FIXTURE", "--profile", "reporting-volume"]);
+
+        Assert.Equal(MaintenanceOutcome.Authorized, resolution.Outcome);
+        Assert.Equal(MaintenanceCommands.DefaultCompletedCycles, resolution.CompletedCycles);
+    }
+
+    [Theory]
+    [InlineData("live-board-stress")]
+    [InlineData("doctor-view-stress")]
+    [InlineData("doctor-view-overflow-stress")]
+    [InlineData("scenario-rich")]
+    [InlineData("full-stress")]
+    public void Maintenance_resolve_refuses_completed_cycles_for_non_reporting_volume_profiles(string profile)
+    {
+        var resolution = MaintenanceCommands.Resolve(
+            ["--maintenance", "reset-stress-fixture", "--confirm", "RESET_STRESS_FIXTURE",
+             "--profile", profile, "--completed-cycles", "500"]);
+
+        Assert.Equal(MaintenanceOutcome.Refused, resolution.Outcome);
+        Assert.NotNull(resolution.RefusalReason);
+    }
+
+    [Fact]
+    public void Maintenance_stress_fixture_command_is_production_forbidden()
+    {
+        Assert.True(MaintenanceCommands.IsProductionForbidden(MaintenanceCommands.StressFixtureCommand));
+    }
+
+    [Fact]
+    public void Live_board_stress_fills_all_twelve_rooms_with_every_state_present()
+    {
+        using var workspace = TestWorkspace.Create();
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production, roomCount: 12);
+
+        var result = context.Store.ResetAndSeedStressFixture(MaintenanceCommands.ProfileLiveBoardStress, null);
+
+        Assert.Equal(12, result.ActiveRoomsReset);
+        Assert.Equal(12, result.RoomStateCounts.Values.Sum());
+        Assert.Equal(1, result.RoomStateCounts.GetValueOrDefault(RoomStates.Available));
+        foreach (var state in new[]
+                 {
+                     RoomStates.Available, RoomStates.Seated, RoomStates.ReadyForDoctor, RoomStates.Aging,
+                     RoomStates.Stale, RoomStates.DoctorInRoom, RoomStates.Turnover
+                 })
+        {
+            Assert.True(result.RoomStateCounts.GetValueOrDefault(state) >= 1, $"Expected at least one room in state '{state}'.");
+        }
+
+        var rooms = context.Store.GetSnapshot().Rooms;
+        Assert.Contains(rooms, room => room.State == RoomStates.Available && room.AssignedDoctor is null);
+        Assert.Contains(rooms, room => room.ProcedureCode != null && room.ProcedureCode.EndsWith("+SED", StringComparison.Ordinal));
+        Assert.Contains(rooms, room => room.ProcedureCode == "PCOC");
+    }
+
+    [Fact]
+    public void Live_board_stress_in_progress_rows_do_not_count_as_completed_history()
+    {
+        using var workspace = TestWorkspace.Create();
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production, roomCount: 12);
+
+        var result = context.Store.ResetAndSeedStressFixture(MaintenanceCommands.ProfileLiveBoardStress, null);
+
+        // live-board-stress seeds two DoctorInRoom rooms and one Turnover room - each gets a paired
+        // in-progress completed-cycle row (RoomAvailableAt still null). None of that is seeded
+        // *history*: no completed cycles exist yet, so exception/audit counts and the history
+        // horizon must all read as empty/not-seeded, never inflated or dated by in-progress rows.
+        Assert.Equal(3, result.InProgressCycleRowsSeeded);
+        Assert.Empty(result.DerivedExceptionReasonCounts);
+        Assert.Equal(0, result.ManualAuditCandidatesSeeded);
+        Assert.Null(result.HistoryEarliestSeatedAt);
+        Assert.Null(result.HistoryLatestSeatedAt);
+    }
+
+    [Fact]
+    public void Live_board_stress_in_progress_rows_compute_arrival_wait_state_from_their_own_timestamps()
+    {
+        using var workspace = TestWorkspace.Create();
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production, roomCount: 12);
+
+        context.Store.ResetAndSeedStressFixture(MaintenanceCommands.ProfileLiveBoardStress, null);
+
+        // FinalWaitState/Aging/StaleThresholdReached are set once, at arrival, by the real lifecycle
+        // (ApplyDoctorArrived) and are never revisited by MarkDoctorComplete/MarkRoomAvailable - so a
+        // directly-seeded DoctorInRoom/Turnover row must compute these correctly at seed time from its
+        // own ReadyForDoctorAt -> DoctorArrivedAt gap, not assume a fixed placeholder. Uses the default
+        // 7-minute aging / 12-minute stale thresholds (StoreContext.Create's defaults, not overridden).
+        var inProgressCycles = context.Repository.LoadCompletedCycles().Where(cycle => cycle.RoomAvailableAt is null).ToList();
+        Assert.Equal(3, inProgressCycles.Count);
+        Assert.All(inProgressCycles, cycle =>
+        {
+            Assert.NotNull(cycle.ReadyForDoctorAt);
+            Assert.NotNull(cycle.DoctorArrivedAt);
+            var elapsed = cycle.DoctorArrivedAt!.Value - cycle.ReadyForDoctorAt!.Value;
+            var expectedState = elapsed >= TimeSpan.FromMinutes(12) ? RoomStates.Stale
+                : elapsed >= TimeSpan.FromMinutes(7) ? RoomStates.Aging
+                : RoomStates.ReadyForDoctor;
+            Assert.Equal(expectedState, cycle.FinalWaitState);
+            Assert.Equal(elapsed >= TimeSpan.FromMinutes(7), cycle.AgingThresholdReached);
+            Assert.Equal(elapsed >= TimeSpan.FromMinutes(12), cycle.StaleThresholdReached);
+        });
+    }
+
+    [Fact]
+    public void Doctor_view_stress_splits_active_rooms_one_three_four_four_with_pre_arrival_states()
+    {
+        using var workspace = TestWorkspace.Create();
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production, roomCount: 12);
+
+        var result = context.Store.ResetAndSeedStressFixture(MaintenanceCommands.ProfileDoctorViewStress, null);
+
+        Assert.Equal(1, result.ActiveRoomDoctorCounts.GetValueOrDefault("otte"));
+        Assert.Equal(3, result.ActiveRoomDoctorCounts.GetValueOrDefault("pledger"));
+        Assert.Equal(4, result.ActiveRoomDoctorCounts.GetValueOrDefault("gibson"));
+        Assert.Equal(4, result.ActiveRoomDoctorCounts.GetValueOrDefault("schroeder"));
+
+        // Every counted room stays pre-arrival, so Doctor View's assignment-based (not
+        // state-filtered) current-room-frame count can never be accidentally inflated by an
+        // assigned IN ROOM/TURNOVER room.
+        var preArrivalStates = new[] { RoomStates.Seated, RoomStates.ReadyForDoctor, RoomStates.Aging, RoomStates.Stale };
+        var assignedRooms = context.Store.GetSnapshot().Rooms.Where(room => room.AssignedDoctor is not null);
+        Assert.All(assignedRooms, room => Assert.Contains(room.State, preArrivalStates));
+    }
+
+    [Fact]
+    public void Doctor_view_overflow_stress_gives_one_doctor_five_active_rooms()
+    {
+        using var workspace = TestWorkspace.Create();
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production, roomCount: 12);
+
+        var result = context.Store.ResetAndSeedStressFixture(MaintenanceCommands.ProfileDoctorViewOverflowStress, null);
+
+        Assert.Equal(5, result.ActiveRoomDoctorCounts.GetValueOrDefault("otte"));
+        Assert.Equal(3, result.ActiveRoomDoctorCounts.GetValueOrDefault("pledger"));
+        Assert.Equal(2, result.ActiveRoomDoctorCounts.GetValueOrDefault("gibson"));
+        Assert.Equal(2, result.ActiveRoomDoctorCounts.GetValueOrDefault("schroeder"));
+
+        var preArrivalStates = new[] { RoomStates.Seated, RoomStates.ReadyForDoctor, RoomStates.Aging, RoomStates.Stale };
+        var assignedRooms = context.Store.GetSnapshot().Rooms.Where(room => room.AssignedDoctor is not null);
+        Assert.All(assignedRooms, room => Assert.Contains(room.State, preArrivalStates));
+    }
+
+    [Fact]
+    public void Scenario_rich_derived_exceptions_surface_in_a_bounded_range_exactly_once_with_no_overlap()
+    {
+        using var workspace = TestWorkspace.Create();
+        var now = new DateTimeOffset(2026, 6, 15, 14, 0, 0, TimeSpan.Zero);
+        var clock = new ManualTimeProvider(now);
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production, roomCount: 12, timeProvider: clock);
+
+        context.Store.ResetAndSeedStressFixture(MaintenanceCommands.ProfileScenarioRich, null);
+
+        // Bounded (not All-time) window covering just today.AddDays(-2) through today, where every
+        // derived-exception edge case was seeded. Narrow on purpose so the total candidate count
+        // stays comfortably under RecentCompletedCycles' 25-row cap regardless of sort order (the
+        // MissingTiming cycle has a null DoctorArrivedAt, the field RecentCompletedCycles sorts on).
+        var today = DateOnly.FromDateTime(now.UtcDateTime.Date);
+        var window = ReportDateRange.FromDates(today.AddDays(-2), today);
+        var reports = context.Store.GetReports(window);
+
+        var expectedReasons = new[]
+        {
+            ReportingExceptionReasons.UnmappedProcedure,
+            ReportingExceptionReasons.LegacyProcedure,
+            ReportingExceptionReasons.ExtremeDuration,
+            ReportingExceptionReasons.OvernightLifecycle,
+            ReportingExceptionReasons.MissingTiming
+        };
+
+        var flaggedCycles = reports.RecentCompletedCycles.Where(cycle => cycle.HasReportingException).ToList();
+
+        // Exactly the five intended edge-case cycles are flagged in this window - no unexpected
+        // extras (the bulk clean history and the four bucket markers never trip a derived reason).
+        Assert.Equal(5, flaggedCycles.Count);
+        Assert.All(flaggedCycles, cycle => Assert.Single(cycle.ReportingExceptionReasons));
+
+        foreach (var reason in expectedReasons)
+        {
+            var matching = flaggedCycles.Where(cycle => cycle.ReportingExceptionReasons.Contains(reason)).ToList();
+            Assert.Single(matching);
+        }
+    }
+
+    [Fact]
+    public void Scenario_rich_populates_every_report_date_range_bucket_with_strictly_increasing_counts()
+    {
+        using var workspace = TestWorkspace.Create();
+        var now = new DateTimeOffset(2026, 6, 15, 14, 0, 0, TimeSpan.Zero);
+        var clock = new ManualTimeProvider(now);
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production, roomCount: 12, timeProvider: clock);
+
+        context.Store.ResetAndSeedStressFixture(MaintenanceCommands.ProfileScenarioRich, null);
+
+        var today = DateOnly.FromDateTime(now.UtcDateTime.Date);
+        var todayCount = context.Store.GetReports(ReportDateRange.FromDates(today, today)).CompletedRoomCyclesCount;
+        var last7Count = context.Store.GetReports(ReportDateRange.FromDates(today.AddDays(-6), today)).CompletedRoomCyclesCount;
+        var last30Count = context.Store.GetReports(ReportDateRange.FromDates(today.AddDays(-29), today)).CompletedRoomCyclesCount;
+        var allTimeCount = context.Store.GetReports(ReportDateRange.AllTime).CompletedRoomCyclesCount;
+
+        Assert.True(todayCount > 0, "Today bucket marker did not land in the Today window.");
+        Assert.True(last7Count > todayCount, "Last-7 window did not exceed Today.");
+        Assert.True(last30Count > last7Count, "Last-30 window did not exceed Last-7.");
+        Assert.True(allTimeCount > last30Count, "All-time window did not exceed Last-30.");
+    }
+
+    [Fact]
+    public void Full_stress_composes_live_board_and_scenario_rich_data_without_bespoke_logic()
+    {
+        using var workspace = TestWorkspace.Create();
+        var now = new DateTimeOffset(2026, 6, 15, 14, 0, 0, TimeSpan.Zero);
+        var clock = new ManualTimeProvider(now);
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production, roomCount: 12, timeProvider: clock);
+
+        var result = context.Store.ResetAndSeedStressFixture(MaintenanceCommands.ProfileFullStress, null);
+
+        // Renders all 12 room cards: 11 assigned/active rooms plus 1 intentionally unassigned
+        // AVAILABLE room - not "all 12 active".
+        Assert.Equal(12, result.RoomStateCounts.Values.Sum());
+        Assert.Equal(1, result.RoomStateCounts.GetValueOrDefault(RoomStates.Available));
+        Assert.Equal(11, result.ActiveRoomDoctorCounts.Values.Sum());
+        Assert.Equal(5, result.ActiveRoomDoctorCounts.GetValueOrDefault("otte"));
+        Assert.Equal(2, result.ActiveRoomDoctorCounts.GetValueOrDefault("gibson"));
+        Assert.Equal(2, result.ActiveRoomDoctorCounts.GetValueOrDefault("pledger"));
+        Assert.Equal(2, result.ActiveRoomDoctorCounts.GetValueOrDefault("schroeder"));
+
+        // Composes live-board-stress's IN ROOM/TURNOVER coverage: the resulting in-progress cycle
+        // rows must not be counted or dated as seeded history (same invariant as the isolated
+        // live-board-stress test) - the history horizon must reflect the 120-day scenario-rich seed,
+        // not the minutes-old in-progress rows.
+        Assert.Equal(2, result.InProgressCycleRowsSeeded);
+        Assert.NotNull(result.HistoryEarliestSeatedAt);
+        Assert.True(
+            result.HistoryEarliestSeatedAt <= now.AddDays(-100),
+            "History horizon should reflect the 120-day scenario-rich seed, not the minutes-old in-progress rows.");
+
+        // Composes scenario-rich's edge cases: every derived reason present exactly once, plus the
+        // manual audit candidate.
+        var expectedReasons = new[]
+        {
+            ReportingExceptionReasons.UnmappedProcedure,
+            ReportingExceptionReasons.LegacyProcedure,
+            ReportingExceptionReasons.ExtremeDuration,
+            ReportingExceptionReasons.OvernightLifecycle,
+            ReportingExceptionReasons.MissingTiming
+        };
+        foreach (var reason in expectedReasons)
+        {
+            Assert.Equal(1, result.DerivedExceptionReasonCounts.GetValueOrDefault(reason));
+        }
+        Assert.Equal(1, result.ManualAuditCandidatesSeeded);
+    }
+
     // Seats, readies, completes, and frees one room across the given minute offsets from seatedAt.
     // Each call uses a self-contained time window; keep windows non-overlapping to avoid
     // cross-cycle doctor-occupied wait when that is not under test.
