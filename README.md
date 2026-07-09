@@ -438,19 +438,26 @@ Run it the same way as the other `--maintenance` commands, with `--confirm RESET
 dotnet run --project .\src\ChairSide.Board\ChairSide.Board.csproj -- --environment Development --BoardPersistenceOptions:DatabasePath=.\src\ChairSide.Board\data\chairside-dev.db --maintenance reset-stress-fixture --confirm RESET_STRESS_FIXTURE --profile live-board-stress
 ```
 
-There is no default profile - `--profile` is required so a stress fixture can never be seeded by accident. Choose one of six profiles:
+There is no default profile - `--profile` is required so a stress fixture can never be seeded by accident. Choose one of seven profiles:
 
 - `reporting-volume` - the existing large synthetic completed-cycle dataset (the same shape as `reset-large-synthetic-report-data`), for reporting-volume testing.
 - `live-board-stress` - fills all 12 master-board room cards, with every room state (`AVAILABLE`, `IN PREP`, `READY`, `AGING`, `STALE`, `IN ROOM`, `TURNOVER`) present at least once, including sedation cases and a long-label procedure, to catch board layout regressions.
 - `doctor-view-stress` - a fixed 1/3/4/4 active-room split across the four doctors, so Doctor View's 1-room, 3-room (2x2 with a quiet fourth quadrant), and 4-room (full 2x2) postures can all be reviewed.
 - `doctor-view-overflow-stress` - one doctor with 5 active rooms (a ragged extra row), so Doctor View's beyond-4-room overflow behavior can be reviewed, alongside 3-room and 2-room postures for the other doctors.
 - `scenario-rich` - an extended multi-month completed-cycle history plus a small set of explicit edge-case cycles (one clean cycle in each of the Today, Last-7, Last-30, and older-than-Last-30 report windows; one cycle per derived reporting-exception reason; and one manual audit-review candidate), for reporting/trend/exception-review testing.
-- `full-stress` - composes `live-board-stress`'s room-state coverage (with one doctor's active rooms shaped to also exercise the Doctor View overflow case) with `scenario-rich`'s history and edge cases in a single fixture. Renders all 12 room cards - 11 assigned/active rooms plus 1 intentionally unassigned `AVAILABLE` room - not "all 12 active."
+- `full-stress` - composes `live-board-stress`'s room-state coverage (with one doctor's active rooms shaped to also exercise the Doctor View overflow case) with `scenario-rich`'s history and edge cases in a single fixture. Renders all 12 room cards - 11 assigned/active rooms plus 1 intentionally unassigned `AVAILABLE` room - not "all 12 active." Does not include the large reporting-volume completed-cycle history.
+- `all-scenarios` - the deliberate superset: `full-stress`'s live-board/Doctor View overflow fixture (Otte at 5 active rooms), plus a large reporting-volume completed-cycle history, plus scenario-rich's bulk history and edge-case/bucket-marker cycles. The scenario-rich bulk history is seeded on calendar days far in the past so it can never land on the same days as the large reporting-volume seed. For manual review, load `all-scenarios` once to see every board/Doctor View/reporting edge case together in one seeded database.
 
-`--completed-cycles` (default 1000, accepted range 100-10000) is only valid with `--profile reporting-volume`; supplying it with any other profile is refused with no mutation, so a mistyped or misremembered flag never silently seeds a different fixture than intended:
+`--completed-cycles` (default 1000, accepted range 100-10000) is only valid with `--profile reporting-volume` or `--profile all-scenarios`; supplying it with any other profile is refused with no mutation, so a mistyped or misremembered flag never silently seeds a different fixture than intended:
 
 ```powershell
 dotnet run --project .\src\ChairSide.Board\ChairSide.Board.csproj -- --environment Development --BoardPersistenceOptions:DatabasePath=.\src\ChairSide.Board\data\chairside-dev.db --maintenance reset-stress-fixture --confirm RESET_STRESS_FIXTURE --profile reporting-volume --completed-cycles 500
+```
+
+`--completed-cycles` omitted with `--profile all-scenarios` uses the same default (1000):
+
+```powershell
+dotnet run --project .\src\ChairSide.Board\ChairSide.Board.csproj -- --environment Development --BoardPersistenceOptions:DatabasePath=.\src\ChairSide.Board\data\chairside-dev.db --maintenance reset-stress-fixture --confirm RESET_STRESS_FIXTURE --profile all-scenarios
 ```
 
 Like `reset-large-synthetic-report-data`, this command is destructive to whatever database it targets: it clears all completed cycles and resets every active room to Available before seeding the requested fixture. Use it only against a Development/test database, never against production data. It hard-refuses to run in Production regardless of confirmation token, and there is no HTTP endpoint - it never runs as part of normal application startup or serving.
