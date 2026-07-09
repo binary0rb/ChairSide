@@ -4595,7 +4595,8 @@ public sealed class BoardStoreTests
     [InlineData("doctor-view-overflow-stress")]
     [InlineData("scenario-rich")]
     [InlineData("full-stress")]
-    public void Maintenance_resolve_accepts_all_six_stress_fixture_profiles(string profile)
+    [InlineData("all-scenarios")]
+    public void Maintenance_resolve_accepts_all_seven_stress_fixture_profiles(string profile)
     {
         var resolution = MaintenanceCommands.Resolve(
             ["--maintenance", "reset-stress-fixture", "--confirm", "RESET_STRESS_FIXTURE", "--profile", profile]);
@@ -4604,22 +4605,26 @@ public sealed class BoardStoreTests
         Assert.Equal(profile, resolution.Profile);
     }
 
-    [Fact]
-    public void Maintenance_resolve_accepts_completed_cycles_only_for_reporting_volume_profile()
+    [Theory]
+    [InlineData("reporting-volume")]
+    [InlineData("all-scenarios")]
+    public void Maintenance_resolve_accepts_completed_cycles_for_reporting_volume_and_all_scenarios_profiles(string profile)
     {
         var resolution = MaintenanceCommands.Resolve(
             ["--maintenance", "reset-stress-fixture", "--confirm", "RESET_STRESS_FIXTURE",
-             "--profile", "reporting-volume", "--completed-cycles", "500"]);
+             "--profile", profile, "--completed-cycles", "500"]);
 
         Assert.Equal(MaintenanceOutcome.Authorized, resolution.Outcome);
         Assert.Equal(500, resolution.CompletedCycles);
     }
 
-    [Fact]
-    public void Maintenance_resolve_authorizes_reporting_volume_profile_with_default_completed_cycles_when_omitted()
+    [Theory]
+    [InlineData("reporting-volume")]
+    [InlineData("all-scenarios")]
+    public void Maintenance_resolve_authorizes_default_completed_cycles_when_omitted(string profile)
     {
         var resolution = MaintenanceCommands.Resolve(
-            ["--maintenance", "reset-stress-fixture", "--confirm", "RESET_STRESS_FIXTURE", "--profile", "reporting-volume"]);
+            ["--maintenance", "reset-stress-fixture", "--confirm", "RESET_STRESS_FIXTURE", "--profile", profile]);
 
         Assert.Equal(MaintenanceOutcome.Authorized, resolution.Outcome);
         Assert.Equal(MaintenanceCommands.DefaultCompletedCycles, resolution.CompletedCycles);
@@ -4631,7 +4636,7 @@ public sealed class BoardStoreTests
     [InlineData("doctor-view-overflow-stress")]
     [InlineData("scenario-rich")]
     [InlineData("full-stress")]
-    public void Maintenance_resolve_refuses_completed_cycles_for_non_reporting_volume_profiles(string profile)
+    public void Maintenance_resolve_refuses_completed_cycles_for_non_reporting_volume_non_all_scenarios_profiles(string profile)
     {
         var resolution = MaintenanceCommands.Resolve(
             ["--maintenance", "reset-stress-fixture", "--confirm", "RESET_STRESS_FIXTURE",
@@ -4868,6 +4873,91 @@ public sealed class BoardStoreTests
             Assert.Equal(1, result.DerivedExceptionReasonCounts.GetValueOrDefault(reason));
         }
         Assert.Equal(1, result.ManualAuditCandidatesSeeded);
+    }
+
+    [Fact]
+    public void All_scenarios_composes_live_board_reporting_volume_and_scenario_rich_with_exact_ground_truth_count()
+    {
+        using var workspace = TestWorkspace.Create();
+        var now = new DateTimeOffset(2026, 6, 15, 14, 0, 0, TimeSpan.Zero);
+        var clock = new ManualTimeProvider(now);
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production, roomCount: 12, timeProvider: clock);
+
+        var result = context.Store.ResetAndSeedStressFixture(MaintenanceCommands.ProfileAllScenarios, 500);
+
+        // Live shape: reuses full-stress's fixture table exactly - 12 room cards (11 assigned/active
+        // plus 1 unassigned AVAILABLE), Otte at the named Doctor View overflow count of 5.
+        Assert.Equal(12, result.RoomStateCounts.Values.Sum());
+        Assert.Equal(1, result.RoomStateCounts.GetValueOrDefault(RoomStates.Available));
+        Assert.Equal(11, result.ActiveRoomDoctorCounts.Values.Sum());
+        Assert.Equal(5, result.ActiveRoomDoctorCounts.GetValueOrDefault("otte"));
+        Assert.Equal(2, result.ActiveRoomDoctorCounts.GetValueOrDefault("gibson"));
+        Assert.Equal(2, result.ActiveRoomDoctorCounts.GetValueOrDefault("pledger"));
+        Assert.Equal(2, result.ActiveRoomDoctorCounts.GetValueOrDefault("schroeder"));
+        Assert.Equal(2, result.InProgressCycleRowsSeeded);
+
+        // Exact deterministic total: 500 large-synthetic cycles + 363 scenario-rich bulk-history
+        // cycles (121 days x 3/day) + 10 explicit scenario-rich edge cases = 873, with zero rows
+        // lost to collision (the day-offset shift keeps the bulk history's calendar days disjoint
+        // from the large-synthetic seed's range). CyclesSeeded is ground-truth (ties out exactly to
+        // the persisted completed-cycle count), not a sum of sub-seeder self-reports.
+        Assert.Equal(873, result.CyclesSeeded);
+        var persistedCompletedCount = context.Repository.LoadCompletedCycles().Count(cycle => cycle.RoomAvailableAt is not null);
+        Assert.Equal(persistedCompletedCount, result.CyclesSeeded);
+        Assert.Equal(4, result.DoctorsRepresented);
+        Assert.True(result.ProcedureFamiliesRepresented > 1, "Expected more than one procedure family across the composed history.");
+
+        // History horizon reflects the shifted scenario-rich bulk history (2000+ days back), not the
+        // large-synthetic seed's much more recent range and not the minutes-old in-progress rows.
+        Assert.NotNull(result.HistoryEarliestSeatedAt);
+        Assert.True(
+            result.HistoryEarliestSeatedAt <= now.AddDays(-2000),
+            "History horizon should reflect the shifted scenario-rich bulk history, not the large-synthetic seed's more recent range.");
+
+        // Every derived reporting-exception reason present exactly once, plus the manual audit
+        // candidate - composed unmodified from SeedScenarioRichEdgeCases.
+        var expectedReasons = new[]
+        {
+            ReportingExceptionReasons.UnmappedProcedure,
+            ReportingExceptionReasons.LegacyProcedure,
+            ReportingExceptionReasons.ExtremeDuration,
+            ReportingExceptionReasons.OvernightLifecycle,
+            ReportingExceptionReasons.MissingTiming
+        };
+        foreach (var reason in expectedReasons)
+        {
+            Assert.Equal(1, result.DerivedExceptionReasonCounts.GetValueOrDefault(reason));
+        }
+        Assert.Equal(1, result.ManualAuditCandidatesSeeded);
+
+        // Date-range buckets are populated: the Today marker (plus the large-synthetic seed's own
+        // recent cycles) land in Today. TotalCompletedCycleCount (not CompletedRoomCyclesCount) is
+        // the ground-truth all-time total independent of the selected window: CompletedRoomCyclesCount
+        // deliberately excludes the manual-audit-candidate cycle (IsException = true), so it reads 872
+        // here, one less than the raw 873 - that exclusion is correct reporting behavior, not a
+        // collision or a miscount.
+        var today = DateOnly.FromDateTime(now.UtcDateTime.Date);
+        var todayCount = context.Store.GetReports(ReportDateRange.FromDates(today, today)).CompletedRoomCyclesCount;
+        var allTimeTotal = context.Store.GetReports(ReportDateRange.AllTime).TotalCompletedCycleCount;
+        Assert.True(todayCount > 0, "Expected at least one completed cycle in the Today window.");
+        Assert.Equal(873, allTimeTotal);
+    }
+
+    [Fact]
+    public void All_scenarios_defaults_completed_cycles_when_omitted()
+    {
+        using var workspace = TestWorkspace.Create();
+        // Fixed clock, matching the composition test above - keeps the Today marker's dynamic
+        // timestamp away from the large-synthetic seed's fixed per-room hours, so the exact total
+        // below is deterministic regardless of when this test actually runs.
+        var now = new DateTimeOffset(2026, 6, 15, 14, 0, 0, TimeSpan.Zero);
+        var clock = new ManualTimeProvider(now);
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production, roomCount: 12, timeProvider: clock);
+
+        var result = context.Store.ResetAndSeedStressFixture(MaintenanceCommands.ProfileAllScenarios, null);
+
+        // 1000 (default) + 363 (scenario-rich bulk history) + 10 (edge cases) = 1373.
+        Assert.Equal(1373, result.CyclesSeeded);
     }
 
     // Seats, readies, completes, and frees one room across the given minute offsets from seatedAt.

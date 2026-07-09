@@ -1022,6 +1022,22 @@ public sealed class DemoBoardStore
                     break;
                 }
 
+                case MaintenanceCommands.ProfileAllScenarios:
+                    // Composition only: the same live-room runner (full-stress's overflow-shaped
+                    // fixture table, so Otte = 5), the existing large-synthetic seeder unmodified,
+                    // and the same scenario-rich history/edge-case builders used above - no bespoke
+                    // seeding logic. The bulk scenario-rich history is shifted by
+                    // AllScenariosHistoryDayOffsetShift so it can never land on the same calendar
+                    // days as the large-synthetic seed (see that constant's comment). cyclesSeeded/
+                    // doctorsRepresented/proceduresRepresented are intentionally left at 0 here and
+                    // computed from the ground-truth persisted completed cycles below instead of
+                    // summed from sub-seeder self-reports, so the summary is accurate regardless.
+                    SeedLiveRoomFixtures(FullStressLiveFixtures(), now);
+                    SeedLargeSyntheticReportData(completedCycles ?? MaintenanceCommands.DefaultCompletedCycles);
+                    SeedScenarioRichHistory(AllScenariosHistoryDayOffsetShift);
+                    SeedScenarioRichEdgeCases(now);
+                    break;
+
                 default:
                     throw new InvalidOperationException($"Unknown stress fixture profile '{profile}'.");
             }
@@ -1049,6 +1065,27 @@ public sealed class DemoBoardStore
             // range, so an in-progress live room never inflates or skews those numbers.
             var completedHistoryCycles = _completedCycles.Where(cycle => cycle.RoomAvailableAt is not null).ToList();
             var inProgressCycleRowsSeeded = _completedCycles.Count - completedHistoryCycles.Count;
+
+            if (string.Equals(profile, MaintenanceCommands.ProfileAllScenarios, StringComparison.Ordinal))
+            {
+                // Ground truth, not a sum of sub-seeder self-reports: the large-synthetic seed and
+                // the scenario-rich history both write through the same WriteSyntheticCase/(RoomId,
+                // SeatedAt) upsert key, so a self-reported sum could overcount if any two writes ever
+                // targeted the same slot. Counting/deriving directly from the persisted completed
+                // cycles is correct regardless. SeedReportDataResult only exposes represented-doctor/
+                // family *counts* (not the sets themselves), so a true cross-seeder union is not
+                // available without a broader return-type change; deriving both numbers directly from
+                // completedHistoryCycles avoids that and is exact.
+                cyclesSeeded = completedHistoryCycles.Count;
+                doctorsRepresented = completedHistoryCycles
+                    .Select(cycle => cycle.AssignedDoctor)
+                    .Distinct(StringComparer.Ordinal)
+                    .Count();
+                proceduresRepresented = completedHistoryCycles
+                    .Select(cycle => ResolveBaseProcedureCode(cycle.ProcedureCode))
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .Count();
+            }
 
             var derivedExceptionReasonCounts = completedHistoryCycles
                 .SelectMany(cycle => cycle.ReportingExceptionReasons)
@@ -1422,7 +1459,21 @@ public sealed class DemoBoardStore
     private const int ScenarioRichHistoryDays = 120;
     private const int ScenarioRichCasesPerDay = 3;
 
-    private SeedReportDataResult SeedScenarioRichHistory()
+    // Fixed day-offset shift applied only by the all-scenarios profile so its scenario-rich bulk
+    // history never lands on the same calendar days as its large-synthetic seed. Both loops call the
+    // shared WriteSyntheticCase, whose (RoomId, SeatedAt) upsert key depends only on caseInDay (not
+    // on which loop calls it), so unshifted overlapping day ranges could silently collide and
+    // overwrite each other's rows. 2000 days is a fixed, deterministic margin comfortably beyond the
+    // worst-case large-synthetic span (MaxCompletedCycles / LargeSyntheticCasesPerDay = 10000 / 12,
+    // about 834 days), so it is safe regardless of the requested --completed-cycles count.
+    private const int AllScenariosHistoryDayOffsetShift = 2000;
+
+    // Seeds ScenarioRichHistoryDays of clean synthetic history ending dayOffsetShift days before
+    // today (0 = ends today, matching the scenario-rich profile's own unshifted default). Only the
+    // calendar day passed to WriteSyntheticCase shifts; the dayOffset value used for jitter/family
+    // seeding stays the original 0..ScenarioRichHistoryDays index, so a shifted call produces
+    // content-identical cycles to an unshifted call, just relocated to different calendar days.
+    private SeedReportDataResult SeedScenarioRichHistory(int dayOffsetShift = 0)
     {
         var doctorIds = _activeDoctors.Select(doctor => doctor.Id).ToList();
         if (doctorIds.Count == 0)
@@ -1438,7 +1489,7 @@ public sealed class DemoBoardStore
 
         for (var dayOffset = 0; dayOffset <= ScenarioRichHistoryDays; dayOffset++)
         {
-            var day = today.AddDays(-dayOffset);
+            var day = today.AddDays(-(dayOffset + dayOffsetShift));
             for (var caseInDay = 0; caseInDay < ScenarioRichCasesPerDay; caseInDay++)
             {
                 var completed = WriteSyntheticCase(doctorIds, dayOffset, day, caseInDay, globalIndex);

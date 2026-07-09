@@ -349,7 +349,7 @@
                   {
                       "path":  "docs/knowledge/tests/deterministic-stress-fixtures.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  5694,
+                      "sizeBytes":  8795,
                       "typeSymbols":  [
 
                                       ],
@@ -373,6 +373,7 @@
                                        "Intent",
                                        "Profiles",
                                        "Constraints",
+                                       "Day-offset shift (all-scenarios only)",
                                        "Source anchors",
                                        "Verification notes"
                                    ]
@@ -734,7 +735,7 @@
                   {
                       "path":  "README.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  30574,
+                      "sizeBytes":  31588,
                       "typeSymbols":  [
 
                                       ],
@@ -1379,7 +1380,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/DemoBoardStore.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  170951,
+                      "sizeBytes":  174993,
                       "typeSymbols":  [
                                           "ExceptionReasons",
                                           "ReportingExceptionReasons",
@@ -1508,7 +1509,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/MaintenanceCommands.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  11816,
+                      "sizeBytes":  11990,
                       "typeSymbols":  [
                                           "MaintenanceOutcome",
                                           "MaintenanceResolution",
@@ -2218,7 +2219,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/BoardStoreTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  308237,
+                      "sizeBytes":  313908,
                       "typeSymbols":  [
                                           "BoardStoreTests",
                                           "is",

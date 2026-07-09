@@ -68,6 +68,7 @@ public static class MaintenanceCommands
     public const string ProfileDoctorViewOverflowStress = "doctor-view-overflow-stress";
     public const string ProfileScenarioRich = "scenario-rich";
     public const string ProfileFullStress = "full-stress";
+    public const string ProfileAllScenarios = "all-scenarios";
 
     // Single source of truth for which --profile values reset-stress-fixture accepts.
     public static readonly IReadOnlyList<string> StressFixtureProfiles =
@@ -77,7 +78,8 @@ public static class MaintenanceCommands
         ProfileDoctorViewStress,
         ProfileDoctorViewOverflowStress,
         ProfileScenarioRich,
-        ProfileFullStress
+        ProfileFullStress,
+        ProfileAllScenarios
     ];
 
     public static MaintenanceResolution Resolve(string[] args)
@@ -166,7 +168,7 @@ public static class MaintenanceCommands
                     $"Unknown {ProfileFlag} '{profile}'. Expected one of: {string.Join(", ", StressFixtureProfiles)}.");
             }
 
-            if (string.Equals(profile, ProfileReportingVolume, StringComparison.Ordinal))
+            if (profile is ProfileReportingVolume or ProfileAllScenarios)
             {
                 var (completedCycles, refusal) = ResolveCompletedCycles(args, command);
                 if (refusal is not null)
@@ -177,16 +179,16 @@ public static class MaintenanceCommands
                 return new MaintenanceResolution(MaintenanceOutcome.Authorized, command, null, completedCycles, profile);
             }
 
-            // --completed-cycles only means something for the reporting-volume profile (the one that
-            // delegates to the large synthetic seeder). Refuse rather than silently ignore it for
-            // every other profile, so a typo'd or misremembered flag never seeds a different fixture
-            // than the operator expected.
+            // --completed-cycles only means something for the reporting-volume profile and the
+            // all-scenarios profile (which also delegates part of its seeding to the large synthetic
+            // seeder). Refuse rather than silently ignore it for every other profile, so a typo'd or
+            // misremembered flag never seeds a different fixture than the operator expected.
             if (GetFlagValue(args, CompletedCyclesFlag) is not null)
             {
                 return new MaintenanceResolution(
                     MaintenanceOutcome.Refused,
                     command,
-                    $"{CompletedCyclesFlag} is only valid with {ProfileFlag} {ProfileReportingVolume}. Remove {CompletedCyclesFlag} or switch to that profile.");
+                    $"{CompletedCyclesFlag} is only valid with {ProfileFlag} {ProfileReportingVolume} or {ProfileFlag} {ProfileAllScenarios}. Remove {CompletedCyclesFlag} or switch to one of those profiles.");
             }
 
             return new MaintenanceResolution(MaintenanceOutcome.Authorized, command, null, null, profile);
