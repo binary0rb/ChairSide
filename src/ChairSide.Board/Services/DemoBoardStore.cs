@@ -1989,9 +1989,9 @@ public sealed class DemoBoardStore
     }
 
     /// <summary>
-    /// Checks all active room cycles for exceeding MaxActiveDurationHours and expires any
-    /// that do. Each expired room is archived as an exception cycle, reset to Available,
-    /// and logged with reason ExceededMaxActiveDuration.
+    /// Checks all active room assignments for exceeding MaxActiveDurationHours and expires any
+    /// that do. Prestaging assignments are archived as aborted assignments; seated/later rooms
+    /// are archived as exception cycles. Each room is reset to Available atomically with its archive.
     /// Returns the room IDs that were expired.
     /// </summary>
     public IReadOnlyList<int> CheckAndExpireActiveCycles()
@@ -2010,18 +2010,23 @@ public sealed class DemoBoardStore
 
             foreach (var room in _rooms)
             {
-                if (room.State == RoomStates.Available || room.SeatedAt is null)
+                if (room.State == RoomStates.Available)
                 {
                     continue;
                 }
 
-                if (now - room.SeatedAt.Value <= maxDuration)
+                var activeStartedAt = room.State == RoomStates.Prestaging
+                    ? room.PrestageStartedAt
+                    : room.SeatedAt;
+                if (activeStartedAt is null || now - activeStartedAt.Value <= maxDuration)
                 {
                     continue;
                 }
 
-                ExpireRoom(room, now, ExceptionReasons.ExceededMaxActiveDuration);
-                expired.Add(room.RoomId);
+                if (ExpireRoom(room, now, ExceptionReasons.ExceededMaxActiveDuration))
+                {
+                    expired.Add(room.RoomId);
+                }
             }
 
             return expired;
@@ -2030,7 +2035,8 @@ public sealed class DemoBoardStore
 
     /// <summary>
     /// Checks whether the after-hours sweep should fire for the current clinic day and,
-    /// if so, expires all still-active room cycles as AfterHoursSweep exceptions.
+    /// if so, expires all still-active room assignments. Prestaging assignments are archived as
+    /// aborted assignments; seated/later rooms are archived as AfterHoursSweep exceptions.
     /// Runs at most once per clinic day; skips Available rooms.
     /// Returns the room IDs that were expired.
     /// </summary>
@@ -2079,13 +2085,18 @@ public sealed class DemoBoardStore
             var expired = new List<int>();
             foreach (var room in _rooms)
             {
-                if (room.State == RoomStates.Available || room.SeatedAt is null)
+                if (room.State == RoomStates.Available
+                    || (room.State == RoomStates.Prestaging
+                        ? room.PrestageStartedAt is null
+                        : room.SeatedAt is null))
                 {
                     continue;
                 }
 
-                ExpireRoom(room, now, ExceptionReasons.AfterHoursSweep);
-                expired.Add(room.RoomId);
+                if (ExpireRoom(room, now, ExceptionReasons.AfterHoursSweep))
+                {
+                    expired.Add(room.RoomId);
+                }
             }
 
             return expired;
@@ -2093,57 +2104,134 @@ public sealed class DemoBoardStore
     }
 
     /// <summary>
-    /// Archives an active room as an exception cycle and resets it to Available.
-    /// Does not manufacture DoctorCompleteAt. Must be called inside _syncRoot.
+    /// Archives a prestaging room as an aborted assignment or a seated/later room as an exception
+    /// cycle, then resets it to Available. Does not manufacture SeatedAt or DoctorCompleteAt.
+    /// Must be called inside _syncRoot.
     /// </summary>
-    private void ExpireRoom(RoomState room, DateTimeOffset now, string reason)
+    private bool ExpireRoom(RoomState room, DateTimeOffset now, string reason)
     {
+        var snapshot = CopyRoomState(room);
+        if (snapshot.State == RoomStates.Prestaging && snapshot.SeatedAt is null)
+        {
+            return ExpirePrestagingRoom(room, snapshot, now, reason);
+        }
+
+        if (snapshot.SeatedAt is null)
+        {
+            return false;
+        }
+
+        ExpireSeatedRoom(room, snapshot, now, reason);
+        return true;
+    }
+
+    private bool ExpirePrestagingRoom(RoomState room, RoomState snapshot, DateTimeOffset now, string reason)
+    {
+        var assignedDoctor = snapshot.AssignedDoctor;
+        var procedureCode = snapshot.ProcedureCode;
+        if (string.IsNullOrWhiteSpace(assignedDoctor))
+        {
+            throw new InvalidOperationException(
+                $"Cannot expire prestaging room {snapshot.RoomId}: required assigned doctor is missing.");
+        }
+
+        if (string.IsNullOrWhiteSpace(procedureCode))
+        {
+            throw new InvalidOperationException(
+                $"Cannot expire prestaging room {snapshot.RoomId}: required procedure code is missing.");
+        }
+
+        var record = new AbortedRoomAssignment
+        {
+            EpisodeId = snapshot.EpisodeId ?? NewEpisodeId(),
+            RoomId = snapshot.RoomId,
+            AssignedDoctor = assignedDoctor,
+            AssignedDoctorDisplayName = snapshot.AssignedDoctorDisplayName,
+            ProcedureCode = procedureCode,
+            ProcedureCategory = snapshot.ProcedureCategory,
+            OriginalDefaultExpectedUnits = snapshot.OriginalDefaultExpectedUnits,
+            ExpectedAllocationUnits = snapshot.ExpectedAllocationUnits,
+            ExpectedAllocationMinutes = snapshot.ExpectedAllocationMinutes,
+            AllocationAdjustedFromDefault = snapshot.AllocationAdjustedFromDefault,
+            PrestageStartedAt = snapshot.PrestageStartedAt,
+            SeatedAt = null,
+            ReadyForDoctorAt = null,
+            TerminatedAt = now,
+            TerminatedFromState = RoomStates.Prestaging,
+            TerminationKind = reason switch
+            {
+                ExceptionReasons.ExceededMaxActiveDuration => TerminationKinds.MaxDurationExpired,
+                ExceptionReasons.AfterHoursSweep => TerminationKinds.AfterHoursExpired,
+                _ => throw new InvalidOperationException($"Unsupported prestaging expiration reason '{reason}'.")
+            },
+            CancellationReason = null
+        };
+
+        _repository.TerminateIncompleteAssignment(record, new RoomState(room.RoomId), _doctors, _procedures);
+
+        ResetRoom(room);
+        AddEvent(new RoomEvent(room.RoomId, "ForceExpired", now, record.AssignedDoctor, record.ProcedureCode));
+        return true;
+    }
+
+    private void ExpireSeatedRoom(RoomState room, RoomState snapshot, DateTimeOffset now, string reason)
+    {
+        var seatedAt = snapshot.SeatedAt
+            ?? throw new InvalidOperationException($"Cannot expire seated room {snapshot.RoomId} without SeatedAt.");
+
         // SuggestedAction depends on whether the doctor had arrived at the time of expiry.
-        var suggestedAction = room.DoctorArrivedAt.HasValue
+        var suggestedAction = snapshot.DoctorArrivedAt.HasValue
             ? "Review timing"
             : "Exclude abandoned cycle";
 
         // For rooms where DoctorArrived was never called, no cycle exists yet - create one.
         // For rooms already past DoctorArrived, a cycle was created at MarkDoctorArrived.
-        var cycle = _completedCycles.FirstOrDefault(c => c.RoomId == room.RoomId && c.SeatedAt == room.SeatedAt!.Value);
-
-        if (cycle is null)
-        {
-            cycle = new CompletedRoomCycle
+        var cycleIndex = _completedCycles.FindIndex(c =>
+            c.RoomId == snapshot.RoomId && c.SeatedAt == seatedAt);
+        var cycle = cycleIndex >= 0
+            ? CopyCompletedCycle(_completedCycles[cycleIndex])
+            : new CompletedRoomCycle
             {
-                RoomId = room.RoomId,
-                AssignedDoctor = room.AssignedDoctor ?? "",
-                ProcedureCode = room.ProcedureCode ?? "",
-                SeatedAt = room.SeatedAt!.Value,
-                ReadyForDoctorAt = room.ReadyForDoctorAt,
-                DoctorArrivedAt = null,  // doctor never arrived
-                SeatedToDoctorSeconds = SecondsBetween(room.SeatedAt.Value, now),
-                PrepSeconds = room.ReadyForDoctorAt.HasValue
-                    ? SecondsBetween(room.SeatedAt.Value, room.ReadyForDoctorAt.Value)
+                EpisodeId = snapshot.EpisodeId,
+                RoomId = snapshot.RoomId,
+                AssignedDoctor = snapshot.AssignedDoctor ?? "",
+                ProcedureCode = snapshot.ProcedureCode ?? "",
+                PrestageStartedAt = snapshot.PrestageStartedAt,
+                SeatedAt = seatedAt,
+                ReadyForDoctorAt = snapshot.ReadyForDoctorAt,
+                DoctorArrivedAt = null,
+                SeatedToDoctorSeconds = SecondsBetween(seatedAt, now),
+                PrepSeconds = snapshot.ReadyForDoctorAt.HasValue
+                    ? SecondsBetween(seatedAt, snapshot.ReadyForDoctorAt.Value)
                     : null,
                 ReadyToDoctorSeconds = null,
-                FinalWaitState = room.State,
-                AgingThresholdReached = room.AgingStartedAt is not null,
-                StaleThresholdReached = room.StaleStartedAt is not null,
-                OriginalDefaultExpectedUnits = room.OriginalDefaultExpectedUnits,
-                ExpectedAllocationUnits = room.ExpectedAllocationUnits,
-                ExpectedAllocationMinutes = room.ExpectedAllocationMinutes,
-                AllocationAdjustedFromDefault = room.AllocationAdjustedFromDefault
+                FinalWaitState = snapshot.State,
+                AgingThresholdReached = snapshot.AgingStartedAt is not null,
+                StaleThresholdReached = snapshot.StaleStartedAt is not null,
+                OriginalDefaultExpectedUnits = snapshot.OriginalDefaultExpectedUnits,
+                ExpectedAllocationUnits = snapshot.ExpectedAllocationUnits,
+                ExpectedAllocationMinutes = snapshot.ExpectedAllocationMinutes,
+                AllocationAdjustedFromDefault = snapshot.AllocationAdjustedFromDefault
             };
-            _completedCycles.Add(cycle);
-        }
 
         cycle.IsException = true;
         cycle.RequiresReview = true;
         cycle.ExceptionReason = reason;
         cycle.SuggestedAction = suggestedAction;
         cycle.ReviewStatus = ReviewStatuses.PendingReview;
-        PersistCycle(cycle);
+        _repository.SaveCompletedCycleAndRoom(cycle, new RoomState(room.RoomId), _doctors, _procedures);
 
-        AddEvent(new RoomEvent(room.RoomId, "ForceExpired", now, room.AssignedDoctor, room.ProcedureCode));
+        if (cycleIndex >= 0)
+        {
+            _completedCycles[cycleIndex] = cycle;
+        }
+        else
+        {
+            _completedCycles.Add(cycle);
+        }
 
         ResetRoom(room);
-        PersistRoom(room);
+        AddEvent(new RoomEvent(room.RoomId, "ForceExpired", now, snapshot.AssignedDoctor, snapshot.ProcedureCode));
     }
 
     // Returns null if timeZone is a non-blank, non-UTC value that cannot be resolved.
@@ -2507,6 +2595,56 @@ public sealed class DemoBoardStore
             ExpectedAllocationUnits = room.ExpectedAllocationUnits,
             ExpectedAllocationMinutes = room.ExpectedAllocationMinutes,
             AllocationAdjustedFromDefault = room.AllocationAdjustedFromDefault
+        };
+
+    private static CompletedRoomCycle CopyCompletedCycle(CompletedRoomCycle cycle) =>
+        new()
+        {
+            CompletedCycleId = cycle.CompletedCycleId,
+            EpisodeId = cycle.EpisodeId,
+            RoomId = cycle.RoomId,
+            AssignedDoctor = cycle.AssignedDoctor,
+            ProcedureCode = cycle.ProcedureCode,
+            PrestageStartedAt = cycle.PrestageStartedAt,
+            SeatedAt = cycle.SeatedAt,
+            ReadyForDoctorAt = cycle.ReadyForDoctorAt,
+            DoctorArrivedAt = cycle.DoctorArrivedAt,
+            DoctorCompleteAt = cycle.DoctorCompleteAt,
+            RoomAvailableAt = cycle.RoomAvailableAt,
+            SeatedToDoctorSeconds = cycle.SeatedToDoctorSeconds,
+            PrepSeconds = cycle.PrepSeconds,
+            ReadyToDoctorSeconds = cycle.ReadyToDoctorSeconds,
+            DoctorInRoomSeconds = cycle.DoctorInRoomSeconds,
+            TurnoverSeconds = cycle.TurnoverSeconds,
+            TotalRoomCycleSeconds = cycle.TotalRoomCycleSeconds,
+            OriginalDefaultExpectedUnits = cycle.OriginalDefaultExpectedUnits,
+            ExpectedAllocationUnits = cycle.ExpectedAllocationUnits,
+            ExpectedAllocationMinutes = cycle.ExpectedAllocationMinutes,
+            AllocationAdjustedFromDefault = cycle.AllocationAdjustedFromDefault,
+            DoctorOccupiedWaitSeconds = cycle.DoctorOccupiedWaitSeconds,
+            DoctorAvailableWaitSeconds = cycle.DoctorAvailableWaitSeconds,
+            HasReportingException = cycle.HasReportingException,
+            ReportingExceptionReasons = cycle.ReportingExceptionReasons.ToArray(),
+            IsExcludedFromStandardMetrics = cycle.IsExcludedFromStandardMetrics,
+            DisplayProcedureLabel = cycle.DisplayProcedureLabel,
+            IsLegacyProcedure = cycle.IsLegacyProcedure,
+            IsUnmappedProcedure = cycle.IsUnmappedProcedure,
+            MeasuredCaseFlowMinutes = cycle.MeasuredCaseFlowMinutes,
+            AllocationVarianceMinutes = cycle.AllocationVarianceMinutes,
+            HasAllocationVariance = cycle.HasAllocationVariance,
+            IsOverExpectedAllocation = cycle.IsOverExpectedAllocation,
+            IsUnderExpectedAllocation = cycle.IsUnderExpectedAllocation,
+            IsAtExpectedAllocation = cycle.IsAtExpectedAllocation,
+            FinalWaitState = cycle.FinalWaitState,
+            AgingThresholdReached = cycle.AgingThresholdReached,
+            StaleThresholdReached = cycle.StaleThresholdReached,
+            IsException = cycle.IsException,
+            RequiresReview = cycle.RequiresReview,
+            ExceptionReason = cycle.ExceptionReason,
+            ReviewStatus = cycle.ReviewStatus,
+            SuggestedAction = cycle.SuggestedAction,
+            ReviewedAt = cycle.ReviewedAt,
+            ReviewedBy = cycle.ReviewedBy
         };
 
     private static void ResetRoom(RoomState room)

@@ -3973,6 +3973,239 @@ public sealed class BoardStoreTests
     }
 
     [Fact]
+    public void Prestaging_before_max_duration_is_not_expired()
+    {
+        using var workspace = TestWorkspace.Create();
+        var now = new DateTimeOffset(2026, 7, 3, 9, 0, 0, TimeSpan.Zero);
+        var clock = new ManualTimeProvider(now);
+        var context = StoreContext.Create(
+            workspace,
+            environmentName: Environments.Production,
+            timeProvider: clock,
+            expirationOptions: new RoomExpirationOptions
+            {
+                Enabled = true,
+                MaxActiveDurationHours = 8
+            });
+
+        Assert.NotNull(context.Store.BeginPrestage(1, "otte", "EXT", expectedAllocationUnits: 5));
+        clock.SetUtcNow(now.AddHours(7).AddMinutes(59));
+
+        Assert.Empty(context.Store.CheckAndExpireActiveCycles());
+        Assert.Equal(RoomStates.Prestaging, context.Store.GetRoom(1)?.State);
+        Assert.Empty(context.Repository.LoadAbortedAssignments());
+        Assert.Empty(context.Repository.LoadCompletedCycles());
+    }
+
+    [Fact]
+    public void Malformed_prestaging_max_duration_expiration_throws_without_terminal_records()
+    {
+        using var workspace = TestWorkspace.Create();
+        var databasePath = workspace.ProductionDatabasePath();
+        var now = new DateTimeOffset(2026, 7, 3, 18, 0, 0, TimeSpan.Zero);
+        var seed = StoreContext.Create(
+            workspace,
+            environmentName: Environments.Production,
+            databasePath: databasePath);
+        seed.Repository.SaveRooms(
+            [
+                new RoomState(1)
+                {
+                    State = RoomStates.Prestaging,
+                    PrestageStartedAt = now.AddHours(-9)
+                }
+            ],
+            seed.Doctors,
+            seed.Procedures);
+
+        var context = StoreContext.Create(
+            workspace,
+            environmentName: Environments.Production,
+            databasePath: databasePath,
+            timeProvider: new ManualTimeProvider(now),
+            expirationOptions: new RoomExpirationOptions
+            {
+                Enabled = true,
+                MaxActiveDurationHours = 8
+            });
+
+        var exception = Assert.Throws<InvalidOperationException>(context.Store.CheckAndExpireActiveCycles);
+        Assert.Contains("prestaging room 1", exception.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("assigned doctor", exception.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(RoomStates.Prestaging, context.Store.GetRoom(1)?.State);
+        Assert.Empty(context.Repository.LoadAbortedAssignments());
+        Assert.Empty(context.Repository.LoadCompletedCycles());
+    }
+
+    [Fact]
+    public void Prestaging_over_max_duration_persists_complete_abort_and_reset_across_reload()
+    {
+        using var workspace = TestWorkspace.Create();
+        var databasePath = workspace.ProductionDatabasePath();
+        var prestageAt = new DateTimeOffset(2026, 7, 3, 9, 0, 0, TimeSpan.Zero);
+        var terminatedAt = prestageAt.AddHours(8).AddSeconds(1);
+        var clock = new ManualTimeProvider(prestageAt);
+        var context = StoreContext.Create(
+            workspace,
+            environmentName: Environments.Production,
+            databasePath: databasePath,
+            timeProvider: clock,
+            expirationOptions: new RoomExpirationOptions
+            {
+                Enabled = true,
+                MaxActiveDurationHours = 8
+            });
+
+        Assert.NotNull(context.Store.BeginPrestage(1, "otte", "EXT", sedation: true, expectedAllocationUnits: 5));
+        var active = context.Repository.LoadRooms(3).Single(room => room.RoomId == 1);
+        clock.SetUtcNow(terminatedAt);
+
+        Assert.Equal([1], context.Store.CheckAndExpireActiveCycles());
+        Assert.Equal(RoomStates.Available, context.Store.GetRoom(1)?.State);
+
+        var abort = Assert.Single(context.Repository.LoadAbortedAssignments());
+        Assert.Equal(active.EpisodeId, abort.EpisodeId);
+        Assert.Equal(1, abort.RoomId);
+        Assert.Equal("otte", abort.AssignedDoctor);
+        Assert.Equal("Dr. Otte", abort.AssignedDoctorDisplayName);
+        Assert.Equal("EXT+SED", abort.ProcedureCode);
+        Assert.Equal("Extraction + Sedation", abort.ProcedureCategory);
+        Assert.Equal(3, abort.OriginalDefaultExpectedUnits);
+        Assert.Equal(5, abort.ExpectedAllocationUnits);
+        Assert.Equal(50, abort.ExpectedAllocationMinutes);
+        Assert.True(abort.AllocationAdjustedFromDefault);
+        Assert.Equal(prestageAt, abort.PrestageStartedAt);
+        Assert.Null(abort.SeatedAt);
+        Assert.Null(abort.ReadyForDoctorAt);
+        Assert.Equal(terminatedAt, abort.TerminatedAt);
+        Assert.Equal(RoomStates.Prestaging, abort.TerminatedFromState);
+        Assert.Equal(TerminationKinds.MaxDurationExpired, abort.TerminationKind);
+        Assert.Null(abort.CancellationReason);
+        Assert.Empty(context.Repository.LoadCompletedCycles());
+
+        var reloaded = StoreContext.Create(
+            workspace,
+            environmentName: Environments.Production,
+            databasePath: databasePath,
+            timeProvider: clock);
+        var durableRoom = reloaded.Repository.LoadRooms(3).Single(room => room.RoomId == 1);
+        Assert.Equal(RoomStates.Available, durableRoom.State);
+        Assert.Null(durableRoom.EpisodeId);
+        Assert.Null(durableRoom.PrestageStartedAt);
+        Assert.Null(durableRoom.SeatedAt);
+        AssertSameAbortedAssignment(abort, Assert.Single(reloaded.Repository.LoadAbortedAssignments()));
+        Assert.Empty(reloaded.Repository.LoadCompletedCycles());
+    }
+
+    [Fact]
+    public void Prestaging_max_duration_expiration_is_idempotent_after_success()
+    {
+        using var workspace = TestWorkspace.Create();
+        var now = new DateTimeOffset(2026, 7, 3, 9, 0, 0, TimeSpan.Zero);
+        var clock = new ManualTimeProvider(now);
+        var context = StoreContext.Create(
+            workspace,
+            environmentName: Environments.Production,
+            timeProvider: clock,
+            expirationOptions: new RoomExpirationOptions
+            {
+                Enabled = true,
+                MaxActiveDurationHours = 8
+            });
+
+        Assert.NotNull(context.Store.BeginPrestage(1, "otte", "CON"));
+        clock.SetUtcNow(now.AddHours(8).AddSeconds(1));
+
+        Assert.Equal([1], context.Store.CheckAndExpireActiveCycles());
+        Assert.Empty(context.Store.CheckAndExpireActiveCycles());
+        Assert.Equal(RoomStates.Available, context.Store.GetRoom(1)?.State);
+        Assert.Single(context.Repository.LoadAbortedAssignments());
+        Assert.Empty(context.Repository.LoadCompletedCycles());
+    }
+
+    [Fact]
+    public void Prestaging_after_hours_sweep_uses_clinic_time_and_runs_once_per_clinic_day()
+    {
+        using var workspace = TestWorkspace.Create();
+        var beforeCutoff = new DateTimeOffset(2026, 7, 3, 23, 30, 0, TimeSpan.Zero); // 18:30 CDT
+        var afterCutoff = beforeCutoff.AddHours(1); // 19:30 CDT, same clinic day
+        var clock = new ManualTimeProvider(beforeCutoff);
+        var context = StoreContext.Create(
+            workspace,
+            environmentName: Environments.Production,
+            timeProvider: clock,
+            expirationOptions: new RoomExpirationOptions
+            {
+                Enabled = true,
+                AfterHoursSweepEnabled = true,
+                AfterHoursSweepTime = "19:00",
+                TimeZone = "America/Chicago"
+            });
+
+        Assert.NotNull(context.Store.BeginPrestage(1, "otte", "CON"));
+        Assert.Empty(context.Store.TryRunAfterHoursSweep());
+
+        clock.SetUtcNow(afterCutoff);
+        Assert.Equal([1], context.Store.TryRunAfterHoursSweep());
+        var abort = Assert.Single(context.Repository.LoadAbortedAssignments());
+        Assert.Equal(RoomStates.Prestaging, abort.TerminatedFromState);
+        Assert.Equal(TerminationKinds.AfterHoursExpired, abort.TerminationKind);
+        Assert.Equal(afterCutoff, abort.TerminatedAt);
+        Assert.Null(abort.SeatedAt);
+        Assert.Null(abort.CancellationReason);
+        Assert.Empty(context.Repository.LoadCompletedCycles());
+
+        Assert.NotNull(context.Store.BeginPrestage(2, "pledger", "EXT"));
+        clock.SetUtcNow(afterCutoff.AddMinutes(10));
+        Assert.Empty(context.Store.TryRunAfterHoursSweep());
+        Assert.Equal(RoomStates.Prestaging, context.Store.GetRoom(2)?.State);
+        Assert.Single(context.Repository.LoadAbortedAssignments());
+        Assert.Empty(context.Repository.LoadCompletedCycles());
+    }
+
+    [Fact]
+    public void Malformed_prestaging_after_hours_expiration_throws_without_terminal_records()
+    {
+        using var workspace = TestWorkspace.Create();
+        var databasePath = workspace.ProductionDatabasePath();
+        var now = new DateTimeOffset(2026, 7, 3, 19, 0, 0, TimeSpan.Zero);
+        var seed = StoreContext.Create(
+            workspace,
+            environmentName: Environments.Production,
+            databasePath: databasePath);
+        seed.Repository.SaveRooms(
+            [
+                new RoomState(1)
+                {
+                    State = RoomStates.Prestaging,
+                    PrestageStartedAt = now.AddMinutes(-30)
+                }
+            ],
+            seed.Doctors,
+            seed.Procedures);
+
+        var context = StoreContext.Create(
+            workspace,
+            environmentName: Environments.Production,
+            databasePath: databasePath,
+            timeProvider: new ManualTimeProvider(now),
+            expirationOptions: new RoomExpirationOptions
+            {
+                Enabled = true,
+                AfterHoursSweepEnabled = true,
+                AfterHoursSweepTime = "19:00",
+                TimeZone = "UTC"
+            });
+
+        var exception = Assert.Throws<InvalidOperationException>(context.Store.TryRunAfterHoursSweep);
+        Assert.Contains("prestaging room 1", exception.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("assigned doctor", exception.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(RoomStates.Prestaging, context.Store.GetRoom(1)?.State);
+        Assert.Empty(context.Repository.LoadAbortedAssignments());
+        Assert.Empty(context.Repository.LoadCompletedCycles());
+    }
+
+    [Fact]
     public void Manual_mark_as_exception_moves_cycle_from_normal_to_exceptions()
     {
         // The admin marks a completed cycle as ManualReview - it should disappear from
@@ -4052,6 +4285,7 @@ public sealed class BoardStoreTests
             });
 
         Assert.NotNull(SeatViaPrestage(context.Store, 1, "otte", "CON"));
+        var active = context.Repository.LoadRooms(3).Single(room => room.RoomId == 1);
         Assert.NotNull(context.Store.MarkReadyForDoctor(1));
 
         // Advance past 8-hour limit.
@@ -4070,7 +4304,12 @@ public sealed class BoardStoreTests
         Assert.Equal(ReviewStatuses.PendingReview, exception.ReviewStatus);
         Assert.True(exception.IsException);
         Assert.True(exception.RequiresReview);
+        Assert.Equal(active.EpisodeId, exception.EpisodeId);
+        Assert.Equal(active.PrestageStartedAt, exception.PrestageStartedAt);
         Assert.Equal(0, context.Store.GetReports().CompletedRoomCyclesCount);
+        var durableException = Assert.Single(context.Repository.LoadCompletedCycles());
+        Assert.Equal(active.EpisodeId, durableException.EpisodeId);
+        Assert.Equal(active.PrestageStartedAt, durableException.PrestageStartedAt);
     }
 
     [Fact]
@@ -4131,6 +4370,9 @@ public sealed class BoardStoreTests
 
         Assert.NotNull(SeatViaPrestage(context.Store, 1, "otte", "CON"));
         Assert.NotNull(SeatViaPrestage(context.Store, 2, "pledger", "EXT"));
+        var activeRooms = context.Repository.LoadRooms(3)
+            .Where(room => room.RoomId is 1 or 2)
+            .ToDictionary(room => room.RoomId);
 
         var expired = context.Store.TryRunAfterHoursSweep();
 
@@ -4148,8 +4390,60 @@ public sealed class BoardStoreTests
             Assert.Equal(ExceptionReasons.AfterHoursSweep, ex.ExceptionReason);
             Assert.True(ex.IsException);
             Assert.True(ex.RequiresReview);
+            Assert.Equal(activeRooms[ex.RoomId].EpisodeId, ex.EpisodeId);
+            Assert.Equal(activeRooms[ex.RoomId].PrestageStartedAt, ex.PrestageStartedAt);
         });
+        Assert.Equal(2, context.Repository.LoadCompletedCycles().Count);
         Assert.Equal(0, context.Store.GetReports().CompletedRoomCyclesCount);
+    }
+
+    [Fact]
+    public void Legacy_seated_room_with_null_episode_and_prestage_expires_safely()
+    {
+        using var workspace = TestWorkspace.Create();
+        var databasePath = workspace.ProductionDatabasePath();
+        var now = new DateTimeOffset(2026, 7, 3, 18, 0, 0, TimeSpan.Zero);
+        var seatedAt = now.AddHours(-9);
+        var seed = StoreContext.Create(
+            workspace,
+            environmentName: Environments.Production,
+            databasePath: databasePath);
+        seed.Repository.SaveRooms(
+            [
+                new RoomState(1)
+                {
+                    AssignedDoctor = "otte",
+                    ProcedureCode = "CON",
+                    State = RoomStates.Seated,
+                    SeatedAt = seatedAt,
+                    OriginalDefaultExpectedUnits = 1,
+                    ExpectedAllocationUnits = 1,
+                    ExpectedAllocationMinutes = 10
+                }
+            ],
+            seed.Doctors,
+            seed.Procedures);
+
+        var clock = new ManualTimeProvider(now);
+        var context = StoreContext.Create(
+            workspace,
+            environmentName: Environments.Production,
+            databasePath: databasePath,
+            timeProvider: clock,
+            expirationOptions: new RoomExpirationOptions
+            {
+                Enabled = true,
+                MaxActiveDurationHours = 8
+            });
+
+        Assert.Equal([1], context.Store.CheckAndExpireActiveCycles());
+        var exception = Assert.Single(context.Repository.LoadCompletedCycles());
+        Assert.Null(exception.EpisodeId);
+        Assert.Null(exception.PrestageStartedAt);
+        Assert.Equal(seatedAt, exception.SeatedAt);
+        Assert.Equal(ExceptionReasons.ExceededMaxActiveDuration, exception.ExceptionReason);
+        Assert.Equal(RoomStates.Available, context.Store.GetRoom(1)?.State);
+        Assert.Empty(context.Repository.LoadAbortedAssignments());
     }
 
     [Fact]
