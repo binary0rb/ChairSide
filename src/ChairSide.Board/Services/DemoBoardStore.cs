@@ -2382,9 +2382,11 @@ public sealed class DemoBoardStore
 
     private static void ResetRoom(RoomState room)
     {
+        room.EpisodeId = null;
         room.AssignedDoctor = null;
         room.ProcedureCode = null;
         room.State = RoomStates.Available;
+        room.PrestageStartedAt = null;
         room.SeatedAt = null;
         room.AgingStartedAt = null;
         room.StaleStartedAt = null;
@@ -3311,9 +3313,22 @@ public sealed class CompletedRoomCycle
     // once. Reporting and exception actions can target a single cycle by this value without
     // relying on the legacy (RoomId, SeatedAt) compound key.
     public long CompletedCycleId { get; set; }
+
+    // Opaque per-episode identity minted at Begin Prestage and carried through the whole
+    // occupancy episode into this completed cycle. Null on legacy rows persisted before the
+    // Prestaging feature. Distinct from CompletedCycleId (a per-row SQLite id): EpisodeId ties a
+    // completed cycle back to the single occupancy episode it belongs to, so an episode can be
+    // proven to appear in exactly one of completed_room_cycles / aborted_room_assignments.
+    public string? EpisodeId { get; set; }
     public int RoomId { get; set; }
     public string AssignedDoctor { get; set; } = "";
     public string ProcedureCode { get; set; } = "";
+
+    // Room-unavailable clock start. Set when the episode began with Begin Prestage; null on legacy
+    // rows or any cycle whose room was never prestaged. When present, room-unavailable time for a
+    // successful cycle is measured from here rather than from SeatedAt. Not yet consumed by any
+    // report calculation.
+    public DateTimeOffset? PrestageStartedAt { get; set; }
     public DateTimeOffset SeatedAt { get; set; }
     public DateTimeOffset? ReadyForDoctorAt { get; set; }
     /// <summary>
@@ -3552,9 +3567,20 @@ public sealed record StressFixtureResult(
 public sealed class RoomState(int roomId)
 {
     public int RoomId { get; } = roomId;
+
+    // Opaque per-episode identity minted at Begin Prestage and cleared on ResetRoom. Carried
+    // through Seat/Ready/Arrive into the eventual completed cycle or aborted-assignment record so
+    // the whole occupancy episode shares one id. Null while Available and on legacy rows that
+    // predate the Prestaging feature.
+    public string? EpisodeId { get; set; }
     public string? AssignedDoctor { get; set; }
     public string? ProcedureCode { get; set; }
     public string State { get; set; } = RoomStates.Available;
+
+    // Room-unavailable clock start, set at Begin Prestage and cleared on ResetRoom. Null while
+    // Available and on legacy rows persisted before the Prestaging feature (which reload with their
+    // existing state and are never forced through Prestaging).
+    public DateTimeOffset? PrestageStartedAt { get; set; }
     public DateTimeOffset? SeatedAt { get; set; }
     public DateTimeOffset? AgingStartedAt { get; set; }
     public DateTimeOffset? StaleStartedAt { get; set; }
@@ -3574,12 +3600,95 @@ public sealed class RoomState(int roomId)
 public static class RoomStates
 {
     public const string Available = "available";
+    public const string Prestaging = "prestaging";
     public const string Seated = "seated";
     public const string Aging = "aging";
     public const string Stale = "stale";
     public const string ReadyForDoctor = "readyForDoctor";
     public const string DoctorInRoom = "doctorInRoom";
     public const string Turnover = "turnover";
+}
+
+/// <summary>
+/// How an occupancy episode was terminated before it produced a normal completed cycle. This is the
+/// mechanism, deliberately kept separate from any staff-selected operational reason (see
+/// <see cref="CancellationReasons"/>): a record always has a termination kind, and only staff
+/// cancellations additionally carry a reason.
+/// </summary>
+public static class TerminationKinds
+{
+    /// <summary>A staff member explicitly canceled the prestage or seating from the room panel.</summary>
+    public const string StaffCanceled = "StaffCanceled";
+
+    /// <summary>The active-cycle safety sweep expired the episode for exceeding the max active duration.</summary>
+    public const string MaxDurationExpired = "MaxDurationExpired";
+
+    /// <summary>The after-hours clinic-local sweep expired the episode at end of day.</summary>
+    public const string AfterHoursExpired = "AfterHoursExpired";
+}
+
+/// <summary>
+/// Optional, staff-selected operational reason accompanying a <see cref="TerminationKinds.StaffCanceled"/>
+/// termination. Never inferred; null when not supplied or when the termination was an automatic sweep.
+/// Operational metadata only - never PHI.
+/// </summary>
+public static class CancellationReasons
+{
+    public const string PatientCanceled = "PatientCanceled";
+    public const string NoShow = "NoShow";
+    public const string MovedRoom = "MovedRoom";
+    public const string SchedulingError = "SchedulingError";
+    public const string ProcedureChanged = "ProcedureChanged";
+    public const string Other = "Other";
+}
+
+/// <summary>
+/// Durable record of an occupancy episode that left Available but returned to Available without
+/// producing a normal completed cycle (a canceled prestage, a canceled seating, or a sweep-expired
+/// prestage). Preserves the full assignment snapshot so room-unavailable time stays attributable.
+/// Non-PHI: identity, procedure, allocation, timestamps, and operational termination metadata only.
+///
+/// Populations are disjoint by construction: an episode either reaches a normal completed cycle
+/// (completed_room_cycles) or terminates incomplete (this record), never both, so summing spans
+/// across the two tables counts each episode's room-unavailable time exactly once.
+/// </summary>
+public sealed class AbortedRoomAssignment
+{
+    // Stable per-row identity assigned by SQLite (aborted_room_assignments.id). Zero until persisted.
+    public long AbortedAssignmentId { get; set; }
+
+    // Per-episode identity and idempotency key (UNIQUE in storage). Minted at Begin Prestage for
+    // new episodes, or at termination time for a legacy row that never had one. Two genuinely
+    // distinct episodes always carry distinct EpisodeIds even under an identical (fixed-clock)
+    // termination instant; re-terminating the same episode reuses the same id and is a no-op.
+    public string EpisodeId { get; set; } = "";
+    public int RoomId { get; set; }
+
+    // Full assignment snapshot. Doctor and procedure are always populated because every
+    // terminal-eligible state (Prestaging, Seated, ReadyForDoctor, Aging, Stale) has them set;
+    // sedation is preserved via the composite procedure code (e.g. "EXT+SED"), matching the
+    // completed_room_cycles convention.
+    public string AssignedDoctor { get; set; } = "";
+    public string ProcedureCode { get; set; } = "";
+    public int OriginalDefaultExpectedUnits { get; set; }
+    public int ExpectedAllocationUnits { get; set; }
+    public int ExpectedAllocationMinutes { get; set; }
+    public bool AllocationAdjustedFromDefault { get; set; }
+
+    // Phase timestamps captured up to the point of termination. PrestageStartedAt is null only for a
+    // legacy row that was seated before the Prestaging feature; SeatedAt/ReadyForDoctorAt are present
+    // only if the episode had reached those phases before termination.
+    public DateTimeOffset? PrestageStartedAt { get; set; }
+    public DateTimeOffset? SeatedAt { get; set; }
+    public DateTimeOffset? ReadyForDoctorAt { get; set; }
+
+    // Termination facts. TerminatedFromState is the room state at termination; TerminationKind is the
+    // mechanism (see TerminationKinds); CancellationReason is the optional staff reason (see
+    // CancellationReasons) and is only meaningful for a StaffCanceled termination.
+    public DateTimeOffset TerminatedAt { get; set; }
+    public string TerminatedFromState { get; set; } = "";
+    public string TerminationKind { get; set; } = "";
+    public string? CancellationReason { get; set; }
 }
 
 public static class ReviewStatuses

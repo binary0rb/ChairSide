@@ -60,7 +60,9 @@ public sealed class SqliteBoardRepository
                 original_default_expected_units,
                 expected_allocation_units,
                 expected_allocation_minutes,
-                allocation_adjusted_from_default
+                allocation_adjusted_from_default,
+                prestage_started_at,
+                episode_id
             FROM active_rooms
             WHERE room_id BETWEEN 1 AND $roomCount
             ORDER BY room_id;
@@ -86,7 +88,9 @@ public sealed class SqliteBoardRepository
                 OriginalDefaultExpectedUnits = reader.GetInt32(11),
                 ExpectedAllocationUnits = reader.GetInt32(12),
                 ExpectedAllocationMinutes = reader.GetInt32(13),
-                AllocationAdjustedFromDefault = reader.GetInt32(14) == 1
+                AllocationAdjustedFromDefault = reader.GetInt32(14) == 1,
+                PrestageStartedAt = ReadNullableDateTimeOffset(reader, 15),
+                EpisodeId = ReadNullableString(reader, 16)
             });
         }
 
@@ -204,7 +208,9 @@ public sealed class SqliteBoardRepository
                 original_default_expected_units,
                 expected_allocation_units,
                 expected_allocation_minutes,
-                allocation_adjusted_from_default
+                allocation_adjusted_from_default,
+                prestage_started_at,
+                episode_id
             FROM completed_room_cycles
             ORDER BY doctor_arrived_at DESC;
             """;
@@ -243,7 +249,9 @@ public sealed class SqliteBoardRepository
                 OriginalDefaultExpectedUnits = reader.GetInt32(25),
                 ExpectedAllocationUnits = reader.GetInt32(26),
                 ExpectedAllocationMinutes = reader.GetInt32(27),
-                AllocationAdjustedFromDefault = reader.GetInt32(28) == 1
+                AllocationAdjustedFromDefault = reader.GetInt32(28) == 1,
+                PrestageStartedAt = ReadNullableDateTimeOffset(reader, 29),
+                EpisodeId = ReadNullableString(reader, 30)
             });
         }
 
@@ -252,11 +260,28 @@ public sealed class SqliteBoardRepository
 
     public void SaveCompletedCycle(CompletedRoomCycle cycle, IReadOnlyList<Doctor> doctors, IReadOnlyList<ProcedureCategory> procedures)
     {
+        using var connection = OpenConnection();
+        using var transaction = connection.BeginTransaction();
+        SaveCompletedCycle(connection, transaction, cycle, doctors, procedures);
+        transaction.Commit();
+    }
+
+    // Transactional core of SaveCompletedCycle. Runs the completed-cycle upsert and the id-readback
+    // on the caller's connection/transaction so it can be composed atomically with an active-room
+    // save (see SaveCompletedCycleAndRoom). Does not open, commit, or roll back - the caller owns
+    // the transaction.
+    private void SaveCompletedCycle(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        CompletedRoomCycle cycle,
+        IReadOnlyList<Doctor> doctors,
+        IReadOnlyList<ProcedureCategory> procedures)
+    {
         var doctor = doctors.FirstOrDefault(item => item.Id == cycle.AssignedDoctor);
         var procedure = procedures.FirstOrDefault(item => item.Code == cycle.ProcedureCode || item.Id == cycle.ProcedureCode);
 
-        using var connection = OpenConnection();
         using var command = connection.CreateCommand();
+        command.Transaction = transaction;
         command.CommandText = """
             INSERT INTO completed_room_cycles (
                 room_id,
@@ -289,6 +314,8 @@ public sealed class SqliteBoardRepository
                 expected_allocation_units,
                 expected_allocation_minutes,
                 allocation_adjusted_from_default,
+                prestage_started_at,
+                episode_id,
                 created_at,
                 updated_at
             )
@@ -323,6 +350,8 @@ public sealed class SqliteBoardRepository
                 $expectedAllocationUnits,
                 $expectedAllocationMinutes,
                 $allocationAdjustedFromDefault,
+                $prestageStartedAt,
+                $episodeId,
                 $now,
                 $now
             )
@@ -355,6 +384,8 @@ public sealed class SqliteBoardRepository
                 expected_allocation_units = excluded.expected_allocation_units,
                 expected_allocation_minutes = excluded.expected_allocation_minutes,
                 allocation_adjusted_from_default = excluded.allocation_adjusted_from_default,
+                prestage_started_at = excluded.prestage_started_at,
+                episode_id = excluded.episode_id,
                 updated_at = excluded.updated_at;
             """;
 
@@ -389,6 +420,8 @@ public sealed class SqliteBoardRepository
         command.Parameters.AddWithValue("$expectedAllocationUnits", cycle.ExpectedAllocationUnits);
         command.Parameters.AddWithValue("$expectedAllocationMinutes", cycle.ExpectedAllocationMinutes);
         command.Parameters.AddWithValue("$allocationAdjustedFromDefault", cycle.AllocationAdjustedFromDefault ? 1 : 0);
+        command.Parameters.AddWithValue("$prestageStartedAt", ToDbValue(cycle.PrestageStartedAt));
+        command.Parameters.AddWithValue("$episodeId", ToDbValue(cycle.EpisodeId));
         command.Parameters.AddWithValue("$now", now);
         command.ExecuteNonQuery();
 
@@ -396,6 +429,7 @@ public sealed class SqliteBoardRepository
         // row or update an existing one, so we read the id back by the natural (room_id, seated_at)
         // key rather than relying on last_insert_rowid(), which is not meaningful on the update path.
         using var idCommand = connection.CreateCommand();
+        idCommand.Transaction = transaction;
         idCommand.CommandText = """
             SELECT id FROM completed_room_cycles
             WHERE room_id = $roomId AND seated_at = $seatedAt;
@@ -406,6 +440,196 @@ public sealed class SqliteBoardRepository
         if (idResult is not null and not DBNull)
         {
             cycle.CompletedCycleId = Convert.ToInt64(idResult);
+        }
+    }
+
+    /// <summary>
+    /// Atomically upserts a completed cycle and saves the (already reset-in-memory) active room in a
+    /// single transaction, so the "record the finished/expired cycle" and "return the room to
+    /// Available" writes succeed or fail together. Used by the ordinary Room Available completion and
+    /// the seated-room force-expire archive, both of which were previously two separate commits.
+    /// </summary>
+    public void SaveCompletedCycleAndRoom(
+        CompletedRoomCycle cycle,
+        RoomState room,
+        IReadOnlyList<Doctor> doctors,
+        IReadOnlyList<ProcedureCategory> procedures)
+    {
+        using var connection = OpenConnection();
+        using var transaction = connection.BeginTransaction();
+        SaveCompletedCycle(connection, transaction, cycle, doctors, procedures);
+        SaveRoom(connection, transaction, room, doctors, procedures);
+        transaction.Commit();
+    }
+
+    /// <summary>
+    /// Atomically records an aborted (incomplete) assignment and saves the (already reset-in-memory)
+    /// active room in a single transaction, so the durable incomplete-assignment record and the
+    /// return to Available succeed or fail together. Used by Cancel Prestage, Cancel Seating, and the
+    /// sweep expiration of a prestaging room. The insert is idempotent on episode_id: re-terminating
+    /// the same episode is a no-op and never overwrites an earlier distinct episode.
+    /// </summary>
+    public void TerminateIncompleteAssignment(
+        AbortedRoomAssignment record,
+        RoomState room,
+        IReadOnlyList<Doctor> doctors,
+        IReadOnlyList<ProcedureCategory> procedures)
+    {
+        using var connection = OpenConnection();
+        using var transaction = connection.BeginTransaction();
+        InsertAbortedAssignment(connection, transaction, record, doctors, procedures);
+        SaveRoom(connection, transaction, room, doctors, procedures);
+        transaction.Commit();
+    }
+
+    public IReadOnlyList<AbortedRoomAssignment> LoadAbortedAssignments()
+    {
+        using var connection = OpenConnection();
+        using var command = connection.CreateCommand();
+        command.CommandText = """
+            SELECT
+                id,
+                episode_id,
+                room_id,
+                assigned_doctor_id,
+                procedure_code,
+                original_default_expected_units,
+                expected_allocation_units,
+                expected_allocation_minutes,
+                allocation_adjusted_from_default,
+                prestage_started_at,
+                seated_at,
+                ready_for_doctor_at,
+                terminated_at,
+                terminated_from_state,
+                termination_kind,
+                cancellation_reason
+            FROM aborted_room_assignments
+            ORDER BY terminated_at DESC;
+            """;
+
+        var records = new List<AbortedRoomAssignment>();
+        using var reader = command.ExecuteReader();
+        while (reader.Read())
+        {
+            records.Add(new AbortedRoomAssignment
+            {
+                AbortedAssignmentId = reader.GetInt64(0),
+                EpisodeId = reader.GetString(1),
+                RoomId = reader.GetInt32(2),
+                AssignedDoctor = reader.GetString(3),
+                ProcedureCode = reader.GetString(4),
+                OriginalDefaultExpectedUnits = reader.GetInt32(5),
+                ExpectedAllocationUnits = reader.GetInt32(6),
+                ExpectedAllocationMinutes = reader.GetInt32(7),
+                AllocationAdjustedFromDefault = reader.GetInt32(8) == 1,
+                PrestageStartedAt = ReadNullableDateTimeOffset(reader, 9),
+                SeatedAt = ReadNullableDateTimeOffset(reader, 10),
+                ReadyForDoctorAt = ReadNullableDateTimeOffset(reader, 11),
+                TerminatedAt = ReadRequiredDateTimeOffset(reader, 12),
+                TerminatedFromState = reader.GetString(13),
+                TerminationKind = reader.GetString(14),
+                CancellationReason = ReadNullableString(reader, 15)
+            });
+        }
+
+        return records;
+    }
+
+    // Inserts one aborted-assignment record on the caller's connection/transaction. Idempotent on
+    // episode_id (ON CONFLICT DO NOTHING) so a retried or restart-replayed termination cannot create
+    // a duplicate, and a later distinct episode (different episode_id) can never overwrite it.
+    // Denormalizes the doctor display name and procedure category the same way SaveCompletedCycle
+    // does. Populates AbortedAssignmentId from the row that actually ended up persisted.
+    private void InsertAbortedAssignment(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        AbortedRoomAssignment record,
+        IReadOnlyList<Doctor> doctors,
+        IReadOnlyList<ProcedureCategory> procedures)
+    {
+        var doctor = doctors.FirstOrDefault(item => item.Id == record.AssignedDoctor);
+        var procedure = procedures.FirstOrDefault(item => item.Code == record.ProcedureCode || item.Id == record.ProcedureCode);
+
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = """
+            INSERT INTO aborted_room_assignments (
+                episode_id,
+                room_id,
+                assigned_doctor_id,
+                assigned_doctor_display_name,
+                procedure_code,
+                procedure_category,
+                original_default_expected_units,
+                expected_allocation_units,
+                expected_allocation_minutes,
+                allocation_adjusted_from_default,
+                prestage_started_at,
+                seated_at,
+                ready_for_doctor_at,
+                terminated_at,
+                terminated_from_state,
+                termination_kind,
+                cancellation_reason,
+                created_at,
+                updated_at
+            )
+            VALUES (
+                $episodeId,
+                $roomId,
+                $assignedDoctorId,
+                $assignedDoctorDisplayName,
+                $procedureCode,
+                $procedureCategory,
+                $originalDefaultExpectedUnits,
+                $expectedAllocationUnits,
+                $expectedAllocationMinutes,
+                $allocationAdjustedFromDefault,
+                $prestageStartedAt,
+                $seatedAt,
+                $readyForDoctorAt,
+                $terminatedAt,
+                $terminatedFromState,
+                $terminationKind,
+                $cancellationReason,
+                $now,
+                $now
+            )
+            ON CONFLICT(episode_id) DO NOTHING;
+            """;
+
+        var now = FormatDateTimeOffset(DateTimeOffset.UtcNow);
+        command.Parameters.AddWithValue("$episodeId", record.EpisodeId);
+        command.Parameters.AddWithValue("$roomId", record.RoomId);
+        command.Parameters.AddWithValue("$assignedDoctorId", record.AssignedDoctor);
+        command.Parameters.AddWithValue("$assignedDoctorDisplayName", doctor?.Name ?? record.AssignedDoctor);
+        command.Parameters.AddWithValue("$procedureCode", record.ProcedureCode);
+        command.Parameters.AddWithValue("$procedureCategory", procedure?.Label ?? record.ProcedureCode);
+        command.Parameters.AddWithValue("$originalDefaultExpectedUnits", record.OriginalDefaultExpectedUnits);
+        command.Parameters.AddWithValue("$expectedAllocationUnits", record.ExpectedAllocationUnits);
+        command.Parameters.AddWithValue("$expectedAllocationMinutes", record.ExpectedAllocationMinutes);
+        command.Parameters.AddWithValue("$allocationAdjustedFromDefault", record.AllocationAdjustedFromDefault ? 1 : 0);
+        command.Parameters.AddWithValue("$prestageStartedAt", ToDbValue(record.PrestageStartedAt));
+        command.Parameters.AddWithValue("$seatedAt", ToDbValue(record.SeatedAt));
+        command.Parameters.AddWithValue("$readyForDoctorAt", ToDbValue(record.ReadyForDoctorAt));
+        command.Parameters.AddWithValue("$terminatedAt", FormatDateTimeOffset(record.TerminatedAt));
+        command.Parameters.AddWithValue("$terminatedFromState", record.TerminatedFromState);
+        command.Parameters.AddWithValue("$terminationKind", record.TerminationKind);
+        command.Parameters.AddWithValue("$cancellationReason", ToDbValue(record.CancellationReason));
+        command.Parameters.AddWithValue("$now", now);
+        command.ExecuteNonQuery();
+
+        // Read the id back by the idempotency key so the returned record carries the stable id of the
+        // row that is actually persisted (whether this call inserted it or a prior call already did).
+        using var idCommand = connection.CreateCommand();
+        idCommand.Transaction = transaction;
+        idCommand.CommandText = "SELECT id FROM aborted_room_assignments WHERE episode_id = $episodeId;";
+        idCommand.Parameters.AddWithValue("$episodeId", record.EpisodeId);
+        var idResult = idCommand.ExecuteScalar();
+        if (idResult is not null and not DBNull)
+        {
+            record.AbortedAssignmentId = Convert.ToInt64(idResult);
         }
     }
 
@@ -438,6 +662,8 @@ public sealed class SqliteBoardRepository
                     expected_allocation_units INTEGER NOT NULL DEFAULT 0,
                     expected_allocation_minutes INTEGER NOT NULL DEFAULT 0,
                     allocation_adjusted_from_default INTEGER NOT NULL DEFAULT 0,
+                    prestage_started_at TEXT NULL,
+                    episode_id TEXT NULL,
                     updated_at TEXT NOT NULL
                 );
 
@@ -473,9 +699,35 @@ public sealed class SqliteBoardRepository
                     suggested_action TEXT NULL,
                     reviewed_at TEXT NULL,
                     reviewed_by TEXT NULL,
+                    prestage_started_at TEXT NULL,
+                    episode_id TEXT NULL,
                     created_at TEXT NOT NULL,
                     updated_at TEXT NOT NULL,
                     UNIQUE(room_id, seated_at)
+                );
+
+                CREATE TABLE IF NOT EXISTS aborted_room_assignments (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    episode_id TEXT NOT NULL,
+                    room_id INTEGER NOT NULL,
+                    assigned_doctor_id TEXT NOT NULL,
+                    assigned_doctor_display_name TEXT NOT NULL,
+                    procedure_code TEXT NOT NULL,
+                    procedure_category TEXT NOT NULL,
+                    original_default_expected_units INTEGER NOT NULL DEFAULT 0,
+                    expected_allocation_units INTEGER NOT NULL DEFAULT 0,
+                    expected_allocation_minutes INTEGER NOT NULL DEFAULT 0,
+                    allocation_adjusted_from_default INTEGER NOT NULL DEFAULT 0,
+                    prestage_started_at TEXT NULL,
+                    seated_at TEXT NULL,
+                    ready_for_doctor_at TEXT NULL,
+                    terminated_at TEXT NOT NULL,
+                    terminated_from_state TEXT NOT NULL,
+                    termination_kind TEXT NOT NULL,
+                    cancellation_reason TEXT NULL,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL,
+                    UNIQUE(episode_id)
                 );
                 """;
             command.ExecuteNonQuery();
@@ -506,6 +758,15 @@ public sealed class SqliteBoardRepository
         TryAddColumn(connection, "ALTER TABLE completed_room_cycles ADD COLUMN expected_allocation_units INTEGER NOT NULL DEFAULT 0");
         TryAddColumn(connection, "ALTER TABLE completed_room_cycles ADD COLUMN expected_allocation_minutes INTEGER NOT NULL DEFAULT 0");
         TryAddColumn(connection, "ALTER TABLE completed_room_cycles ADD COLUMN allocation_adjusted_from_default INTEGER NOT NULL DEFAULT 0");
+
+        // Prestaging phase (operational, non-PHI). Additive on both tables; existing rows default to
+        // null (no prestage phase / episode recorded), so legacy rows reload with their current state
+        // and are never forced through Prestaging. Added before the rebuild migrations below so those
+        // rebuilds' shared-column copies pick these up on any table they touch.
+        TryAddColumn(connection, "ALTER TABLE active_rooms ADD COLUMN prestage_started_at TEXT NULL");
+        TryAddColumn(connection, "ALTER TABLE active_rooms ADD COLUMN episode_id TEXT NULL");
+        TryAddColumn(connection, "ALTER TABLE completed_room_cycles ADD COLUMN prestage_started_at TEXT NULL");
+        TryAddColumn(connection, "ALTER TABLE completed_room_cycles ADD COLUMN episode_id TEXT NULL");
 
         // Migration: ensure completed_room_cycles has an explicit id primary key column.
         // The table has declared "id INTEGER PRIMARY KEY AUTOINCREMENT" since its first version,
@@ -556,6 +817,8 @@ public sealed class SqliteBoardRepository
             suggested_action TEXT NULL,
             reviewed_at TEXT NULL,
             reviewed_by TEXT NULL,
+            prestage_started_at TEXT NULL,
+            episode_id TEXT NULL,
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL,
             UNIQUE(room_id, seated_at)
@@ -596,6 +859,8 @@ public sealed class SqliteBoardRepository
         "suggested_action",
         "reviewed_at",
         "reviewed_by",
+        "prestage_started_at",
+        "episode_id",
         "created_at",
         "updated_at"
     ];
@@ -716,6 +981,8 @@ public sealed class SqliteBoardRepository
                 suggested_action TEXT NULL,
                 reviewed_at TEXT NULL,
                 reviewed_by TEXT NULL,
+                prestage_started_at TEXT NULL,
+                episode_id TEXT NULL,
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL,
                 UNIQUE(room_id, seated_at)
@@ -754,6 +1021,8 @@ public sealed class SqliteBoardRepository
                 expected_allocation_units,
                 expected_allocation_minutes,
                 allocation_adjusted_from_default,
+                prestage_started_at,
+                episode_id,
                 created_at,
                 updated_at
             )
@@ -789,6 +1058,8 @@ public sealed class SqliteBoardRepository
                 expected_allocation_units,
                 expected_allocation_minutes,
                 allocation_adjusted_from_default,
+                prestage_started_at,
+                episode_id,
                 created_at,
                 updated_at
             FROM completed_room_cycles_v1;
@@ -887,6 +1158,8 @@ public sealed class SqliteBoardRepository
                 expected_allocation_units,
                 expected_allocation_minutes,
                 allocation_adjusted_from_default,
+                prestage_started_at,
+                episode_id,
                 updated_at
             )
             VALUES (
@@ -907,6 +1180,8 @@ public sealed class SqliteBoardRepository
                 $expectedAllocationUnits,
                 $expectedAllocationMinutes,
                 $allocationAdjustedFromDefault,
+                $prestageStartedAt,
+                $episodeId,
                 $updatedAt
             )
             ON CONFLICT(room_id) DO UPDATE SET
@@ -926,6 +1201,8 @@ public sealed class SqliteBoardRepository
                 expected_allocation_units = excluded.expected_allocation_units,
                 expected_allocation_minutes = excluded.expected_allocation_minutes,
                 allocation_adjusted_from_default = excluded.allocation_adjusted_from_default,
+                prestage_started_at = excluded.prestage_started_at,
+                episode_id = excluded.episode_id,
                 updated_at = excluded.updated_at;
             """;
 
@@ -946,6 +1223,8 @@ public sealed class SqliteBoardRepository
         command.Parameters.AddWithValue("$expectedAllocationUnits", room.ExpectedAllocationUnits);
         command.Parameters.AddWithValue("$expectedAllocationMinutes", room.ExpectedAllocationMinutes);
         command.Parameters.AddWithValue("$allocationAdjustedFromDefault", room.AllocationAdjustedFromDefault ? 1 : 0);
+        command.Parameters.AddWithValue("$prestageStartedAt", ToDbValue(room.PrestageStartedAt));
+        command.Parameters.AddWithValue("$episodeId", ToDbValue(room.EpisodeId));
         command.Parameters.AddWithValue("$updatedAt", FormatDateTimeOffset(DateTimeOffset.UtcNow));
         command.ExecuteNonQuery();
     }

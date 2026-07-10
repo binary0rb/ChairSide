@@ -1826,10 +1826,14 @@ public sealed class BoardStoreTests
         using var connection = OpenConnection(context.DatabasePath);
         var activeRoomColumns = GetColumnNames(connection, "active_rooms");
         var completedCycleColumns = GetColumnNames(connection, "completed_room_cycles");
+        var abortedAssignmentColumns = GetColumnNames(connection, "aborted_room_assignments");
 
         Assert.Subset(AllowedActiveRoomColumns, activeRoomColumns);
         Assert.Subset(AllowedCompletedCycleColumns, completedCycleColumns);
-        Assert.DoesNotContain(activeRoomColumns.Concat(completedCycleColumns), ContainsBannedPhiTerm);
+        Assert.Subset(AllowedAbortedAssignmentColumns, abortedAssignmentColumns);
+        Assert.DoesNotContain(
+            activeRoomColumns.Concat(completedCycleColumns).Concat(abortedAssignmentColumns),
+            ContainsBannedPhiTerm);
     }
 
     [Fact]
@@ -1851,6 +1855,296 @@ public sealed class BoardStoreTests
         using var command = connection.CreateCommand();
         command.CommandText = "SELECT COUNT(*) FROM completed_room_cycles WHERE room_id = 1;";
         Assert.Equal(1L, (long)command.ExecuteScalar()!);
+    }
+
+    [Fact]
+    public void Aborted_assignment_round_trips_full_snapshot_and_nullable_phase_timestamps()
+    {
+        using var workspace = TestWorkspace.Create();
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production);
+
+        var prestageStartedAt = new DateTimeOffset(2026, 3, 2, 14, 5, 0, TimeSpan.Zero);
+        var seatedAt = prestageStartedAt.AddMinutes(4);
+        var terminatedAt = prestageStartedAt.AddMinutes(9);
+        var record = new AbortedRoomAssignment
+        {
+            EpisodeId = "episode-a",
+            RoomId = 1,
+            AssignedDoctor = "otte",
+            ProcedureCode = "EXT+SED",
+            OriginalDefaultExpectedUnits = 3,
+            ExpectedAllocationUnits = 4,
+            ExpectedAllocationMinutes = 40,
+            AllocationAdjustedFromDefault = true,
+            PrestageStartedAt = prestageStartedAt,
+            SeatedAt = seatedAt,
+            ReadyForDoctorAt = null,
+            TerminatedAt = terminatedAt,
+            TerminatedFromState = RoomStates.Seated,
+            TerminationKind = TerminationKinds.StaffCanceled,
+            CancellationReason = CancellationReasons.PatientCanceled
+        };
+
+        context.Repository.TerminateIncompleteAssignment(record, new RoomState(1), context.Doctors, context.Procedures);
+
+        var reloaded = Assert.Single(context.Repository.LoadAbortedAssignments());
+        Assert.True(reloaded.AbortedAssignmentId > 0);
+        Assert.Equal("episode-a", reloaded.EpisodeId);
+        Assert.Equal(1, reloaded.RoomId);
+        Assert.Equal("otte", reloaded.AssignedDoctor);
+        Assert.Equal("EXT+SED", reloaded.ProcedureCode);
+        Assert.Equal(3, reloaded.OriginalDefaultExpectedUnits);
+        Assert.Equal(4, reloaded.ExpectedAllocationUnits);
+        Assert.Equal(40, reloaded.ExpectedAllocationMinutes);
+        Assert.True(reloaded.AllocationAdjustedFromDefault);
+        Assert.Equal(prestageStartedAt, reloaded.PrestageStartedAt);
+        Assert.Equal(seatedAt, reloaded.SeatedAt);
+        Assert.Null(reloaded.ReadyForDoctorAt);
+        Assert.Equal(terminatedAt, reloaded.TerminatedAt);
+        Assert.Equal(RoomStates.Seated, reloaded.TerminatedFromState);
+        Assert.Equal(TerminationKinds.StaffCanceled, reloaded.TerminationKind);
+        Assert.Equal(CancellationReasons.PatientCanceled, reloaded.CancellationReason);
+    }
+
+    [Fact]
+    public void Terminating_the_same_episode_twice_is_idempotent()
+    {
+        using var workspace = TestWorkspace.Create();
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production);
+
+        var at = new DateTimeOffset(2026, 3, 3, 12, 0, 0, TimeSpan.Zero);
+        var first = NewAbortedAssignment("episode-dup", roomId: 1, prestageStartedAt: at, terminatedAt: at.AddMinutes(5));
+        context.Repository.TerminateIncompleteAssignment(first, new RoomState(1), context.Doctors, context.Procedures);
+        var firstId = first.AbortedAssignmentId;
+
+        // Re-terminating the same episode id (e.g. a retried request or a restart-replayed sweep).
+        var second = NewAbortedAssignment("episode-dup", roomId: 1, prestageStartedAt: at, terminatedAt: at.AddMinutes(5));
+        context.Repository.TerminateIncompleteAssignment(second, new RoomState(1), context.Doctors, context.Procedures);
+
+        Assert.Single(context.Repository.LoadAbortedAssignments());
+        Assert.True(firstId > 0);
+        Assert.Equal(firstId, second.AbortedAssignmentId);
+    }
+
+    [Fact]
+    public void Distinct_episodes_in_same_room_at_same_timestamp_persist_separately()
+    {
+        using var workspace = TestWorkspace.Create();
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production);
+
+        // Same room, identical prestage/termination timestamps (the fixed-clock case), different
+        // episode ids: both genuinely-distinct episodes must survive - neither overwrites the other.
+        var at = new DateTimeOffset(2026, 3, 4, 15, 30, 0, TimeSpan.Zero);
+        var episodeX = NewAbortedAssignment("episode-x", roomId: 1, prestageStartedAt: at, terminatedAt: at);
+        var episodeY = NewAbortedAssignment("episode-y", roomId: 1, prestageStartedAt: at, terminatedAt: at);
+        context.Repository.TerminateIncompleteAssignment(episodeX, new RoomState(1), context.Doctors, context.Procedures);
+        context.Repository.TerminateIncompleteAssignment(episodeY, new RoomState(1), context.Doctors, context.Procedures);
+
+        var loaded = context.Repository.LoadAbortedAssignments();
+        Assert.Equal(2, loaded.Count);
+        Assert.Contains(loaded, r => r.EpisodeId == "episode-x");
+        Assert.Contains(loaded, r => r.EpisodeId == "episode-y");
+    }
+
+    [Fact]
+    public void Terminate_incomplete_assignment_persists_record_and_reset_room_together()
+    {
+        using var workspace = TestWorkspace.Create();
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production);
+
+        // Put room 1 into a non-Available state so the reset is observable.
+        Assert.NotNull(context.Store.SeatRoom(1, "otte", "CON"));
+
+        var record = NewAbortedAssignment(
+            "episode-d", roomId: 1,
+            prestageStartedAt: new DateTimeOffset(2026, 3, 5, 10, 0, 0, TimeSpan.Zero),
+            terminatedAt: new DateTimeOffset(2026, 3, 5, 10, 6, 0, TimeSpan.Zero));
+        context.Repository.TerminateIncompleteAssignment(record, new RoomState(1), context.Doctors, context.Procedures);
+
+        // Both writes landed from the one call: the durable record exists...
+        Assert.Single(context.Repository.LoadAbortedAssignments());
+
+        // ...and the active room was reset to Available with no residual assignment/episode state.
+        var room1 = context.Repository.LoadRooms(3).Single(room => room.RoomId == 1);
+        Assert.Equal(RoomStates.Available, room1.State);
+        Assert.Null(room1.AssignedDoctor);
+        Assert.Null(room1.SeatedAt);
+        Assert.Null(room1.PrestageStartedAt);
+        Assert.Null(room1.EpisodeId);
+    }
+
+    [Fact]
+    public void Save_completed_cycle_and_room_persists_both_and_propagates_id_on_insert_and_update()
+    {
+        using var workspace = TestWorkspace.Create();
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production);
+
+        var seatedAt = new DateTimeOffset(2026, 4, 1, 8, 0, 0, TimeSpan.Zero);
+        var cycle = new CompletedRoomCycle
+        {
+            RoomId = 1,
+            EpisodeId = "episode-e",
+            AssignedDoctor = "otte",
+            ProcedureCode = "CON",
+            PrestageStartedAt = seatedAt.AddMinutes(-5),
+            SeatedAt = seatedAt,
+            SeatedToDoctorSeconds = 600,
+            FinalWaitState = RoomStates.ReadyForDoctor
+        };
+
+        context.Repository.SaveCompletedCycleAndRoom(cycle, new RoomState(1), context.Doctors, context.Procedures);
+
+        // Insert path: the id assigned inside the transaction is read back and propagated onto the cycle.
+        Assert.True(cycle.CompletedCycleId > 0);
+        var insertedId = cycle.CompletedCycleId;
+
+        var loadedCycle = Assert.Single(context.Repository.LoadCompletedCycles());
+        Assert.Equal(insertedId, loadedCycle.CompletedCycleId);
+        Assert.Equal("episode-e", loadedCycle.EpisodeId);
+        Assert.Equal(seatedAt.AddMinutes(-5), loadedCycle.PrestageStartedAt);
+
+        // The active room was reset to Available in the same operation.
+        var room1 = context.Repository.LoadRooms(3).Single(room => room.RoomId == 1);
+        Assert.Equal(RoomStates.Available, room1.State);
+
+        // Update path: the same (room_id, seated_at) upsert reads the id back inside the transaction
+        // and keeps it stable, so the propagated id is consistent across insert and update.
+        cycle.RoomAvailableAt = seatedAt.AddMinutes(30);
+        context.Repository.SaveCompletedCycleAndRoom(cycle, new RoomState(1), context.Doctors, context.Procedures);
+        Assert.Equal(insertedId, cycle.CompletedCycleId);
+
+        var afterUpdate = Assert.Single(context.Repository.LoadCompletedCycles());
+        Assert.Equal(insertedId, afterUpdate.CompletedCycleId);
+        Assert.Equal(seatedAt.AddMinutes(30), afterUpdate.RoomAvailableAt);
+    }
+
+    [Fact]
+    public void Legacy_database_without_prestage_columns_initializes_and_preserves_active_seated_row()
+    {
+        using var workspace = TestWorkspace.Create();
+        var legacyDbPath = Path.Combine(workspace.DataRoot, "legacy.db");
+        var seatedAt = new DateTimeOffset(2026, 2, 10, 9, 0, 0, TimeSpan.Zero);
+
+        // Pre-create a database with the pre-Prestaging active_rooms schema (no prestage_started_at /
+        // episode_id) holding one Seated room, simulating a production database from before this feature.
+        using (var seed = new SqliteConnection(new SqliteConnectionStringBuilder { DataSource = legacyDbPath }.ToString()))
+        {
+            seed.Open();
+            ExecuteSql(seed, """
+                CREATE TABLE active_rooms (
+                    room_id INTEGER PRIMARY KEY,
+                    assigned_doctor_id TEXT NULL,
+                    assigned_doctor_display_name TEXT NULL,
+                    procedure_code TEXT NULL,
+                    procedure_category TEXT NULL,
+                    state TEXT NOT NULL,
+                    seated_at TEXT NULL,
+                    aging_started_at TEXT NULL,
+                    stale_started_at TEXT NULL,
+                    ready_for_doctor_at TEXT NULL,
+                    doctor_arrived_at TEXT NULL,
+                    doctor_complete_at TEXT NULL,
+                    room_available_at TEXT NULL,
+                    original_default_expected_units INTEGER NOT NULL DEFAULT 0,
+                    expected_allocation_units INTEGER NOT NULL DEFAULT 0,
+                    expected_allocation_minutes INTEGER NOT NULL DEFAULT 0,
+                    allocation_adjusted_from_default INTEGER NOT NULL DEFAULT 0,
+                    updated_at TEXT NOT NULL
+                );
+                """);
+            ExecuteSql(seed, $"""
+                INSERT INTO active_rooms (room_id, assigned_doctor_id, procedure_code, state, seated_at, updated_at)
+                VALUES (1, 'otte', 'CON', 'seated', '{seatedAt:O}', '{seatedAt:O}');
+                """);
+        }
+
+        // Opening the store runs the additive migrations; the legacy row must survive untouched and
+        // is never forced through Prestaging.
+        var context = StoreContext.Create(
+            workspace,
+            environmentName: Environments.Production,
+            databasePath: legacyDbPath,
+            roomCount: 3);
+
+        using (var connection = OpenConnection(legacyDbPath))
+        {
+            var columns = GetColumnNames(connection, "active_rooms");
+            Assert.Contains("prestage_started_at", columns);
+            Assert.Contains("episode_id", columns);
+        }
+
+        var room1 = context.Repository.LoadRooms(3).Single(room => room.RoomId == 1);
+        Assert.Equal(RoomStates.Seated, room1.State);
+        Assert.Equal("otte", room1.AssignedDoctor);
+        Assert.Equal("CON", room1.ProcedureCode);
+        Assert.Equal(seatedAt, room1.SeatedAt);
+        Assert.Null(room1.PrestageStartedAt);
+        Assert.Null(room1.EpisodeId);
+    }
+
+    [Fact]
+    public void Reset_room_clears_episode_id_and_prestage_started_at_along_with_every_other_field()
+    {
+        // ResetRoom is private static; invoked via reflection, mirroring InvokeTryAddColumn's pattern
+        // for testing a private static helper directly rather than through a specific caller.
+        var room = new RoomState(1)
+        {
+            EpisodeId = "episode-r",
+            AssignedDoctor = "otte",
+            ProcedureCode = "CON",
+            State = RoomStates.Seated,
+            PrestageStartedAt = new DateTimeOffset(2026, 5, 1, 9, 0, 0, TimeSpan.Zero),
+            SeatedAt = new DateTimeOffset(2026, 5, 1, 9, 5, 0, TimeSpan.Zero),
+            AgingStartedAt = new DateTimeOffset(2026, 5, 1, 9, 12, 0, TimeSpan.Zero),
+            StaleStartedAt = new DateTimeOffset(2026, 5, 1, 9, 17, 0, TimeSpan.Zero),
+            ReadyForDoctorAt = new DateTimeOffset(2026, 5, 1, 9, 6, 0, TimeSpan.Zero),
+            DoctorArrivedAt = new DateTimeOffset(2026, 5, 1, 9, 20, 0, TimeSpan.Zero),
+            DoctorCompleteAt = new DateTimeOffset(2026, 5, 1, 9, 40, 0, TimeSpan.Zero),
+            RoomAvailableAt = new DateTimeOffset(2026, 5, 1, 9, 50, 0, TimeSpan.Zero),
+            OriginalDefaultExpectedUnits = 2,
+            ExpectedAllocationUnits = 3,
+            ExpectedAllocationMinutes = 30,
+            AllocationAdjustedFromDefault = true
+        };
+
+        InvokeResetRoom(room);
+
+        Assert.Null(room.EpisodeId);
+        Assert.Null(room.AssignedDoctor);
+        Assert.Null(room.ProcedureCode);
+        Assert.Equal(RoomStates.Available, room.State);
+        Assert.Null(room.PrestageStartedAt);
+        Assert.Null(room.SeatedAt);
+        Assert.Null(room.AgingStartedAt);
+        Assert.Null(room.StaleStartedAt);
+        Assert.Null(room.ReadyForDoctorAt);
+        Assert.Null(room.DoctorArrivedAt);
+        Assert.Null(room.DoctorCompleteAt);
+        Assert.Null(room.RoomAvailableAt);
+        Assert.Equal(0, room.OriginalDefaultExpectedUnits);
+        Assert.Equal(0, room.ExpectedAllocationUnits);
+        Assert.Equal(0, room.ExpectedAllocationMinutes);
+        Assert.False(room.AllocationAdjustedFromDefault);
+    }
+
+    [Fact]
+    public void Fresh_room_state_constructions_never_carry_over_episode_or_prestage_fields()
+    {
+        // BuildLiveRoom, Available, Seated, and ReadyForDoctorRoom all build a *new* RoomState via an
+        // object initializer rather than copying from an existing instance, so EpisodeId/
+        // PrestageStartedAt correctly default to null on every one of them. This is a direct
+        // characterization of that default, guarding against a future refactor that turns one of
+        // these into a field-by-field copy of a stale RoomState.
+        using var workspace = TestWorkspace.Create();
+        var context = StoreContext.Create(workspace, environmentName: Environments.Development, roomCount: 12);
+
+        var rooms = context.Repository.LoadRooms(12);
+        Assert.NotEmpty(rooms);
+        Assert.All(rooms, room =>
+        {
+            Assert.Null(room.EpisodeId);
+            Assert.Null(room.PrestageStartedAt);
+        });
     }
 
     [Fact]
@@ -6009,6 +6303,8 @@ public sealed class BoardStoreTests
         "expected_allocation_units",
         "expected_allocation_minutes",
         "allocation_adjusted_from_default",
+        "prestage_started_at",
+        "episode_id",
         "updated_at"
     ];
 
@@ -6045,6 +6341,32 @@ public sealed class BoardStoreTests
         "suggested_action",
         "reviewed_at",
         "reviewed_by",
+        "prestage_started_at",
+        "episode_id",
+        "created_at",
+        "updated_at"
+    ];
+
+    private static readonly HashSet<string> AllowedAbortedAssignmentColumns =
+    [
+        "id",
+        "episode_id",
+        "room_id",
+        "assigned_doctor_id",
+        "assigned_doctor_display_name",
+        "procedure_code",
+        "procedure_category",
+        "original_default_expected_units",
+        "expected_allocation_units",
+        "expected_allocation_minutes",
+        "allocation_adjusted_from_default",
+        "prestage_started_at",
+        "seated_at",
+        "ready_for_doctor_at",
+        "terminated_at",
+        "terminated_from_state",
+        "termination_kind",
+        "cancellation_reason",
         "created_at",
         "updated_at"
     ];
@@ -6089,6 +6411,30 @@ public sealed class BoardStoreTests
         command.ExecuteNonQuery();
     }
 
+    // Minimal valid aborted-assignment record for repository tests that do not care about the full
+    // snapshot (idempotency, distinct-episode, and combined-write coverage). Phase timestamps beyond
+    // the prestage start are left null (a prestage-phase cancel).
+    private static AbortedRoomAssignment NewAbortedAssignment(
+        string episodeId, int roomId, DateTimeOffset prestageStartedAt, DateTimeOffset terminatedAt) =>
+        new()
+        {
+            EpisodeId = episodeId,
+            RoomId = roomId,
+            AssignedDoctor = "otte",
+            ProcedureCode = "CON",
+            OriginalDefaultExpectedUnits = 1,
+            ExpectedAllocationUnits = 1,
+            ExpectedAllocationMinutes = 10,
+            AllocationAdjustedFromDefault = false,
+            PrestageStartedAt = prestageStartedAt,
+            SeatedAt = null,
+            ReadyForDoctorAt = null,
+            TerminatedAt = terminatedAt,
+            TerminatedFromState = RoomStates.Seated,
+            TerminationKind = TerminationKinds.StaffCanceled,
+            CancellationReason = CancellationReasons.PatientCanceled
+        };
+
     private static void InvokeTryAddColumn(SqliteConnection connection, string alterTableSql)
     {
         var method = typeof(SqliteBoardRepository).GetMethod(
@@ -6099,6 +6445,24 @@ public sealed class BoardStoreTests
         try
         {
             method.Invoke(null, [connection, alterTableSql]);
+        }
+        catch (TargetInvocationException ex) when (ex.InnerException is not null)
+        {
+            System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(ex.InnerException).Throw();
+            throw;
+        }
+    }
+
+    private static void InvokeResetRoom(RoomState room)
+    {
+        var method = typeof(DemoBoardStore).GetMethod(
+            "ResetRoom",
+            BindingFlags.NonPublic | BindingFlags.Static);
+        Assert.NotNull(method);
+
+        try
+        {
+            method.Invoke(null, [room]);
         }
         catch (TargetInvocationException ex) when (ex.InnerException is not null)
         {
