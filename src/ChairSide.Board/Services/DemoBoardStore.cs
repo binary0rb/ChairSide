@@ -176,7 +176,9 @@ public sealed class DemoBoardStore
             var now = Now;
             room.EpisodeId = NewEpisodeId();
             room.AssignedDoctor = doctor.Id;
+            room.AssignedDoctorDisplayName = doctor.Name;
             room.ProcedureCode = storedProcedureCode;
+            room.ProcedureCategory = ResolveProcedure(storedProcedureCode)?.Label ?? procedure.Label;
             ApplyExpectedAllocation(room, procedure, expectedAllocationUnits);
             room.PrestageStartedAt = now;
             room.SeatedAt = null;
@@ -277,10 +279,21 @@ public sealed class DemoBoardStore
         }
     }
 
-    public RoomStatus? CancelSeating(int roomNumber)
+    public RoomStatus? CancelPrestage(int roomNumber, string? cancellationReason = null) =>
+        CancelIncompleteAssignment(roomNumber, cancellationReason, prestageOnly: true);
+
+    public RoomStatus? CancelSeating(int roomNumber, string? cancellationReason = null) =>
+        CancelIncompleteAssignment(roomNumber, cancellationReason, prestageOnly: false);
+
+    private RoomStatus? CancelIncompleteAssignment(int roomNumber, string? cancellationReason, bool prestageOnly)
     {
         lock (_syncRoot)
         {
+            if (!IsValidCancellationReason(cancellationReason))
+            {
+                return null;
+            }
+
             var room = _rooms.FirstOrDefault(item => item.RoomId == roomNumber);
             if (room is null)
             {
@@ -288,15 +301,45 @@ public sealed class DemoBoardStore
             }
 
             var now = Now;
-            UpdateRoomState(room, now);
-            if (!CanEditSeatedRoom(room) || room.SeatedAt is null)
+            var snapshot = CopyRoomState(room);
+            UpdateRoomState(snapshot, now);
+            var canCancel = prestageOnly ? CanCancelPrestage(snapshot) : CanCancelSeating(snapshot);
+            if (!canCancel || snapshot.AssignedDoctor is null || snapshot.ProcedureCode is null)
             {
                 return null;
             }
 
-            AddEvent(new RoomEvent(room.RoomId, "SeatingCanceled", now, room.AssignedDoctor, room.ProcedureCode));
+            var record = new AbortedRoomAssignment
+            {
+                EpisodeId = snapshot.EpisodeId ?? NewEpisodeId(),
+                RoomId = snapshot.RoomId,
+                AssignedDoctor = snapshot.AssignedDoctor,
+                AssignedDoctorDisplayName = snapshot.AssignedDoctorDisplayName,
+                ProcedureCode = snapshot.ProcedureCode,
+                ProcedureCategory = snapshot.ProcedureCategory,
+                OriginalDefaultExpectedUnits = snapshot.OriginalDefaultExpectedUnits,
+                ExpectedAllocationUnits = snapshot.ExpectedAllocationUnits,
+                ExpectedAllocationMinutes = snapshot.ExpectedAllocationMinutes,
+                AllocationAdjustedFromDefault = snapshot.AllocationAdjustedFromDefault,
+                PrestageStartedAt = snapshot.PrestageStartedAt,
+                SeatedAt = snapshot.SeatedAt,
+                ReadyForDoctorAt = snapshot.ReadyForDoctorAt,
+                TerminatedAt = now,
+                TerminatedFromState = snapshot.State,
+                TerminationKind = TerminationKinds.StaffCanceled,
+                CancellationReason = cancellationReason
+            };
+            var resetRoom = new RoomState(room.RoomId);
+
+            _repository.TerminateIncompleteAssignment(record, resetRoom, _doctors, _procedures);
+
             ResetRoom(room);
-            PersistRoom(room);
+            AddEvent(new RoomEvent(
+                room.RoomId,
+                prestageOnly ? "PrestageCanceled" : "SeatingCanceled",
+                now,
+                record.AssignedDoctor,
+                record.ProcedureCode));
 
             return ToRoomStatus(room, now);
         }
@@ -2443,11 +2486,36 @@ public sealed class DemoBoardStore
     private static bool HasValidExpectedAllocation(ProcedureCategory procedure) =>
         procedure.DefaultExpectedUnits >= MinExpectedUnits;
 
+    private static RoomState CopyRoomState(RoomState room) =>
+        new(room.RoomId)
+        {
+            EpisodeId = room.EpisodeId,
+            AssignedDoctor = room.AssignedDoctor,
+            AssignedDoctorDisplayName = room.AssignedDoctorDisplayName,
+            ProcedureCode = room.ProcedureCode,
+            ProcedureCategory = room.ProcedureCategory,
+            State = room.State,
+            PrestageStartedAt = room.PrestageStartedAt,
+            SeatedAt = room.SeatedAt,
+            AgingStartedAt = room.AgingStartedAt,
+            StaleStartedAt = room.StaleStartedAt,
+            ReadyForDoctorAt = room.ReadyForDoctorAt,
+            DoctorArrivedAt = room.DoctorArrivedAt,
+            DoctorCompleteAt = room.DoctorCompleteAt,
+            RoomAvailableAt = room.RoomAvailableAt,
+            OriginalDefaultExpectedUnits = room.OriginalDefaultExpectedUnits,
+            ExpectedAllocationUnits = room.ExpectedAllocationUnits,
+            ExpectedAllocationMinutes = room.ExpectedAllocationMinutes,
+            AllocationAdjustedFromDefault = room.AllocationAdjustedFromDefault
+        };
+
     private static void ResetRoom(RoomState room)
     {
         room.EpisodeId = null;
         room.AssignedDoctor = null;
+        room.AssignedDoctorDisplayName = null;
         room.ProcedureCode = null;
+        room.ProcedureCategory = null;
         room.State = RoomStates.Available;
         room.PrestageStartedAt = null;
         room.SeatedAt = null;
@@ -2514,6 +2582,21 @@ public sealed class DemoBoardStore
 
     private static bool CanSeat(RoomState room) =>
         room.State == RoomStates.Prestaging && room.PrestageStartedAt is not null && room.SeatedAt is null;
+
+    private static bool CanCancelPrestage(RoomState room) =>
+        room.State == RoomStates.Prestaging && room.PrestageStartedAt is not null && room.SeatedAt is null;
+
+    private static bool CanCancelSeating(RoomState room) =>
+        room.State is RoomStates.Seated or RoomStates.ReadyForDoctor or RoomStates.Aging or RoomStates.Stale;
+
+    private static bool IsValidCancellationReason(string? cancellationReason) =>
+        cancellationReason is null
+            or CancellationReasons.PatientCanceled
+            or CancellationReasons.NoShow
+            or CancellationReasons.MovedRoom
+            or CancellationReasons.SchedulingError
+            or CancellationReasons.ProcedureChanged
+            or CancellationReasons.Other;
 
     private static bool CanEditSeatedRoom(RoomState room) =>
         room.State is RoomStates.Seated or RoomStates.Aging or RoomStates.Stale or RoomStates.ReadyForDoctor;
@@ -3647,7 +3730,9 @@ public sealed class RoomState(int roomId)
     // predate the Prestaging feature.
     public string? EpisodeId { get; set; }
     public string? AssignedDoctor { get; set; }
+    public string? AssignedDoctorDisplayName { get; set; }
     public string? ProcedureCode { get; set; }
+    public string? ProcedureCategory { get; set; }
     public string State { get; set; } = RoomStates.Available;
 
     // Room-unavailable clock start, set at Begin Prestage and cleared on ResetRoom. Null while
@@ -3742,7 +3827,9 @@ public sealed class AbortedRoomAssignment
     // sedation is preserved via the composite procedure code (e.g. "EXT+SED"), matching the
     // completed_room_cycles convention.
     public string AssignedDoctor { get; set; } = "";
+    public string? AssignedDoctorDisplayName { get; set; }
     public string ProcedureCode { get; set; } = "";
+    public string? ProcedureCategory { get; set; }
     public int OriginalDefaultExpectedUnits { get; set; }
     public int ExpectedAllocationUnits { get; set; }
     public int ExpectedAllocationMinutes { get; set; }

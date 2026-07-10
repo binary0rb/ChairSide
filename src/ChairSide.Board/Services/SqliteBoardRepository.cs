@@ -48,7 +48,9 @@ public sealed class SqliteBoardRepository
             SELECT
                 room_id,
                 assigned_doctor_id,
+                assigned_doctor_display_name,
                 procedure_code,
+                procedure_category,
                 state,
                 seated_at,
                 aging_started_at,
@@ -76,21 +78,23 @@ public sealed class SqliteBoardRepository
             rooms.Add(new RoomState(reader.GetInt32(0))
             {
                 AssignedDoctor = ReadNullableString(reader, 1),
-                ProcedureCode = ReadNullableString(reader, 2),
-                State = reader.GetString(3),
-                SeatedAt = ReadNullableDateTimeOffset(reader, 4),
-                AgingStartedAt = ReadNullableDateTimeOffset(reader, 5),
-                StaleStartedAt = ReadNullableDateTimeOffset(reader, 6),
-                ReadyForDoctorAt = ReadNullableDateTimeOffset(reader, 7),
-                DoctorArrivedAt = ReadNullableDateTimeOffset(reader, 8),
-                DoctorCompleteAt = ReadNullableDateTimeOffset(reader, 9),
-                RoomAvailableAt = ReadNullableDateTimeOffset(reader, 10),
-                OriginalDefaultExpectedUnits = reader.GetInt32(11),
-                ExpectedAllocationUnits = reader.GetInt32(12),
-                ExpectedAllocationMinutes = reader.GetInt32(13),
-                AllocationAdjustedFromDefault = reader.GetInt32(14) == 1,
-                PrestageStartedAt = ReadNullableDateTimeOffset(reader, 15),
-                EpisodeId = ReadNullableString(reader, 16)
+                AssignedDoctorDisplayName = ReadNullableString(reader, 2),
+                ProcedureCode = ReadNullableString(reader, 3),
+                ProcedureCategory = ReadNullableString(reader, 4),
+                State = reader.GetString(5),
+                SeatedAt = ReadNullableDateTimeOffset(reader, 6),
+                AgingStartedAt = ReadNullableDateTimeOffset(reader, 7),
+                StaleStartedAt = ReadNullableDateTimeOffset(reader, 8),
+                ReadyForDoctorAt = ReadNullableDateTimeOffset(reader, 9),
+                DoctorArrivedAt = ReadNullableDateTimeOffset(reader, 10),
+                DoctorCompleteAt = ReadNullableDateTimeOffset(reader, 11),
+                RoomAvailableAt = ReadNullableDateTimeOffset(reader, 12),
+                OriginalDefaultExpectedUnits = reader.GetInt32(13),
+                ExpectedAllocationUnits = reader.GetInt32(14),
+                ExpectedAllocationMinutes = reader.GetInt32(15),
+                AllocationAdjustedFromDefault = reader.GetInt32(16) == 1,
+                PrestageStartedAt = ReadNullableDateTimeOffset(reader, 17),
+                EpisodeId = ReadNullableString(reader, 18)
             });
         }
 
@@ -492,7 +496,9 @@ public sealed class SqliteBoardRepository
                 episode_id,
                 room_id,
                 assigned_doctor_id,
+                assigned_doctor_display_name,
                 procedure_code,
+                procedure_category,
                 original_default_expected_units,
                 expected_allocation_units,
                 expected_allocation_minutes,
@@ -518,18 +524,20 @@ public sealed class SqliteBoardRepository
                 EpisodeId = reader.GetString(1),
                 RoomId = reader.GetInt32(2),
                 AssignedDoctor = reader.GetString(3),
-                ProcedureCode = reader.GetString(4),
-                OriginalDefaultExpectedUnits = reader.GetInt32(5),
-                ExpectedAllocationUnits = reader.GetInt32(6),
-                ExpectedAllocationMinutes = reader.GetInt32(7),
-                AllocationAdjustedFromDefault = reader.GetInt32(8) == 1,
-                PrestageStartedAt = ReadNullableDateTimeOffset(reader, 9),
-                SeatedAt = ReadNullableDateTimeOffset(reader, 10),
-                ReadyForDoctorAt = ReadNullableDateTimeOffset(reader, 11),
-                TerminatedAt = ReadRequiredDateTimeOffset(reader, 12),
-                TerminatedFromState = reader.GetString(13),
-                TerminationKind = reader.GetString(14),
-                CancellationReason = ReadNullableString(reader, 15)
+                AssignedDoctorDisplayName = reader.GetString(4),
+                ProcedureCode = reader.GetString(5),
+                ProcedureCategory = reader.GetString(6),
+                OriginalDefaultExpectedUnits = reader.GetInt32(7),
+                ExpectedAllocationUnits = reader.GetInt32(8),
+                ExpectedAllocationMinutes = reader.GetInt32(9),
+                AllocationAdjustedFromDefault = reader.GetInt32(10) == 1,
+                PrestageStartedAt = ReadNullableDateTimeOffset(reader, 11),
+                SeatedAt = ReadNullableDateTimeOffset(reader, 12),
+                ReadyForDoctorAt = ReadNullableDateTimeOffset(reader, 13),
+                TerminatedAt = ReadRequiredDateTimeOffset(reader, 14),
+                TerminatedFromState = reader.GetString(15),
+                TerminationKind = reader.GetString(16),
+                CancellationReason = ReadNullableString(reader, 17)
             });
         }
 
@@ -539,8 +547,8 @@ public sealed class SqliteBoardRepository
     // Inserts one aborted-assignment record on the caller's connection/transaction. Idempotent on
     // episode_id (ON CONFLICT DO NOTHING) so a retried or restart-replayed termination cannot create
     // a duplicate, and a later distinct episode (different episode_id) can never overwrite it.
-    // Denormalizes the doctor display name and procedure category the same way SaveCompletedCycle
-    // does. Populates AbortedAssignmentId from the row that actually ended up persisted.
+    // Persists the captured doctor/procedure display snapshots. Legacy null snapshots use the
+    // current roster as a best-effort fallback. Populates AbortedAssignmentId from the persisted row.
     private void InsertAbortedAssignment(
         SqliteConnection connection,
         SqliteTransaction transaction,
@@ -548,8 +556,12 @@ public sealed class SqliteBoardRepository
         IReadOnlyList<Doctor> doctors,
         IReadOnlyList<ProcedureCategory> procedures)
     {
-        var doctor = doctors.FirstOrDefault(item => item.Id == record.AssignedDoctor);
-        var procedure = procedures.FirstOrDefault(item => item.Code == record.ProcedureCode || item.Id == record.ProcedureCode);
+        var doctorDisplayName = record.AssignedDoctorDisplayName
+            ?? doctors.FirstOrDefault(item => item.Id == record.AssignedDoctor)?.Name
+            ?? record.AssignedDoctor;
+        var procedureCategory = record.ProcedureCategory
+            ?? ResolveProcedureCategory(procedures, record.ProcedureCode)
+            ?? record.ProcedureCode;
 
         using var command = connection.CreateCommand();
         command.Transaction = transaction;
@@ -603,9 +615,9 @@ public sealed class SqliteBoardRepository
         command.Parameters.AddWithValue("$episodeId", record.EpisodeId);
         command.Parameters.AddWithValue("$roomId", record.RoomId);
         command.Parameters.AddWithValue("$assignedDoctorId", record.AssignedDoctor);
-        command.Parameters.AddWithValue("$assignedDoctorDisplayName", doctor?.Name ?? record.AssignedDoctor);
+        command.Parameters.AddWithValue("$assignedDoctorDisplayName", doctorDisplayName);
         command.Parameters.AddWithValue("$procedureCode", record.ProcedureCode);
-        command.Parameters.AddWithValue("$procedureCategory", procedure?.Label ?? record.ProcedureCode);
+        command.Parameters.AddWithValue("$procedureCategory", procedureCategory);
         command.Parameters.AddWithValue("$originalDefaultExpectedUnits", record.OriginalDefaultExpectedUnits);
         command.Parameters.AddWithValue("$expectedAllocationUnits", record.ExpectedAllocationUnits);
         command.Parameters.AddWithValue("$expectedAllocationMinutes", record.ExpectedAllocationMinutes);
@@ -1130,13 +1142,6 @@ public sealed class SqliteBoardRepository
         IReadOnlyList<Doctor> doctors,
         IReadOnlyList<ProcedureCategory> procedures)
     {
-        var doctor = room.AssignedDoctor is null
-            ? null
-            : doctors.FirstOrDefault(item => item.Id == room.AssignedDoctor);
-        var procedure = room.ProcedureCode is null
-            ? null
-            : procedures.FirstOrDefault(item => item.Code == room.ProcedureCode || item.Id == room.ProcedureCode);
-
         using var command = connection.CreateCommand();
         command.Transaction = transaction;
         command.CommandText = """
@@ -1208,9 +1213,9 @@ public sealed class SqliteBoardRepository
 
         command.Parameters.AddWithValue("$roomId", room.RoomId);
         command.Parameters.AddWithValue("$assignedDoctorId", ToDbValue(room.AssignedDoctor));
-        command.Parameters.AddWithValue("$assignedDoctorDisplayName", ToDbValue(doctor?.Name));
+        command.Parameters.AddWithValue("$assignedDoctorDisplayName", ToDbValue(room.AssignedDoctorDisplayName));
         command.Parameters.AddWithValue("$procedureCode", ToDbValue(room.ProcedureCode));
-        command.Parameters.AddWithValue("$procedureCategory", ToDbValue(procedure?.Label));
+        command.Parameters.AddWithValue("$procedureCategory", ToDbValue(room.ProcedureCategory));
         command.Parameters.AddWithValue("$state", room.State);
         command.Parameters.AddWithValue("$seatedAt", ToDbValue(room.SeatedAt));
         command.Parameters.AddWithValue("$agingStartedAt", ToDbValue(room.AgingStartedAt));
@@ -1227,6 +1232,39 @@ public sealed class SqliteBoardRepository
         command.Parameters.AddWithValue("$episodeId", ToDbValue(room.EpisodeId));
         command.Parameters.AddWithValue("$updatedAt", FormatDateTimeOffset(DateTimeOffset.UtcNow));
         command.ExecuteNonQuery();
+    }
+
+    private static string? ResolveProcedureCategory(
+        IReadOnlyList<ProcedureCategory> procedures,
+        string? procedureCode)
+    {
+        if (string.IsNullOrWhiteSpace(procedureCode))
+        {
+            return null;
+        }
+
+        var exact = procedures.FirstOrDefault(item =>
+            string.Equals(item.Code, procedureCode, StringComparison.OrdinalIgnoreCase)
+            || string.Equals(item.Id, procedureCode, StringComparison.OrdinalIgnoreCase));
+        if (exact is not null)
+        {
+            return exact.Label;
+        }
+
+        const string sedationSuffix = "+SED";
+        if (procedureCode.EndsWith(sedationSuffix, StringComparison.OrdinalIgnoreCase))
+        {
+            var baseCode = procedureCode[..^sedationSuffix.Length];
+            var baseProcedure = procedures.FirstOrDefault(item =>
+                string.Equals(item.Code, baseCode, StringComparison.OrdinalIgnoreCase)
+                || string.Equals(item.Id, baseCode, StringComparison.OrdinalIgnoreCase));
+            if (baseProcedure is not null)
+            {
+                return $"{baseProcedure.Label} + Sedation";
+            }
+        }
+
+        return procedureCode;
     }
 
     private SqliteConnection OpenConnection()

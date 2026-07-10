@@ -484,6 +484,423 @@ public sealed class BoardStoreTests
     }
 
     [Fact]
+    public void Cancel_prestage_persists_full_abort_snapshot_and_resets_room()
+    {
+        using var workspace = TestWorkspace.Create();
+        var databasePath = workspace.ProductionDatabasePath();
+        var prestageAt = new DateTimeOffset(2026, 7, 2, 9, 0, 0, TimeSpan.Zero);
+        var terminatedAt = prestageAt.AddMinutes(4);
+        var clock = new ManualTimeProvider(prestageAt);
+        var context = StoreContext.Create(
+            workspace,
+            environmentName: Environments.Production,
+            databasePath: databasePath,
+            timeProvider: clock);
+
+        var prestaged = context.Store.BeginPrestage(1, "otte", "EXT", expectedAllocationUnits: 5);
+        Assert.NotNull(prestaged);
+        var activeSnapshot = context.Repository.LoadRooms(3).Single(room => room.RoomId == 1);
+        var episodeId = activeSnapshot.EpisodeId;
+        Assert.Equal("Dr. Otte", activeSnapshot.AssignedDoctorDisplayName);
+        Assert.Equal("Extraction", activeSnapshot.ProcedureCategory);
+        clock.SetUtcNow(terminatedAt);
+
+        var canceled = context.Store.CancelPrestage(1, CancellationReasons.MovedRoom);
+
+        Assert.NotNull(canceled);
+        Assert.Equal(RoomStates.Available, canceled.State);
+        var abort = Assert.Single(context.Repository.LoadAbortedAssignments());
+        Assert.Equal(episodeId, abort.EpisodeId);
+        Assert.Equal(1, abort.RoomId);
+        Assert.Equal("otte", abort.AssignedDoctor);
+        Assert.Equal("Dr. Otte", abort.AssignedDoctorDisplayName);
+        Assert.Equal("EXT", abort.ProcedureCode);
+        Assert.Equal("Extraction", abort.ProcedureCategory);
+        Assert.Equal(3, abort.OriginalDefaultExpectedUnits);
+        Assert.Equal(5, abort.ExpectedAllocationUnits);
+        Assert.Equal(50, abort.ExpectedAllocationMinutes);
+        Assert.True(abort.AllocationAdjustedFromDefault);
+        Assert.Equal(prestageAt, abort.PrestageStartedAt);
+        Assert.Null(abort.SeatedAt);
+        Assert.Null(abort.ReadyForDoctorAt);
+        Assert.Equal(terminatedAt, abort.TerminatedAt);
+        Assert.Equal(RoomStates.Prestaging, abort.TerminatedFromState);
+        Assert.Equal(TerminationKinds.StaffCanceled, abort.TerminationKind);
+        Assert.Equal(CancellationReasons.MovedRoom, abort.CancellationReason);
+        Assert.Empty(context.Repository.LoadCompletedCycles());
+        Assert.Contains(context.Store.GetSnapshot().RecentEvents, item => item.EventType == "PrestageCanceled");
+
+        using (var connection = OpenConnection(databasePath))
+        using (var command = connection.CreateCommand())
+        {
+            command.CommandText = "SELECT assigned_doctor_display_name, procedure_category FROM aborted_room_assignments;";
+            using var reader = command.ExecuteReader();
+            Assert.True(reader.Read());
+            Assert.Equal("Dr. Otte", reader.GetString(0));
+            Assert.Equal("Extraction", reader.GetString(1));
+            Assert.False(reader.Read());
+        }
+
+        Assert.Null(context.Store.CancelPrestage(1));
+        Assert.Single(context.Repository.LoadAbortedAssignments());
+
+        var reloaded = StoreContext.Create(
+            workspace,
+            environmentName: Environments.Production,
+            databasePath: databasePath,
+            timeProvider: clock);
+        var reloadedRoom = reloaded.Repository.LoadRooms(3).Single(room => room.RoomId == 1);
+        Assert.Equal(RoomStates.Available, reloadedRoom.State);
+        Assert.Null(reloadedRoom.EpisodeId);
+        Assert.Null(reloadedRoom.AssignedDoctor);
+        Assert.Null(reloadedRoom.ProcedureCode);
+        Assert.Null(reloadedRoom.PrestageStartedAt);
+        Assert.Null(reloadedRoom.SeatedAt);
+        Assert.Equal(episodeId, Assert.Single(reloaded.Repository.LoadAbortedAssignments()).EpisodeId);
+        Assert.Empty(reloaded.Repository.LoadCompletedCycles());
+    }
+
+    [Fact]
+    public void Composite_sedation_cancellation_persists_canonical_procedure_category()
+    {
+        using var workspace = TestWorkspace.Create();
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production);
+
+        Assert.NotNull(context.Store.BeginPrestage(1, "otte", "EXT", sedation: true));
+        var active = context.Repository.LoadRooms(3).Single(room => room.RoomId == 1);
+        Assert.Equal("EXT+SED", active.ProcedureCode);
+        Assert.Equal("Extraction + Sedation", active.ProcedureCategory);
+
+        Assert.NotNull(context.Store.CancelPrestage(1));
+
+        var abort = Assert.Single(context.Repository.LoadAbortedAssignments());
+        Assert.Equal("EXT+SED", abort.ProcedureCode);
+        Assert.Equal("Extraction + Sedation", abort.ProcedureCategory);
+        using var connection = OpenConnection(context.DatabasePath);
+        using var command = connection.CreateCommand();
+        command.CommandText = "SELECT procedure_category FROM aborted_room_assignments;";
+        Assert.Equal("Extraction + Sedation", (string)command.ExecuteScalar()!);
+    }
+
+    [Fact]
+    public void Cancellation_retains_begin_prestage_display_snapshots_after_roster_change()
+    {
+        using var workspace = TestWorkspace.Create();
+        var databasePath = workspace.ProductionDatabasePath();
+        var originalDoctors = new DoctorRosterOptions
+        {
+            Doctors =
+            [
+                new()
+                {
+                    Id = "otte",
+                    DisplayName = "Dr. Original Otte",
+                    ShortName = "Otte",
+                    Color = "#dc2626",
+                    Active = true
+                }
+            ]
+        };
+        var originalProcedures = new ProcedureRosterOptions
+        {
+            Procedures =
+            [
+                new()
+                {
+                    Id = "consult",
+                    Code = "CON",
+                    Label = "Original Consult",
+                    Icon = "speech",
+                    Active = true,
+                    DefaultExpectedUnits = 1
+                }
+            ]
+        };
+        var first = StoreContext.Create(
+            workspace,
+            environmentName: Environments.Production,
+            databasePath: databasePath,
+            doctorRosterOptions: originalDoctors,
+            procedureRosterOptions: originalProcedures);
+        Assert.NotNull(first.Store.BeginPrestage(1, "otte", "CON"));
+
+        var changedDoctors = new DoctorRosterOptions
+        {
+            Doctors =
+            [
+                new()
+                {
+                    Id = "otte",
+                    DisplayName = "Dr. Renamed Otte",
+                    ShortName = "Renamed",
+                    Color = "#dc2626",
+                    Active = true
+                }
+            ]
+        };
+        var changedProcedures = new ProcedureRosterOptions
+        {
+            Procedures =
+            [
+                new()
+                {
+                    Id = "consult",
+                    Code = "CON",
+                    Label = "Renamed Consult",
+                    Icon = "speech",
+                    Active = true,
+                    DefaultExpectedUnits = 1
+                }
+            ]
+        };
+        var second = StoreContext.Create(
+            workspace,
+            environmentName: Environments.Production,
+            databasePath: databasePath,
+            doctorRosterOptions: changedDoctors,
+            procedureRosterOptions: changedProcedures);
+        var loaded = second.Repository.LoadRooms(3).Single(room => room.RoomId == 1);
+        Assert.Equal("Dr. Original Otte", loaded.AssignedDoctorDisplayName);
+        Assert.Equal("Original Consult", loaded.ProcedureCategory);
+
+        Assert.NotNull(second.Store.CancelPrestage(1));
+
+        var abort = Assert.Single(second.Repository.LoadAbortedAssignments());
+        Assert.Equal("Dr. Original Otte", abort.AssignedDoctorDisplayName);
+        Assert.Equal("Original Consult", abort.ProcedureCategory);
+    }
+
+    [Fact]
+    public void Cancel_seating_persists_complete_new_episode_snapshot_and_reset_across_reload()
+    {
+        using var workspace = TestWorkspace.Create();
+        var databasePath = workspace.ProductionDatabasePath();
+        var prestageAt = new DateTimeOffset(2026, 7, 2, 9, 30, 0, TimeSpan.Zero);
+        var seatedAt = prestageAt.AddMinutes(3);
+        var readyAt = prestageAt.AddMinutes(5);
+        var terminatedAt = prestageAt.AddMinutes(8);
+        var clock = new ManualTimeProvider(prestageAt);
+        var context = StoreContext.Create(
+            workspace,
+            environmentName: Environments.Production,
+            databasePath: databasePath,
+            timeProvider: clock);
+
+        Assert.NotNull(context.Store.BeginPrestage(1, "otte", "EXT", expectedAllocationUnits: 5));
+        var episodeId = context.Repository.LoadRooms(3).Single(room => room.RoomId == 1).EpisodeId;
+        clock.SetUtcNow(seatedAt);
+        Assert.NotNull(context.Store.SeatRoom(1));
+        clock.SetUtcNow(readyAt);
+        Assert.NotNull(context.Store.MarkReadyForDoctor(1));
+        clock.SetUtcNow(terminatedAt);
+
+        Assert.NotNull(context.Store.CancelSeating(1, CancellationReasons.ProcedureChanged));
+
+        var abort = Assert.Single(context.Repository.LoadAbortedAssignments());
+        Assert.Equal(episodeId, abort.EpisodeId);
+        Assert.Equal(1, abort.RoomId);
+        Assert.Equal("otte", abort.AssignedDoctor);
+        Assert.Equal("Dr. Otte", abort.AssignedDoctorDisplayName);
+        Assert.Equal("EXT", abort.ProcedureCode);
+        Assert.Equal("Extraction", abort.ProcedureCategory);
+        Assert.Equal(3, abort.OriginalDefaultExpectedUnits);
+        Assert.Equal(5, abort.ExpectedAllocationUnits);
+        Assert.Equal(50, abort.ExpectedAllocationMinutes);
+        Assert.True(abort.AllocationAdjustedFromDefault);
+        Assert.Equal(prestageAt, abort.PrestageStartedAt);
+        Assert.Equal(seatedAt, abort.SeatedAt);
+        Assert.Equal(readyAt, abort.ReadyForDoctorAt);
+        Assert.Equal(terminatedAt, abort.TerminatedAt);
+        Assert.Equal(RoomStates.ReadyForDoctor, abort.TerminatedFromState);
+        Assert.Equal(TerminationKinds.StaffCanceled, abort.TerminationKind);
+        Assert.Equal(CancellationReasons.ProcedureChanged, abort.CancellationReason);
+        Assert.Empty(context.Repository.LoadCompletedCycles());
+
+        var reloaded = StoreContext.Create(
+            workspace,
+            environmentName: Environments.Production,
+            databasePath: databasePath,
+            timeProvider: clock);
+        var room = reloaded.Repository.LoadRooms(3).Single(item => item.RoomId == 1);
+        Assert.Equal(RoomStates.Available, room.State);
+        Assert.Null(room.EpisodeId);
+        Assert.Null(room.AssignedDoctor);
+        Assert.Null(room.AssignedDoctorDisplayName);
+        Assert.Null(room.ProcedureCode);
+        Assert.Null(room.ProcedureCategory);
+        Assert.Null(room.PrestageStartedAt);
+        Assert.Null(room.SeatedAt);
+        var durableAbort = Assert.Single(reloaded.Repository.LoadAbortedAssignments());
+        AssertSameAbortedAssignment(abort, durableAbort);
+        Assert.Empty(reloaded.Repository.LoadCompletedCycles());
+    }
+
+    [Theory]
+    [InlineData(RoomStates.Available)]
+    [InlineData(RoomStates.Seated)]
+    [InlineData(RoomStates.ReadyForDoctor)]
+    [InlineData(RoomStates.Aging)]
+    [InlineData(RoomStates.Stale)]
+    [InlineData(RoomStates.DoctorInRoom)]
+    [InlineData(RoomStates.Turnover)]
+    public void Cancel_prestage_rejects_available_and_post_prestage_states(string state)
+    {
+        using var workspace = TestWorkspace.Create();
+        var clock = new ManualTimeProvider(new DateTimeOffset(2026, 7, 2, 10, 0, 0, TimeSpan.Zero));
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production, timeProvider: clock);
+        DriveRoomToCancellationState(context, clock, state);
+
+        Assert.Null(context.Store.CancelPrestage(1));
+        Assert.Equal(state, context.Store.GetRoom(1)?.State);
+        Assert.Empty(context.Repository.LoadAbortedAssignments());
+    }
+
+    [Theory]
+    [InlineData(RoomStates.Seated)]
+    [InlineData(RoomStates.ReadyForDoctor)]
+    [InlineData(RoomStates.Aging)]
+    [InlineData(RoomStates.Stale)]
+    public void Cancel_seating_persists_exact_allowed_pre_arrival_state(string state)
+    {
+        using var workspace = TestWorkspace.Create();
+        var clock = new ManualTimeProvider(new DateTimeOffset(2026, 7, 2, 11, 0, 0, TimeSpan.Zero));
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production, timeProvider: clock);
+        DriveRoomToCancellationState(context, clock, state);
+        var episodeId = context.Repository.LoadRooms(3).Single(room => room.RoomId == 1).EpisodeId;
+
+        var canceled = context.Store.CancelSeating(1);
+
+        Assert.NotNull(canceled);
+        Assert.Equal(RoomStates.Available, canceled.State);
+        var abort = Assert.Single(context.Repository.LoadAbortedAssignments());
+        Assert.Equal(episodeId, abort.EpisodeId);
+        Assert.Equal(state, abort.TerminatedFromState);
+        Assert.Equal(TerminationKinds.StaffCanceled, abort.TerminationKind);
+        Assert.Null(abort.CancellationReason);
+        Assert.NotNull(abort.PrestageStartedAt);
+        Assert.NotNull(abort.SeatedAt);
+        Assert.Equal(state == RoomStates.Seated, abort.ReadyForDoctorAt is null);
+        Assert.Empty(context.Repository.LoadCompletedCycles());
+    }
+
+    [Theory]
+    [InlineData(RoomStates.Available)]
+    [InlineData(RoomStates.DoctorInRoom)]
+    [InlineData(RoomStates.Turnover)]
+    public void Cancel_seating_rejects_available_and_at_or_after_doctor_arrived(string state)
+    {
+        using var workspace = TestWorkspace.Create();
+        var clock = new ManualTimeProvider(new DateTimeOffset(2026, 7, 2, 12, 0, 0, TimeSpan.Zero));
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production, timeProvider: clock);
+        DriveRoomToCancellationState(context, clock, state);
+
+        Assert.Null(context.Store.CancelSeating(1));
+        Assert.Equal(state, context.Store.GetRoom(1)?.State);
+        Assert.Empty(context.Repository.LoadAbortedAssignments());
+    }
+
+    [Theory]
+    [InlineData(true, "")]
+    [InlineData(true, " ")]
+    [InlineData(true, "UnknownReason")]
+    [InlineData(false, "")]
+    [InlineData(false, " ")]
+    [InlineData(false, "UnknownReason")]
+    public void Cancellation_rejects_blank_or_unknown_reason_without_mutation(bool prestage, string reason)
+    {
+        using var workspace = TestWorkspace.Create();
+        var clock = new ManualTimeProvider(new DateTimeOffset(2026, 7, 2, 13, 0, 0, TimeSpan.Zero));
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production, timeProvider: clock);
+        DriveRoomToCancellationState(context, clock, prestage ? RoomStates.Prestaging : RoomStates.Seated);
+        var before = context.Repository.LoadRooms(3).Single(room => room.RoomId == 1);
+
+        var result = prestage
+            ? context.Store.CancelPrestage(1, reason)
+            : context.Store.CancelSeating(1, reason);
+
+        Assert.Null(result);
+        AssertSameRoomState(before, context.Repository.LoadRooms(3).Single(room => room.RoomId == 1));
+        Assert.Equal(before.State, context.Store.GetRoom(1)?.State);
+        Assert.Empty(context.Repository.LoadAbortedAssignments());
+    }
+
+    [Fact]
+    public void Legacy_ready_room_cancellation_mints_episode_id_without_prestage_timestamp()
+    {
+        using var workspace = TestWorkspace.Create();
+        var databasePath = workspace.ProductionDatabasePath();
+        var seatedAt = new DateTimeOffset(2026, 7, 2, 14, 0, 0, TimeSpan.Zero);
+        var readyAt = seatedAt.AddMinutes(5);
+        var now = readyAt.AddMinutes(1);
+        var seed = StoreContext.Create(workspace, environmentName: Environments.Production, databasePath: databasePath);
+        seed.Repository.SaveRooms(
+            [
+                new RoomState(1)
+                {
+                    AssignedDoctor = "otte",
+                    ProcedureCode = "EXT",
+                    State = RoomStates.ReadyForDoctor,
+                    SeatedAt = seatedAt,
+                    ReadyForDoctorAt = readyAt,
+                    OriginalDefaultExpectedUnits = 3,
+                    ExpectedAllocationUnits = 4,
+                    ExpectedAllocationMinutes = 40,
+                    AllocationAdjustedFromDefault = true
+                }
+            ],
+            seed.Doctors,
+            seed.Procedures);
+        using (var connection = OpenConnection(databasePath))
+        using (var command = connection.CreateCommand())
+        {
+            command.CommandText = "UPDATE active_rooms SET assigned_doctor_display_name = NULL, procedure_category = NULL WHERE room_id = 1;";
+            command.ExecuteNonQuery();
+        }
+
+        var clock = new ManualTimeProvider(now);
+        var context = StoreContext.Create(
+            workspace,
+            environmentName: Environments.Production,
+            databasePath: databasePath,
+            timeProvider: clock);
+        var roomsField = typeof(DemoBoardStore).GetField(
+            "_rooms",
+            BindingFlags.NonPublic | BindingFlags.Instance);
+        var liveRooms = Assert.IsType<List<RoomState>>(roomsField?.GetValue(context.Store));
+        var legacyRoom = liveRooms.Single(room => room.RoomId == 1);
+        Assert.Null(legacyRoom.AssignedDoctorDisplayName);
+        Assert.Null(legacyRoom.ProcedureCategory);
+        var persistedLegacyRoom = context.Repository.LoadRooms(3).Single(room => room.RoomId == 1);
+        Assert.Null(persistedLegacyRoom.AssignedDoctorDisplayName);
+        Assert.Null(persistedLegacyRoom.ProcedureCategory);
+
+        Assert.NotNull(context.Store.CancelSeating(1, CancellationReasons.NoShow));
+
+        var abort = Assert.Single(context.Repository.LoadAbortedAssignments());
+        Assert.False(string.IsNullOrWhiteSpace(abort.EpisodeId));
+        Assert.Equal("Dr. Otte", abort.AssignedDoctorDisplayName);
+        Assert.Equal("Extraction", abort.ProcedureCategory);
+        Assert.Null(abort.PrestageStartedAt);
+        Assert.Equal(seatedAt, abort.SeatedAt);
+        Assert.Equal(readyAt, abort.ReadyForDoctorAt);
+        Assert.Equal(RoomStates.ReadyForDoctor, abort.TerminatedFromState);
+        Assert.Equal(CancellationReasons.NoShow, abort.CancellationReason);
+        Assert.Equal(3, abort.OriginalDefaultExpectedUnits);
+        Assert.Equal(4, abort.ExpectedAllocationUnits);
+        Assert.Equal(40, abort.ExpectedAllocationMinutes);
+        Assert.True(abort.AllocationAdjustedFromDefault);
+        Assert.Empty(context.Repository.LoadCompletedCycles());
+
+        var reloaded = StoreContext.Create(
+            workspace,
+            environmentName: Environments.Production,
+            databasePath: databasePath,
+            timeProvider: clock);
+        Assert.Equal(RoomStates.Available, reloaded.Store.GetRoom(1)?.State);
+        Assert.Equal(abort.EpisodeId, Assert.Single(reloaded.Repository.LoadAbortedAssignments()).EpisodeId);
+    }
+
+    [Fact]
     public void Active_seated_room_survives_store_restart()
     {
         using var workspace = TestWorkspace.Create();
@@ -2281,7 +2698,9 @@ public sealed class BoardStoreTests
             EpisodeId = "episode-a",
             RoomId = 1,
             AssignedDoctor = "otte",
+            AssignedDoctorDisplayName = "Dr. Snapshot Otte",
             ProcedureCode = "EXT+SED",
+            ProcedureCategory = "Snapshot Extraction + Sedation",
             OriginalDefaultExpectedUnits = 3,
             ExpectedAllocationUnits = 4,
             ExpectedAllocationMinutes = 40,
@@ -2302,7 +2721,9 @@ public sealed class BoardStoreTests
         Assert.Equal("episode-a", reloaded.EpisodeId);
         Assert.Equal(1, reloaded.RoomId);
         Assert.Equal("otte", reloaded.AssignedDoctor);
+        Assert.Equal("Dr. Snapshot Otte", reloaded.AssignedDoctorDisplayName);
         Assert.Equal("EXT+SED", reloaded.ProcedureCode);
+        Assert.Equal("Snapshot Extraction + Sedation", reloaded.ProcedureCategory);
         Assert.Equal(3, reloaded.OriginalDefaultExpectedUnits);
         Assert.Equal(4, reloaded.ExpectedAllocationUnits);
         Assert.Equal(40, reloaded.ExpectedAllocationMinutes);
@@ -2501,7 +2922,9 @@ public sealed class BoardStoreTests
         {
             EpisodeId = "episode-r",
             AssignedDoctor = "otte",
+            AssignedDoctorDisplayName = "Dr. Otte",
             ProcedureCode = "CON",
+            ProcedureCategory = "Consult",
             State = RoomStates.Seated,
             PrestageStartedAt = new DateTimeOffset(2026, 5, 1, 9, 0, 0, TimeSpan.Zero),
             SeatedAt = new DateTimeOffset(2026, 5, 1, 9, 5, 0, TimeSpan.Zero),
@@ -2521,7 +2944,9 @@ public sealed class BoardStoreTests
 
         Assert.Null(room.EpisodeId);
         Assert.Null(room.AssignedDoctor);
+        Assert.Null(room.AssignedDoctorDisplayName);
         Assert.Null(room.ProcedureCode);
+        Assert.Null(room.ProcedureCategory);
         Assert.Equal(RoomStates.Available, room.State);
         Assert.Null(room.PrestageStartedAt);
         Assert.Null(room.SeatedAt);
@@ -6385,12 +6810,63 @@ public sealed class BoardStoreTests
     private static DateTimeOffset Utc(int year, int month, int day, int hour, int minute = 0) =>
         new(year, month, day, hour, minute, 0, TimeSpan.Zero);
 
+    private static void DriveRoomToCancellationState(
+        StoreContext context,
+        ManualTimeProvider clock,
+        string targetState)
+    {
+        if (targetState == RoomStates.Available)
+        {
+            Assert.Equal(RoomStates.Available, context.Store.GetRoom(1)?.State);
+            return;
+        }
+
+        var startedAt = clock.GetUtcNow();
+        Assert.NotNull(context.Store.BeginPrestage(1, "otte", "EXT", expectedAllocationUnits: 4));
+        if (targetState == RoomStates.Prestaging)
+        {
+            return;
+        }
+
+        Assert.NotNull(context.Store.SeatRoom(1));
+        if (targetState == RoomStates.Seated)
+        {
+            return;
+        }
+
+        clock.SetUtcNow(startedAt.AddMinutes(1));
+        Assert.NotNull(context.Store.MarkReadyForDoctor(1));
+        if (targetState == RoomStates.ReadyForDoctor)
+        {
+            return;
+        }
+
+        if (targetState is RoomStates.Aging or RoomStates.Stale)
+        {
+            clock.SetUtcNow(startedAt.AddMinutes(targetState == RoomStates.Aging ? 9 : 14));
+            return;
+        }
+
+        clock.SetUtcNow(startedAt.AddMinutes(2));
+        Assert.NotNull(context.Store.MarkDoctorArrived(1));
+        if (targetState == RoomStates.DoctorInRoom)
+        {
+            return;
+        }
+
+        Assert.Equal(RoomStates.Turnover, targetState);
+        clock.SetUtcNow(startedAt.AddMinutes(3));
+        Assert.NotNull(context.Store.MarkDoctorComplete(1));
+    }
+
     private static void AssertSameRoomState(RoomState expected, RoomState actual)
     {
         Assert.Equal(expected.RoomId, actual.RoomId);
         Assert.Equal(expected.EpisodeId, actual.EpisodeId);
         Assert.Equal(expected.AssignedDoctor, actual.AssignedDoctor);
+        Assert.Equal(expected.AssignedDoctorDisplayName, actual.AssignedDoctorDisplayName);
         Assert.Equal(expected.ProcedureCode, actual.ProcedureCode);
+        Assert.Equal(expected.ProcedureCategory, actual.ProcedureCategory);
         Assert.Equal(expected.State, actual.State);
         Assert.Equal(expected.PrestageStartedAt, actual.PrestageStartedAt);
         Assert.Equal(expected.SeatedAt, actual.SeatedAt);
@@ -6404,6 +6880,28 @@ public sealed class BoardStoreTests
         Assert.Equal(expected.ExpectedAllocationUnits, actual.ExpectedAllocationUnits);
         Assert.Equal(expected.ExpectedAllocationMinutes, actual.ExpectedAllocationMinutes);
         Assert.Equal(expected.AllocationAdjustedFromDefault, actual.AllocationAdjustedFromDefault);
+    }
+
+    private static void AssertSameAbortedAssignment(AbortedRoomAssignment expected, AbortedRoomAssignment actual)
+    {
+        Assert.Equal(expected.AbortedAssignmentId, actual.AbortedAssignmentId);
+        Assert.Equal(expected.EpisodeId, actual.EpisodeId);
+        Assert.Equal(expected.RoomId, actual.RoomId);
+        Assert.Equal(expected.AssignedDoctor, actual.AssignedDoctor);
+        Assert.Equal(expected.AssignedDoctorDisplayName, actual.AssignedDoctorDisplayName);
+        Assert.Equal(expected.ProcedureCode, actual.ProcedureCode);
+        Assert.Equal(expected.ProcedureCategory, actual.ProcedureCategory);
+        Assert.Equal(expected.OriginalDefaultExpectedUnits, actual.OriginalDefaultExpectedUnits);
+        Assert.Equal(expected.ExpectedAllocationUnits, actual.ExpectedAllocationUnits);
+        Assert.Equal(expected.ExpectedAllocationMinutes, actual.ExpectedAllocationMinutes);
+        Assert.Equal(expected.AllocationAdjustedFromDefault, actual.AllocationAdjustedFromDefault);
+        Assert.Equal(expected.PrestageStartedAt, actual.PrestageStartedAt);
+        Assert.Equal(expected.SeatedAt, actual.SeatedAt);
+        Assert.Equal(expected.ReadyForDoctorAt, actual.ReadyForDoctorAt);
+        Assert.Equal(expected.TerminatedAt, actual.TerminatedAt);
+        Assert.Equal(expected.TerminatedFromState, actual.TerminatedFromState);
+        Assert.Equal(expected.TerminationKind, actual.TerminationKind);
+        Assert.Equal(expected.CancellationReason, actual.CancellationReason);
     }
 
     private static RoomStatus? SeatViaPrestage(
