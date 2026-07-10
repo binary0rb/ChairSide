@@ -584,18 +584,25 @@ public sealed class DemoBoardStore
             }
 
             var now = Now;
-            room.RoomAvailableAt = now;
-            UpdateCycleReport(room, cycle =>
+            var cycleIndex = _completedCycles.FindIndex(cycle =>
+                cycle.RoomId == room.RoomId && cycle.SeatedAt == room.SeatedAt.Value);
+            if (cycleIndex < 0)
             {
-                cycle.RoomAvailableAt = now;
-                cycle.TurnoverSeconds = SecondsBetween(room.DoctorCompleteAt.Value, now);
-                cycle.TotalRoomCycleSeconds = SecondsBetween(room.SeatedAt.Value, now);
-            });
-            AddEvent(new RoomEvent(room.RoomId, "RoomAvailable", now, room.AssignedDoctor, room.ProcedureCode));
-            PersistCycleForRoom(room);
+                throw new InvalidOperationException(
+                    $"Cannot mark room {room.RoomId} available: turnover room has no completed-cycle record.");
+            }
 
+            var cycle = CopyCompletedCycle(_completedCycles[cycleIndex]);
+            cycle.RoomAvailableAt = now;
+            cycle.TurnoverSeconds = SecondsBetween(room.DoctorCompleteAt.Value, now);
+            cycle.TotalRoomCycleSeconds = SecondsBetween(room.SeatedAt.Value, now);
+            var resetRoom = new RoomState(room.RoomId);
+
+            _repository.SaveCompletedCycleAndRoom(cycle, resetRoom, _doctors, _procedures);
+
+            _completedCycles[cycleIndex] = cycle;
             ResetRoom(room);
-            PersistRoom(room);
+            AddEvent(new RoomEvent(room.RoomId, "RoomAvailable", now, cycle.AssignedDoctor, cycle.ProcedureCode));
 
             return ToRoomStatus(room, now);
         }

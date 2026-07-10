@@ -942,6 +942,147 @@ public sealed class BoardStoreTests
     }
 
     [Fact]
+    public void Room_available_atomically_finalizes_cycle_and_available_room_across_reload()
+    {
+        using var workspace = TestWorkspace.Create();
+        var databasePath = workspace.ProductionDatabasePath();
+        var prestageAt = new DateTimeOffset(2026, 7, 4, 9, 0, 0, TimeSpan.Zero);
+        var seatedAt = prestageAt.AddMinutes(2);
+        var readyAt = prestageAt.AddMinutes(5);
+        var arrivedAt = prestageAt.AddMinutes(10);
+        var completedAt = prestageAt.AddMinutes(20);
+        var availableAt = prestageAt.AddMinutes(25);
+        var clock = new ManualTimeProvider(prestageAt);
+        var context = StoreContext.Create(
+            workspace,
+            environmentName: Environments.Production,
+            databasePath: databasePath,
+            timeProvider: clock);
+
+        Assert.NotNull(context.Store.BeginPrestage(1, "otte", "EXT", expectedAllocationUnits: 5));
+        clock.SetUtcNow(seatedAt);
+        Assert.NotNull(context.Store.SeatRoom(1));
+        clock.SetUtcNow(readyAt);
+        Assert.NotNull(context.Store.MarkReadyForDoctor(1));
+        clock.SetUtcNow(arrivedAt);
+        Assert.NotNull(context.Store.MarkDoctorArrived(1));
+        clock.SetUtcNow(completedAt);
+        Assert.NotNull(context.Store.MarkDoctorComplete(1));
+
+        var beforeAvailable = Assert.Single(context.Repository.LoadCompletedCycles());
+        Assert.True(beforeAvailable.CompletedCycleId > 0);
+        Assert.Null(beforeAvailable.RoomAvailableAt);
+        var completedCycleId = beforeAvailable.CompletedCycleId;
+        var episodeId = beforeAvailable.EpisodeId;
+        var storedPrestageAt = beforeAvailable.PrestageStartedAt;
+
+        clock.SetUtcNow(availableAt);
+        var available = context.Store.MarkRoomAvailable(1);
+
+        Assert.NotNull(available);
+        Assert.Equal(RoomStates.Available, available.State);
+        Assert.Equal(RoomStates.Available, context.Store.GetRoom(1)?.State);
+
+        var tracked = Assert.Single(context.Store.GetReports().RecentCompletedCycles);
+        Assert.Equal(completedCycleId, tracked.CompletedCycleId);
+        Assert.Equal(episodeId, tracked.EpisodeId);
+        Assert.Equal(storedPrestageAt, tracked.PrestageStartedAt);
+        Assert.Equal(availableAt, tracked.RoomAvailableAt);
+        Assert.Equal(5 * 60, tracked.TurnoverSeconds);
+        Assert.Equal((int)(availableAt - seatedAt).TotalSeconds, tracked.TotalRoomCycleSeconds);
+
+        var persisted = Assert.Single(context.Repository.LoadCompletedCycles());
+        Assert.Equal(completedCycleId, persisted.CompletedCycleId);
+        Assert.Equal(episodeId, persisted.EpisodeId);
+        Assert.Equal(storedPrestageAt, persisted.PrestageStartedAt);
+        Assert.Equal(availableAt, persisted.RoomAvailableAt);
+
+        var reloaded = StoreContext.Create(
+            workspace,
+            environmentName: Environments.Production,
+            databasePath: databasePath,
+            timeProvider: clock);
+        Assert.Equal(RoomStates.Available, reloaded.Store.GetRoom(1)?.State);
+        var durableCycle = Assert.Single(reloaded.Store.GetReports().RecentCompletedCycles);
+        Assert.Equal(completedCycleId, durableCycle.CompletedCycleId);
+        Assert.Equal(episodeId, durableCycle.EpisodeId);
+        Assert.Equal(storedPrestageAt, durableCycle.PrestageStartedAt);
+        Assert.Equal(availableAt, durableCycle.RoomAvailableAt);
+    }
+
+    [Fact]
+    public void Legacy_cycle_with_null_episode_and_prestage_completes_normally()
+    {
+        using var workspace = TestWorkspace.Create();
+        var databasePath = workspace.ProductionDatabasePath();
+        var now = new DateTimeOffset(2026, 7, 4, 10, 0, 0, TimeSpan.Zero);
+        var availableAt = now.AddMinutes(5);
+        var clock = new ManualTimeProvider(now);
+        var first = StoreContext.Create(
+            workspace,
+            environmentName: Environments.Production,
+            databasePath: databasePath,
+            timeProvider: clock);
+
+        Assert.NotNull(first.Store.BeginPrestage(1, "otte", "CON"));
+        Assert.NotNull(first.Store.SeatRoom(1));
+        Assert.NotNull(first.Store.MarkReadyForDoctor(1));
+        Assert.NotNull(first.Store.MarkDoctorArrived(1));
+        Assert.NotNull(first.Store.MarkDoctorComplete(1));
+        var cycleId = Assert.Single(first.Repository.LoadCompletedCycles()).CompletedCycleId;
+
+        using (var connection = OpenConnection(databasePath))
+        using (var command = connection.CreateCommand())
+        {
+            command.CommandText = """
+                UPDATE active_rooms
+                SET episode_id = NULL, prestage_started_at = NULL
+                WHERE room_id = 1;
+
+                UPDATE completed_room_cycles
+                SET episode_id = NULL, prestage_started_at = NULL
+                WHERE id = $cycleId;
+                """;
+            command.Parameters.AddWithValue("$cycleId", cycleId);
+            command.ExecuteNonQuery();
+        }
+
+        clock.SetUtcNow(availableAt);
+        var legacy = StoreContext.Create(
+            workspace,
+            environmentName: Environments.Production,
+            databasePath: databasePath,
+            timeProvider: clock);
+
+        Assert.NotNull(legacy.Store.MarkRoomAvailable(1));
+        Assert.Equal(RoomStates.Available, legacy.Store.GetRoom(1)?.State);
+        var cycle = Assert.Single(legacy.Repository.LoadCompletedCycles());
+        Assert.Equal(cycleId, cycle.CompletedCycleId);
+        Assert.Null(cycle.EpisodeId);
+        Assert.Null(cycle.PrestageStartedAt);
+        Assert.Equal(availableAt, cycle.RoomAvailableAt);
+    }
+
+    [Fact]
+    public void Room_available_rejects_repeat_after_reset_without_duplicate_completed_cycle()
+    {
+        using var workspace = TestWorkspace.Create();
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production);
+
+        Assert.NotNull(SeatViaPrestage(context.Store, 1, "otte", "CON"));
+        Assert.NotNull(context.Store.MarkReadyForDoctor(1));
+        Assert.NotNull(context.Store.MarkDoctorArrived(1));
+        Assert.NotNull(context.Store.MarkDoctorComplete(1));
+        Assert.NotNull(context.Store.MarkRoomAvailable(1));
+        var completedCycleId = Assert.Single(context.Repository.LoadCompletedCycles()).CompletedCycleId;
+
+        Assert.Null(context.Store.MarkRoomAvailable(1));
+        Assert.Equal(RoomStates.Available, context.Store.GetRoom(1)?.State);
+        var persisted = Assert.Single(context.Repository.LoadCompletedCycles());
+        Assert.Equal(completedCycleId, persisted.CompletedCycleId);
+    }
+
+    [Fact]
     public void Stale_elapsed_ready_for_doctor_room_reloads_as_stale()
     {
         // Stale escalation is now based on ReadyForDoctorAt. A room that has been seated for a
