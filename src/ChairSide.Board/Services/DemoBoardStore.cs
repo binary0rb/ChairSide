@@ -58,6 +58,7 @@ public sealed class DemoBoardStore
     private readonly List<Doctor> _activeDoctors;
     private readonly List<ProcedureCategory> _procedures;
     private readonly List<ProcedureCategory> _activeProcedures;
+    private readonly bool _demoOffsetsAllowed;
 
     private readonly List<RoomState> _rooms;
     private readonly List<RoomEvent> _events = [];
@@ -84,6 +85,7 @@ public sealed class DemoBoardStore
         _timeProvider = timeProvider ?? TimeProvider.System;
         _roomCount = boardOptions.Value.RoomCount;
         _demoTimerEnabled = boardUiOptions.Value.DemoTimerEnabled ?? !environment.IsProduction();
+        _demoOffsetsAllowed = environment.IsDevelopment();
         _doctors = BuildDoctors(doctorRosterOptions.Value).ToList();
         _activeDoctors = BuildDoctors(doctorRosterOptions.Value, activeOnly: true).ToList();
         _procedures = BuildProcedures(procedureRosterOptions.Value).ToList();
@@ -151,14 +153,14 @@ public sealed class DemoBoardStore
         }
     }
 
-    public RoomStatus? SeatRoom(int roomNumber, string doctorId, string procedureCode, int demoElapsedMinutes = 0, bool sedation = false, int? expectedAllocationUnits = null)
+    public RoomStatus? BeginPrestage(int roomNumber, string doctorId, string procedureCode, bool sedation = false, int? expectedAllocationUnits = null)
     {
         lock (_syncRoot)
         {
             var room = _rooms.FirstOrDefault(item => item.RoomId == roomNumber);
             var doctor = _activeDoctors.FirstOrDefault(item => item.Id == doctorId);
             var procedure = FindActiveProcedure(procedureCode);
-            if (room is null || doctor is null || procedure is null || !CanSeat(room))
+            if (room is null || doctor is null || procedure is null || !CanBeginPrestage(room) || !HasValidExpectedAllocation(procedure))
             {
                 return null;
             }
@@ -172,25 +174,73 @@ public sealed class DemoBoardStore
 
             var storedProcedureCode = ComposeProcedureCode(procedure.Code, sedation);
             var now = Now;
-            var effectiveDemoElapsedMinutes = _demoTimerEnabled ? demoElapsedMinutes : 0;
-            var simulatedElapsed = TimeSpan.FromMinutes(Math.Clamp(effectiveDemoElapsedMinutes, 0, 240));
+            room.EpisodeId = NewEpisodeId();
             room.AssignedDoctor = doctor.Id;
             room.ProcedureCode = storedProcedureCode;
             ApplyExpectedAllocation(room, procedure, expectedAllocationUnits);
-            room.SeatedAt = now - simulatedElapsed;
+            room.PrestageStartedAt = now;
+            room.SeatedAt = null;
             room.AgingStartedAt = null;
             room.StaleStartedAt = null;
+            room.ReadyForDoctorAt = null;
             room.DoctorArrivedAt = null;
             room.DoctorCompleteAt = null;
             room.RoomAvailableAt = null;
-            room.State = RoomStates.Seated;
+            room.State = RoomStates.Prestaging;
             UpdateRoomState(room, now);
-            AddEvent(new RoomEvent(room.RoomId, "Seated", now, doctor.Id, storedProcedureCode));
+            AddEvent(new RoomEvent(room.RoomId, "PrestageStarted", now, doctor.Id, storedProcedureCode));
             PersistRoom(room);
 
             return ToRoomStatus(room, now);
         }
     }
+
+    public RoomStatus? SeatRoom(int roomNumber, int demoElapsedMinutes = 0)
+    {
+        lock (_syncRoot)
+        {
+            if (!IsDemoElapsedMinutesAllowed(demoElapsedMinutes))
+            {
+                return null;
+            }
+
+            var room = _rooms.FirstOrDefault(item => item.RoomId == roomNumber);
+            if (room is null)
+            {
+                return null;
+            }
+
+            var now = Now;
+            UpdateRoomState(room, now);
+            if (!CanSeat(room) || room.PrestageStartedAt is null)
+            {
+                return null;
+            }
+
+            var offset = TimeSpan.FromMinutes(demoElapsedMinutes);
+            if (demoElapsedMinutes != 0)
+            {
+                room.PrestageStartedAt = room.PrestageStartedAt.Value - offset;
+            }
+
+            room.SeatedAt = now - offset;
+            room.AgingStartedAt = null;
+            room.StaleStartedAt = null;
+            room.ReadyForDoctorAt = null;
+            room.DoctorArrivedAt = null;
+            room.DoctorCompleteAt = null;
+            room.RoomAvailableAt = null;
+            room.State = RoomStates.Seated;
+            UpdateRoomState(room, now);
+            AddEvent(new RoomEvent(room.RoomId, "Seated", now, room.AssignedDoctor, room.ProcedureCode));
+            PersistRoom(room);
+
+            return ToRoomStatus(room, now);
+        }
+    }
+
+    public RoomStatus? SeatRoom(int roomNumber, string doctorId, string procedureCode, int demoElapsedMinutes = 0, bool sedation = false, int? expectedAllocationUnits = null) =>
+        SeatRoom(roomNumber, demoElapsedMinutes);
 
     public RoomStatus? UpdateAssignment(int roomNumber, string doctorId, string procedureCode, bool sedation = false)
     {
@@ -416,6 +466,8 @@ public sealed class DemoBoardStore
                 SeatedAt = room.SeatedAt.Value,
                 ReadyForDoctorAt = room.ReadyForDoctorAt,
                 DoctorArrivedAt = now,
+                EpisodeId = room.EpisodeId,
+                PrestageStartedAt = room.PrestageStartedAt,
                 SeatedToDoctorSeconds = seatedToDoctorSeconds,
                 PrepSeconds = prepSeconds,
                 ReadyToDoctorSeconds = readyToDoctorSeconds,
@@ -2133,6 +2185,14 @@ public sealed class DemoBoardStore
 
         if (room.SeatedAt is null)
         {
+            if (room.PrestageStartedAt is not null)
+            {
+                room.AgingStartedAt = null;
+                room.StaleStartedAt = null;
+                room.State = RoomStates.Prestaging;
+                return;
+            }
+
             room.State = RoomStates.Available;
             return;
         }
@@ -2380,6 +2440,9 @@ public sealed class DemoBoardStore
         room.AllocationAdjustedFromDefault = finalUnits != defaultUnits;
     }
 
+    private static bool HasValidExpectedAllocation(ProcedureCategory procedure) =>
+        procedure.DefaultExpectedUnits >= MinExpectedUnits;
+
     private static void ResetRoom(RoomState room)
     {
         room.EpisodeId = null;
@@ -2440,7 +2503,17 @@ public sealed class DemoBoardStore
         return room;
     }
 
-    private static bool CanSeat(RoomState room) => room.State == RoomStates.Available && room.SeatedAt is null;
+    private static string NewEpisodeId() => Guid.NewGuid().ToString("N");
+
+    private bool IsDemoElapsedMinutesAllowed(int demoElapsedMinutes) =>
+        demoElapsedMinutes is >= 0 and <= 240
+        && (demoElapsedMinutes == 0 || _demoOffsetsAllowed);
+
+    private static bool CanBeginPrestage(RoomState room) =>
+        room.State == RoomStates.Available && room.PrestageStartedAt is null && room.SeatedAt is null;
+
+    private static bool CanSeat(RoomState room) =>
+        room.State == RoomStates.Prestaging && room.PrestageStartedAt is not null && room.SeatedAt is null;
 
     private static bool CanEditSeatedRoom(RoomState room) =>
         room.State is RoomStates.Seated or RoomStates.Aging or RoomStates.Stale or RoomStates.ReadyForDoctor;

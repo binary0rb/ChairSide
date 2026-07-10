@@ -23,7 +23,7 @@ public sealed class BoardStoreTests
         using var workspace = TestWorkspace.Create();
         var context = StoreContext.Create(workspace, environmentName: Environments.Production);
 
-        var seated = context.Store.SeatRoom(1, "otte", "CON");
+        var seated = SeatViaPrestage(context.Store, 1, "otte", "CON");
         Assert.NotNull(seated);
         Assert.Equal(RoomStates.Seated, seated.State);
 
@@ -43,7 +43,7 @@ public sealed class BoardStoreTests
         Assert.Equal(0, context.Store.GetReports().CompletedRoomCyclesCount);
         Assert.Null(context.Store.MarkDoctorArrived(1));
 
-        var reseated = context.Store.SeatRoom(1, "otte", "CON");
+        var reseated = SeatViaPrestage(context.Store, 1, "otte", "CON");
         Assert.NotNull(reseated);
 
         // Doctor Arrived must be blocked until Ready for Doctor is called
@@ -74,13 +74,423 @@ public sealed class BoardStoreTests
     }
 
     [Fact]
+    public void Begin_prestage_succeeds_only_from_available_and_captures_snapshot()
+    {
+        using var workspace = TestWorkspace.Create();
+        var now = new DateTimeOffset(2026, 7, 1, 9, 0, 0, TimeSpan.Zero);
+        var clock = new ManualTimeProvider(now);
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production, timeProvider: clock);
+
+        var prestaged = context.Store.BeginPrestage(1, "otte", "EXT", sedation: true, expectedAllocationUnits: 5);
+
+        Assert.NotNull(prestaged);
+        Assert.Equal(RoomStates.Prestaging, prestaged.State);
+        Assert.Equal("otte", prestaged.AssignedDoctor);
+        Assert.Equal("EXT+SED", prestaged.ProcedureCode);
+        Assert.Null(prestaged.SeatedAt);
+        Assert.Equal(3, prestaged.OriginalDefaultExpectedUnits);
+        Assert.Equal(5, prestaged.ExpectedAllocationUnits);
+        Assert.Equal(50, prestaged.ExpectedAllocationMinutes);
+        Assert.True(prestaged.AllocationAdjustedFromDefault);
+
+        var stored = context.Repository.LoadRooms(3).Single(room => room.RoomId == 1);
+        Assert.Equal(RoomStates.Prestaging, stored.State);
+        Assert.False(string.IsNullOrWhiteSpace(stored.EpisodeId));
+        Assert.Equal(now, stored.PrestageStartedAt);
+        Assert.Equal("otte", stored.AssignedDoctor);
+        Assert.Equal("EXT+SED", stored.ProcedureCode);
+        Assert.Equal(3, stored.OriginalDefaultExpectedUnits);
+        Assert.Equal(5, stored.ExpectedAllocationUnits);
+        Assert.Equal(50, stored.ExpectedAllocationMinutes);
+        Assert.True(stored.AllocationAdjustedFromDefault);
+
+        Assert.Null(context.Store.BeginPrestage(1, "pledger", "CON"));
+        var afterRejectedSecondBegin = context.Repository.LoadRooms(3).Single(room => room.RoomId == 1);
+        Assert.Equal(stored.EpisodeId, afterRejectedSecondBegin.EpisodeId);
+        Assert.Equal("otte", afterRejectedSecondBegin.AssignedDoctor);
+        Assert.Equal("EXT+SED", afterRejectedSecondBegin.ProcedureCode);
+    }
+
+    [Fact]
+    public void Begin_prestage_invalid_inputs_leave_room_unchanged()
+    {
+        using var workspace = TestWorkspace.Create();
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production);
+
+        Assert.Null(context.Store.BeginPrestage(1, "missing", "CON"));
+        Assert.Null(context.Store.BeginPrestage(1, "otte", "NOPE"));
+        Assert.Null(context.Store.BeginPrestage(1, "otte", "CON", sedation: true));
+
+        var unchanged = context.Repository.LoadRooms(3).Single(room => room.RoomId == 1);
+        Assert.Equal(RoomStates.Available, unchanged.State);
+        Assert.Null(unchanged.EpisodeId);
+        Assert.Null(unchanged.PrestageStartedAt);
+        Assert.Null(unchanged.AssignedDoctor);
+        Assert.Null(unchanged.ProcedureCode);
+
+        var invalidAllocationContext = StoreContext.Create(
+            workspace,
+            environmentName: Environments.Production,
+            databasePath: Path.Combine(workspace.DataRoot, "invalid-allocation.db"),
+            procedureRosterOptions: new ProcedureRosterOptions
+            {
+                Procedures =
+                [
+                    new()
+                    {
+                        Id = "bad-allocation",
+                        Code = "BAD",
+                        Label = "Bad allocation",
+                        Icon = "speech",
+                        Active = true,
+                        DefaultExpectedUnits = 0
+                    }
+                ]
+            });
+
+        Assert.Null(invalidAllocationContext.Store.BeginPrestage(1, "otte", "BAD"));
+        var afterInvalidAllocation = invalidAllocationContext.Repository.LoadRooms(3).Single(room => room.RoomId == 1);
+        Assert.Equal(RoomStates.Available, afterInvalidAllocation.State);
+        Assert.Null(afterInvalidAllocation.EpisodeId);
+        Assert.Null(afterInvalidAllocation.PrestageStartedAt);
+        Assert.Null(afterInvalidAllocation.AssignedDoctor);
+        Assert.Null(afterInvalidAllocation.ProcedureCode);
+    }
+
+    [Fact]
+    public void Prestaging_survives_store_restart_reconstruction()
+    {
+        using var workspace = TestWorkspace.Create();
+        var databasePath = workspace.ProductionDatabasePath();
+        var now = new DateTimeOffset(2026, 7, 1, 10, 0, 0, TimeSpan.Zero);
+        var clock = new ManualTimeProvider(now);
+
+        var first = StoreContext.Create(workspace, environmentName: Environments.Production, databasePath: databasePath, timeProvider: clock);
+        Assert.NotNull(first.Store.BeginPrestage(1, "otte", "CON"));
+        var persisted = first.Repository.LoadRooms(3).Single(room => room.RoomId == 1);
+
+        var second = StoreContext.Create(workspace, environmentName: Environments.Production, databasePath: databasePath, timeProvider: clock);
+        var reloadedStatus = second.Store.GetRoom(1);
+        var reloadedRoom = second.Repository.LoadRooms(3).Single(room => room.RoomId == 1);
+
+        Assert.NotNull(reloadedStatus);
+        Assert.Equal(RoomStates.Prestaging, reloadedStatus.State);
+        Assert.Equal(RoomStates.Prestaging, reloadedRoom.State);
+        Assert.Equal(persisted.EpisodeId, reloadedRoom.EpisodeId);
+        Assert.Equal(now, reloadedRoom.PrestageStartedAt);
+        Assert.Null(reloadedRoom.SeatedAt);
+    }
+
+    [Fact]
+    public void Seat_room_rejects_available_and_accepts_prestaging_without_replacing_snapshot()
+    {
+        using var workspace = TestWorkspace.Create();
+        var prestageAt = new DateTimeOffset(2026, 7, 1, 11, 0, 0, TimeSpan.Zero);
+        var seatAt = prestageAt.AddMinutes(6);
+        var clock = new ManualTimeProvider(prestageAt);
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production, timeProvider: clock);
+
+        Assert.Null(context.Store.SeatRoom(1));
+        Assert.Equal(RoomStates.Available, context.Store.GetRoom(1)?.State);
+
+        Assert.NotNull(context.Store.BeginPrestage(1, "otte", "EXT", sedation: true, expectedAllocationUnits: 5));
+        var beforeSeat = context.Repository.LoadRooms(3).Single(room => room.RoomId == 1);
+
+        clock.SetUtcNow(seatAt);
+        var seated = context.Store.SeatRoom(1);
+
+        Assert.NotNull(seated);
+        Assert.Equal(RoomStates.Seated, seated.State);
+        Assert.Equal(seatAt, seated.SeatedAt);
+
+        var afterSeat = context.Repository.LoadRooms(3).Single(room => room.RoomId == 1);
+        Assert.Equal(beforeSeat.EpisodeId, afterSeat.EpisodeId);
+        Assert.Equal(prestageAt, afterSeat.PrestageStartedAt);
+        Assert.Equal(seatAt, afterSeat.SeatedAt);
+        Assert.Equal("otte", afterSeat.AssignedDoctor);
+        Assert.Equal("EXT+SED", afterSeat.ProcedureCode);
+        Assert.Equal(3, afterSeat.OriginalDefaultExpectedUnits);
+        Assert.Equal(5, afterSeat.ExpectedAllocationUnits);
+        Assert.Equal(50, afterSeat.ExpectedAllocationMinutes);
+        Assert.True(afterSeat.AllocationAdjustedFromDefault);
+    }
+
+    [Fact]
+    public void Fixed_clock_new_episodes_receive_distinct_episode_ids()
+    {
+        using var workspace = TestWorkspace.Create();
+        var now = new DateTimeOffset(2026, 7, 1, 12, 0, 0, TimeSpan.Zero);
+        var clock = new ManualTimeProvider(now);
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production, timeProvider: clock);
+
+        Assert.NotNull(context.Store.BeginPrestage(1, "otte", "CON"));
+        Assert.NotNull(context.Store.BeginPrestage(2, "pledger", "EXT"));
+
+        var rooms = context.Repository.LoadRooms(3);
+        var room1Episode = rooms.Single(room => room.RoomId == 1).EpisodeId;
+        var room2Episode = rooms.Single(room => room.RoomId == 2).EpisodeId;
+
+        Assert.False(string.IsNullOrWhiteSpace(room1Episode));
+        Assert.False(string.IsNullOrWhiteSpace(room2Episode));
+        Assert.NotEqual(room1Episode, room2Episode);
+    }
+
+    [Fact]
+    public void Development_demo_offset_shifts_prestage_and_seated_timestamps_together()
+    {
+        using var workspace = TestWorkspace.Create();
+        var prestageAt = new DateTimeOffset(2026, 7, 1, 13, 0, 0, TimeSpan.Zero);
+        var seatAt = prestageAt.AddMinutes(4);
+        var clock = new ManualTimeProvider(prestageAt);
+        var context = StoreContext.Create(workspace, environmentName: Environments.Development, timeProvider: clock);
+
+        Assert.NotNull(context.Store.BeginPrestage(1, "otte", "CON"));
+        clock.SetUtcNow(seatAt);
+
+        var seated = context.Store.SeatRoom(1, demoElapsedMinutes: 15);
+
+        Assert.NotNull(seated);
+        var stored = context.Repository.LoadRooms(3).Single(room => room.RoomId == 1);
+        Assert.Equal(prestageAt.AddMinutes(-15), stored.PrestageStartedAt);
+        Assert.Equal(seatAt.AddMinutes(-15), stored.SeatedAt);
+        Assert.Equal(TimeSpan.FromMinutes(4), stored.SeatedAt!.Value - stored.PrestageStartedAt!.Value);
+    }
+
+    [Fact]
+    public void Development_negative_demo_offset_is_rejected_without_mutating_room()
+    {
+        using var workspace = TestWorkspace.Create();
+        var databasePath = Path.Combine(workspace.DataRoot, "negative-demo-offset.db");
+        var prestageAt = new DateTimeOffset(2026, 7, 1, 13, 30, 0, TimeSpan.Zero);
+        var clock = new ManualTimeProvider(prestageAt);
+        var context = StoreContext.Create(
+            workspace,
+            environmentName: Environments.Development,
+            databasePath: databasePath,
+            timeProvider: clock);
+
+        Assert.NotNull(context.Store.BeginPrestage(1, "otte", "CON"));
+        var before = context.Repository.LoadRooms(3).Single(room => room.RoomId == 1);
+        clock.SetUtcNow(prestageAt.AddMinutes(3));
+
+        Assert.Null(context.Store.SeatRoom(1, demoElapsedMinutes: -1));
+
+        var after = context.Repository.LoadRooms(3).Single(room => room.RoomId == 1);
+        AssertSameRoomState(before, after);
+
+        var reloaded = StoreContext.Create(
+            workspace,
+            environmentName: Environments.Development,
+            databasePath: databasePath,
+            timeProvider: clock);
+        AssertSameRoomState(before, reloaded.Repository.LoadRooms(3).Single(room => room.RoomId == 1));
+    }
+
+    [Fact]
+    public void Development_demo_offset_above_maximum_is_rejected_without_mutating_room()
+    {
+        using var workspace = TestWorkspace.Create();
+        var databasePath = Path.Combine(workspace.DataRoot, "oversized-demo-offset.db");
+        var prestageAt = new DateTimeOffset(2026, 7, 1, 13, 45, 0, TimeSpan.Zero);
+        var clock = new ManualTimeProvider(prestageAt);
+        var context = StoreContext.Create(
+            workspace,
+            environmentName: Environments.Development,
+            databasePath: databasePath,
+            timeProvider: clock);
+
+        Assert.NotNull(context.Store.BeginPrestage(1, "otte", "CON"));
+        var before = context.Repository.LoadRooms(3).Single(room => room.RoomId == 1);
+        clock.SetUtcNow(prestageAt.AddMinutes(3));
+
+        Assert.Null(context.Store.SeatRoom(1, demoElapsedMinutes: 241));
+
+        var after = context.Repository.LoadRooms(3).Single(room => room.RoomId == 1);
+        AssertSameRoomState(before, after);
+
+        var reloaded = StoreContext.Create(
+            workspace,
+            environmentName: Environments.Development,
+            databasePath: databasePath,
+            timeProvider: clock);
+        AssertSameRoomState(before, reloaded.Repository.LoadRooms(3).Single(room => room.RoomId == 1));
+    }
+
+    [Fact]
+    public void Production_demo_offset_is_rejected_before_state_derivation_or_mutation()
+    {
+        using var workspace = TestWorkspace.Create();
+        var databasePath = workspace.ProductionDatabasePath();
+        var prestageAt = new DateTimeOffset(2026, 7, 1, 14, 0, 0, TimeSpan.Zero);
+        var seatAt = prestageAt.AddMinutes(3);
+        var clock = new ManualTimeProvider(prestageAt);
+        var context = StoreContext.Create(
+            workspace,
+            environmentName: Environments.Production,
+            databasePath: databasePath,
+            boardUiOptions: new BoardUiOptions { DemoTimerEnabled = true },
+            timeProvider: clock);
+
+        Assert.NotNull(context.Store.BeginPrestage(1, "otte", "CON"));
+        var persistedBefore = context.Repository.LoadRooms(3).Single(room => room.RoomId == 1);
+
+        var roomsField = typeof(DemoBoardStore).GetField(
+            "_rooms",
+            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+        var inMemoryRooms = Assert.IsType<List<RoomState>>(roomsField?.GetValue(context.Store));
+        var inMemoryRoom = inMemoryRooms.Single(room => room.RoomId == 1);
+        var sentinelAgingAt = prestageAt.AddMinutes(-2);
+        var sentinelStaleAt = prestageAt.AddMinutes(-1);
+        inMemoryRoom.State = RoomStates.Available;
+        inMemoryRoom.AgingStartedAt = sentinelAgingAt;
+        inMemoryRoom.StaleStartedAt = sentinelStaleAt;
+
+        clock.SetUtcNow(seatAt);
+
+        Assert.Null(context.Store.SeatRoom(1, demoElapsedMinutes: 15));
+        Assert.Equal(RoomStates.Available, inMemoryRoom.State);
+        Assert.Equal(sentinelAgingAt, inMemoryRoom.AgingStartedAt);
+        Assert.Equal(sentinelStaleAt, inMemoryRoom.StaleStartedAt);
+        Assert.Null(inMemoryRoom.SeatedAt);
+
+        var persistedAfter = context.Repository.LoadRooms(3).Single(room => room.RoomId == 1);
+        AssertSameRoomState(persistedBefore, persistedAfter);
+
+        var reloaded = StoreContext.Create(
+            workspace,
+            environmentName: Environments.Production,
+            databasePath: databasePath,
+            timeProvider: clock);
+        AssertSameRoomState(persistedBefore, reloaded.Repository.LoadRooms(3).Single(room => room.RoomId == 1));
+    }
+
+    [Fact]
+    public void Development_demo_offset_boundaries_zero_and_240_are_applied_without_clamping()
+    {
+        using var workspace = TestWorkspace.Create();
+        var prestageAt = new DateTimeOffset(2026, 7, 1, 14, 30, 0, TimeSpan.Zero);
+        var seatAt = prestageAt.AddMinutes(5);
+        var zeroClock = new ManualTimeProvider(prestageAt);
+        var maximumClock = new ManualTimeProvider(prestageAt);
+        var zeroContext = StoreContext.Create(
+            workspace,
+            environmentName: Environments.Development,
+            databasePath: Path.Combine(workspace.DataRoot, "zero-demo-offset.db"),
+            timeProvider: zeroClock);
+        var maximumContext = StoreContext.Create(
+            workspace,
+            environmentName: Environments.Development,
+            databasePath: Path.Combine(workspace.DataRoot, "maximum-demo-offset.db"),
+            timeProvider: maximumClock);
+
+        Assert.NotNull(zeroContext.Store.BeginPrestage(1, "otte", "CON"));
+        Assert.NotNull(maximumContext.Store.BeginPrestage(1, "pledger", "EXT"));
+        zeroClock.SetUtcNow(seatAt);
+        maximumClock.SetUtcNow(seatAt);
+
+        Assert.NotNull(zeroContext.Store.SeatRoom(1, demoElapsedMinutes: 0));
+        Assert.NotNull(maximumContext.Store.SeatRoom(1, demoElapsedMinutes: 240));
+
+        var zeroOffsetRoom = zeroContext.Repository.LoadRooms(3).Single(room => room.RoomId == 1);
+        var maximumOffsetRoom = maximumContext.Repository.LoadRooms(3).Single(room => room.RoomId == 1);
+        Assert.Equal(prestageAt, zeroOffsetRoom.PrestageStartedAt);
+        Assert.Equal(seatAt, zeroOffsetRoom.SeatedAt);
+        Assert.Equal(prestageAt.AddMinutes(-240), maximumOffsetRoom.PrestageStartedAt);
+        Assert.Equal(seatAt.AddMinutes(-240), maximumOffsetRoom.SeatedAt);
+        Assert.Equal(
+            zeroOffsetRoom.SeatedAt!.Value - zeroOffsetRoom.PrestageStartedAt!.Value,
+            maximumOffsetRoom.SeatedAt!.Value - maximumOffsetRoom.PrestageStartedAt!.Value);
+    }
+
+    [Fact]
+    public void Legacy_active_rows_without_episode_or_prestage_continue_normally()
+    {
+        using var workspace = TestWorkspace.Create();
+        var databasePath = workspace.ProductionDatabasePath();
+        var now = new DateTimeOffset(2026, 7, 1, 15, 0, 0, TimeSpan.Zero);
+        var seatedAt = now.AddMinutes(-10);
+        var readyAt = now.AddMinutes(-2);
+
+        var seed = StoreContext.Create(workspace, environmentName: Environments.Production, databasePath: databasePath);
+        seed.Repository.SaveRooms(
+            [
+                new RoomState(1)
+                {
+                    AssignedDoctor = "otte",
+                    ProcedureCode = "CON",
+                    State = RoomStates.Seated,
+                    SeatedAt = seatedAt
+                },
+                new RoomState(2)
+                {
+                    AssignedDoctor = "pledger",
+                    ProcedureCode = "EXT",
+                    State = RoomStates.ReadyForDoctor,
+                    SeatedAt = seatedAt,
+                    ReadyForDoctorAt = readyAt
+                }
+            ],
+            seed.Doctors,
+            seed.Procedures);
+
+        var clock = new ManualTimeProvider(now);
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production, databasePath: databasePath, timeProvider: clock);
+
+        var seated = context.Store.GetRoom(1);
+        var ready = context.Store.GetRoom(2);
+        Assert.NotNull(seated);
+        Assert.NotNull(ready);
+        Assert.Equal(RoomStates.Seated, seated.State);
+        Assert.Equal(RoomStates.ReadyForDoctor, ready.State);
+
+        var storedRooms = context.Repository.LoadRooms(3);
+        Assert.Null(storedRooms.Single(room => room.RoomId == 1).EpisodeId);
+        Assert.Null(storedRooms.Single(room => room.RoomId == 1).PrestageStartedAt);
+        Assert.Null(storedRooms.Single(room => room.RoomId == 2).EpisodeId);
+        Assert.Null(storedRooms.Single(room => room.RoomId == 2).PrestageStartedAt);
+
+        Assert.NotNull(context.Store.MarkReadyForDoctor(1));
+        Assert.NotNull(context.Store.MarkDoctorArrived(2));
+    }
+
+    [Fact]
+    public void Normally_completed_new_episode_persists_episode_id_and_prestage_started_at()
+    {
+        using var workspace = TestWorkspace.Create();
+        var databasePath = workspace.ProductionDatabasePath();
+        var prestageAt = new DateTimeOffset(2026, 7, 1, 16, 0, 0, TimeSpan.Zero);
+        var clock = new ManualTimeProvider(prestageAt);
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production, databasePath: databasePath, timeProvider: clock);
+
+        Assert.NotNull(context.Store.BeginPrestage(1, "otte", "CON"));
+        var activeEpisode = context.Repository.LoadRooms(3).Single(room => room.RoomId == 1).EpisodeId;
+        clock.SetUtcNow(prestageAt.AddMinutes(5));
+        Assert.NotNull(context.Store.SeatRoom(1));
+        clock.SetUtcNow(prestageAt.AddMinutes(8));
+        Assert.NotNull(context.Store.MarkReadyForDoctor(1));
+        clock.SetUtcNow(prestageAt.AddMinutes(12));
+        Assert.NotNull(context.Store.MarkDoctorArrived(1));
+        Assert.NotNull(context.Store.MarkDoctorComplete(1));
+        Assert.NotNull(context.Store.MarkRoomAvailable(1));
+
+        var cycle = Assert.Single(context.Repository.LoadCompletedCycles());
+        Assert.Equal(activeEpisode, cycle.EpisodeId);
+        Assert.Equal(prestageAt, cycle.PrestageStartedAt);
+
+        var reloaded = StoreContext.Create(workspace, environmentName: Environments.Production, databasePath: databasePath);
+        var reloadedCycle = Assert.Single(reloaded.Repository.LoadCompletedCycles());
+        Assert.Equal(activeEpisode, reloadedCycle.EpisodeId);
+        Assert.Equal(prestageAt, reloadedCycle.PrestageStartedAt);
+    }
+
+    [Fact]
     public void Active_seated_room_survives_store_restart()
     {
         using var workspace = TestWorkspace.Create();
         var databasePath = workspace.ProductionDatabasePath();
 
         var first = StoreContext.Create(workspace, environmentName: Environments.Production, databasePath: databasePath);
-        var seated = first.Store.SeatRoom(1, "otte", "CON");
+        var seated = SeatViaPrestage(first.Store, 1, "otte", "CON");
         Assert.NotNull(seated);
 
         var second = StoreContext.Create(workspace, environmentName: Environments.Production, databasePath: databasePath);
@@ -100,7 +510,7 @@ public sealed class BoardStoreTests
         var databasePath = workspace.ProductionDatabasePath();
 
         var first = StoreContext.Create(workspace, environmentName: Environments.Production, databasePath: databasePath);
-        Assert.NotNull(first.Store.SeatRoom(1, "otte", "CON"));
+        Assert.NotNull(SeatViaPrestage(first.Store, 1, "otte", "CON"));
         Assert.NotNull(first.Store.MarkReadyForDoctor(1));
         Assert.NotNull(first.Store.MarkDoctorArrived(1));
         Assert.NotNull(first.Store.MarkDoctorComplete(1));
@@ -130,7 +540,7 @@ public sealed class BoardStoreTests
             agingMinutes: 1,
             staleMinutes: 2,
             boardUiOptions: new BoardUiOptions { DemoTimerEnabled = true });
-        Assert.NotNull(first.Store.SeatRoom(1, "otte", "CON"));
+        Assert.NotNull(SeatViaPrestage(first.Store, 1, "otte", "CON"));
         Assert.NotNull(first.Store.MarkReadyForDoctor(1));
 
         // Patch the DB to simulate a stale-elapsed ready_for_doctor_at.
@@ -188,7 +598,7 @@ public sealed class BoardStoreTests
             databasePath: databasePath,
             agingMinutes: 1,
             staleMinutes: 2);
-        Assert.NotNull(first.Store.SeatRoom(1, "otte", "CON", demoElapsedMinutes: 3));
+        Assert.NotNull(SeatViaPrestage(first.Store, 1, "otte", "CON"));
         Assert.NotNull(first.Store.MarkReadyForDoctor(1));
         Assert.NotNull(first.Store.MarkDoctorArrived(1));
 
@@ -218,7 +628,7 @@ public sealed class BoardStoreTests
         var clock = new ManualTimeProvider(now);
         var context = StoreContext.Create(workspace, environmentName: Environments.Production, timeProvider: clock);
 
-        Assert.NotNull(context.Store.SeatRoom(1, "otte", "CON"));
+        Assert.NotNull(SeatViaPrestage(context.Store, 1, "otte", "CON"));
         clock.SetUtcNow(now.AddMinutes(5));
         Assert.NotNull(context.Store.MarkReadyForDoctor(1));
         Assert.NotNull(context.Store.MarkDoctorArrived(1));
@@ -239,7 +649,7 @@ public sealed class BoardStoreTests
         using var workspace = TestWorkspace.Create();
         var context = StoreContext.Create(workspace, environmentName: Environments.Production);
 
-        var seated = context.Store.SeatRoom(1, "otte", "CON");
+        var seated = SeatViaPrestage(context.Store, 1, "otte", "CON");
         Assert.NotNull(seated);
         Assert.NotNull(seated.SeatedAt);
 
@@ -276,7 +686,7 @@ public sealed class BoardStoreTests
             staleMinutes: 12,
             timeProvider: clock);
 
-        Assert.NotNull(context.Store.SeatRoom(1, "otte", "CON"));
+        Assert.NotNull(SeatViaPrestage(context.Store, 1, "otte", "CON"));
         clock.SetUtcNow(now.AddMinutes(elapsedMinutes).AddSeconds(elapsedSeconds));
 
         var room = context.Store.GetRoom(1);
@@ -310,7 +720,7 @@ public sealed class BoardStoreTests
             staleMinutes: 12,
             timeProvider: clock);
 
-        Assert.NotNull(context.Store.SeatRoom(1, "otte", "CON"));
+        Assert.NotNull(SeatViaPrestage(context.Store, 1, "otte", "CON"));
         Assert.NotNull(context.Store.MarkReadyForDoctor(1));
         clock.SetUtcNow(now.AddMinutes(elapsedMinutes).AddSeconds(elapsedSeconds));
 
@@ -447,7 +857,7 @@ public sealed class BoardStoreTests
         var context = StoreContext.Create(workspace, environmentName: Environments.Production);
 
         // EXT default is 3 units (30 minutes).
-        var seated = context.Store.SeatRoom(1, "otte", "EXT");
+        var seated = SeatViaPrestage(context.Store, 1, "otte", "EXT");
         Assert.NotNull(seated);
         Assert.Equal(3, seated.OriginalDefaultExpectedUnits);
         Assert.Equal(3, seated.ExpectedAllocationUnits);
@@ -461,7 +871,7 @@ public sealed class BoardStoreTests
         using var workspace = TestWorkspace.Create();
         var context = StoreContext.Create(workspace, environmentName: Environments.Production);
 
-        var seated = context.Store.SeatRoom(1, "otte", "EXT", expectedAllocationUnits: 5);
+        var seated = SeatViaPrestage(context.Store, 1, "otte", "EXT", expectedAllocationUnits: 5);
         Assert.NotNull(seated);
         Assert.Equal(3, seated.OriginalDefaultExpectedUnits);
         Assert.Equal(5, seated.ExpectedAllocationUnits);
@@ -476,7 +886,7 @@ public sealed class BoardStoreTests
         var context = StoreContext.Create(workspace, environmentName: Environments.Production);
 
         // Explicitly supplying the default value is not an adjustment.
-        var seated = context.Store.SeatRoom(1, "otte", "EXT", expectedAllocationUnits: 3);
+        var seated = SeatViaPrestage(context.Store, 1, "otte", "EXT", expectedAllocationUnits: 3);
         Assert.NotNull(seated);
         Assert.Equal(3, seated.ExpectedAllocationUnits);
         Assert.Equal(30, seated.ExpectedAllocationMinutes);
@@ -489,7 +899,7 @@ public sealed class BoardStoreTests
         using var workspace = TestWorkspace.Create();
         var context = StoreContext.Create(workspace, environmentName: Environments.Production);
 
-        var seated = context.Store.SeatRoom(1, "otte", "IMP", expectedAllocationUnits: 4);
+        var seated = SeatViaPrestage(context.Store, 1, "otte", "IMP", expectedAllocationUnits: 4);
         Assert.NotNull(seated);
         Assert.Equal(6, seated.OriginalDefaultExpectedUnits);
         Assert.Equal(4, seated.ExpectedAllocationUnits);
@@ -504,7 +914,7 @@ public sealed class BoardStoreTests
         var context = StoreContext.Create(workspace, environmentName: Environments.Production);
 
         // Explicit 0 must not produce a 0-minute expected allocation.
-        var seated = context.Store.SeatRoom(1, "otte", "EXT", expectedAllocationUnits: 0);
+        var seated = SeatViaPrestage(context.Store, 1, "otte", "EXT", expectedAllocationUnits: 0);
         Assert.NotNull(seated);
         Assert.Equal(1, seated.ExpectedAllocationUnits);
         Assert.Equal(10, seated.ExpectedAllocationMinutes);
@@ -518,7 +928,7 @@ public sealed class BoardStoreTests
         using var workspace = TestWorkspace.Create();
         var context = StoreContext.Create(workspace, environmentName: Environments.Production);
 
-        var seated = context.Store.SeatRoom(1, "otte", "EXT", expectedAllocationUnits: -5);
+        var seated = SeatViaPrestage(context.Store, 1, "otte", "EXT", expectedAllocationUnits: -5);
         Assert.NotNull(seated);
         Assert.Equal(1, seated.ExpectedAllocationUnits);
         Assert.Equal(10, seated.ExpectedAllocationMinutes);
@@ -530,7 +940,7 @@ public sealed class BoardStoreTests
         using var workspace = TestWorkspace.Create();
         var context = StoreContext.Create(workspace, environmentName: Environments.Production);
 
-        var seated = context.Store.SeatRoom(1, "otte", "EXT", expectedAllocationUnits: 100);
+        var seated = SeatViaPrestage(context.Store, 1, "otte", "EXT", expectedAllocationUnits: 100);
         Assert.NotNull(seated);
         Assert.Equal(24, seated.ExpectedAllocationUnits);
         Assert.Equal(240, seated.ExpectedAllocationMinutes);
@@ -543,7 +953,7 @@ public sealed class BoardStoreTests
         using var workspace = TestWorkspace.Create();
         var context = StoreContext.Create(workspace, environmentName: Environments.Production);
 
-        Assert.NotNull(context.Store.SeatRoom(1, "otte", "IMP", expectedAllocationUnits: 7));
+        Assert.NotNull(SeatViaPrestage(context.Store, 1, "otte", "IMP", expectedAllocationUnits: 7));
         Assert.NotNull(context.Store.MarkReadyForDoctor(1));
         Assert.NotNull(context.Store.MarkDoctorArrived(1));
         Assert.NotNull(context.Store.MarkDoctorComplete(1));
@@ -563,7 +973,7 @@ public sealed class BoardStoreTests
         var databasePath = workspace.ProductionDatabasePath();
 
         var first = StoreContext.Create(workspace, environmentName: Environments.Production, databasePath: databasePath);
-        Assert.NotNull(first.Store.SeatRoom(1, "otte", "EXT", expectedAllocationUnits: 5));
+        Assert.NotNull(SeatViaPrestage(first.Store, 1, "otte", "EXT", expectedAllocationUnits: 5));
 
         var second = StoreContext.Create(workspace, environmentName: Environments.Production, databasePath: databasePath);
         var reloaded = second.Store.GetRoom(1);
@@ -582,7 +992,7 @@ public sealed class BoardStoreTests
         var databasePath = workspace.ProductionDatabasePath();
 
         var first = StoreContext.Create(workspace, environmentName: Environments.Production, databasePath: databasePath);
-        Assert.NotNull(first.Store.SeatRoom(1, "otte", "IMP", expectedAllocationUnits: 9));
+        Assert.NotNull(SeatViaPrestage(first.Store, 1, "otte", "IMP", expectedAllocationUnits: 9));
         Assert.NotNull(first.Store.MarkReadyForDoctor(1));
         Assert.NotNull(first.Store.MarkDoctorArrived(1));
         Assert.NotNull(first.Store.MarkDoctorComplete(1));
@@ -604,7 +1014,7 @@ public sealed class BoardStoreTests
         var context = StoreContext.Create(workspace, environmentName: Environments.Production);
 
         // The sedation modifier does not change which roster default applies.
-        var seated = context.Store.SeatRoom(1, "otte", "EXT", sedation: true);
+        var seated = SeatViaPrestage(context.Store, 1, "otte", "EXT", sedation: true);
         Assert.NotNull(seated);
         Assert.Equal("EXT+SED", seated.ProcedureCode);
         Assert.Equal(3, seated.OriginalDefaultExpectedUnits);
@@ -641,9 +1051,9 @@ public sealed class BoardStoreTests
 
         Assert.Equal(["active"], snapshot.Doctors.Select(doctor => doctor.Id));
         Assert.Equal(["ACT"], snapshot.Procedures.Select(procedure => procedure.Code));
-        Assert.Null(context.Store.SeatRoom(1, "inactive", "ACT"));
-        Assert.Null(context.Store.SeatRoom(1, "active", "OFF"));
-        var seated = context.Store.SeatRoom(1, "active", "ACT");
+        Assert.Null(SeatViaPrestage(context.Store, 1, "inactive", "ACT"));
+        Assert.Null(SeatViaPrestage(context.Store, 1, "active", "OFF"));
+        var seated = SeatViaPrestage(context.Store, 1, "active", "ACT");
         Assert.NotNull(seated);
         Assert.Equal("ACT", seated.ProcedureCode);
         Assert.Equal("ACT", seated.Procedure?.Code);
@@ -660,9 +1070,9 @@ public sealed class BoardStoreTests
         Assert.DoesNotContain("SED", snapshot.Procedures.Select(procedure => procedure.Code));
 
         // Standalone sedation is not seatable, by code or by id, for new seating or updates.
-        Assert.Null(context.Store.SeatRoom(1, "otte", "SED"));
-        Assert.Null(context.Store.SeatRoom(1, "otte", "sedation"));
-        Assert.NotNull(context.Store.SeatRoom(1, "otte", "EXT"));
+        Assert.Null(SeatViaPrestage(context.Store, 1, "otte", "SED"));
+        Assert.Null(SeatViaPrestage(context.Store, 1, "otte", "sedation"));
+        Assert.NotNull(SeatViaPrestage(context.Store, 1, "otte", "EXT"));
         Assert.Null(context.Store.UpdateAssignment(1, "otte", "SED"));
     }
 
@@ -673,7 +1083,7 @@ public sealed class BoardStoreTests
         var context = StoreContext.Create(workspace, environmentName: Environments.Production);
 
         // Sedation defaults Off: an eligible procedure seated without the flag is the base case.
-        var seated = context.Store.SeatRoom(1, "otte", "EXT");
+        var seated = SeatViaPrestage(context.Store, 1, "otte", "EXT");
         Assert.NotNull(seated);
         Assert.Equal("EXT", seated.ProcedureCode);
         Assert.Equal("EXT", seated.Procedure?.Code);
@@ -686,7 +1096,7 @@ public sealed class BoardStoreTests
         using var workspace = TestWorkspace.Create();
         var context = StoreContext.Create(workspace, environmentName: Environments.Production);
 
-        var seated = context.Store.SeatRoom(1, "otte", "EXT", sedation: true);
+        var seated = SeatViaPrestage(context.Store, 1, "otte", "EXT", sedation: true);
         Assert.NotNull(seated);
         // Base procedure, sedation flag, and combined case type are all derivable from the code.
         Assert.Equal("EXT+SED", seated.ProcedureCode);
@@ -702,7 +1112,7 @@ public sealed class BoardStoreTests
         var context = StoreContext.Create(workspace, environmentName: Environments.Production);
 
         // All on Four is a newly added, sedation-eligible procedure.
-        var seated = context.Store.SeatRoom(1, "otte", "AO4", sedation: true);
+        var seated = SeatViaPrestage(context.Store, 1, "otte", "AO4", sedation: true);
         Assert.NotNull(seated);
         Assert.Equal("AO4+SED", seated.ProcedureCode);
         Assert.Equal("AO4+SED", seated.Procedure?.Code);
@@ -745,10 +1155,10 @@ public sealed class BoardStoreTests
         var context = StoreContext.Create(workspace, environmentName: Environments.Production);
 
         // Consult is not sedation-eligible, so it can never be marked as a sedation case.
-        Assert.Null(context.Store.SeatRoom(1, "otte", "CON", sedation: true));
+        Assert.Null(SeatViaPrestage(context.Store, 1, "otte", "CON", sedation: true));
 
         // The same procedure remains seatable without sedation.
-        var seated = context.Store.SeatRoom(1, "otte", "CON");
+        var seated = SeatViaPrestage(context.Store, 1, "otte", "CON");
         Assert.NotNull(seated);
         Assert.Equal("CON", seated.ProcedureCode);
     }
@@ -759,7 +1169,7 @@ public sealed class BoardStoreTests
         using var workspace = TestWorkspace.Create();
         var context = StoreContext.Create(workspace, environmentName: Environments.Production);
 
-        Assert.NotNull(context.Store.SeatRoom(1, "otte", "IMP"));
+        Assert.NotNull(SeatViaPrestage(context.Store, 1, "otte", "IMP"));
 
         var withSedation = context.Store.UpdateAssignment(1, "otte", "IMP", sedation: true);
         Assert.NotNull(withSedation);
@@ -921,7 +1331,7 @@ public sealed class BoardStoreTests
 
         // An incomplete cycle (never reaches Room Available) must not count either.
         clock.SetUtcNow(baseTime.AddHours(5));
-        Assert.NotNull(context.Store.SeatRoom(3, "otte", "IMP"));
+        Assert.NotNull(SeatViaPrestage(context.Store, 3, "otte", "IMP"));
         clock.SetUtcNow(baseTime.AddHours(5).AddMinutes(5));
         Assert.NotNull(context.Store.MarkReadyForDoctor(3));
 
@@ -1059,7 +1469,7 @@ public sealed class BoardStoreTests
         var clock = new ManualTimeProvider(baseTime);
         var context = StoreContext.Create(workspace, environmentName: Environments.Production, timeProvider: clock);
 
-        Assert.NotNull(context.Store.SeatRoom(1, "otte", "EXT", expectedAllocationUnits: 3));
+        Assert.NotNull(SeatViaPrestage(context.Store, 1, "otte", "EXT", expectedAllocationUnits: 3));
         clock.SetUtcNow(baseTime.AddMinutes(5));   // Ready for Doctor: prep = 5 min
         Assert.NotNull(context.Store.MarkReadyForDoctor(1));
         clock.SetUtcNow(baseTime.AddMinutes(15));  // Doctor Arrived: ready-to-doctor = 10 min, seated-to-doctor = 15 min
@@ -1098,7 +1508,7 @@ public sealed class BoardStoreTests
         var clock = new ManualTimeProvider(baseTime);
         var context = StoreContext.Create(workspace, environmentName: Environments.Production, timeProvider: clock);
 
-        Assert.NotNull(context.Store.SeatRoom(1, "otte", "EXT", expectedAllocationUnits: 3));
+        Assert.NotNull(SeatViaPrestage(context.Store, 1, "otte", "EXT", expectedAllocationUnits: 3));
         clock.SetUtcNow(baseTime.AddMinutes(5));
         Assert.NotNull(context.Store.MarkReadyForDoctor(1));
         clock.SetUtcNow(baseTime.AddMinutes(15));
@@ -1446,7 +1856,7 @@ public sealed class BoardStoreTests
         var context = StoreContext.Create(workspace, environmentName: Environments.Production, timeProvider: clock);
 
         // Drive only as far as Doctor Arrived: a cycle exists but DoctorCompleteAt is still null.
-        Assert.NotNull(context.Store.SeatRoom(1, "otte", "EXT"));
+        Assert.NotNull(SeatViaPrestage(context.Store, 1, "otte", "EXT"));
         clock.SetUtcNow(baseTime.AddMinutes(5));
         Assert.NotNull(context.Store.MarkReadyForDoctor(1));
         clock.SetUtcNow(baseTime.AddMinutes(15));
@@ -1817,7 +2227,7 @@ public sealed class BoardStoreTests
     {
         using var workspace = TestWorkspace.Create();
         var context = StoreContext.Create(workspace, environmentName: Environments.Production);
-        Assert.NotNull(context.Store.SeatRoom(1, "otte", "CON"));
+        Assert.NotNull(SeatViaPrestage(context.Store, 1, "otte", "CON"));
         Assert.NotNull(context.Store.MarkReadyForDoctor(1));
         Assert.NotNull(context.Store.MarkDoctorArrived(1));
         Assert.NotNull(context.Store.MarkDoctorComplete(1));
@@ -1841,7 +2251,7 @@ public sealed class BoardStoreTests
     {
         using var workspace = TestWorkspace.Create();
         var context = StoreContext.Create(workspace, environmentName: Environments.Production);
-        var seated = context.Store.SeatRoom(1, "otte", "CON");
+        var seated = SeatViaPrestage(context.Store, 1, "otte", "CON");
         Assert.NotNull(seated);
         Assert.NotNull(context.Store.MarkReadyForDoctor(1));
         Assert.NotNull(context.Store.MarkDoctorArrived(1));
@@ -1953,7 +2363,7 @@ public sealed class BoardStoreTests
         var context = StoreContext.Create(workspace, environmentName: Environments.Production);
 
         // Put room 1 into a non-Available state so the reset is observable.
-        Assert.NotNull(context.Store.SeatRoom(1, "otte", "CON"));
+        Assert.NotNull(SeatViaPrestage(context.Store, 1, "otte", "CON"));
 
         var record = NewAbortedAssignment(
             "episode-d", roomId: 1,
@@ -2195,7 +2605,7 @@ public sealed class BoardStoreTests
         var validator = CreateBindingValidator(enabled: false);
 
         Assert.Equal(RoomDeviceTokenValidationResult.Disabled, validator.Validate(1, token: null));
-        Assert.NotNull(context.Store.SeatRoom(1, "otte", "CON"));
+        Assert.NotNull(SeatViaPrestage(context.Store, 1, "otte", "CON"));
     }
 
     [Fact]
@@ -2657,7 +3067,7 @@ public sealed class BoardStoreTests
         using var workspace = TestWorkspace.Create();
         var context = StoreContext.Create(workspace, environmentName: Environments.Production);
 
-        var seated = context.Store.SeatRoom(1, "otte", "CON");
+        var seated = SeatViaPrestage(context.Store, 1, "otte", "CON");
         Assert.NotNull(seated);
         Assert.Equal(RoomStates.Seated, seated.State);
 
@@ -2677,7 +3087,7 @@ public sealed class BoardStoreTests
         Assert.Equal(RoomStates.Available, canceled.State);
 
         // Re-seat and go through to DoctorInRoom
-        Assert.NotNull(context.Store.SeatRoom(1, "otte", "CON"));
+        Assert.NotNull(SeatViaPrestage(context.Store, 1, "otte", "CON"));
         Assert.NotNull(context.Store.MarkReadyForDoctor(1));
 
         var arrived = context.Store.MarkDoctorArrived(1);
@@ -2702,7 +3112,7 @@ public sealed class BoardStoreTests
             timeProvider: clock);
 
         // Seat and mark ready, then advance past aging threshold
-        Assert.NotNull(context.Store.SeatRoom(1, "otte", "CON"));
+        Assert.NotNull(SeatViaPrestage(context.Store, 1, "otte", "CON"));
         Assert.NotNull(context.Store.MarkReadyForDoctor(1));
         clock.SetUtcNow(now.AddMinutes(8)); // past aging (7) but before stale (12)
 
@@ -2733,7 +3143,7 @@ public sealed class BoardStoreTests
         var clock = new ManualTimeProvider(now);
         var context = StoreContext.Create(workspace, environmentName: Environments.Production, timeProvider: clock);
 
-        Assert.NotNull(context.Store.SeatRoom(1, "otte", "CON"));
+        Assert.NotNull(SeatViaPrestage(context.Store, 1, "otte", "CON"));
         clock.SetUtcNow(now.AddMinutes(15)); // 15 min prep
         Assert.NotNull(context.Store.MarkReadyForDoctor(1));
         clock.SetUtcNow(now.AddMinutes(20)); // 5 min doctor response
@@ -2765,7 +3175,7 @@ public sealed class BoardStoreTests
 
         for (var i = 0; i < 110; i++)
         {
-            Assert.NotNull(context.Store.SeatRoom(1, "otte", "CON"));
+            Assert.NotNull(SeatViaPrestage(context.Store, 1, "otte", "CON"));
             Assert.NotNull(context.Store.CancelSeating(1));
         }
 
@@ -2798,7 +3208,7 @@ public sealed class BoardStoreTests
     }
 
     [Fact]
-    public void Demo_elapsed_is_applied_only_when_demo_timer_is_enabled()
+    public void Zero_demo_elapsed_uses_current_time_regardless_of_demo_timer_visibility()
     {
         using var workspace = TestWorkspace.Create();
         var now = new DateTimeOffset(2026, 5, 31, 12, 0, 0, TimeSpan.Zero);
@@ -2817,14 +3227,12 @@ public sealed class BoardStoreTests
             boardUiOptions: new BoardUiOptions { DemoTimerEnabled = false },
             timeProvider: disabledClock);
 
-        var enabledRoom = enabled.Store.SeatRoom(1, "otte", "CON", demoElapsedMinutes: 15);
-        var disabledRoom = disabled.Store.SeatRoom(1, "otte", "CON", demoElapsedMinutes: 15);
+        var enabledRoom = SeatViaPrestage(enabled.Store, 1, "otte", "CON");
+        var disabledRoom = SeatViaPrestage(disabled.Store, 1, "otte", "CON");
 
         Assert.NotNull(enabledRoom);
         Assert.NotNull(disabledRoom);
-        Assert.Equal(now.AddMinutes(-15), enabledRoom.SeatedAt);
-        // Patient Seated / In Prep no longer escalates to aging/stale regardless of elapsed time.
-        // demoElapsedMinutes only back-dates SeatedAt; state remains Seated until Ready for Doctor.
+        Assert.Equal(now, enabledRoom.SeatedAt);
         Assert.Equal(RoomStates.Seated, enabledRoom.State);
         Assert.Equal(now, disabledRoom.SeatedAt);
         Assert.Equal(RoomStates.Seated, disabledRoom.State);
@@ -2864,7 +3272,7 @@ public sealed class BoardStoreTests
         var httpContext = NewResolveConflictHttpContext(roomNumber: 2, token: "room-2-token");
 
         DriveRoomToDoctorInRoom(context, 1, "otte", "CON");
-        Assert.NotNull(context.Store.SeatRoom(2, "otte", "EXT"));
+        Assert.NotNull(SeatViaPrestage(context.Store, 2, "otte", "EXT"));
         Assert.NotNull(context.Store.MarkReadyForDoctor(2));
 
         var response = await global::DoctorArrivalConflictEndpointHandler.ResolveAsync(
@@ -2910,7 +3318,7 @@ public sealed class BoardStoreTests
         var httpContext = NewResolveConflictHttpContext(roomNumber: 2, token: "room-2-token");
 
         DriveRoomToDoctorInRoom(context, 1, "otte", "CON");
-        Assert.NotNull(context.Store.SeatRoom(2, "otte", "EXT"));
+        Assert.NotNull(SeatViaPrestage(context.Store, 2, "otte", "EXT"));
         Assert.NotNull(context.Store.MarkReadyForDoctor(2));
         Assert.NotNull(context.Store.MarkDoctorComplete(1));
 
@@ -2989,7 +3397,7 @@ public sealed class BoardStoreTests
         using var workspace = TestWorkspace.Create();
         var context = StoreContext.Create(workspace, environmentName: Environments.Production);
 
-        Assert.NotNull(context.Store.SeatRoom(1, "otte", "CON"));
+        Assert.NotNull(SeatViaPrestage(context.Store, 1, "otte", "CON"));
         Assert.NotNull(context.Store.MarkReadyForDoctor(1));
         Assert.NotNull(context.Store.MarkDoctorArrived(1));
         Assert.NotNull(context.Store.MarkDoctorComplete(1));
@@ -3019,7 +3427,7 @@ public sealed class BoardStoreTests
         var context = StoreContext.Create(workspace, environmentName: Environments.Production, timeProvider: clock);
 
         // Cycle A: full lifecycle on room 1 - should appear in normal metrics.
-        Assert.NotNull(context.Store.SeatRoom(1, "otte", "CON"));
+        Assert.NotNull(SeatViaPrestage(context.Store, 1, "otte", "CON"));
         Assert.NotNull(context.Store.MarkReadyForDoctor(1));
         Assert.NotNull(context.Store.MarkDoctorArrived(1));
         Assert.NotNull(context.Store.MarkDoctorComplete(1));
@@ -3027,7 +3435,7 @@ public sealed class BoardStoreTests
 
         // Cycle B: only reached DoctorArrived on room 2 - will be marked exception.
         clock.SetUtcNow(now.AddMinutes(30));
-        Assert.NotNull(context.Store.SeatRoom(2, "pledger", "EXT"));
+        Assert.NotNull(SeatViaPrestage(context.Store, 2, "pledger", "EXT"));
         Assert.NotNull(context.Store.MarkReadyForDoctor(2));
         var exceptionArrived = context.Store.MarkDoctorArrived(2);
         Assert.NotNull(exceptionArrived);
@@ -3065,13 +3473,13 @@ public sealed class BoardStoreTests
         var context = StoreContext.Create(workspace, environmentName: Environments.Production);
 
         // Cycle A: complete lifecycle - normal.
-        Assert.NotNull(context.Store.SeatRoom(1, "otte", "CON"));
+        Assert.NotNull(SeatViaPrestage(context.Store, 1, "otte", "CON"));
         Assert.NotNull(context.Store.MarkReadyForDoctor(1));
         var arrivedA = context.Store.MarkDoctorArrived(1);
         Assert.NotNull(arrivedA);
 
         // Cycle B: only reached DoctorArrived - will be marked exception.
-        Assert.NotNull(context.Store.SeatRoom(2, "pledger", "EXT"));
+        Assert.NotNull(SeatViaPrestage(context.Store, 2, "pledger", "EXT"));
         Assert.NotNull(context.Store.MarkReadyForDoctor(2));
         var arrivedB = context.Store.MarkDoctorArrived(2);
         Assert.NotNull(arrivedB);
@@ -3098,7 +3506,7 @@ public sealed class BoardStoreTests
         var databasePath = workspace.ProductionDatabasePath();
 
         var first = StoreContext.Create(workspace, environmentName: Environments.Production, databasePath: databasePath);
-        Assert.NotNull(first.Store.SeatRoom(1, "otte", "CON"));
+        Assert.NotNull(SeatViaPrestage(first.Store, 1, "otte", "CON"));
         Assert.NotNull(first.Store.MarkReadyForDoctor(1));
         var arrived = first.Store.MarkDoctorArrived(1);
         Assert.NotNull(arrived);
@@ -3147,7 +3555,7 @@ public sealed class BoardStoreTests
         using var workspace = TestWorkspace.Create();
         var context = StoreContext.Create(workspace, environmentName: Environments.Production);
 
-        Assert.NotNull(context.Store.SeatRoom(1, "otte", "CON"));
+        Assert.NotNull(SeatViaPrestage(context.Store, 1, "otte", "CON"));
         Assert.NotNull(context.Store.MarkReadyForDoctor(1));
         var arrived = context.Store.MarkDoctorArrived(1);
         Assert.NotNull(arrived);
@@ -3188,7 +3596,7 @@ public sealed class BoardStoreTests
                 MaxActiveDurationHours = 8
             });
 
-        Assert.NotNull(context.Store.SeatRoom(1, "otte", "CON"));
+        Assert.NotNull(SeatViaPrestage(context.Store, 1, "otte", "CON"));
 
         // Advance 7.5 hours - still under the 8-hour limit.
         clock.SetUtcNow(now.AddHours(7).AddMinutes(30));
@@ -3218,7 +3626,7 @@ public sealed class BoardStoreTests
                 MaxActiveDurationHours = 8
             });
 
-        Assert.NotNull(context.Store.SeatRoom(1, "otte", "CON"));
+        Assert.NotNull(SeatViaPrestage(context.Store, 1, "otte", "CON"));
         Assert.NotNull(context.Store.MarkReadyForDoctor(1));
 
         // Advance past 8-hour limit.
@@ -3257,7 +3665,7 @@ public sealed class BoardStoreTests
                 MaxActiveDurationHours = 8
             });
 
-        Assert.NotNull(context.Store.SeatRoom(1, "otte", "CON"));
+        Assert.NotNull(SeatViaPrestage(context.Store, 1, "otte", "CON"));
         Assert.NotNull(context.Store.MarkReadyForDoctor(1));
         Assert.NotNull(context.Store.MarkDoctorArrived(1));
 
@@ -3296,8 +3704,8 @@ public sealed class BoardStoreTests
                 TimeZone = "UTC"
             });
 
-        Assert.NotNull(context.Store.SeatRoom(1, "otte", "CON"));
-        Assert.NotNull(context.Store.SeatRoom(2, "pledger", "EXT"));
+        Assert.NotNull(SeatViaPrestage(context.Store, 1, "otte", "CON"));
+        Assert.NotNull(SeatViaPrestage(context.Store, 2, "pledger", "EXT"));
 
         var expired = context.Store.TryRunAfterHoursSweep();
 
@@ -3338,14 +3746,14 @@ public sealed class BoardStoreTests
             timeProvider: clock,
             expirationOptions: expirationOptions);
 
-        Assert.NotNull(context.Store.SeatRoom(1, "otte", "CON"));
+        Assert.NotNull(SeatViaPrestage(context.Store, 1, "otte", "CON"));
 
         // First sweep: expires room 1.
         var firstSweep = context.Store.TryRunAfterHoursSweep();
         Assert.Equal([1], firstSweep);
 
         // Re-seat room 1 (simulate activity resuming).
-        Assert.NotNull(context.Store.SeatRoom(1, "otte", "CON"));
+        Assert.NotNull(SeatViaPrestage(context.Store, 1, "otte", "CON"));
 
         // Second sweep on the same clinic day (even 10 minutes later): should not fire.
         clock.SetUtcNow(now.AddMinutes(10));
@@ -3378,7 +3786,7 @@ public sealed class BoardStoreTests
                 TimeZone = "Not/A/Valid/TimeZone"
             });
 
-        Assert.NotNull(context.Store.SeatRoom(1, "otte", "CON"));
+        Assert.NotNull(SeatViaPrestage(context.Store, 1, "otte", "CON"));
 
         var expired = context.Store.TryRunAfterHoursSweep();
 
@@ -3430,7 +3838,7 @@ public sealed class BoardStoreTests
                 TimeZone = "Not/A/Valid/TimeZone"
             });
 
-        Assert.NotNull(context.Store.SeatRoom(1, "otte", "CON"));
+        Assert.NotNull(SeatViaPrestage(context.Store, 1, "otte", "CON"));
 
         clock.SetUtcNow(now.AddHours(8).AddSeconds(1));
         var expired = context.Store.CheckAndExpireActiveCycles();
@@ -3462,7 +3870,7 @@ public sealed class BoardStoreTests
                 TimeZone = "America/Chicago"
             });
 
-        Assert.NotNull(context.Store.SeatRoom(1, "otte", "CON"));
+        Assert.NotNull(SeatViaPrestage(context.Store, 1, "otte", "CON"));
 
         var expired = context.Store.TryRunAfterHoursSweep();
 
@@ -3522,7 +3930,7 @@ public sealed class BoardStoreTests
                 MaxActiveDurationHours = 8
             });
 
-        Assert.NotNull(context.Store.SeatRoom(1, "otte", "CON"));
+        Assert.NotNull(SeatViaPrestage(context.Store, 1, "otte", "CON"));
         Assert.NotNull(context.Store.MarkReadyForDoctor(1));
         Assert.NotNull(context.Store.MarkDoctorArrived(1));
         // Note: MarkDoctorComplete is intentionally NOT called.
@@ -3552,14 +3960,14 @@ public sealed class BoardStoreTests
             });
 
         // Room 1: completes the full lifecycle - normal cycle.
-        Assert.NotNull(context.Store.SeatRoom(1, "otte", "CON"));
+        Assert.NotNull(SeatViaPrestage(context.Store, 1, "otte", "CON"));
         Assert.NotNull(context.Store.MarkReadyForDoctor(1));
         Assert.NotNull(context.Store.MarkDoctorArrived(1));
         Assert.NotNull(context.Store.MarkDoctorComplete(1));
         Assert.NotNull(context.Store.MarkRoomAvailable(1));
 
         // Room 2: gets force-expired - exception cycle.
-        Assert.NotNull(context.Store.SeatRoom(2, "pledger", "EXT"));
+        Assert.NotNull(SeatViaPrestage(context.Store, 2, "pledger", "EXT"));
         clock.SetUtcNow(now.AddHours(8).AddSeconds(1));
         context.Store.CheckAndExpireActiveCycles();
 
@@ -3587,7 +3995,7 @@ public sealed class BoardStoreTests
                 MaxActiveDurationHours = 8
             });
 
-        Assert.NotNull(context.Store.SeatRoom(1, "otte", "CON"));
+        Assert.NotNull(SeatViaPrestage(context.Store, 1, "otte", "CON"));
         clock.SetUtcNow(now.AddHours(8).AddSeconds(1));
         context.Store.CheckAndExpireActiveCycles();
 
@@ -3621,7 +4029,7 @@ public sealed class BoardStoreTests
                 MaxActiveDurationHours = 8
             });
 
-        Assert.NotNull(first.Store.SeatRoom(1, "otte", "CON"));
+        Assert.NotNull(SeatViaPrestage(first.Store, 1, "otte", "CON"));
 
         clock.SetUtcNow(now.AddHours(8).AddSeconds(1));
         var expired = first.Store.CheckAndExpireActiveCycles();
@@ -3658,7 +4066,7 @@ public sealed class BoardStoreTests
         var clock = new ManualTimeProvider(now);
         var context = StoreContext.Create(workspace, environmentName: Environments.Production, timeProvider: clock);
 
-        Assert.NotNull(context.Store.SeatRoom(1, "otte", "CON"));
+        Assert.NotNull(SeatViaPrestage(context.Store, 1, "otte", "CON"));
         clock.SetUtcNow(now.AddMinutes(5));
         Assert.NotNull(context.Store.MarkReadyForDoctor(1));
         clock.SetUtcNow(now.AddMinutes(15));
@@ -3684,12 +4092,12 @@ public sealed class BoardStoreTests
         var context = StoreContext.Create(workspace, environmentName: Environments.Production, timeProvider: clock);
 
         // Room 2 (same doctor): arrives at t=0, completes at t=20.
-        Assert.NotNull(context.Store.SeatRoom(2, "otte", "CON"));
+        Assert.NotNull(SeatViaPrestage(context.Store, 2, "otte", "CON"));
         Assert.NotNull(context.Store.MarkReadyForDoctor(2));
         Assert.NotNull(context.Store.MarkDoctorArrived(2)); // DoctorArrivedAt = base_+0
 
         // Room 1 (target): ready at t=5, arrives at t=20.
-        Assert.NotNull(context.Store.SeatRoom(1, "otte", "CON"));
+        Assert.NotNull(SeatViaPrestage(context.Store, 1, "otte", "CON"));
         clock.SetUtcNow(base_.AddMinutes(5));
         Assert.NotNull(context.Store.MarkReadyForDoctor(1)); // ReadyForDoctorAt = base_+5
 
@@ -3723,12 +4131,12 @@ public sealed class BoardStoreTests
         var context = StoreContext.Create(workspace, environmentName: Environments.Production, timeProvider: clock);
 
         // Room 2 (same doctor, blocker): arrives at t=0.
-        Assert.NotNull(context.Store.SeatRoom(2, "otte", "CON"));
+        Assert.NotNull(SeatViaPrestage(context.Store, 2, "otte", "CON"));
         Assert.NotNull(context.Store.MarkReadyForDoctor(2));
         Assert.NotNull(context.Store.MarkDoctorArrived(2)); // DoctorArrivedAt = base_
 
         // Room 1 (target): seat now, ready at t=5.
-        Assert.NotNull(context.Store.SeatRoom(1, "otte", "CON"));
+        Assert.NotNull(SeatViaPrestage(context.Store, 1, "otte", "CON"));
         clock.SetUtcNow(base_.AddMinutes(5));
         Assert.NotNull(context.Store.MarkReadyForDoctor(1)); // ReadyForDoctorAt = base_+5
 
@@ -3760,12 +4168,12 @@ public sealed class BoardStoreTests
         var context = StoreContext.Create(workspace, environmentName: Environments.Production, timeProvider: clock);
 
         // Room 2 (different doctor otte): arrives at t=0, completes at t=20.
-        Assert.NotNull(context.Store.SeatRoom(2, "otte", "CON"));
+        Assert.NotNull(SeatViaPrestage(context.Store, 2, "otte", "CON"));
         Assert.NotNull(context.Store.MarkReadyForDoctor(2));
         Assert.NotNull(context.Store.MarkDoctorArrived(2));
 
         // Room 1 (pledger): seat, ready at t=5, arrive at t=20.
-        Assert.NotNull(context.Store.SeatRoom(1, "pledger", "EXT"));
+        Assert.NotNull(SeatViaPrestage(context.Store, 1, "pledger", "EXT"));
         clock.SetUtcNow(base_.AddMinutes(5));
         Assert.NotNull(context.Store.MarkReadyForDoctor(1));
 
@@ -3794,7 +4202,7 @@ public sealed class BoardStoreTests
         var clock = new ManualTimeProvider(now);
         var context = StoreContext.Create(workspace, environmentName: Environments.Production, timeProvider: clock);
 
-        Assert.NotNull(context.Store.SeatRoom(1, "otte", "CON"));
+        Assert.NotNull(SeatViaPrestage(context.Store, 1, "otte", "CON"));
         clock.SetUtcNow(now.AddMinutes(10));
         Assert.NotNull(context.Store.MarkReadyForDoctor(1));
         clock.SetUtcNow(now.AddMinutes(20));
@@ -3824,7 +4232,7 @@ public sealed class BoardStoreTests
         var context = StoreContext.Create(workspace, environmentName: Environments.Production, timeProvider: clock);
 
         // Normal cycle: Room 1, 10 min ready-to-doctor, no blocker.
-        Assert.NotNull(context.Store.SeatRoom(1, "otte", "CON"));
+        Assert.NotNull(SeatViaPrestage(context.Store, 1, "otte", "CON"));
         clock.SetUtcNow(now.AddMinutes(5));
         Assert.NotNull(context.Store.MarkReadyForDoctor(1));
         clock.SetUtcNow(now.AddMinutes(15));
@@ -3835,7 +4243,7 @@ public sealed class BoardStoreTests
 
         // Exception cycle: Room 2, same doctor, mark as exception.
         clock.SetUtcNow(now.AddMinutes(25));
-        Assert.NotNull(context.Store.SeatRoom(2, "otte", "CON"));
+        Assert.NotNull(SeatViaPrestage(context.Store, 2, "otte", "CON"));
         clock.SetUtcNow(now.AddMinutes(30));
         Assert.NotNull(context.Store.MarkReadyForDoctor(2));
         clock.SetUtcNow(now.AddMinutes(35));
@@ -3863,7 +4271,7 @@ public sealed class BoardStoreTests
         var context = StoreContext.Create(workspace, environmentName: Environments.Production, timeProvider: clock);
 
         // Room 2 (same doctor): will be marked as exception.
-        Assert.NotNull(context.Store.SeatRoom(2, "otte", "CON"));
+        Assert.NotNull(SeatViaPrestage(context.Store, 2, "otte", "CON"));
         Assert.NotNull(context.Store.MarkReadyForDoctor(2));
         Assert.NotNull(context.Store.MarkDoctorArrived(2));   // DoctorArrivedAt = base_
         clock.SetUtcNow(base_.AddMinutes(20));
@@ -3876,7 +4284,7 @@ public sealed class BoardStoreTests
         context.Store.MarkCycleAsException(2, seatedAt2, "Test", "Exclude");
 
         // Room 1 (normal): ready at t=5, arrives at t=20.
-        Assert.NotNull(context.Store.SeatRoom(1, "otte", "CON"));
+        Assert.NotNull(SeatViaPrestage(context.Store, 1, "otte", "CON"));
         clock.SetUtcNow(base_.AddMinutes(5));
         Assert.NotNull(context.Store.MarkReadyForDoctor(1));
         clock.SetUtcNow(base_.AddMinutes(20));
@@ -3904,7 +4312,7 @@ public sealed class BoardStoreTests
         var context = StoreContext.Create(workspace, environmentName: Environments.Production, timeProvider: clock, roomCount: 4);
 
         // === Cycle A: Room 1 (pledger), no blocker, readyToDoctor = 10 min = 600s, available = 600s ===
-        Assert.NotNull(context.Store.SeatRoom(1, "pledger", "CON"));
+        Assert.NotNull(SeatViaPrestage(context.Store, 1, "pledger", "CON"));
         clock.SetUtcNow(base_.AddMinutes(5));
         Assert.NotNull(context.Store.MarkReadyForDoctor(1));
         clock.SetUtcNow(base_.AddMinutes(15));
@@ -3916,12 +4324,12 @@ public sealed class BoardStoreTests
         // === Cycle B: Room 2 (otte), fully blocked by Room 3 ===
         // Room 3 (otte, blocker): arrives at t=20, completes at t=40.
         clock.SetUtcNow(base_.AddMinutes(20));
-        Assert.NotNull(context.Store.SeatRoom(3, "otte", "CON"));
+        Assert.NotNull(SeatViaPrestage(context.Store, 3, "otte", "CON"));
         Assert.NotNull(context.Store.MarkReadyForDoctor(3));
         Assert.NotNull(context.Store.MarkDoctorArrived(3)); // DoctorArrivedAt = base_+20
 
         // Room 2 (otte, target): ready at t=25.
-        Assert.NotNull(context.Store.SeatRoom(2, "otte", "CON"));
+        Assert.NotNull(SeatViaPrestage(context.Store, 2, "otte", "CON"));
         clock.SetUtcNow(base_.AddMinutes(25));
         Assert.NotNull(context.Store.MarkReadyForDoctor(2));
 
@@ -3965,7 +4373,7 @@ public sealed class BoardStoreTests
         using var workspace = TestWorkspace.Create();
         var context = StoreContext.Create(workspace, environmentName: Environments.Production);
 
-        Assert.NotNull(context.Store.SeatRoom(1, "otte", "CON"));
+        Assert.NotNull(SeatViaPrestage(context.Store, 1, "otte", "CON"));
         Assert.NotNull(context.Store.MarkReadyForDoctor(1));
 
         var result = context.Store.TryMarkDoctorArrived(1);
@@ -3986,7 +4394,7 @@ public sealed class BoardStoreTests
         DriveRoomToDoctorInRoom(context, 1, "otte", "CON");
 
         // Room 2: same doctor, ready for doctor.
-        Assert.NotNull(context.Store.SeatRoom(2, "otte", "EXT"));
+        Assert.NotNull(SeatViaPrestage(context.Store, 2, "otte", "EXT"));
         Assert.NotNull(context.Store.MarkReadyForDoctor(2));
 
         var result = context.Store.TryMarkDoctorArrived(2);
@@ -4004,7 +4412,7 @@ public sealed class BoardStoreTests
         var context = StoreContext.Create(workspace, environmentName: Environments.Production);
 
         DriveRoomToDoctorInRoom(context, 1, "otte", "CON");
-        Assert.NotNull(context.Store.SeatRoom(2, "otte", "EXT"));
+        Assert.NotNull(SeatViaPrestage(context.Store, 2, "otte", "EXT"));
         Assert.NotNull(context.Store.MarkReadyForDoctor(2));
 
         var conflict = context.Store.TryMarkDoctorArrived(2).Conflict;
@@ -4025,7 +4433,7 @@ public sealed class BoardStoreTests
         DriveRoomToDoctorInRoom(context, 1, "otte", "CON");
 
         // Room 2: pledger is ready and must not be blocked by otte.
-        Assert.NotNull(context.Store.SeatRoom(2, "pledger", "EXT"));
+        Assert.NotNull(SeatViaPrestage(context.Store, 2, "pledger", "EXT"));
         Assert.NotNull(context.Store.MarkReadyForDoctor(2));
 
         var result = context.Store.TryMarkDoctorArrived(2);
@@ -4041,11 +4449,11 @@ public sealed class BoardStoreTests
         var context = StoreContext.Create(workspace, environmentName: Environments.Production);
 
         // Room 1: same doctor but only ready-for-doctor (not checked in).
-        Assert.NotNull(context.Store.SeatRoom(1, "otte", "CON"));
+        Assert.NotNull(SeatViaPrestage(context.Store, 1, "otte", "CON"));
         Assert.NotNull(context.Store.MarkReadyForDoctor(1));
 
         // Room 2: same doctor, ready.
-        Assert.NotNull(context.Store.SeatRoom(2, "otte", "EXT"));
+        Assert.NotNull(SeatViaPrestage(context.Store, 2, "otte", "EXT"));
         Assert.NotNull(context.Store.MarkReadyForDoctor(2));
 
         var result = context.Store.TryMarkDoctorArrived(2);
@@ -4061,7 +4469,7 @@ public sealed class BoardStoreTests
         var context = StoreContext.Create(workspace, environmentName: Environments.Production);
 
         DriveRoomToDoctorInRoom(context, 1, "otte", "CON");
-        Assert.NotNull(context.Store.SeatRoom(2, "otte", "EXT"));
+        Assert.NotNull(SeatViaPrestage(context.Store, 2, "otte", "EXT"));
         Assert.NotNull(context.Store.MarkReadyForDoctor(2));
 
         var result = context.Store.ResolveDoctorArrivalConflict(2, 1);
@@ -4087,7 +4495,7 @@ public sealed class BoardStoreTests
         var context = StoreContext.Create(workspace, environmentName: Environments.Production);
 
         DriveRoomToDoctorInRoom(context, 1, "otte", "CON");
-        Assert.NotNull(context.Store.SeatRoom(2, "otte", "EXT"));
+        Assert.NotNull(SeatViaPrestage(context.Store, 2, "otte", "EXT"));
         Assert.NotNull(context.Store.MarkReadyForDoctor(2));
 
         // The conflict clears before resolve runs: Room 1 is completed independently.
@@ -4108,7 +4516,7 @@ public sealed class BoardStoreTests
 
         // Real conflict is in Room 1, but the caller claims Room 3.
         DriveRoomToDoctorInRoom(context, 1, "otte", "CON");
-        Assert.NotNull(context.Store.SeatRoom(2, "otte", "EXT"));
+        Assert.NotNull(SeatViaPrestage(context.Store, 2, "otte", "EXT"));
         Assert.NotNull(context.Store.MarkReadyForDoctor(2));
 
         var result = context.Store.ResolveDoctorArrivalConflict(2, 3);
@@ -4122,7 +4530,7 @@ public sealed class BoardStoreTests
     // Drives a room from available through to doctor-in-room with the given doctor and procedure.
     private static void DriveRoomToDoctorInRoom(StoreContext context, int room, string doctor, string procedure)
     {
-        Assert.NotNull(context.Store.SeatRoom(room, doctor, procedure));
+        Assert.NotNull(SeatViaPrestage(context.Store, room, doctor, procedure));
         Assert.NotNull(context.Store.MarkReadyForDoctor(room));
         Assert.NotNull(context.Store.MarkDoctorArrived(room));
         Assert.Equal(RoomStates.DoctorInRoom, context.Store.GetRoom(room)!.State);
@@ -4195,12 +4603,12 @@ public sealed class BoardStoreTests
         var context = StoreContext.Create(workspace, environmentName: Environments.Production, timeProvider: clock);
 
         // Room 2 (same doctor, different procedure) is the blocker: in-room from t+0 to t+10.
-        Assert.NotNull(context.Store.SeatRoom(2, "otte", "EXT"));
+        Assert.NotNull(SeatViaPrestage(context.Store, 2, "otte", "EXT"));
         Assert.NotNull(context.Store.MarkReadyForDoctor(2));
         Assert.NotNull(context.Store.MarkDoctorArrived(2));
 
         // Room 1 (CON target): ready at t+5, arrives at t+15 => readyToDoctor 600s, overlap 300s.
-        Assert.NotNull(context.Store.SeatRoom(1, "otte", "CON"));
+        Assert.NotNull(SeatViaPrestage(context.Store, 1, "otte", "CON"));
         clock.SetUtcNow(base_.AddMinutes(5));
         Assert.NotNull(context.Store.MarkReadyForDoctor(1));
 
@@ -4537,7 +4945,7 @@ public sealed class BoardStoreTests
         using var workspace = TestWorkspace.Create();
         var context = StoreContext.Create(workspace, environmentName: Environments.Production);
 
-        Assert.NotNull(context.Store.SeatRoom(1, "otte", "EXT", expectedAllocationUnits: 5));
+        Assert.NotNull(SeatViaPrestage(context.Store, 1, "otte", "EXT", expectedAllocationUnits: 5));
 
         context.Store.ResetAndSeedSyntheticTrainingData();
 
@@ -4623,7 +5031,7 @@ public sealed class BoardStoreTests
         using var workspace = TestWorkspace.Create();
         var context = StoreContext.Create(workspace, environmentName: Environments.Production);
 
-        Assert.NotNull(context.Store.SeatRoom(1, "otte", "EXT"));
+        Assert.NotNull(SeatViaPrestage(context.Store, 1, "otte", "EXT"));
 
         context.Store.ResetAllDataForEmptyBeta();
 
@@ -5272,7 +5680,7 @@ public sealed class BoardStoreTests
         int? expectedAllocationUnits = null)
     {
         clock.SetUtcNow(seatedAt);
-        Assert.NotNull(context.Store.SeatRoom(room, doctor, procedure, sedation: sedation, expectedAllocationUnits: expectedAllocationUnits));
+        Assert.NotNull(SeatViaPrestage(context.Store, room, doctor, procedure, sedation: sedation, expectedAllocationUnits: expectedAllocationUnits));
         clock.SetUtcNow(seatedAt.AddMinutes(prepMin));
         Assert.NotNull(context.Store.MarkReadyForDoctor(room));
         clock.SetUtcNow(seatedAt.AddMinutes(prepMin + readyMin));
@@ -5977,6 +6385,42 @@ public sealed class BoardStoreTests
     private static DateTimeOffset Utc(int year, int month, int day, int hour, int minute = 0) =>
         new(year, month, day, hour, minute, 0, TimeSpan.Zero);
 
+    private static void AssertSameRoomState(RoomState expected, RoomState actual)
+    {
+        Assert.Equal(expected.RoomId, actual.RoomId);
+        Assert.Equal(expected.EpisodeId, actual.EpisodeId);
+        Assert.Equal(expected.AssignedDoctor, actual.AssignedDoctor);
+        Assert.Equal(expected.ProcedureCode, actual.ProcedureCode);
+        Assert.Equal(expected.State, actual.State);
+        Assert.Equal(expected.PrestageStartedAt, actual.PrestageStartedAt);
+        Assert.Equal(expected.SeatedAt, actual.SeatedAt);
+        Assert.Equal(expected.AgingStartedAt, actual.AgingStartedAt);
+        Assert.Equal(expected.StaleStartedAt, actual.StaleStartedAt);
+        Assert.Equal(expected.ReadyForDoctorAt, actual.ReadyForDoctorAt);
+        Assert.Equal(expected.DoctorArrivedAt, actual.DoctorArrivedAt);
+        Assert.Equal(expected.DoctorCompleteAt, actual.DoctorCompleteAt);
+        Assert.Equal(expected.RoomAvailableAt, actual.RoomAvailableAt);
+        Assert.Equal(expected.OriginalDefaultExpectedUnits, actual.OriginalDefaultExpectedUnits);
+        Assert.Equal(expected.ExpectedAllocationUnits, actual.ExpectedAllocationUnits);
+        Assert.Equal(expected.ExpectedAllocationMinutes, actual.ExpectedAllocationMinutes);
+        Assert.Equal(expected.AllocationAdjustedFromDefault, actual.AllocationAdjustedFromDefault);
+    }
+
+    private static RoomStatus? SeatViaPrestage(
+        DemoBoardStore store,
+        int room,
+        string doctor,
+        string procedure,
+        int demoElapsedMinutes = 0,
+        bool sedation = false,
+        int? expectedAllocationUnits = null)
+    {
+        var prestaged = store.BeginPrestage(room, doctor, procedure, sedation, expectedAllocationUnits);
+        return prestaged is null
+            ? null
+            : store.SeatRoom(room, demoElapsedMinutes);
+    }
+
     // Persists a single clean, allocation-calculable completed cycle anchored on completeAt (same UTC
     // day, no hygiene flags), for date-range tests. Reload a new StoreContext on the same DB to read it.
     private static void SaveCleanCycle(
@@ -6047,7 +6491,7 @@ public sealed class BoardStoreTests
     // Seats, readies, completes, and frees a single room, returning the resulting completed cycle.
     private static CompletedRoomCycle CompleteOneCycle(StoreContext context, int room, string doctor)
     {
-        Assert.NotNull(context.Store.SeatRoom(room, doctor, "CON"));
+        Assert.NotNull(SeatViaPrestage(context.Store, room, doctor, "CON"));
         Assert.NotNull(context.Store.MarkReadyForDoctor(room));
         Assert.NotNull(context.Store.MarkDoctorArrived(room));
         Assert.NotNull(context.Store.MarkDoctorComplete(room));
@@ -6066,7 +6510,7 @@ public sealed class BoardStoreTests
         using var workspace = TestWorkspace.Create();
         var context = StoreContext.Create(workspace, environmentName: Environments.Production);
 
-        Assert.NotNull(context.Store.SeatRoom(1, "otte", "CON"));
+        Assert.NotNull(SeatViaPrestage(context.Store, 1, "otte", "CON"));
         Assert.NotNull(context.Store.MarkReadyForDoctor(1));
         Assert.NotNull(context.Store.MarkDoctorArrived(1));
         Assert.NotNull(context.Store.MarkDoctorComplete(1));
@@ -6088,7 +6532,7 @@ public sealed class BoardStoreTests
         var context = StoreContext.Create(workspace, environmentName: Environments.Production, timeProvider: clock);
 
         // Normal cycle on room 1.
-        Assert.NotNull(context.Store.SeatRoom(1, "otte", "CON"));
+        Assert.NotNull(SeatViaPrestage(context.Store, 1, "otte", "CON"));
         clock.SetUtcNow(now.AddMinutes(5));
         Assert.NotNull(context.Store.MarkReadyForDoctor(1));
         clock.SetUtcNow(now.AddMinutes(15));
@@ -6099,7 +6543,7 @@ public sealed class BoardStoreTests
 
         // Exception cycle on room 2.
         clock.SetUtcNow(now.AddMinutes(25));
-        Assert.NotNull(context.Store.SeatRoom(2, "pledger", "EXT"));
+        Assert.NotNull(SeatViaPrestage(context.Store, 2, "pledger", "EXT"));
         clock.SetUtcNow(now.AddMinutes(30));
         Assert.NotNull(context.Store.MarkReadyForDoctor(2));
         clock.SetUtcNow(now.AddMinutes(35));
@@ -6128,7 +6572,7 @@ public sealed class BoardStoreTests
         using var workspace = TestWorkspace.Create();
         var context = StoreContext.Create(workspace, environmentName: Environments.Production);
 
-        Assert.NotNull(context.Store.SeatRoom(1, "otte", "CON"));
+        Assert.NotNull(SeatViaPrestage(context.Store, 1, "otte", "CON"));
         Assert.NotNull(context.Store.MarkReadyForDoctor(1));
         Assert.NotNull(context.Store.MarkDoctorArrived(1));
         Assert.NotNull(context.Store.MarkDoctorComplete(1));
@@ -6160,7 +6604,7 @@ public sealed class BoardStoreTests
         using var workspace = TestWorkspace.Create();
         var context = StoreContext.Create(workspace, environmentName: Environments.Production);
 
-        Assert.NotNull(context.Store.SeatRoom(1, "otte", "CON"));
+        Assert.NotNull(SeatViaPrestage(context.Store, 1, "otte", "CON"));
         Assert.NotNull(context.Store.MarkReadyForDoctor(1));
         Assert.NotNull(context.Store.MarkDoctorArrived(1));
         Assert.NotNull(context.Store.MarkDoctorComplete(1));
@@ -6183,7 +6627,7 @@ public sealed class BoardStoreTests
         var databasePath = workspace.ProductionDatabasePath();
 
         var first = StoreContext.Create(workspace, environmentName: Environments.Production, databasePath: databasePath);
-        Assert.NotNull(first.Store.SeatRoom(1, "otte", "CON"));
+        Assert.NotNull(SeatViaPrestage(first.Store, 1, "otte", "CON"));
         Assert.NotNull(first.Store.MarkReadyForDoctor(1));
         Assert.NotNull(first.Store.MarkDoctorArrived(1));
         Assert.NotNull(first.Store.MarkDoctorComplete(1));
