@@ -172,14 +172,9 @@ public sealed class DemoBoardStore
                 return null;
             }
 
-            var storedProcedureCode = ComposeProcedureCode(procedure.Code, sedation);
             var now = Now;
             room.EpisodeId = NewEpisodeId();
-            room.AssignedDoctor = doctor.Id;
-            room.AssignedDoctorDisplayName = doctor.Name;
-            room.ProcedureCode = storedProcedureCode;
-            room.ProcedureCategory = ResolveProcedure(storedProcedureCode)?.Label ?? procedure.Label;
-            ApplyExpectedAllocation(room, procedure, expectedAllocationUnits);
+            var storedProcedureCode = ApplyAssignmentSnapshot(room, doctor, procedure, sedation, expectedAllocationUnits);
             room.PrestageStartedAt = now;
             room.SeatedAt = null;
             room.AgingStartedAt = null;
@@ -192,6 +187,69 @@ public sealed class DemoBoardStore
             UpdateRoomState(room, now);
             AddEvent(new RoomEvent(room.RoomId, "PrestageStarted", now, doctor.Id, storedProcedureCode));
             PersistRoom(room);
+
+            return ToRoomStatus(room, now);
+        }
+    }
+
+    /// <summary>
+    /// Corrects the provisional doctor/procedure/sedation/allocation assignment on an active room
+    /// before Doctor Arrived - the hard attribution boundary. Allowed only while the room's effective
+    /// state is Prestaging, Seated, ReadyForDoctor, Aging, or Stale, and only when DoctorArrivedAt is
+    /// still null (checked independently of State as a defensive guard). Preserves the same episode
+    /// and all existing phase timestamps; replaces only the assignment/allocation snapshot. Creates no
+    /// completed cycle and no aborted-assignment record - this is a correction, not a termination.
+    /// </summary>
+    public RoomStatus? UpdateRoomAssignment(int roomNumber, string doctorId, string procedureCode, bool sedation = false, int? expectedAllocationUnits = null)
+    {
+        lock (_syncRoot)
+        {
+            var room = _rooms.FirstOrDefault(item => item.RoomId == roomNumber);
+            var doctor = _activeDoctors.FirstOrDefault(item => item.Id == doctorId);
+            var procedure = FindActiveProcedure(procedureCode);
+            if (room is null || doctor is null || procedure is null || !HasValidExpectedAllocation(procedure))
+            {
+                return null;
+            }
+
+            // Sedation is only valid as a modifier on a sedation-eligible primary
+            // procedure. Requesting it on any other procedure is rejected outright.
+            if (sedation && !procedure.SedationEligible)
+            {
+                return null;
+            }
+
+            var now = Now;
+
+            // Derive the current effective lifecycle state on a DETACHED copy so eligibility is
+            // checked (and the corrected snapshot is built) without mutating the live tracked room
+            // before persistence succeeds.
+            var snapshot = CopyRoomState(room);
+            UpdateRoomState(snapshot, now);
+            if (!CanUpdateRoomAssignment(snapshot))
+            {
+                return null;
+            }
+
+            var storedProcedureCode = ApplyAssignmentSnapshot(snapshot, doctor, procedure, sedation, expectedAllocationUnits);
+
+            // Persist the detached, corrected copy FIRST. If this throws, the live room and its
+            // in-memory state are completely untouched, and no event is appended.
+            PersistRoom(snapshot);
+
+            // Persistence succeeded: copy only the corrected assignment/allocation fields onto the
+            // live room (episode id and every phase timestamp are left untouched), then recompute its
+            // effective state to match what was just persisted.
+            room.AssignedDoctor = snapshot.AssignedDoctor;
+            room.AssignedDoctorDisplayName = snapshot.AssignedDoctorDisplayName;
+            room.ProcedureCode = snapshot.ProcedureCode;
+            room.ProcedureCategory = snapshot.ProcedureCategory;
+            room.OriginalDefaultExpectedUnits = snapshot.OriginalDefaultExpectedUnits;
+            room.ExpectedAllocationUnits = snapshot.ExpectedAllocationUnits;
+            room.ExpectedAllocationMinutes = snapshot.ExpectedAllocationMinutes;
+            room.AllocationAdjustedFromDefault = snapshot.AllocationAdjustedFromDefault;
+            UpdateRoomState(room, now);
+            AddEvent(new RoomEvent(room.RoomId, "AssignmentCorrected", now, doctor.Id, storedProcedureCode));
 
             return ToRoomStatus(room, now);
         }
@@ -2581,6 +2639,24 @@ public sealed class DemoBoardStore
     private static bool HasValidExpectedAllocation(ProcedureCategory procedure) =>
         procedure.DefaultExpectedUnits >= MinExpectedUnits;
 
+    // Applies the assignment snapshot onto a room: assigned doctor id and display snapshot, the
+    // composed (sedation-aware) procedure code, its canonical category label, and the full expected-
+    // allocation snapshot. Deliberately narrow - it never touches EpisodeId or any lifecycle
+    // timestamp, so it is safe to share between BeginPrestage (which separately mints a new episode
+    // and resets lifecycle timestamps) and UpdateRoomAssignment (which preserves the existing episode
+    // and every phase timestamp untouched). Returns the composed procedure code for callers that need
+    // it for auditing/eventing without re-deriving it.
+    private string ApplyAssignmentSnapshot(RoomState room, Doctor doctor, ProcedureCategory procedure, bool sedation, int? expectedAllocationUnits)
+    {
+        var storedProcedureCode = ComposeProcedureCode(procedure.Code, sedation);
+        room.AssignedDoctor = doctor.Id;
+        room.AssignedDoctorDisplayName = doctor.Name;
+        room.ProcedureCode = storedProcedureCode;
+        room.ProcedureCategory = ResolveProcedure(storedProcedureCode)?.Label ?? procedure.Label;
+        ApplyExpectedAllocation(room, procedure, expectedAllocationUnits);
+        return storedProcedureCode;
+    }
+
     private static RoomState CopyRoomState(RoomState room) =>
         new(room.RoomId)
         {
@@ -2733,6 +2809,16 @@ public sealed class DemoBoardStore
 
     private static bool CanCancelSeating(RoomState room) =>
         room.State is RoomStates.Seated or RoomStates.ReadyForDoctor or RoomStates.Aging or RoomStates.Stale;
+
+    // The provisional assignment remains correctable until Doctor Arrived - the hard attribution
+    // boundary. Allowed while the effective state is Prestaging (with a started prestage clock),
+    // Seated, ReadyForDoctor, Aging, or Stale. DoctorArrivedAt is checked independently of State as a
+    // defensive guard: it must never be possible to correct an assignment once a doctor has arrived,
+    // even if State were somehow malformed into one of the otherwise-allowed values.
+    private static bool CanUpdateRoomAssignment(RoomState room) =>
+        room.DoctorArrivedAt is null
+        && ((room.State == RoomStates.Prestaging && room.PrestageStartedAt is not null)
+            || room.State is RoomStates.Seated or RoomStates.ReadyForDoctor or RoomStates.Aging or RoomStates.Stale);
 
     private static bool IsValidCancellationReason(string? cancellationReason) =>
         cancellationReason is null

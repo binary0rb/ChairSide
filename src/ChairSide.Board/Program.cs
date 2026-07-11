@@ -314,6 +314,11 @@ app.MapPost("/api/client-errors", async (
 app.MapPost("/api/rooms/{roomNumber:int}/prestage", RoomLifecycleEndpointHandler.BeginPrestageAsync);
 app.MapPost("/api/rooms/{roomNumber:int}/seat", RoomLifecycleEndpointHandler.SeatAsync);
 
+// Pre-arrival assignment correction: distinct from the legacy /assignment route below (which does
+// not support Prestaging or allocation updates and remains untouched for the currently-checked-in
+// UI). Allowed only before Doctor Arrived; see DemoBoardStore.UpdateRoomAssignment.
+app.MapPost("/api/rooms/{roomNumber:int}/update-assignment", RoomLifecycleEndpointHandler.UpdateRoomAssignmentAsync);
+
 app.MapPost("/api/rooms/{roomNumber:int}/assignment", async Task<IResult> (
     int roomNumber,
     UpdateAssignmentRequest request,
@@ -1087,6 +1092,78 @@ public static class RoomLifecycleEndpointHandler
 
         await diagnosticLogger.LogRoomAuditAsync(auditCtx.Build(
             "begin-prestage", roomNumber, previousRoom, result, true, null,
+            result.AssignedDoctor, result.ProcedureCode));
+        await hubContext.Clients.All.SendAsync("boardUpdated", store.GetSnapshot());
+        return Results.Ok(result);
+    }
+
+    // Pre-arrival assignment correction. Distinct from the legacy /assignment endpoint above (which
+    // remains untouched): this route allows Prestaging as well as Seated/ReadyForDoctor/Aging/Stale,
+    // and also corrects the expected-allocation snapshot. Reuses BeginPrestageRequest unchanged - the
+    // request shape is identical (doctorId, procedureCode/procedureId, sedation,
+    // expectedAllocationUnits; no demo timing field) - and the same alias-resolution and
+    // doctor/procedure validation BeginPrestage already uses, so there is no second, competing
+    // validation model for this assignment shape.
+    public static async Task<IResult> UpdateRoomAssignmentAsync(
+        int roomNumber,
+        BeginPrestageRequest request,
+        HttpContext httpContext,
+        RoomDeviceTokenValidator roomDeviceTokenValidator,
+        DemoBoardStore store,
+        DiagnosticLogger diagnosticLogger,
+        IHubContext<BoardHub> hubContext)
+    {
+        const string action = "update-room-assignment";
+        var auditCtx = AuditRequestContext.From(httpContext);
+        var previousRoom = store.GetRoom(roomNumber);
+
+        var bindingFailure = RoomDeviceBindingGuard.ValidateMutationRequest(
+            roomNumber,
+            httpContext.Request,
+            roomDeviceTokenValidator);
+        if (bindingFailure is not null)
+        {
+            await diagnosticLogger.LogRoomAuditAsync(auditCtx.Build(
+                action, roomNumber, previousRoom, null, false, "binding-rejected",
+                previousRoom?.AssignedDoctor, previousRoom?.ProcedureCode));
+            return bindingFailure;
+        }
+
+        var aliasResolution = ProcedureAliasResolver.Resolve(request.ProcedureCode, request.ProcedureId);
+        if (aliasResolution.ConflictError is not null)
+        {
+            await diagnosticLogger.LogRoomAuditAsync(auditCtx.Build(
+                action, roomNumber, previousRoom, null, false, "validation-failed",
+                previousRoom?.AssignedDoctor, previousRoom?.ProcedureCode));
+            return Results.BadRequest(aliasResolution.ConflictError);
+        }
+
+        var procedureCode = aliasResolution.ProcedureCode;
+        var doctorId = request.DoctorId?.Trim();
+
+        var validationError = RoomMutationRequestValidator.ValidateDoctorAndProcedure(doctorId, procedureCode);
+        if (validationError is not null)
+        {
+            await diagnosticLogger.LogRoomAuditAsync(auditCtx.Build(
+                action, roomNumber, previousRoom, null, false, "validation-failed",
+                doctorId, procedureCode));
+            return Results.BadRequest(validationError);
+        }
+
+        var result = store.UpdateRoomAssignment(roomNumber, doctorId!, procedureCode!, request.Sedation, request.ExpectedAllocationUnits);
+        if (result is null)
+        {
+            var reason = store.IsConfiguredRoom(roomNumber) ? "state-rejected" : "room-not-found";
+            await diagnosticLogger.LogRoomAuditAsync(auditCtx.Build(
+                action, roomNumber, previousRoom, null, false, reason,
+                doctorId, procedureCode));
+            return store.IsConfiguredRoom(roomNumber)
+                ? Results.BadRequest("Update Room Assignment is only available before Doctor Arrived, with a valid doctor and procedure.")
+                : Results.NotFound("Room is not configured.");
+        }
+
+        await diagnosticLogger.LogRoomAuditAsync(auditCtx.Build(
+            action, roomNumber, previousRoom, result, true, null,
             result.AssignedDoctor, result.ProcedureCode));
         await hubContext.Clients.All.SendAsync("boardUpdated", store.GetSnapshot());
         return Results.Ok(result);
