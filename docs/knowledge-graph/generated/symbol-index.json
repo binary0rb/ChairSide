@@ -1,7 +1,7 @@
 ﻿{
     "generatedStamp":  "deterministic",
     "root":  ".",
-    "fileCount":  77,
+    "fileCount":  80,
     "files":  [
                   {
                       "path":  ".github/pull_request_template.md",
@@ -131,7 +131,7 @@
                   {
                       "path":  "docs/design/prestage-assignment-lifecycle.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  16667,
+                      "sizeBytes":  16879,
                       "typeSymbols":  [
 
                                       ],
@@ -1642,6 +1642,39 @@
                                    ]
                   },
                   {
+                      "path":  "src/ChairSide.Board/Services/ReadyHandoffContracts.cs",
+                      "kind":  "CSharp",
+                      "sizeBytes":  5390,
+                      "typeSymbols":  [
+                                          "ReadyHandoffStatus",
+                                          "ReadyHandoffContract"
+                                      ],
+                      "methodSymbols":  [
+                                            "Active",
+                                            "Withdrawn",
+                                            "Accepted",
+                                            "Create",
+                                            "ValidateStatusTimestamps",
+                                            "ValidateTimestamp",
+                                            "EnsureNotBeforeReady"
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
                       "path":  "src/ChairSide.Board/Services/ReportTrendSnapshot.cs",
                       "kind":  "CSharp",
                       "sizeBytes":  3942,
@@ -1656,6 +1689,62 @@
                                             "FormatDate",
                                             "Average",
                                             "Median"
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
+                      "path":  "src/ChairSide.Board/Services/RoomAssignmentContracts.cs",
+                      "kind":  "CSharp",
+                      "sizeBytes":  13795,
+                      "typeSymbols":  [
+                                          "AssignmentCompleteness",
+                                          "SedationState",
+                                          "ExpectedAllocationState",
+                                          "CanonicalRoomLifecycleState",
+                                          "ReadyUrgency",
+                                          "RoomIntegrityFaultCode",
+                                          "SedationContract",
+                                          "ExpectedAllocationContract",
+                                          "RoomAssignmentContract",
+                                          "AssignmentCompletenessEvaluator",
+                                          "ReadyUrgencyEvaluator",
+                                          "RoomCapabilities",
+                                          "RoomCapabilitiesEvaluator",
+                                          "RoomIntegrityFault",
+                                          "RoomIntegrityFaultEvaluator"
+                                      ],
+                      "methodSymbols":  [
+                                            "UnavailableNoProcedure",
+                                            "UnavailableProcedureIneligible",
+                                            "EligibleUnresolved",
+                                            "EligibleYes",
+                                            "EligibleNo",
+                                            "FromProcedure",
+                                            "Create",
+                                            "Unknown",
+                                            "Suggested",
+                                            "ConfirmedSuggestedValue",
+                                            "ConfirmedAdjustedValue",
+                                            "ValidatePositiveValue",
+                                            "NormalizeToken",
+                                            "ValidateProcedureSedationCompatibility",
+                                            "Evaluate",
+                                            "Validate",
+                                            "IsReadyOrLater"
                                         ],
                       "routes":  [
 
@@ -2384,6 +2473,71 @@
                                       ],
                       "methodSymbols":  [
 
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
+                      "path":  "tests/ChairSide.Board.Tests/PrestagingAssignmentContractTests.cs",
+                      "kind":  "CSharp",
+                      "sizeBytes":  19615,
+                      "typeSymbols":  [
+                                          "PrestagingAssignmentContractTests",
+                                          "HandoffEnvelope"
+                                      ],
+                      "methodSymbols":  [
+                                            "Sedation_without_procedure_is_unavailable",
+                                            "Sedation_for_ineligible_procedure_is_unavailable_but_complete_for_sedation",
+                                            "Eligible_sedation_without_explicit_choice_is_unresolved",
+                                            "Eligible_sedation_yes_is_explicit_and_complete_for_sedation",
+                                            "Eligible_sedation_no_is_explicit_and_complete_for_sedation",
+                                            "Illegal_sedation_combinations_are_rejected",
+                                            "Unknown_allocation_has_no_values",
+                                            "Suggested_allocation_has_suggested_value_only",
+                                            "Confirmed_suggestion_has_matching_suggested_and_confirmed_values",
+                                            "Confirmed_adjustment_has_distinct_confirmed_value",
+                                            "Zero_and_negative_allocation_values_are_rejected",
+                                            "Suggested_allocation_alone_does_not_complete_assignment",
+                                            "Entirely_absent_assignment_is_absent",
+                                            "Doctor_only_assignment_is_partial",
+                                            "Procedure_only_assignment_is_partial",
+                                            "Doctor_and_eligible_procedure_with_unresolved_sedation_is_partial",
+                                            "Assignment_missing_allocation_confirmation_is_partial",
+                                            "Ineligible_procedure_assignment_can_be_complete_without_sedation_decision",
+                                            "Eligible_yes_assignment_can_be_complete",
+                                            "Eligible_no_assignment_can_be_complete",
+                                            "Active_handoff_contains_complete_assignment_snapshot",
+                                            "Withdrawn_handoff_requires_withdrawn_timestamp",
+                                            "Accepted_handoff_requires_accepted_timestamp",
+                                            "Handoff_rejects_incomplete_assignment",
+                                            "Handoff_rejects_invalid_timestamp_and_status_combinations",
+                                            "Handoff_rejects_empty_identifier",
+                                            "None_urgency_is_valid_outside_ready",
+                                            "Aging_and_stale_urgency_are_valid_while_ready",
+                                            "Aging_and_stale_urgency_are_rejected_outside_ready",
+                                            "Ready_or_later_incomplete_assignment_yields_integrity_fault",
+                                            "Integrity_fault_is_separate_from_assignment_completeness",
+                                            "Legacy_false_sentinel_is_not_automatically_canonical_eligible_no",
+                                            "Legacy_zero_sentinel_is_not_canonical_confirmed_allocation",
+                                            "Procedure_suggestion_is_not_allocation_confirmation",
+                                            "Capabilities_follow_canonical_lifecycle",
+                                            "New_contract_status_values_serialize_as_strings_with_web_property_names",
+                                            "Nullable_handoff_absence_serializes_as_null",
+                                            "AbsentAssignment",
+                                            "CompleteIneligibleAssignment"
                                         ],
                       "routes":  [
 
