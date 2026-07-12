@@ -2665,6 +2665,12 @@ public sealed class DemoBoardStore
             AssignedDoctorDisplayName = room.AssignedDoctorDisplayName,
             ProcedureCode = room.ProcedureCode,
             ProcedureCategory = room.ProcedureCategory,
+            SedationState = room.SedationState,
+            ExpectedAllocationState = room.ExpectedAllocationState,
+            ExpectedAllocationSuggestedUnits = room.ExpectedAllocationSuggestedUnits,
+            ExpectedAllocationConfirmedUnits = room.ExpectedAllocationConfirmedUnits,
+            ActiveReadyHandoffId = room.ActiveReadyHandoffId,
+            AcceptedReadyHandoffId = room.AcceptedReadyHandoffId,
             State = room.State,
             PrestageStartedAt = room.PrestageStartedAt,
             SeatedAt = room.SeatedAt,
@@ -2686,6 +2692,7 @@ public sealed class DemoBoardStore
             CompletedCycleId = cycle.CompletedCycleId,
             EpisodeId = cycle.EpisodeId,
             RoomId = cycle.RoomId,
+            AcceptedReadyHandoffId = cycle.AcceptedReadyHandoffId,
             AssignedDoctor = cycle.AssignedDoctor,
             ProcedureCode = cycle.ProcedureCode,
             PrestageStartedAt = cycle.PrestageStartedAt,
@@ -2737,6 +2744,12 @@ public sealed class DemoBoardStore
         room.AssignedDoctorDisplayName = null;
         room.ProcedureCode = null;
         room.ProcedureCategory = null;
+        room.SedationState = null;
+        room.ExpectedAllocationState = null;
+        room.ExpectedAllocationSuggestedUnits = null;
+        room.ExpectedAllocationConfirmedUnits = null;
+        room.ActiveReadyHandoffId = null;
+        room.AcceptedReadyHandoffId = null;
         room.State = RoomStates.Available;
         room.PrestageStartedAt = null;
         room.SeatedAt = null;
@@ -3707,6 +3720,7 @@ public sealed class CompletedRoomCycle
     // completed cycle back to the single occupancy episode it belongs to, so an episode can be
     // proven to appear in exactly one of completed_room_cycles / aborted_room_assignments.
     public string? EpisodeId { get; set; }
+    public string? AcceptedReadyHandoffId { get; set; }
     public int RoomId { get; set; }
     public string AssignedDoctor { get; set; } = "";
     public string ProcedureCode { get; set; } = "";
@@ -3964,6 +3978,12 @@ public sealed class RoomState(int roomId)
     public string? AssignedDoctorDisplayName { get; set; }
     public string? ProcedureCode { get; set; }
     public string? ProcedureCategory { get; set; }
+    public SedationState? SedationState { get; set; }
+    public ExpectedAllocationState? ExpectedAllocationState { get; set; }
+    public int? ExpectedAllocationSuggestedUnits { get; set; }
+    public int? ExpectedAllocationConfirmedUnits { get; set; }
+    public string? ActiveReadyHandoffId { get; set; }
+    public string? AcceptedReadyHandoffId { get; set; }
     public string State { get; set; } = RoomStates.Available;
 
     // Room-unavailable clock start, set at Begin Prestage and cleared on ResetRoom. Null while
@@ -4053,14 +4073,18 @@ public sealed class AbortedRoomAssignment
     public string EpisodeId { get; set; } = "";
     public int RoomId { get; set; }
 
-    // Full assignment snapshot. Doctor and procedure are always populated because every
-    // terminal-eligible state (Prestaging, Seated, ReadyForDoctor, Aging, Stale) has them set;
-    // sedation is preserved via the composite procedure code (e.g. "EXT+SED"), matching the
-    // completed_room_cycles convention.
-    public string AssignedDoctor { get; set; } = "";
+    // Assignment snapshot. Canonical Prestaging can terminate with no or partial assignment, so
+    // doctor/procedure are nullable. Legacy rows may also have null canonical state fields when a
+    // truthful migration cannot prove sedation or allocation intent.
+    public string? AssignedDoctor { get; set; }
     public string? AssignedDoctorDisplayName { get; set; }
-    public string ProcedureCode { get; set; } = "";
+    public string? ProcedureCode { get; set; }
     public string? ProcedureCategory { get; set; }
+    public SedationState? SedationState { get; set; }
+    public ExpectedAllocationState? ExpectedAllocationState { get; set; }
+    public int? ExpectedAllocationSuggestedUnits { get; set; }
+    public int? ExpectedAllocationConfirmedUnits { get; set; }
+    public string? TerminalReadyHandoffId { get; set; }
     public int OriginalDefaultExpectedUnits { get; set; }
     public int ExpectedAllocationUnits { get; set; }
     public int ExpectedAllocationMinutes { get; set; }

@@ -8892,6 +8892,12 @@ public sealed class BoardStoreTests
         "allocation_adjusted_from_default",
         "prestage_started_at",
         "episode_id",
+        "sedation_state",
+        "expected_allocation_state",
+        "expected_allocation_suggested_units",
+        "expected_allocation_confirmed_units",
+        "active_ready_handoff_id",
+        "accepted_ready_handoff_id",
         "updated_at"
     ];
 
@@ -8930,6 +8936,7 @@ public sealed class BoardStoreTests
         "reviewed_by",
         "prestage_started_at",
         "episode_id",
+        "accepted_ready_handoff_id",
         "created_at",
         "updated_at"
     ];
@@ -8943,6 +8950,11 @@ public sealed class BoardStoreTests
         "assigned_doctor_display_name",
         "procedure_code",
         "procedure_category",
+        "sedation_state",
+        "expected_allocation_state",
+        "expected_allocation_suggested_units",
+        "expected_allocation_confirmed_units",
+        "terminal_ready_handoff_id",
         "original_default_expected_units",
         "expected_allocation_units",
         "expected_allocation_minutes",

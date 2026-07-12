@@ -1,7 +1,7 @@
 ﻿{
     "generatedStamp":  "deterministic",
     "root":  ".",
-    "fileCount":  80,
+    "fileCount":  82,
     "files":  [
                   {
                       "path":  ".github/pull_request_template.md",
@@ -1446,7 +1446,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/DemoBoardStore.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  201184,
+                      "sizeBytes":  202578,
                       "typeSymbols":  [
                                           "ExceptionReasons",
                                           "ReportingExceptionReasons",
@@ -1644,7 +1644,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/ReadyHandoffContracts.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  5390,
+                      "sizeBytes":  5550,
                       "typeSymbols":  [
                                           "ReadyHandoffStatus",
                                           "ReadyHandoffContract"
@@ -1657,6 +1657,39 @@
                                             "ValidateStatusTimestamps",
                                             "ValidateTimestamp",
                                             "EnsureNotBeforeReady"
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
+                      "path":  "src/ChairSide.Board/Services/ReadyHandoffPersistenceRecords.cs",
+                      "kind":  "CSharp",
+                      "sizeBytes":  4561,
+                      "typeSymbols":  [
+                                          "ReadyHandoffTerminationKinds",
+                                          "PersistedRoomAssignment",
+                                          "PersistedReadyHandoff"
+                                      ],
+                      "methodSymbols":  [
+                                            "IsValid",
+                                            "FromCanonicalContract",
+                                            "FromContract",
+                                            "ToContract",
+                                            "ValidateCanonicalValues",
+                                            "ValidateCanonicalWrite"
                                         ],
                       "routes":  [
 
@@ -1709,7 +1742,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/RoomAssignmentContracts.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  13795,
+                      "sizeBytes":  14198,
                       "typeSymbols":  [
                                           "AssignmentCompleteness",
                                           "SedationState",
@@ -1925,7 +1958,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/SqliteBoardRepository.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  64070,
+                      "sizeBytes":  107942,
                       "typeSymbols":  [
                                           "SqliteBoardRepository",
                                           "the",
@@ -1945,29 +1978,35 @@
                                             "SaveCompletedCycle",
                                             "SaveCompletedCycleAndRoom",
                                             "TerminateIncompleteAssignment",
+                                            "SaveCanonicalAssignment",
+                                            "CreateReadyHandoff",
+                                            "WithdrawReadyHandoff",
+                                            "AcceptReadyHandoffAndSaveCycle",
+                                            "TerminateReadyHandoffAndIncompleteAssignment",
                                             "LoadAbortedAssignments",
+                                            "LoadReadyHandoffsByEpisode",
+                                            "LoadActiveReadyHandoff",
+                                            "LoadReadyHandoff",
+                                            "ReadReadyHandoffs",
+                                            "LoadOwnedActiveReadyHandoff",
+                                            "ValidateRoomHandoffReference",
+                                            "ValidateCompletedCycleMatchesRoom",
+                                            "ValidateAbortedAssignmentMatchesRoom",
+                                            "ValidateRoomEpisode",
+                                            "InsertReadyHandoff",
+                                            "UpdateReadyHandoffOutcome",
+                                            "TerminateReadyHandoff",
                                             "InsertAbortedAssignment",
                                             "Initialize",
                                             "EnsureCompletedCycleIdColumn",
                                             "MigrateNullableDoctorArrivedAt",
+                                            "MigrateAbortedAssignmentCanonicalSchema",
+                                            "CreateReadyHandoffIndexes",
+                                            "ApplyLosslessCanonicalBackfills",
                                             "TableExists",
                                             "GetColumnNames",
                                             "Execute",
-                                            "TryAddColumn",
-                                            "IsDuplicateColumnError",
-                                            "ResolveProcedureCategory",
-                                            "OpenConnection",
-                                            "ValidateDatabasePath",
-                                            "IsPathInsideContentRoot",
-                                            "NormalizeDirectoryPath",
-                                            "VerifyDirectoryWritable",
-                                            "ResolveDatabasePath",
-                                            "FormatDateTimeOffset",
-                                            "ToDbValue",
-                                            "ReadNullableString",
-                                            "ReadNullableInt32",
-                                            "ReadNullableDateTimeOffset",
-                                            "ReadRequiredDateTimeOffset"
+                                            "TryAddColumn"
                                         ],
                       "routes":  [
 
@@ -2389,7 +2428,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/BoardStoreTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  472335,
+                      "sizeBytes":  472782,
                       "typeSymbols":  [
                                           "BoardStoreTests",
                                           "is",
@@ -2493,7 +2532,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/PrestagingAssignmentContractTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  19615,
+                      "sizeBytes":  20147,
                       "typeSymbols":  [
                                           "PrestagingAssignmentContractTests",
                                           "HandoffEnvelope"
@@ -2575,6 +2614,73 @@
                                             "Preset_identity_and_report_window_are_copied_but_do_not_affect_observed_calculation",
                                             "Public_model_does_not_expose_projection_or_capacity_promise_names",
                                             "ScheduleFitReport"
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
+                      "path":  "tests/ChairSide.Board.Tests/ReadyHandoffPersistenceTests.cs",
+                      "kind":  "CSharp",
+                      "sizeBytes":  50831,
+                      "typeSymbols":  [
+                                          "ReadyHandoffPersistenceTests",
+                                          "RoomSnapshot",
+                                          "HandoffSnapshot"
+                                      ],
+                      "methodSymbols":  [
+                                            "Fresh_database_contains_ready_handoff_schema_and_canonical_columns",
+                                            "Legacy_schema_migrates_without_fabricating_ready_handoffs_or_accepted_snapshots",
+                                            "Canonical_active_room_assignment_round_trips",
+                                            "Ready_handoff_creation_persists_active_reference_and_complete_snapshot",
+                                            "Ready_handoff_rejects_incomplete_assignment_without_persisting_side_effects",
+                                            "Withdrawn_handoff_allows_reissued_active_handoff_and_preserves_history",
+                                            "Accepted_handoff_updates_room_and_completed_cycle_atomically",
+                                            "Canceled_ready_handoff_termination_is_distinct_from_withdrawal",
+                                            "Expired_ready_handoff_termination_is_distinct_from_withdrawal",
+                                            "Failed_acceptance_rolls_back_handoff_outcome",
+                                            "Database_constraints_reject_second_active_and_second_accepted_handoff_for_episode",
+                                            "Ready_handoff_operations_reject_wrong_episode",
+                                            "Ready_handoff_operations_reject_wrong_room",
+                                            "Ready_handoff_operations_reject_stale_handoff_after_reissued_ready",
+                                            "Ready_handoff_operations_reject_missing_active_room_reference",
+                                            "Ready_handoff_operations_reject_changed_active_room_reference",
+                                            "Accepted_handoff_derives_completed_cycle_assignment_from_immutable_snapshot",
+                                            "New_canonical_assignment_writes_reject_legacy_ambiguous_state",
+                                            "Canonical_absent_assignment_is_a_strict_new_write",
+                                            "Create_ready_handoff_does_not_mutate_caller_on_duplicate_active_failure",
+                                            "Create_ready_handoff_does_not_mutate_caller_when_room_save_fails",
+                                            "Failed_withdrawal_rolls_back_room_and_handoff",
+                                            "Failed_ready_termination_rolls_back_room_handoff_and_aborted_history",
+                                            "AmbiguousCanonicalAssignments",
+                                            "CanonicalAssignments",
+                                            "ReadyRoom",
+                                            "CompleteAssignment",
+                                            "CompletedCycle",
+                                            "AbortedAssignment",
+                                            "LoadRoom",
+                                            "CopyRoom",
+                                            "AssertOperationFailsWithoutChanges",
+                                            "InvokeReadyHandoffOperation",
+                                            "CountRows",
+                                            "From",
+                                            "OpenConnection",
+                                            "GetColumnNames",
+                                            "GetTableNames",
+                                            "GetIndexNames",
+                                            "GetSchemaNames"
                                         ],
                       "routes":  [
 

@@ -315,6 +315,12 @@
                       "path":  "src/ChairSide.Board/Services/ReadyHandoffContracts.cs"
                   },
                   {
+                      "id":  "file:src/ChairSide.Board/Services/ReadyHandoffPersistenceRecords.cs",
+                      "label":  "src/ChairSide.Board/Services/ReadyHandoffPersistenceRecords.cs",
+                      "type":  "File",
+                      "path":  "src/ChairSide.Board/Services/ReadyHandoffPersistenceRecords.cs"
+                  },
+                  {
                       "id":  "file:src/ChairSide.Board/Services/ReportTrendSnapshot.cs",
                       "label":  "src/ChairSide.Board/Services/ReportTrendSnapshot.cs",
                       "type":  "File",
@@ -457,6 +463,12 @@
                       "label":  "tests/ChairSide.Board.Tests/ProjectionAssumptionChecklistTests.cs",
                       "type":  "File",
                       "path":  "tests/ChairSide.Board.Tests/ProjectionAssumptionChecklistTests.cs"
+                  },
+                  {
+                      "id":  "file:tests/ChairSide.Board.Tests/ReadyHandoffPersistenceTests.cs",
+                      "label":  "tests/ChairSide.Board.Tests/ReadyHandoffPersistenceTests.cs",
+                      "type":  "File",
+                      "path":  "tests/ChairSide.Board.Tests/ReadyHandoffPersistenceTests.cs"
                   },
                   {
                       "id":  "file:tests/ChairSide.Board.Tests/ReportTrendSnapshotTests.cs",
@@ -939,6 +951,12 @@
                       "path":  "tests/ChairSide.Board.Tests/PrestagingAssignmentContractTests.cs"
                   },
                   {
+                      "id":  "symbol:type:HandoffSnapshot",
+                      "label":  "HandoffSnapshot",
+                      "type":  "CodeType",
+                      "path":  "tests/ChairSide.Board.Tests/ReadyHandoffPersistenceTests.cs"
+                  },
+                  {
                       "id":  "symbol:type:is",
                       "label":  "is",
                       "type":  "CodeType",
@@ -1047,6 +1065,18 @@
                       "path":  "tests/ChairSide.Board.Tests/BoardStoreTests.cs"
                   },
                   {
+                      "id":  "symbol:type:PersistedReadyHandoff",
+                      "label":  "PersistedReadyHandoff",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/ReadyHandoffPersistenceRecords.cs"
+                  },
+                  {
+                      "id":  "symbol:type:PersistedRoomAssignment",
+                      "label":  "PersistedRoomAssignment",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/ReadyHandoffPersistenceRecords.cs"
+                  },
+                  {
                       "id":  "symbol:type:PrestagingAssignmentContractTests",
                       "label":  "PrestagingAssignmentContractTests",
                       "type":  "CodeType",
@@ -1119,10 +1149,22 @@
                       "path":  "src/ChairSide.Board/Services/ReadyHandoffContracts.cs"
                   },
                   {
+                      "id":  "symbol:type:ReadyHandoffPersistenceTests",
+                      "label":  "ReadyHandoffPersistenceTests",
+                      "type":  "CodeType",
+                      "path":  "tests/ChairSide.Board.Tests/ReadyHandoffPersistenceTests.cs"
+                  },
+                  {
                       "id":  "symbol:type:ReadyHandoffStatus",
                       "label":  "ReadyHandoffStatus",
                       "type":  "CodeType",
                       "path":  "src/ChairSide.Board/Services/ReadyHandoffContracts.cs"
+                  },
+                  {
+                      "id":  "symbol:type:ReadyHandoffTerminationKinds",
+                      "label":  "ReadyHandoffTerminationKinds",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/ReadyHandoffPersistenceRecords.cs"
                   },
                   {
                       "id":  "symbol:type:ReadyUrgency",
@@ -1291,6 +1333,12 @@
                       "label":  "RoomMutationRequestValidator",
                       "type":  "CodeType",
                       "path":  "src/ChairSide.Board/Services/RoomMutationRequestValidator.cs"
+                  },
+                  {
+                      "id":  "symbol:type:RoomSnapshot",
+                      "label":  "RoomSnapshot",
+                      "type":  "CodeType",
+                      "path":  "tests/ChairSide.Board.Tests/ReadyHandoffPersistenceTests.cs"
                   },
                   {
                       "id":  "symbol:type:RoomState",
@@ -2018,6 +2066,21 @@
                       "label":  "declares"
                   },
                   {
+                      "from":  "file:src/ChairSide.Board/Services/ReadyHandoffPersistenceRecords.cs",
+                      "to":  "symbol:type:PersistedReadyHandoff",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/ReadyHandoffPersistenceRecords.cs",
+                      "to":  "symbol:type:PersistedRoomAssignment",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/ReadyHandoffPersistenceRecords.cs",
+                      "to":  "symbol:type:ReadyHandoffTerminationKinds",
+                      "label":  "declares"
+                  },
+                  {
                       "from":  "file:src/ChairSide.Board/Services/ReportTrendSnapshot.cs",
                       "to":  "symbol:type:ReportTrendBucket",
                       "label":  "declares"
@@ -2260,6 +2323,21 @@
                   {
                       "from":  "file:tests/ChairSide.Board.Tests/ProjectionAssumptionChecklistTests.cs",
                       "to":  "symbol:type:ProjectionAssumptionChecklistTests",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:tests/ChairSide.Board.Tests/ReadyHandoffPersistenceTests.cs",
+                      "to":  "symbol:type:HandoffSnapshot",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:tests/ChairSide.Board.Tests/ReadyHandoffPersistenceTests.cs",
+                      "to":  "symbol:type:ReadyHandoffPersistenceTests",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:tests/ChairSide.Board.Tests/ReadyHandoffPersistenceTests.cs",
+                      "to":  "symbol:type:RoomSnapshot",
                       "label":  "declares"
                   },
                   {
@@ -2539,6 +2617,11 @@
                   },
                   {
                       "from":  "repo:chairside",
+                      "to":  "file:src/ChairSide.Board/Services/ReadyHandoffPersistenceRecords.cs",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
                       "to":  "file:src/ChairSide.Board/Services/ReportTrendSnapshot.cs",
                       "label":  "contains"
                   },
@@ -2655,6 +2738,11 @@
                   {
                       "from":  "repo:chairside",
                       "to":  "file:tests/ChairSide.Board.Tests/ProjectionAssumptionChecklistTests.cs",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:tests/ChairSide.Board.Tests/ReadyHandoffPersistenceTests.cs",
                       "label":  "contains"
                   },
                   {
