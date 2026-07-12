@@ -525,6 +525,12 @@
                       "path":  "src/ChairSide.Board/Program.cs"
                   },
                   {
+                      "id":  "route:/api/rooms/{roomNumber:int}/cancel-prestage",
+                      "label":  "/api/rooms/{roomNumber:int}/cancel-prestage",
+                      "type":  "Route",
+                      "path":  "src/ChairSide.Board/Program.cs"
+                  },
+                  {
                       "id":  "route:/api/rooms/{roomNumber:int}/cancel-seating",
                       "label":  "/api/rooms/{roomNumber:int}/cancel-seating",
                       "type":  "Route",
@@ -549,6 +555,12 @@
                       "path":  "src/ChairSide.Board/Program.cs"
                   },
                   {
+                      "id":  "route:/api/rooms/{roomNumber:int}/prestage",
+                      "label":  "/api/rooms/{roomNumber:int}/prestage",
+                      "type":  "Route",
+                      "path":  "src/ChairSide.Board/Program.cs"
+                  },
+                  {
                       "id":  "route:/api/rooms/{roomNumber:int}/ready-for-doctor",
                       "label":  "/api/rooms/{roomNumber:int}/ready-for-doctor",
                       "type":  "Route",
@@ -561,10 +573,22 @@
                       "path":  "src/ChairSide.Board/Program.cs"
                   },
                   {
+                      "id":  "route:/api/rooms/{roomNumber:int}/update-assignment",
+                      "label":  "/api/rooms/{roomNumber:int}/update-assignment",
+                      "type":  "Route",
+                      "path":  "src/ChairSide.Board/Program.cs"
+                  },
+                  {
                       "id":  "route:/boardHub",
                       "label":  "/boardHub",
                       "type":  "Route",
                       "path":  "src/ChairSide.Board/Program.cs"
+                  },
+                  {
+                      "id":  "symbol:type:AbortedRoomAssignment",
+                      "label":  "AbortedRoomAssignment",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/DemoBoardStore.cs"
                   },
                   {
                       "id":  "symbol:type:AdminAccessGuard",
@@ -609,8 +633,26 @@
                       "path":  "src/ChairSide.Board/Services/DemoBoardStore.cs"
                   },
                   {
+                      "id":  "symbol:type:always",
+                      "label":  "always",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/DemoBoardStore.cs"
+                  },
+                  {
+                      "id":  "symbol:type:and",
+                      "label":  "and",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/SqliteBoardRepository.cs"
+                  },
+                  {
                       "id":  "symbol:type:AuditRequestContext",
                       "label":  "AuditRequestContext",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Program.cs"
+                  },
+                  {
+                      "id":  "symbol:type:BeginPrestageRequest",
+                      "label":  "BeginPrestageRequest",
                       "type":  "CodeType",
                       "path":  "src/ChairSide.Board/Program.cs"
                   },
@@ -661,6 +703,30 @@
                       "label":  "Bucket",
                       "type":  "CodeType",
                       "path":  "src/ChairSide.Board/Services/ClientErrorRateLimiter.cs"
+                  },
+                  {
+                      "id":  "symbol:type:CancellationReasons",
+                      "label":  "CancellationReasons",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/DemoBoardStore.cs"
+                  },
+                  {
+                      "id":  "symbol:type:CancelRequestParser",
+                      "label":  "CancelRequestParser",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Program.cs"
+                  },
+                  {
+                      "id":  "symbol:type:CancelRoomAssignmentRequest",
+                      "label":  "CancelRoomAssignmentRequest",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Program.cs"
+                  },
+                  {
+                      "id":  "symbol:type:carries",
+                      "label":  "carries",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/SqliteBoardRepository.cs"
                   },
                   {
                       "id":  "symbol:type:ClientErrorEntry",
@@ -801,6 +867,18 @@
                       "path":  "src/ChairSide.Board/Services/DemoBoardStore.cs"
                   },
                   {
+                      "id":  "symbol:type:exists",
+                      "label":  "exists",
+                      "type":  "CodeType",
+                      "path":  "tests/ChairSide.Board.Tests/BoardStoreTests.cs"
+                  },
+                  {
+                      "id":  "symbol:type:for",
+                      "label":  "for",
+                      "type":  "CodeType",
+                      "path":  "tests/ChairSide.Board.Tests/BoardStoreTests.cs"
+                  },
+                  {
                       "id":  "symbol:type:is",
                       "label":  "is",
                       "type":  "CodeType",
@@ -885,10 +963,34 @@
                       "path":  "src/ChairSide.Board/Services/ProjectionAssumptionChecklist.cs"
                   },
                   {
+                      "id":  "symbol:type:of",
+                      "label":  "of",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/DemoBoardStore.cs"
+                  },
+                  {
+                      "id":  "symbol:type:on",
+                      "label":  "on",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/SqliteBoardRepository.cs"
+                  },
+                  {
+                      "id":  "symbol:type:ParsedSeatRequest",
+                      "label":  "ParsedSeatRequest",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Program.cs"
+                  },
+                  {
                       "id":  "symbol:type:persisted",
                       "label":  "persisted",
                       "type":  "CodeType",
                       "path":  "tests/ChairSide.Board.Tests/BoardStoreTests.cs"
+                  },
+                  {
+                      "id":  "symbol:type:ProcedureAliasResolver",
+                      "label":  "ProcedureAliasResolver",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Program.cs"
                   },
                   {
                       "id":  "symbol:type:ProcedureCategory",
@@ -1053,6 +1155,12 @@
                       "path":  "src/ChairSide.Board/Services/RoomExpirationService.cs"
                   },
                   {
+                      "id":  "symbol:type:RoomLifecycleEndpointHandler",
+                      "label":  "RoomLifecycleEndpointHandler",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Program.cs"
+                  },
+                  {
                       "id":  "symbol:type:RoomMutationRequestValidator",
                       "label":  "RoomMutationRequestValidator",
                       "type":  "CodeType",
@@ -1113,6 +1221,12 @@
                       "path":  "src/ChairSide.Board/Services/ScheduleFitCalculator.cs"
                   },
                   {
+                      "id":  "symbol:type:SeatRequestParser",
+                      "label":  "SeatRequestParser",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Program.cs"
+                  },
+                  {
                       "id":  "symbol:type:SeatRoomRequest",
                       "label":  "SeatRoomRequest",
                       "type":  "CodeType",
@@ -1121,6 +1235,12 @@
                   {
                       "id":  "symbol:type:SeedReportDataResult",
                       "label":  "SeedReportDataResult",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/DemoBoardStore.cs"
+                  },
+                  {
+                      "id":  "symbol:type:so",
+                      "label":  "so",
                       "type":  "CodeType",
                       "path":  "src/ChairSide.Board/Services/DemoBoardStore.cs"
                   },
@@ -1143,10 +1263,16 @@
                       "path":  "src/ChairSide.Board/Services/DemoBoardStore.cs"
                   },
                   {
+                      "id":  "symbol:type:StrictJsonRequestReader",
+                      "label":  "StrictJsonRequestReader",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Program.cs"
+                  },
+                  {
                       "id":  "symbol:type:struct",
                       "label":  "struct",
                       "type":  "CodeType",
-                      "path":  "src/ChairSide.Board/Services/DemoBoardStore.cs"
+                      "path":  "src/ChairSide.Board/Program.cs"
                   },
                   {
                       "id":  "symbol:type:SyntheticFamily",
@@ -1157,6 +1283,12 @@
                   {
                       "id":  "symbol:type:SyntheticJitter",
                       "label":  "SyntheticJitter",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/DemoBoardStore.cs"
+                  },
+                  {
+                      "id":  "symbol:type:TerminationKinds",
+                      "label":  "TerminationKinds",
                       "type":  "CodeType",
                       "path":  "src/ChairSide.Board/Services/DemoBoardStore.cs"
                   },
@@ -1177,6 +1309,12 @@
                       "label":  "TestWorkspace",
                       "type":  "CodeType",
                       "path":  "tests/ChairSide.Board.Tests/BoardStoreTests.cs"
+                  },
+                  {
+                      "id":  "symbol:type:the",
+                      "label":  "the",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/SqliteBoardRepository.cs"
                   },
                   {
                       "id":  "symbol:type:UpdateAssignmentRequest",
@@ -1328,6 +1466,11 @@
                   },
                   {
                       "from":  "file:src/ChairSide.Board/Program.cs",
+                      "to":  "route:/api/rooms/{roomNumber:int}/cancel-prestage",
+                      "label":  "maps"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Program.cs",
                       "to":  "route:/api/rooms/{roomNumber:int}/cancel-seating",
                       "label":  "maps"
                   },
@@ -1348,6 +1491,11 @@
                   },
                   {
                       "from":  "file:src/ChairSide.Board/Program.cs",
+                      "to":  "route:/api/rooms/{roomNumber:int}/prestage",
+                      "label":  "maps"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Program.cs",
                       "to":  "route:/api/rooms/{roomNumber:int}/ready-for-doctor",
                       "label":  "maps"
                   },
@@ -1358,12 +1506,32 @@
                   },
                   {
                       "from":  "file:src/ChairSide.Board/Program.cs",
+                      "to":  "route:/api/rooms/{roomNumber:int}/update-assignment",
+                      "label":  "maps"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Program.cs",
                       "to":  "route:/boardHub",
                       "label":  "maps"
                   },
                   {
                       "from":  "file:src/ChairSide.Board/Program.cs",
                       "to":  "symbol:type:AuditRequestContext",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Program.cs",
+                      "to":  "symbol:type:BeginPrestageRequest",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Program.cs",
+                      "to":  "symbol:type:CancelRequestParser",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Program.cs",
+                      "to":  "symbol:type:CancelRoomAssignmentRequest",
                       "label":  "declares"
                   },
                   {
@@ -1388,12 +1556,42 @@
                   },
                   {
                       "from":  "file:src/ChairSide.Board/Program.cs",
+                      "to":  "symbol:type:ParsedSeatRequest",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Program.cs",
+                      "to":  "symbol:type:ProcedureAliasResolver",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Program.cs",
                       "to":  "symbol:type:ResolveDoctorArrivalConflictRequest",
                       "label":  "declares"
                   },
                   {
                       "from":  "file:src/ChairSide.Board/Program.cs",
+                      "to":  "symbol:type:RoomLifecycleEndpointHandler",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Program.cs",
+                      "to":  "symbol:type:SeatRequestParser",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Program.cs",
                       "to":  "symbol:type:SeatRoomRequest",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Program.cs",
+                      "to":  "symbol:type:StrictJsonRequestReader",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Program.cs",
+                      "to":  "symbol:type:struct",
                       "label":  "declares"
                   },
                   {
@@ -1428,12 +1626,27 @@
                   },
                   {
                       "from":  "file:src/ChairSide.Board/Services/DemoBoardStore.cs",
+                      "to":  "symbol:type:AbortedRoomAssignment",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/DemoBoardStore.cs",
                       "to":  "symbol:type:AllocationVarianceSummary",
                       "label":  "declares"
                   },
                   {
                       "from":  "file:src/ChairSide.Board/Services/DemoBoardStore.cs",
+                      "to":  "symbol:type:always",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/DemoBoardStore.cs",
                       "to":  "symbol:type:BoardSnapshot",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/DemoBoardStore.cs",
+                      "to":  "symbol:type:CancellationReasons",
                       "label":  "declares"
                   },
                   {
@@ -1518,6 +1731,11 @@
                   },
                   {
                       "from":  "file:src/ChairSide.Board/Services/DemoBoardStore.cs",
+                      "to":  "symbol:type:of",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/DemoBoardStore.cs",
                       "to":  "symbol:type:ProcedureCategory",
                       "label":  "declares"
                   },
@@ -1573,6 +1791,11 @@
                   },
                   {
                       "from":  "file:src/ChairSide.Board/Services/DemoBoardStore.cs",
+                      "to":  "symbol:type:so",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/DemoBoardStore.cs",
                       "to":  "symbol:type:StressFixtureResult",
                       "label":  "declares"
                   },
@@ -1589,6 +1812,11 @@
                   {
                       "from":  "file:src/ChairSide.Board/Services/DemoBoardStore.cs",
                       "to":  "symbol:type:SyntheticJitter",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/DemoBoardStore.cs",
+                      "to":  "symbol:type:TerminationKinds",
                       "label":  "declares"
                   },
                   {
@@ -1703,12 +1931,42 @@
                   },
                   {
                       "from":  "file:src/ChairSide.Board/Services/SqliteBoardRepository.cs",
+                      "to":  "symbol:type:and",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/SqliteBoardRepository.cs",
+                      "to":  "symbol:type:carries",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/SqliteBoardRepository.cs",
+                      "to":  "symbol:type:on",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/SqliteBoardRepository.cs",
                       "to":  "symbol:type:SqliteBoardRepository",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/SqliteBoardRepository.cs",
+                      "to":  "symbol:type:the",
                       "label":  "declares"
                   },
                   {
                       "from":  "file:tests/ChairSide.Board.Tests/BoardStoreTests.cs",
                       "to":  "symbol:type:BoardStoreTests",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:tests/ChairSide.Board.Tests/BoardStoreTests.cs",
+                      "to":  "symbol:type:exists",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:tests/ChairSide.Board.Tests/BoardStoreTests.cs",
+                      "to":  "symbol:type:for",
                       "label":  "declares"
                   },
                   {
