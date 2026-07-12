@@ -309,10 +309,22 @@
                       "path":  "src/ChairSide.Board/Services/ProjectionAssumptionChecklist.cs"
                   },
                   {
+                      "id":  "file:src/ChairSide.Board/Services/ReadyHandoffContracts.cs",
+                      "label":  "src/ChairSide.Board/Services/ReadyHandoffContracts.cs",
+                      "type":  "File",
+                      "path":  "src/ChairSide.Board/Services/ReadyHandoffContracts.cs"
+                  },
+                  {
                       "id":  "file:src/ChairSide.Board/Services/ReportTrendSnapshot.cs",
                       "label":  "src/ChairSide.Board/Services/ReportTrendSnapshot.cs",
                       "type":  "File",
                       "path":  "src/ChairSide.Board/Services/ReportTrendSnapshot.cs"
+                  },
+                  {
+                      "id":  "file:src/ChairSide.Board/Services/RoomAssignmentContracts.cs",
+                      "label":  "src/ChairSide.Board/Services/RoomAssignmentContracts.cs",
+                      "type":  "File",
+                      "path":  "src/ChairSide.Board/Services/RoomAssignmentContracts.cs"
                   },
                   {
                       "id":  "file:src/ChairSide.Board/Services/RoomDeviceBindingGuard.cs",
@@ -433,6 +445,12 @@
                       "label":  "tests/ChairSide.Board.Tests/ChairSide.Board.Tests.csproj",
                       "type":  "File",
                       "path":  "tests/ChairSide.Board.Tests/ChairSide.Board.Tests.csproj"
+                  },
+                  {
+                      "id":  "file:tests/ChairSide.Board.Tests/PrestagingAssignmentContractTests.cs",
+                      "label":  "tests/ChairSide.Board.Tests/PrestagingAssignmentContractTests.cs",
+                      "type":  "File",
+                      "path":  "tests/ChairSide.Board.Tests/PrestagingAssignmentContractTests.cs"
                   },
                   {
                       "id":  "file:tests/ChairSide.Board.Tests/ProjectionAssumptionChecklistTests.cs",
@@ -651,6 +669,18 @@
                       "path":  "src/ChairSide.Board/Services/SqliteBoardRepository.cs"
                   },
                   {
+                      "id":  "symbol:type:AssignmentCompleteness",
+                      "label":  "AssignmentCompleteness",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/RoomAssignmentContracts.cs"
+                  },
+                  {
+                      "id":  "symbol:type:AssignmentCompletenessEvaluator",
+                      "label":  "AssignmentCompletenessEvaluator",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/RoomAssignmentContracts.cs"
+                  },
+                  {
                       "id":  "symbol:type:AuditRequestContext",
                       "label":  "AuditRequestContext",
                       "type":  "CodeType",
@@ -727,6 +757,12 @@
                       "label":  "CancelRoomAssignmentRequest",
                       "type":  "CodeType",
                       "path":  "src/ChairSide.Board/Program.cs"
+                  },
+                  {
+                      "id":  "symbol:type:CanonicalRoomLifecycleState",
+                      "label":  "CanonicalRoomLifecycleState",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/RoomAssignmentContracts.cs"
                   },
                   {
                       "id":  "symbol:type:carries",
@@ -879,10 +915,28 @@
                       "path":  "tests/ChairSide.Board.Tests/BoardStoreTests.cs"
                   },
                   {
+                      "id":  "symbol:type:ExpectedAllocationContract",
+                      "label":  "ExpectedAllocationContract",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/RoomAssignmentContracts.cs"
+                  },
+                  {
+                      "id":  "symbol:type:ExpectedAllocationState",
+                      "label":  "ExpectedAllocationState",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/RoomAssignmentContracts.cs"
+                  },
+                  {
                       "id":  "symbol:type:for",
                       "label":  "for",
                       "type":  "CodeType",
                       "path":  "tests/ChairSide.Board.Tests/BoardStoreTests.cs"
+                  },
+                  {
+                      "id":  "symbol:type:HandoffEnvelope",
+                      "label":  "HandoffEnvelope",
+                      "type":  "CodeType",
+                      "path":  "tests/ChairSide.Board.Tests/PrestagingAssignmentContractTests.cs"
                   },
                   {
                       "id":  "symbol:type:is",
@@ -993,6 +1047,12 @@
                       "path":  "tests/ChairSide.Board.Tests/BoardStoreTests.cs"
                   },
                   {
+                      "id":  "symbol:type:PrestagingAssignmentContractTests",
+                      "label":  "PrestagingAssignmentContractTests",
+                      "type":  "CodeType",
+                      "path":  "tests/ChairSide.Board.Tests/PrestagingAssignmentContractTests.cs"
+                  },
+                  {
                       "id":  "symbol:type:ProcedureAliasResolver",
                       "label":  "ProcedureAliasResolver",
                       "type":  "CodeType",
@@ -1053,6 +1113,30 @@
                       "path":  "src/ChairSide.Board/Services/ProjectionAssumptionChecklist.cs"
                   },
                   {
+                      "id":  "symbol:type:ReadyHandoffContract",
+                      "label":  "ReadyHandoffContract",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/ReadyHandoffContracts.cs"
+                  },
+                  {
+                      "id":  "symbol:type:ReadyHandoffStatus",
+                      "label":  "ReadyHandoffStatus",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/ReadyHandoffContracts.cs"
+                  },
+                  {
+                      "id":  "symbol:type:ReadyUrgency",
+                      "label":  "ReadyUrgency",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/RoomAssignmentContracts.cs"
+                  },
+                  {
+                      "id":  "symbol:type:ReadyUrgencyEvaluator",
+                      "label":  "ReadyUrgencyEvaluator",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/RoomAssignmentContracts.cs"
+                  },
+                  {
                       "id":  "symbol:type:ReportingExceptionReasons",
                       "label":  "ReportingExceptionReasons",
                       "type":  "CodeType",
@@ -1107,10 +1191,28 @@
                       "path":  "src/ChairSide.Board/Services/DemoBoardStore.cs"
                   },
                   {
+                      "id":  "symbol:type:RoomAssignmentContract",
+                      "label":  "RoomAssignmentContract",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/RoomAssignmentContracts.cs"
+                  },
+                  {
                       "id":  "symbol:type:RoomAuditEntry",
                       "label":  "RoomAuditEntry",
                       "type":  "CodeType",
                       "path":  "src/ChairSide.Board/Services/DiagnosticLogger.cs"
+                  },
+                  {
+                      "id":  "symbol:type:RoomCapabilities",
+                      "label":  "RoomCapabilities",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/RoomAssignmentContracts.cs"
+                  },
+                  {
+                      "id":  "symbol:type:RoomCapabilitiesEvaluator",
+                      "label":  "RoomCapabilitiesEvaluator",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/RoomAssignmentContracts.cs"
                   },
                   {
                       "id":  "symbol:type:RoomDeviceBindingGuard",
@@ -1159,6 +1261,24 @@
                       "label":  "RoomExpirationService",
                       "type":  "CodeType",
                       "path":  "src/ChairSide.Board/Services/RoomExpirationService.cs"
+                  },
+                  {
+                      "id":  "symbol:type:RoomIntegrityFault",
+                      "label":  "RoomIntegrityFault",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/RoomAssignmentContracts.cs"
+                  },
+                  {
+                      "id":  "symbol:type:RoomIntegrityFaultCode",
+                      "label":  "RoomIntegrityFaultCode",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/RoomAssignmentContracts.cs"
+                  },
+                  {
+                      "id":  "symbol:type:RoomIntegrityFaultEvaluator",
+                      "label":  "RoomIntegrityFaultEvaluator",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/RoomAssignmentContracts.cs"
                   },
                   {
                       "id":  "symbol:type:RoomLifecycleEndpointHandler",
@@ -1237,6 +1357,18 @@
                       "label":  "SeatRoomRequest",
                       "type":  "CodeType",
                       "path":  "src/ChairSide.Board/Program.cs"
+                  },
+                  {
+                      "id":  "symbol:type:SedationContract",
+                      "label":  "SedationContract",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/RoomAssignmentContracts.cs"
+                  },
+                  {
+                      "id":  "symbol:type:SedationState",
+                      "label":  "SedationState",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/RoomAssignmentContracts.cs"
                   },
                   {
                       "id":  "symbol:type:SeedReportDataResult",
@@ -1876,6 +2008,16 @@
                       "label":  "declares"
                   },
                   {
+                      "from":  "file:src/ChairSide.Board/Services/ReadyHandoffContracts.cs",
+                      "to":  "symbol:type:ReadyHandoffContract",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/ReadyHandoffContracts.cs",
+                      "to":  "symbol:type:ReadyHandoffStatus",
+                      "label":  "declares"
+                  },
+                  {
                       "from":  "file:src/ChairSide.Board/Services/ReportTrendSnapshot.cs",
                       "to":  "symbol:type:ReportTrendBucket",
                       "label":  "declares"
@@ -1888,6 +2030,81 @@
                   {
                       "from":  "file:src/ChairSide.Board/Services/ReportTrendSnapshot.cs",
                       "to":  "symbol:type:ReportTrendSnapshotBuilder",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/RoomAssignmentContracts.cs",
+                      "to":  "symbol:type:AssignmentCompleteness",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/RoomAssignmentContracts.cs",
+                      "to":  "symbol:type:AssignmentCompletenessEvaluator",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/RoomAssignmentContracts.cs",
+                      "to":  "symbol:type:CanonicalRoomLifecycleState",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/RoomAssignmentContracts.cs",
+                      "to":  "symbol:type:ExpectedAllocationContract",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/RoomAssignmentContracts.cs",
+                      "to":  "symbol:type:ExpectedAllocationState",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/RoomAssignmentContracts.cs",
+                      "to":  "symbol:type:ReadyUrgency",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/RoomAssignmentContracts.cs",
+                      "to":  "symbol:type:ReadyUrgencyEvaluator",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/RoomAssignmentContracts.cs",
+                      "to":  "symbol:type:RoomAssignmentContract",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/RoomAssignmentContracts.cs",
+                      "to":  "symbol:type:RoomCapabilities",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/RoomAssignmentContracts.cs",
+                      "to":  "symbol:type:RoomCapabilitiesEvaluator",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/RoomAssignmentContracts.cs",
+                      "to":  "symbol:type:RoomIntegrityFault",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/RoomAssignmentContracts.cs",
+                      "to":  "symbol:type:RoomIntegrityFaultCode",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/RoomAssignmentContracts.cs",
+                      "to":  "symbol:type:RoomIntegrityFaultEvaluator",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/RoomAssignmentContracts.cs",
+                      "to":  "symbol:type:SedationContract",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/RoomAssignmentContracts.cs",
+                      "to":  "symbol:type:SedationState",
                       "label":  "declares"
                   },
                   {
@@ -2028,6 +2245,16 @@
                   {
                       "from":  "file:tests/ChairSide.Board.Tests/BoardStoreTests.cs",
                       "to":  "symbol:type:TestWorkspace",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:tests/ChairSide.Board.Tests/PrestagingAssignmentContractTests.cs",
+                      "to":  "symbol:type:HandoffEnvelope",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:tests/ChairSide.Board.Tests/PrestagingAssignmentContractTests.cs",
+                      "to":  "symbol:type:PrestagingAssignmentContractTests",
                       "label":  "declares"
                   },
                   {
@@ -2307,7 +2534,17 @@
                   },
                   {
                       "from":  "repo:chairside",
+                      "to":  "file:src/ChairSide.Board/Services/ReadyHandoffContracts.cs",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
                       "to":  "file:src/ChairSide.Board/Services/ReportTrendSnapshot.cs",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:src/ChairSide.Board/Services/RoomAssignmentContracts.cs",
                       "label":  "contains"
                   },
                   {
@@ -2408,6 +2645,11 @@
                   {
                       "from":  "repo:chairside",
                       "to":  "file:tests/ChairSide.Board.Tests/ChairSide.Board.Tests.csproj",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:tests/ChairSide.Board.Tests/PrestagingAssignmentContractTests.cs",
                       "label":  "contains"
                   },
                   {
