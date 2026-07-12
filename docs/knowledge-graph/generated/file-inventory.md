@@ -10,6 +10,7 @@ This file is mechanical output from `tools/knowledge-graph/New-ChairSideKnowledg
 | `AGENTS.md` | Markdown | headings: AGENTS, ChairSide Project Brief, Project name, Purpose, Scope, Repository orientation and token discipline, Private development knowledge graph, PR knowledge-impact check | - |
 | `ChairSide.Board.sln` | Solution | - | - |
 | `CLAUDE.md` | Markdown | headings: Claude Code note | - |
+| `docs/design/prestage-assignment-lifecycle.md` | Markdown | headings: Prestaging Assignment Lifecycle, Status and traceability, Operational problem and approved intent, Primary lifecycle, Ready urgency model, Assignment completeness model, Normal assignment entry, Ready handoff and assignment lock | - |
 | `docs/executive-summary.md` | Markdown | headings: Executive Summary | - |
 | `docs/knowledge/_meta/tag-dictionary.md` | Markdown | headings: ChairSide Knowledge Tag Dictionary, 1. Title and purpose, 2. Agent reading order, 3. Source-truth relationship, 4. Canonical tag rules, 5. Canonical project-area tags, 6. Canonical domain-concept tags, 7. Canonical artifact/status tags | - |
 | `docs/knowledge/product/non-phi-boundary.md` | Markdown | headings: Non-PHI boundary, Intent, Constraints, Source anchors, Verification notes | - |

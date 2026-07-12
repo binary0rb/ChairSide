@@ -1,7 +1,7 @@
 ﻿{
     "generatedStamp":  "deterministic",
     "root":  ".",
-    "fileCount":  76,
+    "fileCount":  77,
     "files":  [
                   {
                       "path":  ".github/pull_request_template.md",
@@ -126,6 +126,50 @@
                                           ],
                       "headings":  [
                                        "Claude Code note"
+                                   ]
+                  },
+                  {
+                      "path":  "docs/design/prestage-assignment-lifecycle.md",
+                      "kind":  "Markdown",
+                      "sizeBytes":  16667,
+                      "typeSymbols":  [
+
+                                      ],
+                      "methodSymbols":  [
+
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+                                       "Prestaging Assignment Lifecycle",
+                                       "Status and traceability",
+                                       "Operational problem and approved intent",
+                                       "Primary lifecycle",
+                                       "Ready urgency model",
+                                       "Assignment completeness model",
+                                       "Normal assignment entry",
+                                       "Ready handoff and assignment lock",
+                                       "Withdraw Ready",
+                                       "Room-page behavior",
+                                       "Master-board behavior",
+                                       "Doctor-view behavior",
+                                       "Persistence, contracts, and atomicity",
+                                       "Cancellation, expiration, recovery, and compatibility",
+                                       "Reporting semantics",
+                                       "Explicit non-goals",
+                                       "Acceptance scenarios",
+                                       "Future implementation decomposition",
+                                       "Superseded Gate A assumptions"
                                    ]
                   },
                   {

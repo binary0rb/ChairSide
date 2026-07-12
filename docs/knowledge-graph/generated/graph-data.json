@@ -27,6 +27,12 @@
                       "path":  "CLAUDE.md"
                   },
                   {
+                      "id":  "file:docs/design/prestage-assignment-lifecycle.md",
+                      "label":  "docs/design/prestage-assignment-lifecycle.md",
+                      "type":  "File",
+                      "path":  "docs/design/prestage-assignment-lifecycle.md"
+                  },
+                  {
                       "id":  "file:docs/executive-summary.md",
                       "label":  "docs/executive-summary.md",
                       "type":  "File",
@@ -2062,6 +2068,11 @@
                   {
                       "from":  "repo:chairside",
                       "to":  "file:CLAUDE.md",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:docs/design/prestage-assignment-lifecycle.md",
                       "label":  "contains"
                   },
                   {
