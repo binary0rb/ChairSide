@@ -62,7 +62,7 @@ const app = {
 const stateNames = ["empty", "seated", "aging", "stale", "ready-for-doctor", "doctor-in-room", "turnover"];
 // States where "Ready for Doctor" button is enabled (only the neutral In Prep state).
 const activeSeatedStates = new Set(["seated"]);
-// States where corrections (cancel/update) are available - all states before Doctor Arrived.
+// States where cancellation is available. Assignment editing is separately locked at Ready.
 const cancelableStates = new Set(["seated", "ready-for-doctor", "aging", "stale"]);
 // States where "Doctor Arrived" is enabled - all ready-for-doctor phase states.
 const doctorArrivedStates = new Set(["ready-for-doctor", "aging", "stale"]);
@@ -3066,7 +3066,7 @@ function normalizeState(room) {
     return "doctor-in-room";
   }
 
-  // aging and stale are server-authoritative states in the Ready for Doctor phase.
+  // Legacy persisted aging/stale values remain readable Ready-phase compatibility states.
   // Return them directly; do NOT re-compute from seatedAt (which never escalates).
   if (raw === "aging" || raw === "stale") {
     return raw;
@@ -3879,7 +3879,7 @@ function wireRoomPanel() {
     }
 
     if (!cancelableStates.has(currentRoomState())) {
-      setRoomActionStatus("Update Assignment is only available before Doctor Arrived.", "error");
+      setRoomActionStatus("Update Assignment is only available while the room is in prep or seated.", "error");
       return;
     }
 

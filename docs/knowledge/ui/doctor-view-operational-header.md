@@ -1,7 +1,7 @@
 ---
 title: Doctor View operational header
 tags: [ui-cohesion, doctors, room, design-decision, active, last-verified]
-last_verified_commit: cfce40c
+last_verified_commit: pending-issue-119
 ---
 
 # Doctor View operational header
@@ -35,9 +35,9 @@ The empty fourth quadrant in the 3-room state is reserved layout capacity - quie
 
 ## Room counting: assignment-based, not state-filtered
 
-The current-room frame's per-doctor room count is assignment-based, not state-filtered. A room counts toward a doctor's frame whenever it is assigned to that doctor, in any non-`AVAILABLE` state - including `IN ROOM` and `TURNOVER`, not just the pre-arrival wait states (`IN PREP`, `READY`, `AGING`, `STALE`). `AVAILABLE` rooms never count, but only because room reset clears the assigned doctor (the room's assignment becomes null), not because of the `AVAILABLE` state itself.
+The current-room frame's per-doctor room count is assignment-based, not state-filtered. A room counts toward a doctor's frame whenever it is assigned to that doctor, in any non-`AVAILABLE` state - including `IN ROOM` and `TURNOVER`, not just the pre-arrival primary states (`PRESTAGING`, `IN PREP`, and `READY`). Aging and Stale are secondary Ready urgency projections, not new primary states. `AVAILABLE` rooms never count, but only because room reset clears the assigned doctor (the room's assignment becomes null), not because of the `AVAILABLE` state itself.
 
-This means a doctor who still has an assigned `IN ROOM` or `TURNOVER` room, in addition to newly-seated rooms, shows a higher current-room count than the pre-arrival room count alone would suggest. Deterministic stress fixtures that need an exact posture count (1, 3, 4, or 5+ rooms) keep every counted room in a pre-arrival state for that reason, so the intended count is never accidentally inflated by an assigned `IN ROOM`/`TURNOVER` room. See `docs/knowledge/tests/deterministic-stress-fixtures.md`.
+This means a doctor who still has an assigned `IN ROOM` or `TURNOVER` room, in addition to newly-seated rooms, shows a higher current-room count than the pre-arrival room count alone would suggest. Deterministic Doctor View fixtures that need an exact posture count (1, 3, 4, or 5+ rooms) keep every counted room in `Seated` or canonical `ReadyForDoctor`; threshold-relative Ready times exercise Aging/Stale urgency without persisting those labels as primary states. See `docs/knowledge/tests/deterministic-stress-fixtures.md`.
 
 Source: `src/ChairSide.Board/wwwroot/board.js`, `renderDoctorView`'s room filter - `room.assignedDoctor === doctor.id || (room.doctor && room.doctor.id === doctor.id)`, with no state predicate.
 

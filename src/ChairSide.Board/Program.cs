@@ -1,3 +1,5 @@
+using System.Text.Json;
+
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Options;
 
@@ -309,59 +311,13 @@ app.MapPost("/api/client-errors", async (
     return Results.NoContent();
 });
 
-app.MapPost("/api/rooms/{roomNumber:int}/seat", async Task<IResult> (
-    int roomNumber,
-    SeatRoomRequest request,
-    HttpContext httpContext,
-    RoomDeviceTokenValidator roomDeviceTokenValidator,
-    DemoBoardStore store,
-    DiagnosticLogger diagnosticLogger,
-    Microsoft.AspNetCore.SignalR.IHubContext<BoardHub> hubContext) =>
-{
-    var auditCtx = AuditRequestContext.From(httpContext);
-    var previousRoom = store.GetRoom(roomNumber);
-    var procedureCode = (request.ProcedureCode ?? request.ProcedureId)?.Trim();
-    var doctorId = request.DoctorId?.Trim();
+app.MapPost("/api/rooms/{roomNumber:int}/prestage", RoomLifecycleEndpointHandler.BeginPrestageAsync);
+app.MapPost("/api/rooms/{roomNumber:int}/seat", RoomLifecycleEndpointHandler.SeatAsync);
 
-    var bindingFailure = RoomDeviceBindingGuard.ValidateMutationRequest(
-        roomNumber,
-        httpContext.Request,
-        roomDeviceTokenValidator);
-    if (bindingFailure is not null)
-    {
-        await diagnosticLogger.LogRoomAuditAsync(auditCtx.Build(
-            "seat", roomNumber, previousRoom, null, false, "binding-rejected",
-            previousRoom?.AssignedDoctor, previousRoom?.ProcedureCode));
-        return bindingFailure;
-    }
-
-    var validationError = RoomMutationRequestValidator.ValidateDoctorAndProcedure(doctorId, procedureCode);
-    if (validationError is not null)
-    {
-        await diagnosticLogger.LogRoomAuditAsync(auditCtx.Build(
-            "seat", roomNumber, previousRoom, null, false, "validation-failed",
-            doctorId, procedureCode));
-        return Results.BadRequest(validationError);
-    }
-
-    var result = store.SeatRoom(roomNumber, doctorId!, procedureCode!, request.DemoElapsedMinutes, request.Sedation, request.ExpectedAllocationUnits);
-    if (result is null)
-    {
-        var reason = store.IsConfiguredRoom(roomNumber) ? "state-rejected" : "room-not-found";
-        await diagnosticLogger.LogRoomAuditAsync(auditCtx.Build(
-            "seat", roomNumber, previousRoom, null, false, reason,
-            doctorId, procedureCode));
-        return store.IsConfiguredRoom(roomNumber)
-            ? Results.BadRequest("Seat Room is only available when the room is available and the selected doctor and procedure are valid.")
-            : Results.NotFound("Room is not configured.");
-    }
-
-    await diagnosticLogger.LogRoomAuditAsync(auditCtx.Build(
-        "seat", roomNumber, previousRoom, result, true, null,
-        result.AssignedDoctor, result.ProcedureCode));
-    await hubContext.Clients.All.SendAsync("boardUpdated", store.GetSnapshot());
-    return Results.Ok(result);
-});
+// Canonical draft assignment correction: distinct from the legacy /assignment route below because
+// this request shape also carries expected-allocation updates. Allowed only while the room is
+// Prestaging or Seated; see DemoBoardStore.UpdateRoomAssignment.
+app.MapPost("/api/rooms/{roomNumber:int}/update-assignment", RoomLifecycleEndpointHandler.UpdateRoomAssignmentAsync);
 
 app.MapPost("/api/rooms/{roomNumber:int}/assignment", async Task<IResult> (
     int roomNumber,
@@ -406,7 +362,7 @@ app.MapPost("/api/rooms/{roomNumber:int}/assignment", async Task<IResult> (
             "update-assignment", roomNumber, previousRoom, null, false, reason,
             doctorId, procedureCode));
         return store.IsConfiguredRoom(roomNumber)
-            ? Results.BadRequest("Update Assignment is only available for seated, aging, stale, or ready-for-doctor rooms with a valid doctor and procedure.")
+            ? Results.BadRequest("Update Assignment is only available while the room is prestaging or seated, with a valid doctor and procedure.")
             : Results.NotFound("Room is not configured.");
     }
 
@@ -417,47 +373,8 @@ app.MapPost("/api/rooms/{roomNumber:int}/assignment", async Task<IResult> (
     return Results.Ok(result);
 });
 
-app.MapPost("/api/rooms/{roomNumber:int}/cancel-seating", async Task<IResult> (
-    int roomNumber,
-    HttpContext httpContext,
-    RoomDeviceTokenValidator roomDeviceTokenValidator,
-    DemoBoardStore store,
-    DiagnosticLogger diagnosticLogger,
-    Microsoft.AspNetCore.SignalR.IHubContext<BoardHub> hubContext) =>
-{
-    var auditCtx = AuditRequestContext.From(httpContext);
-    var previousRoom = store.GetRoom(roomNumber);
-
-    var bindingFailure = RoomDeviceBindingGuard.ValidateMutationRequest(
-        roomNumber,
-        httpContext.Request,
-        roomDeviceTokenValidator);
-    if (bindingFailure is not null)
-    {
-        await diagnosticLogger.LogRoomAuditAsync(auditCtx.Build(
-            "cancel-seating", roomNumber, previousRoom, null, false, "binding-rejected",
-            previousRoom?.AssignedDoctor, previousRoom?.ProcedureCode));
-        return bindingFailure;
-    }
-
-    var result = store.CancelSeating(roomNumber);
-    if (result is null)
-    {
-        var reason = store.IsConfiguredRoom(roomNumber) ? "state-rejected" : "room-not-found";
-        await diagnosticLogger.LogRoomAuditAsync(auditCtx.Build(
-            "cancel-seating", roomNumber, previousRoom, null, false, reason,
-            previousRoom?.AssignedDoctor, previousRoom?.ProcedureCode));
-        return store.IsConfiguredRoom(roomNumber)
-            ? Results.BadRequest("Cancel Seating is only available for seated, aging, stale, or ready-for-doctor rooms.")
-            : Results.NotFound("Room is not configured.");
-    }
-
-    await diagnosticLogger.LogRoomAuditAsync(auditCtx.Build(
-        "cancel-seating", roomNumber, previousRoom, result, true, null,
-        previousRoom?.AssignedDoctor, previousRoom?.ProcedureCode));
-    await hubContext.Clients.All.SendAsync("boardUpdated", store.GetSnapshot());
-    return Results.Ok(result);
-});
+app.MapPost("/api/rooms/{roomNumber:int}/cancel-prestage", RoomLifecycleEndpointHandler.CancelPrestageAsync);
+app.MapPost("/api/rooms/{roomNumber:int}/cancel-seating", RoomLifecycleEndpointHandler.CancelSeatingAsync);
 
 app.MapPost("/api/rooms/{roomNumber:int}/ready-for-doctor", async Task<IResult> (
     int roomNumber,
@@ -490,7 +407,7 @@ app.MapPost("/api/rooms/{roomNumber:int}/ready-for-doctor", async Task<IResult> 
             "ready-for-doctor", roomNumber, previousRoom, null, false, reason,
             previousRoom?.AssignedDoctor, previousRoom?.ProcedureCode));
         return store.IsConfiguredRoom(roomNumber)
-            ? Results.BadRequest("Ready for Doctor is only available for seated, aging, or stale rooms.")
+            ? Results.BadRequest("Ready for Doctor requires a seated room with a complete, currently valid, durably saved assignment.")
             : Results.NotFound("Room is not configured.");
     }
 
@@ -771,21 +688,756 @@ return 0;
 // Request / response types
 // ---------------------------------------------------------------------------
 
-public sealed record SeatRoomRequest(
-    string DoctorId,
+public sealed record BeginPrestageRequest(
+    string? DoctorId = null,
     string? ProcedureCode = null,
     string? ProcedureId = null,
-    int DemoElapsedMinutes = 0,
     bool Sedation = false,
     // Optional final confirmed expected allocation in 10-minute units. When omitted, the
     // selected procedure's default expected units are used. Operational metadata only - never PHI.
     int? ExpectedAllocationUnits = null);
+
+// Canonical Seat transport contract. This is the ONLY publicly declared shape for POST .../seat: it
+// carries no doctor, procedure, sedation, or allocation fields. The temporary assignment-bearing
+// compatibility shape (for the currently checked-in room-panel UI) is parsed manually from the raw
+// request body - see RoomLifecycleEndpointHandler.SeatAsync and SeatRequestParser - specifically so
+// it is never exposed as part of this public contract.
+public sealed record SeatRoomRequest(int DemoElapsedMinutes = 0);
+
+public sealed record CancelRoomAssignmentRequest(string? CancellationReason = null);
 
 public sealed record UpdateAssignmentRequest(
     string DoctorId,
     string? ProcedureCode = null,
     string? ProcedureId = null,
     bool Sedation = false);
+
+// Resolves the procedureCode / procedureId alias pair supplied to Begin Prestage and to the
+// assignment-bearing compatibility Seat request. Both fields name the same procedure historically;
+// neither is preferred over the other. null means the alias was omitted entirely, which is always
+// acceptable when the other alias is valid. A SUPPLIED blank or whitespace-only alias, by contrast,
+// is invalid input and is rejected outright - it is not silently treated as omitted, because a caller
+// that explicitly sent an empty string most likely made a mistake rather than intending "no alias."
+// When both aliases are supplied and valid they must agree, case-insensitively after trimming, or the
+// request is rejected with a conflict error - in every rejection case, before any store mutation.
+public static class ProcedureAliasResolver
+{
+    public static ProcedureAliasResolution Resolve(string? procedureCode, string? procedureId)
+    {
+        if (IsBlankButSupplied(procedureCode))
+        {
+            return new ProcedureAliasResolution(null, "procedureCode must not be blank.");
+        }
+
+        if (IsBlankButSupplied(procedureId))
+        {
+            return new ProcedureAliasResolution(null, "procedureId must not be blank.");
+        }
+
+        var code = procedureCode?.Trim();
+        var id = procedureId?.Trim();
+
+        if (code is null)
+        {
+            return new ProcedureAliasResolution(id, null);
+        }
+
+        if (id is null)
+        {
+            return new ProcedureAliasResolution(code, null);
+        }
+
+        return string.Equals(code, id, StringComparison.OrdinalIgnoreCase)
+            ? new ProcedureAliasResolution(code, null)
+            : new ProcedureAliasResolution(null, $"procedureCode ('{code}') and procedureId ('{id}') do not match.");
+    }
+
+    // True only when the value is non-null but reduces to nothing after trimming (e.g. "" or "   ").
+    // A null value is omitted, not blank, and is never rejected here.
+    private static bool IsBlankButSupplied(string? value) =>
+        value is not null && value.Trim().Length == 0;
+}
+
+// ProcedureCode is the resolved alias to use (may itself be null when neither alias was supplied -
+// callers fall back to the existing missing-procedure validation for that case). ConflictError is
+// set only when both aliases were supplied and disagreed; callers must return 400 before mutating.
+public readonly record struct ProcedureAliasResolution(string? ProcedureCode, string? ConflictError);
+
+// Strict JSON request-body reading shared by Seat and the cancellation routes. No new HTTP test
+// harness or NuGet package is introduced: this reads HttpRequest.Body directly so the real parsing
+// path is exercised by DefaultHttpContext-based tests, not by constructing a bound DTO.
+internal static class StrictJsonRequestReader
+{
+    // No body, an empty body, and a whitespace-only body are all treated as an empty JSON object,
+    // regardless of Content-Type - this preserves the existing reasonless caller (Cancel Seating
+    // today sends no body and no Content-Type header at all). A non-empty body must declare a JSON
+    // content type and parse to a JSON object; anything else is the project's normal 400 behavior.
+    public static async Task<(JsonElement Root, IResult? Error)> ReadObjectAsync(HttpRequest request)
+    {
+        string raw;
+        using (var reader = new StreamReader(request.Body, leaveOpen: true))
+        {
+            raw = await reader.ReadToEndAsync();
+        }
+
+        if (string.IsNullOrWhiteSpace(raw))
+        {
+            using var empty = JsonDocument.Parse("{}");
+            return (empty.RootElement.Clone(), null);
+        }
+
+        if (!request.HasJsonContentType())
+        {
+            return (default, Results.BadRequest("Unsupported content type. Expected application/json."));
+        }
+
+        JsonDocument document;
+        try
+        {
+            document = JsonDocument.Parse(raw);
+        }
+        catch (JsonException)
+        {
+            return (default, Results.BadRequest("Malformed JSON request body."));
+        }
+
+        using (document)
+        {
+            if (document.RootElement.ValueKind != JsonValueKind.Object)
+            {
+                return (default, Results.BadRequest("Request body must be a JSON object."));
+            }
+
+            return (document.RootElement.Clone(), null);
+        }
+    }
+
+    // Rejects any property name outside the allow-list (case-insensitive) and rejects case-variant
+    // duplicate property names within the same object (JsonDocument does not deduplicate these).
+    public static IResult? ValidatePropertySet(JsonElement root, IReadOnlyCollection<string> allowedProperties)
+    {
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var property in root.EnumerateObject())
+        {
+            if (!seen.Add(property.Name))
+            {
+                return Results.BadRequest($"Duplicate property '{property.Name}' in request body.");
+            }
+
+            if (!allowedProperties.Contains(property.Name))
+            {
+                return Results.BadRequest($"Unknown property '{property.Name}' in request body.");
+            }
+        }
+
+        return null;
+    }
+}
+
+// Parsed Seat request. Internal: this is never bound automatically by ASP.NET model binding (that is
+// exactly Defect 2/3 this replaces) - RoomLifecycleEndpointHandler.SeatAsync builds it explicitly
+// from the raw JSON body after property-set validation.
+//
+// HasCompatibilityAssignmentPayload is set by SeatRequestParser from JSON PROPERTY PRESENCE, not from
+// the resolved field values below - a caller sending {"sedation": false} or {"doctorId": null} has
+// still supplied an assignment-bearing property and must be routed into compatibility validation
+// (and rejected there as incomplete), not silently treated as a canonical bare Seat request.
+internal sealed record ParsedSeatRequest(
+    int DemoElapsedMinutes,
+    string? DoctorId,
+    string? ProcedureCode,
+    string? ProcedureId,
+    bool Sedation,
+    int? ExpectedAllocationUnits,
+    bool HasCompatibilityAssignmentPayload);
+
+internal static class SeatRequestParser
+{
+    // Canonical (demoElapsedMinutes) plus the temporary compatibility fields, finalized from the
+    // exact property set the currently checked-in room-panel JS sends (board.js sendSeatRoom).
+    public static readonly IReadOnlyCollection<string> AllowedProperties = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+    {
+        "demoElapsedMinutes", "doctorId", "procedureCode", "procedureId", "sedation", "expectedAllocationUnits"
+    };
+
+    public static bool TryParse(JsonElement root, out ParsedSeatRequest parsed, out IResult? error)
+    {
+        var demoElapsedMinutes = 0;
+        string? doctorId = null;
+        string? procedureCode = null;
+        string? procedureId = null;
+        var sedation = false;
+        int? expectedAllocationUnits = null;
+
+        // Set on PROPERTY NAME PRESENCE alone, before the value is even inspected - a request that
+        // supplies one of these five properties is assignment-bearing regardless of whether the
+        // value turns out to be null or false. Never derived from the parsed values below.
+        var hasCompatibilityAssignmentPayload = false;
+
+        foreach (var property in root.EnumerateObject())
+        {
+            if (property.NameEquals("demoElapsedMinutes"))
+            {
+                if (!TryGetInt(property.Value, out demoElapsedMinutes))
+                {
+                    parsed = null!;
+                    error = Results.BadRequest("demoElapsedMinutes must be an integer.");
+                    return false;
+                }
+            }
+            else if (property.NameEquals("doctorId"))
+            {
+                hasCompatibilityAssignmentPayload = true;
+                if (!TryGetNullableString(property.Value, out doctorId))
+                {
+                    parsed = null!;
+                    error = Results.BadRequest("doctorId must be a string or null.");
+                    return false;
+                }
+            }
+            else if (property.NameEquals("procedureCode"))
+            {
+                hasCompatibilityAssignmentPayload = true;
+                if (!TryGetNullableString(property.Value, out procedureCode))
+                {
+                    parsed = null!;
+                    error = Results.BadRequest("procedureCode must be a string or null.");
+                    return false;
+                }
+            }
+            else if (property.NameEquals("procedureId"))
+            {
+                hasCompatibilityAssignmentPayload = true;
+                if (!TryGetNullableString(property.Value, out procedureId))
+                {
+                    parsed = null!;
+                    error = Results.BadRequest("procedureId must be a string or null.");
+                    return false;
+                }
+            }
+            else if (property.NameEquals("sedation"))
+            {
+                hasCompatibilityAssignmentPayload = true;
+                if (property.Value.ValueKind is not (JsonValueKind.True or JsonValueKind.False))
+                {
+                    parsed = null!;
+                    error = Results.BadRequest("sedation must be a boolean.");
+                    return false;
+                }
+
+                sedation = property.Value.GetBoolean();
+            }
+            else if (property.NameEquals("expectedAllocationUnits"))
+            {
+                hasCompatibilityAssignmentPayload = true;
+                if (!TryGetNullableInt(property.Value, out expectedAllocationUnits))
+                {
+                    parsed = null!;
+                    error = Results.BadRequest("expectedAllocationUnits must be an integer or null.");
+                    return false;
+                }
+            }
+
+            // Any other property name is already rejected by ValidatePropertySet before this runs.
+        }
+
+        parsed = new ParsedSeatRequest(
+            demoElapsedMinutes, doctorId, procedureCode, procedureId, sedation, expectedAllocationUnits,
+            hasCompatibilityAssignmentPayload);
+        error = null;
+        return true;
+    }
+
+    private static bool TryGetInt(JsonElement value, out int result)
+    {
+        result = 0;
+        return value.ValueKind == JsonValueKind.Number && value.TryGetInt32(out result);
+    }
+
+    private static bool TryGetNullableInt(JsonElement value, out int? result)
+    {
+        if (value.ValueKind == JsonValueKind.Null)
+        {
+            result = null;
+            return true;
+        }
+
+        if (value.ValueKind == JsonValueKind.Number && value.TryGetInt32(out var parsed))
+        {
+            result = parsed;
+            return true;
+        }
+
+        result = null;
+        return false;
+    }
+
+    private static bool TryGetNullableString(JsonElement value, out string? result)
+    {
+        if (value.ValueKind == JsonValueKind.Null)
+        {
+            result = null;
+            return true;
+        }
+
+        if (value.ValueKind == JsonValueKind.String)
+        {
+            result = value.GetString();
+            return true;
+        }
+
+        result = null;
+        return false;
+    }
+}
+
+// Parses the shared optional-cancellation-reason body for both Cancel Prestage and Cancel Seating.
+internal static class CancelRequestParser
+{
+    public static readonly IReadOnlyCollection<string> AllowedProperties = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+    {
+        "cancellationReason"
+    };
+
+    public static bool TryParse(JsonElement root, out string? cancellationReason, out IResult? error)
+    {
+        cancellationReason = null;
+        error = null;
+
+        foreach (var property in root.EnumerateObject())
+        {
+            if (!property.NameEquals("cancellationReason"))
+            {
+                // Any other property name is already rejected by ValidatePropertySet before this runs.
+                continue;
+            }
+
+            if (property.Value.ValueKind == JsonValueKind.Null)
+            {
+                cancellationReason = null;
+            }
+            else if (property.Value.ValueKind == JsonValueKind.String)
+            {
+                cancellationReason = property.Value.GetString();
+            }
+            else
+            {
+                error = Results.BadRequest("cancellationReason must be a string or null.");
+                return false;
+            }
+        }
+
+        return true;
+    }
+}
+
+public static class RoomLifecycleEndpointHandler
+{
+    public static async Task<IResult> BeginPrestageAsync(
+        int roomNumber,
+        BeginPrestageRequest request,
+        HttpContext httpContext,
+        RoomDeviceTokenValidator roomDeviceTokenValidator,
+        DemoBoardStore store,
+        DiagnosticLogger diagnosticLogger,
+        IHubContext<BoardHub> hubContext)
+    {
+        var auditCtx = AuditRequestContext.From(httpContext);
+        var previousRoom = store.GetRoom(roomNumber);
+
+        var bindingFailure = RoomDeviceBindingGuard.ValidateMutationRequest(
+            roomNumber,
+            httpContext.Request,
+            roomDeviceTokenValidator);
+        if (bindingFailure is not null)
+        {
+            await diagnosticLogger.LogRoomAuditAsync(auditCtx.Build(
+                "begin-prestage", roomNumber, previousRoom, null, false, "binding-rejected",
+                previousRoom?.AssignedDoctor, previousRoom?.ProcedureCode));
+            return bindingFailure;
+        }
+
+        var aliasResolution = ProcedureAliasResolver.Resolve(request.ProcedureCode, request.ProcedureId);
+        if (aliasResolution.ConflictError is not null)
+        {
+            await diagnosticLogger.LogRoomAuditAsync(auditCtx.Build(
+                "begin-prestage", roomNumber, previousRoom, null, false, "validation-failed",
+                previousRoom?.AssignedDoctor, previousRoom?.ProcedureCode));
+            return Results.BadRequest(aliasResolution.ConflictError);
+        }
+
+        var procedureCode = aliasResolution.ProcedureCode;
+        var doctorId = request.DoctorId?.Trim();
+
+        var validationError = RoomMutationRequestValidator.ValidateDoctorAndProcedure(doctorId, procedureCode);
+        if (validationError is not null)
+        {
+            await diagnosticLogger.LogRoomAuditAsync(auditCtx.Build(
+                "begin-prestage", roomNumber, previousRoom, null, false, "validation-failed",
+                doctorId, procedureCode));
+            return Results.BadRequest(validationError);
+        }
+
+        var result = store.BeginPrestage(roomNumber, doctorId!, procedureCode!, request.Sedation, request.ExpectedAllocationUnits);
+        if (result is null)
+        {
+            var reason = store.IsConfiguredRoom(roomNumber) ? "state-rejected" : "room-not-found";
+            await diagnosticLogger.LogRoomAuditAsync(auditCtx.Build(
+                "begin-prestage", roomNumber, previousRoom, null, false, reason,
+                doctorId, procedureCode));
+            return store.IsConfiguredRoom(roomNumber)
+                ? Results.BadRequest("Begin Prestage is only available when the room is available and the selected doctor and procedure are valid.")
+                : Results.NotFound("Room is not configured.");
+        }
+
+        await diagnosticLogger.LogRoomAuditAsync(auditCtx.Build(
+            "begin-prestage", roomNumber, previousRoom, result, true, null,
+            result.AssignedDoctor, result.ProcedureCode));
+        await hubContext.Clients.All.SendAsync("boardUpdated", store.GetSnapshot());
+        return Results.Ok(result);
+    }
+
+    // Canonical draft assignment correction. Distinct from the legacy /assignment endpoint above
+    // because this route also corrects the expected-allocation snapshot. Reuses BeginPrestageRequest unchanged - the
+    // request shape is identical (doctorId, procedureCode/procedureId, sedation,
+    // expectedAllocationUnits; no demo timing field) - and the same alias-resolution and
+    // doctor/procedure validation BeginPrestage already uses, so there is no second, competing
+    // validation model for this assignment shape.
+    public static async Task<IResult> UpdateRoomAssignmentAsync(
+        int roomNumber,
+        BeginPrestageRequest request,
+        HttpContext httpContext,
+        RoomDeviceTokenValidator roomDeviceTokenValidator,
+        DemoBoardStore store,
+        DiagnosticLogger diagnosticLogger,
+        IHubContext<BoardHub> hubContext)
+    {
+        const string action = "update-room-assignment";
+        var auditCtx = AuditRequestContext.From(httpContext);
+        var previousRoom = store.GetRoom(roomNumber);
+
+        var bindingFailure = RoomDeviceBindingGuard.ValidateMutationRequest(
+            roomNumber,
+            httpContext.Request,
+            roomDeviceTokenValidator);
+        if (bindingFailure is not null)
+        {
+            await diagnosticLogger.LogRoomAuditAsync(auditCtx.Build(
+                action, roomNumber, previousRoom, null, false, "binding-rejected",
+                previousRoom?.AssignedDoctor, previousRoom?.ProcedureCode));
+            return bindingFailure;
+        }
+
+        var aliasResolution = ProcedureAliasResolver.Resolve(request.ProcedureCode, request.ProcedureId);
+        if (aliasResolution.ConflictError is not null)
+        {
+            await diagnosticLogger.LogRoomAuditAsync(auditCtx.Build(
+                action, roomNumber, previousRoom, null, false, "validation-failed",
+                previousRoom?.AssignedDoctor, previousRoom?.ProcedureCode));
+            return Results.BadRequest(aliasResolution.ConflictError);
+        }
+
+        var procedureCode = aliasResolution.ProcedureCode;
+        var doctorId = request.DoctorId?.Trim();
+
+        var validationError = RoomMutationRequestValidator.ValidateDoctorAndProcedure(doctorId, procedureCode);
+        if (validationError is not null)
+        {
+            await diagnosticLogger.LogRoomAuditAsync(auditCtx.Build(
+                action, roomNumber, previousRoom, null, false, "validation-failed",
+                doctorId, procedureCode));
+            return Results.BadRequest(validationError);
+        }
+
+        var result = store.UpdateRoomAssignment(roomNumber, doctorId!, procedureCode!, request.Sedation, request.ExpectedAllocationUnits);
+        if (result is null)
+        {
+            var reason = store.IsConfiguredRoom(roomNumber) ? "state-rejected" : "room-not-found";
+            await diagnosticLogger.LogRoomAuditAsync(auditCtx.Build(
+                action, roomNumber, previousRoom, null, false, reason,
+                doctorId, procedureCode));
+            return store.IsConfiguredRoom(roomNumber)
+                ? Results.BadRequest("Update Room Assignment is only available while the room is prestaging or seated, with a valid doctor and procedure.")
+                : Results.NotFound("Room is not configured.");
+        }
+
+        await diagnosticLogger.LogRoomAuditAsync(auditCtx.Build(
+            action, roomNumber, previousRoom, result, true, null,
+            result.AssignedDoctor, result.ProcedureCode));
+        await hubContext.Clients.All.SendAsync("boardUpdated", store.GetSnapshot());
+        return Results.Ok(result);
+    }
+
+    public static async Task<IResult> SeatAsync(
+        int roomNumber,
+        HttpContext httpContext,
+        RoomDeviceTokenValidator roomDeviceTokenValidator,
+        DemoBoardStore store,
+        IWebHostEnvironment environment,
+        DiagnosticLogger diagnosticLogger,
+        IHubContext<BoardHub> hubContext)
+    {
+        var auditCtx = AuditRequestContext.From(httpContext);
+        var previousRoom = store.GetRoom(roomNumber);
+
+        var bindingFailure = RoomDeviceBindingGuard.ValidateMutationRequest(
+            roomNumber,
+            httpContext.Request,
+            roomDeviceTokenValidator);
+        if (bindingFailure is not null)
+        {
+            await diagnosticLogger.LogRoomAuditAsync(auditCtx.Build(
+                "seat", roomNumber, previousRoom, null, false, "binding-rejected",
+                previousRoom?.AssignedDoctor, previousRoom?.ProcedureCode));
+            return bindingFailure;
+        }
+
+        var (root, bodyError) = await StrictJsonRequestReader.ReadObjectAsync(httpContext.Request);
+        if (bodyError is not null)
+        {
+            await diagnosticLogger.LogRoomAuditAsync(auditCtx.Build(
+                "seat", roomNumber, previousRoom, null, false, "validation-failed",
+                previousRoom?.AssignedDoctor, previousRoom?.ProcedureCode));
+            return bodyError;
+        }
+
+        var propertyError = StrictJsonRequestReader.ValidatePropertySet(root, SeatRequestParser.AllowedProperties);
+        if (propertyError is not null)
+        {
+            await diagnosticLogger.LogRoomAuditAsync(auditCtx.Build(
+                "seat", roomNumber, previousRoom, null, false, "validation-failed",
+                previousRoom?.AssignedDoctor, previousRoom?.ProcedureCode));
+            return propertyError;
+        }
+
+        if (!SeatRequestParser.TryParse(root, out var request, out var parseError))
+        {
+            await diagnosticLogger.LogRoomAuditAsync(auditCtx.Build(
+                "seat", roomNumber, previousRoom, null, false, "validation-failed",
+                previousRoom?.AssignedDoctor, previousRoom?.ProcedureCode));
+            return parseError!;
+        }
+
+        RoomStatus? result;
+        string? doctorId = null;
+        string? procedureCode = null;
+        if (request.HasCompatibilityAssignmentPayload)
+        {
+            // TEMPORARY COMPATIBILITY: the currently checked-in room-panel UI still posts this old
+            // assignment-bearing seat body. This two-step Begin Prestage -> Seat Room bridge is not
+            // given a new atomic store method; a small residual concurrency window between the two
+            // store calls is accepted as temporary. Remove this branch once the UI moves to Begin
+            // Prestage + bare Seat Room directly.
+            //
+            // Validate the simulation and the procedure alias before BeginPrestage so a rejected
+            // compatibility request cannot leave an unintended prestaged assignment behind. SeatRoom
+            // remains authoritative too.
+            var demoValidationError = ValidateCompatibilityDemoElapsedMinutes(request.DemoElapsedMinutes, environment);
+            if (demoValidationError is not null)
+            {
+                await diagnosticLogger.LogRoomAuditAsync(auditCtx.Build(
+                    "seat", roomNumber, previousRoom, null, false, "validation-failed",
+                    previousRoom?.AssignedDoctor, previousRoom?.ProcedureCode));
+                return Results.BadRequest(demoValidationError);
+            }
+
+            var aliasResolution = ProcedureAliasResolver.Resolve(request.ProcedureCode, request.ProcedureId);
+            if (aliasResolution.ConflictError is not null)
+            {
+                await diagnosticLogger.LogRoomAuditAsync(auditCtx.Build(
+                    "seat", roomNumber, previousRoom, null, false, "validation-failed",
+                    previousRoom?.AssignedDoctor, previousRoom?.ProcedureCode));
+                return Results.BadRequest(aliasResolution.ConflictError);
+            }
+
+            procedureCode = aliasResolution.ProcedureCode;
+            doctorId = request.DoctorId?.Trim();
+            var validationError = RoomMutationRequestValidator.ValidateDoctorAndProcedure(doctorId, procedureCode);
+            if (validationError is not null)
+            {
+                await diagnosticLogger.LogRoomAuditAsync(auditCtx.Build(
+                    "seat", roomNumber, previousRoom, null, false, "validation-failed",
+                    doctorId, procedureCode));
+                return Results.BadRequest(validationError);
+            }
+
+            if (store.BeginPrestage(roomNumber, doctorId!, procedureCode!, request.Sedation, request.ExpectedAllocationUnits) is null)
+            {
+                return await SeatRejectedAsync(
+                    roomNumber,
+                    previousRoom,
+                    doctorId,
+                    procedureCode,
+                    auditCtx,
+                    store,
+                    diagnosticLogger,
+                    "Seat Room compatibility requests are only available when the room is available and the selected doctor and procedure are valid.");
+            }
+
+            result = store.SeatRoom(roomNumber, request.DemoElapsedMinutes);
+        }
+        else
+        {
+            result = store.SeatRoom(roomNumber, request.DemoElapsedMinutes);
+        }
+
+        if (result is null)
+        {
+            return await SeatRejectedAsync(
+                roomNumber,
+                previousRoom,
+                doctorId,
+                procedureCode,
+                auditCtx,
+                store,
+                diagnosticLogger,
+                "Seat Room is only available from Prestaging.");
+        }
+
+        await diagnosticLogger.LogRoomAuditAsync(auditCtx.Build(
+            "seat", roomNumber, previousRoom, result, true, null,
+            result.AssignedDoctor, result.ProcedureCode));
+        await hubContext.Clients.All.SendAsync("boardUpdated", store.GetSnapshot());
+        return Results.Ok(result);
+    }
+
+    public static Task<IResult> CancelPrestageAsync(
+        int roomNumber,
+        HttpContext httpContext,
+        RoomDeviceTokenValidator roomDeviceTokenValidator,
+        DemoBoardStore store,
+        DiagnosticLogger diagnosticLogger,
+        IHubContext<BoardHub> hubContext) =>
+        CancelIncompleteAssignmentAsync(
+            "cancel-prestage",
+            "Cancel Prestage is only available for prestaging rooms with a valid cancellation reason.",
+            roomNumber,
+            httpContext,
+            roomDeviceTokenValidator,
+            store,
+            diagnosticLogger,
+            hubContext,
+            store.CancelPrestage);
+
+    public static Task<IResult> CancelSeatingAsync(
+        int roomNumber,
+        HttpContext httpContext,
+        RoomDeviceTokenValidator roomDeviceTokenValidator,
+        DemoBoardStore store,
+        DiagnosticLogger diagnosticLogger,
+        IHubContext<BoardHub> hubContext) =>
+        CancelIncompleteAssignmentAsync(
+            "cancel-seating",
+            "Cancel Seating is only available for seated, aging, stale, or ready-for-doctor rooms with a valid cancellation reason.",
+            roomNumber,
+            httpContext,
+            roomDeviceTokenValidator,
+            store,
+            diagnosticLogger,
+            hubContext,
+            store.CancelSeating);
+
+    private static async Task<IResult> CancelIncompleteAssignmentAsync(
+        string action,
+        string rejectedMessage,
+        int roomNumber,
+        HttpContext httpContext,
+        RoomDeviceTokenValidator roomDeviceTokenValidator,
+        DemoBoardStore store,
+        DiagnosticLogger diagnosticLogger,
+        IHubContext<BoardHub> hubContext,
+        Func<int, string?, RoomStatus?> cancel)
+    {
+        var auditCtx = AuditRequestContext.From(httpContext);
+        var previousRoom = store.GetRoom(roomNumber);
+
+        var bindingFailure = RoomDeviceBindingGuard.ValidateMutationRequest(
+            roomNumber,
+            httpContext.Request,
+            roomDeviceTokenValidator);
+        if (bindingFailure is not null)
+        {
+            await diagnosticLogger.LogRoomAuditAsync(auditCtx.Build(
+                action, roomNumber, previousRoom, null, false, "binding-rejected",
+                previousRoom?.AssignedDoctor, previousRoom?.ProcedureCode));
+            return bindingFailure;
+        }
+
+        var (root, bodyError) = await StrictJsonRequestReader.ReadObjectAsync(httpContext.Request);
+        if (bodyError is not null)
+        {
+            await diagnosticLogger.LogRoomAuditAsync(auditCtx.Build(
+                action, roomNumber, previousRoom, null, false, "validation-failed",
+                previousRoom?.AssignedDoctor, previousRoom?.ProcedureCode));
+            return bodyError;
+        }
+
+        var propertyError = StrictJsonRequestReader.ValidatePropertySet(root, CancelRequestParser.AllowedProperties);
+        if (propertyError is not null)
+        {
+            await diagnosticLogger.LogRoomAuditAsync(auditCtx.Build(
+                action, roomNumber, previousRoom, null, false, "validation-failed",
+                previousRoom?.AssignedDoctor, previousRoom?.ProcedureCode));
+            return propertyError;
+        }
+
+        if (!CancelRequestParser.TryParse(root, out var cancellationReason, out var parseError))
+        {
+            await diagnosticLogger.LogRoomAuditAsync(auditCtx.Build(
+                action, roomNumber, previousRoom, null, false, "validation-failed",
+                previousRoom?.AssignedDoctor, previousRoom?.ProcedureCode));
+            return parseError!;
+        }
+
+        var result = cancel(roomNumber, cancellationReason);
+        if (result is null)
+        {
+            var reason = store.IsConfiguredRoom(roomNumber) ? "state-rejected" : "room-not-found";
+            await diagnosticLogger.LogRoomAuditAsync(auditCtx.Build(
+                action, roomNumber, previousRoom, null, false, reason,
+                previousRoom?.AssignedDoctor, previousRoom?.ProcedureCode));
+            return store.IsConfiguredRoom(roomNumber)
+                ? Results.BadRequest(rejectedMessage)
+                : Results.NotFound("Room is not configured.");
+        }
+
+        await diagnosticLogger.LogRoomAuditAsync(auditCtx.Build(
+            action, roomNumber, previousRoom, result, true, null,
+            previousRoom?.AssignedDoctor, previousRoom?.ProcedureCode));
+        await hubContext.Clients.All.SendAsync("boardUpdated", store.GetSnapshot());
+        return Results.Ok(result);
+    }
+
+    private static async Task<IResult> SeatRejectedAsync(
+        int roomNumber,
+        RoomStatus? previousRoom,
+        string? doctorId,
+        string? procedureCode,
+        AuditRequestContext auditCtx,
+        DemoBoardStore store,
+        DiagnosticLogger diagnosticLogger,
+        string rejectedMessage)
+    {
+        var reason = store.IsConfiguredRoom(roomNumber) ? "state-rejected" : "room-not-found";
+        await diagnosticLogger.LogRoomAuditAsync(auditCtx.Build(
+            "seat", roomNumber, previousRoom, null, false, reason, doctorId, procedureCode));
+        return store.IsConfiguredRoom(roomNumber)
+            ? Results.BadRequest(rejectedMessage)
+            : Results.NotFound("Room is not configured.");
+    }
+
+    private static string? ValidateCompatibilityDemoElapsedMinutes(int demoElapsedMinutes, IWebHostEnvironment environment)
+    {
+        if (demoElapsedMinutes is < 0 or > 240)
+        {
+            return "demoElapsedMinutes must be between 0 and 240.";
+        }
+
+        return demoElapsedMinutes > 0 && !environment.IsDevelopment()
+            ? "demoElapsedMinutes is only available in Development."
+            : null;
+    }
+}
 
 /// <summary>
 /// Body for POST /api/reports/cycles/mark-exception.

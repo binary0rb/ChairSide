@@ -58,6 +58,7 @@ public sealed class DemoBoardStore
     private readonly List<Doctor> _activeDoctors;
     private readonly List<ProcedureCategory> _procedures;
     private readonly List<ProcedureCategory> _activeProcedures;
+    private readonly bool _demoOffsetsAllowed;
 
     private readonly List<RoomState> _rooms;
     private readonly List<RoomEvent> _events = [];
@@ -84,24 +85,24 @@ public sealed class DemoBoardStore
         _timeProvider = timeProvider ?? TimeProvider.System;
         _roomCount = boardOptions.Value.RoomCount;
         _demoTimerEnabled = boardUiOptions.Value.DemoTimerEnabled ?? !environment.IsProduction();
+        _demoOffsetsAllowed = environment.IsDevelopment();
         _doctors = BuildDoctors(doctorRosterOptions.Value).ToList();
         _activeDoctors = BuildDoctors(doctorRosterOptions.Value, activeOnly: true).ToList();
         _procedures = BuildProcedures(procedureRosterOptions.Value).ToList();
         _activeProcedures = BuildProcedures(procedureRosterOptions.Value, activeOnly: true).ToList();
         var now = Now;
 
-        var hasPersistedRooms = _repository.HasAnyRoomRows();
+        var hasOperationalData = _repository.HasOperationalData();
         _repository.EnsureConfiguredRooms(_roomCount);
         _rooms = _repository.LoadRooms(_roomCount).ToList();
         AddMissingRooms();
-        RecomputeLoadedRoomStates(now);
 
-        if (!hasPersistedRooms && !environment.IsProduction())
+        if (!hasOperationalData && !environment.IsProduction())
         {
             SeedDemoRooms(now);
+            _repository.SaveRooms(_rooms, _doctors, _procedures);
         }
 
-        _repository.SaveRooms(_rooms, _doctors, _procedures);
         _completedCycles = _repository.LoadCompletedCycles().ToList();
     }
 
@@ -110,8 +111,6 @@ public sealed class DemoBoardStore
         lock (_syncRoot)
         {
             var now = Now;
-            _rooms.ForEach(room => UpdateRoomState(room, now));
-
             return new BoardSnapshot(
                 now,
                 _roomCount,
@@ -138,7 +137,6 @@ public sealed class DemoBoardStore
             }
 
             var now = Now;
-            UpdateRoomState(room, now);
             return ToRoomStatus(room, now);
         }
     }
@@ -151,86 +149,211 @@ public sealed class DemoBoardStore
         }
     }
 
-    public RoomStatus? SeatRoom(int roomNumber, string doctorId, string procedureCode, int demoElapsedMinutes = 0, bool sedation = false, int? expectedAllocationUnits = null)
+    public RoomStatus? BeginPrestage(int roomNumber)
+    {
+        return BeginPrestage(
+            roomNumber,
+            RoomAssignmentContract.Create(
+                null,
+                null,
+                SedationContract.UnavailableNoProcedure(),
+                ExpectedAllocationContract.Unknown()));
+    }
+
+    public RoomStatus? BeginPrestage(int roomNumber, string doctorId, string procedureCode, bool sedation = false, int? expectedAllocationUnits = null)
+    {
+        var doctor = _activeDoctors.FirstOrDefault(item => item.Id == doctorId);
+        var procedure = FindActiveProcedure(procedureCode);
+        if (doctor is null || procedure is null || !HasValidExpectedAllocation(procedure) || (sedation && !procedure.SedationEligible))
+        {
+            return null;
+        }
+
+        return BeginPrestage(roomNumber, CreateLegacyCompatibleAssignment(doctor, procedure, sedation, expectedAllocationUnits));
+    }
+
+    private RoomStatus? BeginPrestage(int roomNumber, RoomAssignmentContract assignment)
     {
         lock (_syncRoot)
         {
             var room = _rooms.FirstOrDefault(item => item.RoomId == roomNumber);
-            var doctor = _activeDoctors.FirstOrDefault(item => item.Id == doctorId);
-            var procedure = FindActiveProcedure(procedureCode);
-            if (room is null || doctor is null || procedure is null || !CanSeat(room))
+            if (room is null || !CanBeginPrestage(room))
             {
                 return null;
             }
 
-            // Sedation is only valid as a modifier on a sedation-eligible primary
-            // procedure. Requesting it on any other procedure is rejected outright.
-            if (sedation && !procedure.SedationEligible)
-            {
-                return null;
-            }
-
-            var storedProcedureCode = ComposeProcedureCode(procedure.Code, sedation);
+            var expectation = ActiveRoomWriteExpectation.FromRoom(room);
             var now = Now;
-            var effectiveDemoElapsedMinutes = _demoTimerEnabled ? demoElapsedMinutes : 0;
-            var simulatedElapsed = TimeSpan.FromMinutes(Math.Clamp(effectiveDemoElapsedMinutes, 0, 240));
-            room.AssignedDoctor = doctor.Id;
-            room.ProcedureCode = storedProcedureCode;
-            ApplyExpectedAllocation(room, procedure, expectedAllocationUnits);
-            room.SeatedAt = now - simulatedElapsed;
-            room.AgingStartedAt = null;
-            room.StaleStartedAt = null;
-            room.DoctorArrivedAt = null;
-            room.DoctorCompleteAt = null;
-            room.RoomAvailableAt = null;
-            room.State = RoomStates.Seated;
-            UpdateRoomState(room, now);
-            AddEvent(new RoomEvent(room.RoomId, "Seated", now, doctor.Id, storedProcedureCode));
-            PersistRoom(room);
+            var candidate = new RoomState(room.RoomId)
+            {
+                EpisodeId = NewEpisodeId(),
+                State = RoomStates.Prestaging,
+                PrestageStartedAt = now
+            };
+            var persisted = PersistedRoomAssignment.FromCanonicalContract(
+                assignment,
+                ResolveDoctorDisplayName(assignment.DoctorId),
+                ResolveProcedure(assignment.ProcedureCode)?.Label);
+            ApplyPersistedAssignment(candidate, persisted);
+            var committed = _repository.SaveCanonicalAssignment(candidate, persisted, expectation, _doctors, _procedures);
+            if (committed is null)
+            {
+                return null;
+            }
+            ApplyCommittedRoom(room, committed.Room);
+            AddEvent(new RoomEvent(room.RoomId, "PrestageStarted", now, room.AssignedDoctor, room.ProcedureCode));
+            return ToRoomStatus(room, now);
+        }
+    }
 
+    public RoomStatus? SaveAssignmentDetails(int roomNumber, RoomAssignmentContract assignment)
+    {
+        ArgumentNullException.ThrowIfNull(assignment);
+        lock (_syncRoot)
+        {
+            var room = _rooms.FirstOrDefault(item => item.RoomId == roomNumber);
+            if (room is null || room.DoctorArrivedAt is not null || room.State is not (RoomStates.Prestaging or RoomStates.Seated))
+            {
+                return null;
+            }
+
+            if (!IsAssignmentValidForRoster(assignment))
+            {
+                return null;
+            }
+
+            var expectation = ActiveRoomWriteExpectation.FromRoom(room);
+            var persisted = PersistedRoomAssignment.FromCanonicalContract(
+                assignment,
+                ResolveDoctorDisplayName(assignment.DoctorId),
+                ResolveProcedure(assignment.ProcedureCode)?.Label);
+            var candidate = CopyRoomState(room);
+            ApplyPersistedAssignment(candidate, persisted);
+            var committed = _repository.SaveCanonicalAssignment(candidate, persisted, expectation, _doctors, _procedures);
+            if (committed is null)
+            {
+                return null;
+            }
+            ApplyCommittedRoom(room, committed.Room);
+            AddEvent(new RoomEvent(room.RoomId, "AssignmentSaved", Now, candidate.AssignedDoctor, candidate.ProcedureCode));
+            return ToRoomStatus(room, Now);
+        }
+    }
+
+    /// <summary>
+    /// Corrects the provisional doctor/procedure/sedation/allocation assignment while an active room
+    /// is Prestaging or Seated. Ready for Doctor locks the durably saved assignment into an immutable
+    /// handoff; staff must withdraw Ready before correcting it. Preserves the same episode and all
+    /// existing phase timestamps; replaces only the assignment/allocation snapshot. Creates no
+    /// completed cycle and no aborted-assignment record - this is a correction, not a termination.
+    /// </summary>
+    public RoomStatus? UpdateRoomAssignment(int roomNumber, string doctorId, string procedureCode, bool sedation = false, int? expectedAllocationUnits = null)
+    {
+        var doctor = _activeDoctors.FirstOrDefault(item => item.Id == doctorId);
+        var procedure = FindActiveProcedure(procedureCode);
+        if (doctor is null || procedure is null || !HasValidExpectedAllocation(procedure) || (sedation && !procedure.SedationEligible))
+        {
+            return null;
+        }
+
+        return SaveAssignmentDetails(roomNumber, CreateLegacyCompatibleAssignment(doctor, procedure, sedation, expectedAllocationUnits));
+    }
+
+    public RoomStatus? SeatRoom(int roomNumber, int demoElapsedMinutes = 0)
+    {
+        return SeatRoomWithAssignment(roomNumber, assignment: null, demoElapsedMinutes);
+    }
+
+    public RoomStatus? SeatRoom(int roomNumber, RoomAssignmentContract assignment, int demoElapsedMinutes = 0)
+    {
+        ArgumentNullException.ThrowIfNull(assignment);
+        return SeatRoomWithAssignment(roomNumber, assignment, demoElapsedMinutes);
+    }
+
+    public RoomStatus? SeatRoom(int roomNumber, string doctorId, string procedureCode, int demoElapsedMinutes = 0, bool sedation = false, int? expectedAllocationUnits = null)
+    {
+        var doctor = _activeDoctors.FirstOrDefault(item => item.Id == doctorId);
+        var procedure = FindActiveProcedure(procedureCode);
+        if (doctor is null || procedure is null || !HasValidExpectedAllocation(procedure) || (sedation && !procedure.SedationEligible))
+        {
+            return null;
+        }
+
+        return SeatRoomWithAssignment(
+            roomNumber,
+            CreateLegacyCompatibleAssignment(doctor, procedure, sedation, expectedAllocationUnits),
+            demoElapsedMinutes);
+    }
+
+    private RoomStatus? SeatRoomWithAssignment(int roomNumber, RoomAssignmentContract? assignment, int demoElapsedMinutes)
+    {
+        lock (_syncRoot)
+        {
+            if (!IsDemoElapsedMinutesAllowed(demoElapsedMinutes))
+            {
+                return null;
+            }
+
+            var room = _rooms.FirstOrDefault(item => item.RoomId == roomNumber);
+            if (room is null || !CanSeat(room) || room.PrestageStartedAt is null)
+            {
+                return null;
+            }
+
+            if (assignment is not null && !IsAssignmentValidForRoster(assignment))
+            {
+                return null;
+            }
+
+            var expectation = ActiveRoomWriteExpectation.FromRoom(room);
+            var now = Now;
+            var offset = TimeSpan.FromMinutes(demoElapsedMinutes);
+            var candidate = CopyRoomState(room);
+            if (demoElapsedMinutes != 0)
+            {
+                candidate.PrestageStartedAt = candidate.PrestageStartedAt!.Value - offset;
+            }
+
+            var persisted = assignment is null
+                ? GetCanonicalAssignment(candidate)
+                : PersistedRoomAssignment.FromCanonicalContract(
+                    assignment,
+                    ResolveDoctorDisplayName(assignment.DoctorId),
+                    ResolveProcedure(assignment.ProcedureCode)?.Label);
+            ApplyPersistedAssignment(candidate, persisted);
+            candidate.SeatedAt = now - offset;
+            candidate.State = RoomStates.Seated;
+            var committed = _repository.SaveCanonicalAssignment(candidate, persisted, expectation, _doctors, _procedures);
+            if (committed is null)
+            {
+                return null;
+            }
+            ApplyCommittedRoom(room, committed.Room);
+            AddEvent(new RoomEvent(room.RoomId, "Seated", now, room.AssignedDoctor, room.ProcedureCode));
             return ToRoomStatus(room, now);
         }
     }
 
     public RoomStatus? UpdateAssignment(int roomNumber, string doctorId, string procedureCode, bool sedation = false)
     {
-        lock (_syncRoot)
-        {
-            var room = _rooms.FirstOrDefault(item => item.RoomId == roomNumber);
-            var doctor = _activeDoctors.FirstOrDefault(item => item.Id == doctorId);
-            var procedure = FindActiveProcedure(procedureCode);
-            if (room is null || doctor is null || procedure is null)
-            {
-                return null;
-            }
-
-            if (sedation && !procedure.SedationEligible)
-            {
-                return null;
-            }
-
-            var now = Now;
-            UpdateRoomState(room, now);
-            if (!CanEditSeatedRoom(room) || room.SeatedAt is null)
-            {
-                return null;
-            }
-
-            var storedProcedureCode = ComposeProcedureCode(procedure.Code, sedation);
-            room.AssignedDoctor = doctor.Id;
-            room.ProcedureCode = storedProcedureCode;
-            UpdateRoomState(room, now);
-            AddEvent(new RoomEvent(room.RoomId, "AssignmentUpdated", now, doctor.Id, storedProcedureCode));
-            PersistRoom(room);
-
-            return ToRoomStatus(room, now);
-        }
+        return UpdateRoomAssignment(roomNumber, doctorId, procedureCode, sedation);
     }
 
-    public RoomStatus? CancelSeating(int roomNumber)
+    public RoomStatus? CancelPrestage(int roomNumber, string? cancellationReason = null) =>
+        CancelIncompleteAssignment(roomNumber, cancellationReason, prestageOnly: true);
+
+    public RoomStatus? CancelSeating(int roomNumber, string? cancellationReason = null) =>
+        CancelIncompleteAssignment(roomNumber, cancellationReason, prestageOnly: false);
+
+    private RoomStatus? CancelIncompleteAssignment(int roomNumber, string? cancellationReason, bool prestageOnly)
     {
         lock (_syncRoot)
         {
+            if (!IsValidCancellationReason(cancellationReason))
+            {
+                return null;
+            }
+
             var room = _rooms.FirstOrDefault(item => item.RoomId == roomNumber);
             if (room is null)
             {
@@ -238,15 +361,65 @@ public sealed class DemoBoardStore
             }
 
             var now = Now;
-            UpdateRoomState(room, now);
-            if (!CanEditSeatedRoom(room) || room.SeatedAt is null)
+            var snapshot = CopyRoomState(room);
+            var canCancel = prestageOnly ? CanCancelPrestage(snapshot) : CanCancelSeating(snapshot);
+            if (!canCancel)
             {
                 return null;
             }
 
-            AddEvent(new RoomEvent(room.RoomId, "SeatingCanceled", now, room.AssignedDoctor, room.ProcedureCode));
+            var record = new AbortedRoomAssignment
+            {
+                EpisodeId = snapshot.EpisodeId ?? NewEpisodeId(),
+                RoomId = snapshot.RoomId,
+                AssignedDoctor = snapshot.AssignedDoctor,
+                AssignedDoctorDisplayName = snapshot.AssignedDoctorDisplayName,
+                ProcedureCode = snapshot.ProcedureCode,
+                ProcedureCategory = snapshot.ProcedureCategory,
+                SedationState = snapshot.SedationState,
+                ExpectedAllocationState = snapshot.ExpectedAllocationState,
+                ExpectedAllocationSuggestedUnits = snapshot.ExpectedAllocationSuggestedUnits,
+                ExpectedAllocationConfirmedUnits = snapshot.ExpectedAllocationConfirmedUnits,
+                OriginalDefaultExpectedUnits = snapshot.OriginalDefaultExpectedUnits,
+                ExpectedAllocationUnits = snapshot.ExpectedAllocationUnits,
+                ExpectedAllocationMinutes = snapshot.ExpectedAllocationMinutes,
+                AllocationAdjustedFromDefault = snapshot.AllocationAdjustedFromDefault,
+                PrestageStartedAt = snapshot.PrestageStartedAt,
+                SeatedAt = snapshot.SeatedAt,
+                ReadyForDoctorAt = snapshot.ReadyForDoctorAt,
+                TerminatedAt = now,
+                TerminatedFromState = snapshot.State,
+                TerminationKind = TerminationKinds.StaffCanceled,
+                CancellationReason = cancellationReason
+            };
+            var resetRoom = new RoomState(room.RoomId);
+
+            if (snapshot.ActiveReadyHandoffId is { Length: > 0 })
+            {
+                // Cancellation tolerates a faulted handoff reference: CancelReadyRoom terminates the
+                // handoff only when the room genuinely owns it as Active, and otherwise preserves the
+                // unrelated/historical row untouched while still recording the abort and releasing the
+                // room. Doctor Arrived and Withdraw Ready remain gated on integrity faults elsewhere.
+                _repository.CancelReadyRoom(
+                    record,
+                    snapshot,
+                    snapshot.ActiveReadyHandoffId,
+                    now,
+                    _doctors,
+                    _procedures);
+            }
+            else
+            {
+                _repository.TerminateIncompleteAssignment(record, resetRoom, _doctors, _procedures);
+            }
+
             ResetRoom(room);
-            PersistRoom(room);
+            AddEvent(new RoomEvent(
+                room.RoomId,
+                prestageOnly ? "PrestageCanceled" : "SeatingCanceled",
+                now,
+                record.AssignedDoctor,
+                record.ProcedureCode));
 
             return ToRoomStatus(room, now);
         }
@@ -263,18 +436,67 @@ public sealed class DemoBoardStore
             }
 
             var now = Now;
-            UpdateRoomState(room, now);
             if (!CanMarkReadyForDoctor(room) || room.SeatedAt is null)
             {
                 return null;
             }
+            RoomAssignmentContract assignment;
+            try
+            {
+                assignment = GetCanonicalAssignment(room).ToContract();
+            }
+            catch (InvalidOperationException)
+            {
+                return null;
+            }
+            if (assignment.Completeness != AssignmentCompleteness.Complete || room.ActiveReadyHandoffId is not null || room.AcceptedReadyHandoffId is not null)
+            {
+                return null;
+            }
 
-            room.ReadyForDoctorAt = now;
-            room.State = RoomStates.ReadyForDoctor;
+            // Ready is rejected when the persisted assignment is no longer valid against the current
+            // active roster, even if its stored completeness is Complete (e.g. a since-deactivated
+            // doctor/procedure, or a domain-impossible stored procedure/sedation pairing).
+            if (!IsAssignmentValidForRoster(assignment))
+            {
+                return null;
+            }
+
+            var candidate = CopyRoomState(room);
+            candidate.State = RoomStates.ReadyForDoctor;
+            var handoff = _repository.CreateReadyHandoff(candidate, assignment, now, _doctors, _procedures);
+            candidate.ReadyForDoctorAt = now;
+            candidate.ActiveReadyHandoffId = handoff.HandoffId;
+            candidate.AcceptedReadyHandoffId = null;
+            ApplyPersistedAssignment(candidate, handoff.Assignment);
+            ApplyCommittedRoom(room, candidate);
             AddEvent(new RoomEvent(room.RoomId, "ReadyForDoctor", now, room.AssignedDoctor, room.ProcedureCode));
-            PersistRoom(room);
-
             return ToRoomStatus(room, now);
+        }
+    }
+
+    public RoomStatus? WithdrawReady(int roomNumber)
+    {
+        lock (_syncRoot)
+        {
+            var room = _rooms.FirstOrDefault(item => item.RoomId == roomNumber);
+            if (room is null
+                || room.State is not (RoomStates.ReadyForDoctor or RoomStates.Aging or RoomStates.Stale)
+                || string.IsNullOrWhiteSpace(room.ActiveReadyHandoffId))
+            {
+                return null;
+            }
+            if (DeriveIntegrityFaults(room).Count > 0)
+            {
+                return null;
+            }
+
+            var candidate = CopyRoomState(room);
+            candidate.State = RoomStates.Seated;
+            var committed = _repository.WithdrawReadyHandoff(candidate, room.ActiveReadyHandoffId, Now, _doctors, _procedures);
+            ApplyCommittedRoom(room, committed.Room);
+            AddEvent(new RoomEvent(room.RoomId, "ReadyWithdrawn", Now, room.AssignedDoctor, room.ProcedureCode));
+            return ToRoomStatus(room, Now);
         }
     }
 
@@ -379,8 +601,11 @@ public sealed class DemoBoardStore
             return null;
         }
 
-        UpdateRoomState(room, now);
-        if (!CanMarkDoctorArrived(room) || room.SeatedAt is null || room.AssignedDoctor is null || room.ProcedureCode is null)
+        if (!CanMarkDoctorArrived(room) || room.SeatedAt is null || string.IsNullOrWhiteSpace(room.ActiveReadyHandoffId))
+        {
+            return null;
+        }
+        if (DeriveIntegrityFaults(room).Count > 0)
         {
             return null;
         }
@@ -392,7 +617,8 @@ public sealed class DemoBoardStore
     // that PrepareDoctorArrived has already validated. Must be called inside _syncRoot.
     private RoomStatus ApplyDoctorArrived(RoomState room, DateTimeOffset now)
     {
-        var finalWaitState = room.State;
+        var snapshot = CopyRoomState(room);
+        var urgency = ProjectReadyUrgency(snapshot, now);
         var seatedToDoctorSeconds = SecondsBetween(room.SeatedAt!.Value, now);
         var prepSeconds = room.ReadyForDoctorAt.HasValue
             ? SecondsBetween(room.SeatedAt.Value, room.ReadyForDoctorAt.Value)
@@ -401,41 +627,42 @@ public sealed class DemoBoardStore
             ? SecondsBetween(room.ReadyForDoctorAt.Value, now)
             : (int?)null;
 
-        room.DoctorArrivedAt = now;
-        room.State = RoomStates.DoctorInRoom;
-        AddEvent(new RoomEvent(room.RoomId, "DoctorArrived", now, room.AssignedDoctor, room.ProcedureCode, TimeSpan.FromSeconds(seatedToDoctorSeconds)));
-
-        CompletedRoomCycle? cycle = null;
-        if (!HasCycleReport(room.RoomId, room.SeatedAt.Value))
+        snapshot.DoctorArrivedAt = now;
+        snapshot.State = RoomStates.DoctorInRoom;
+        var cycle = new CompletedRoomCycle
         {
-            cycle = new CompletedRoomCycle
-            {
-                RoomId = room.RoomId,
-                AssignedDoctor = room.AssignedDoctor!,
-                ProcedureCode = room.ProcedureCode!,
-                SeatedAt = room.SeatedAt.Value,
-                ReadyForDoctorAt = room.ReadyForDoctorAt,
+                RoomId = snapshot.RoomId,
+                AssignedDoctor = snapshot.AssignedDoctor ?? "",
+                ProcedureCode = snapshot.ProcedureCode ?? "",
+                SeatedAt = snapshot.SeatedAt!.Value,
+                ReadyForDoctorAt = snapshot.ReadyForDoctorAt,
                 DoctorArrivedAt = now,
+                EpisodeId = snapshot.EpisodeId,
+                PrestageStartedAt = snapshot.PrestageStartedAt,
                 SeatedToDoctorSeconds = seatedToDoctorSeconds,
                 PrepSeconds = prepSeconds,
                 ReadyToDoctorSeconds = readyToDoctorSeconds,
-                FinalWaitState = finalWaitState,
-                AgingThresholdReached = room.AgingStartedAt is not null,
-                StaleThresholdReached = room.StaleStartedAt is not null,
-                OriginalDefaultExpectedUnits = room.OriginalDefaultExpectedUnits,
-                ExpectedAllocationUnits = room.ExpectedAllocationUnits,
-                ExpectedAllocationMinutes = room.ExpectedAllocationMinutes,
-                AllocationAdjustedFromDefault = room.AllocationAdjustedFromDefault
-            };
-            _completedCycles.Add(cycle);
-        }
-
-        PersistRoom(room);
-        if (cycle is not null)
+                FinalWaitState = RoomStates.ReadyForDoctor,
+                AgingThresholdReached = urgency is ReadyUrgency.Aging or ReadyUrgency.Stale,
+                StaleThresholdReached = urgency == ReadyUrgency.Stale,
+                OriginalDefaultExpectedUnits = snapshot.OriginalDefaultExpectedUnits,
+                ExpectedAllocationUnits = snapshot.ExpectedAllocationUnits,
+                ExpectedAllocationMinutes = snapshot.ExpectedAllocationMinutes,
+                AllocationAdjustedFromDefault = snapshot.AllocationAdjustedFromDefault
+        };
+        var committed = _repository.AcceptReadyHandoffAndSaveCycle(
+            snapshot,
+            cycle,
+            snapshot.ActiveReadyHandoffId!,
+            now,
+            _doctors,
+            _procedures);
+        ApplyCommittedRoom(room, committed.Room);
+        if (committed.CompletedCycle is not null)
         {
-            PersistCycle(cycle);
+            _completedCycles.Add(committed.CompletedCycle);
         }
-
+        AddEvent(new RoomEvent(room.RoomId, "DoctorArrived", now, room.AssignedDoctor, room.ProcedureCode, TimeSpan.FromSeconds(seatedToDoctorSeconds)));
         return ToRoomStatus(room, now);
     }
 
@@ -449,6 +676,38 @@ public sealed class DemoBoardStore
             .OrderBy(item => item.RoomId)
             .FirstOrDefault();
 
+    private static bool CanCreateLegacyCompletionCycle(RoomState room) =>
+        room.SeatedAt.HasValue
+        && room.DoctorArrivedAt.HasValue
+        && string.IsNullOrWhiteSpace(room.AcceptedReadyHandoffId)
+        && !room.SedationState.HasValue
+        && !room.ExpectedAllocationState.HasValue;
+
+    private static CompletedRoomCycle CreateLegacyCompletionCycle(RoomState room) =>
+        new()
+        {
+            EpisodeId = room.EpisodeId,
+            RoomId = room.RoomId,
+            AssignedDoctor = room.AssignedDoctor ?? string.Empty,
+            ProcedureCode = room.ProcedureCode ?? string.Empty,
+            PrestageStartedAt = room.PrestageStartedAt,
+            SeatedAt = room.SeatedAt!.Value,
+            ReadyForDoctorAt = room.ReadyForDoctorAt,
+            DoctorArrivedAt = room.DoctorArrivedAt,
+            SeatedToDoctorSeconds = SecondsBetween(room.SeatedAt.Value, room.DoctorArrivedAt!.Value),
+            PrepSeconds = room.ReadyForDoctorAt.HasValue
+                ? SecondsBetween(room.SeatedAt.Value, room.ReadyForDoctorAt.Value)
+                : null,
+            ReadyToDoctorSeconds = room.ReadyForDoctorAt.HasValue
+                ? SecondsBetween(room.ReadyForDoctorAt.Value, room.DoctorArrivedAt.Value)
+                : null,
+            FinalWaitState = room.State,
+            OriginalDefaultExpectedUnits = room.OriginalDefaultExpectedUnits,
+            ExpectedAllocationUnits = room.ExpectedAllocationUnits,
+            ExpectedAllocationMinutes = room.ExpectedAllocationMinutes,
+            AllocationAdjustedFromDefault = room.AllocationAdjustedFromDefault
+        };
+
     private string? ResolveDoctorDisplayName(string? doctorId) =>
         doctorId is null ? null : _doctors.FirstOrDefault(item => item.Id == doctorId)?.Name;
 
@@ -461,19 +720,36 @@ public sealed class DemoBoardStore
             {
                 return null;
             }
+            if (!CanCreateLegacyCompletionCycle(room) && DeriveIntegrityFaults(room).Count > 0)
+            {
+                return null;
+            }
 
             var now = Now;
-            room.DoctorCompleteAt = now;
-            room.State = RoomStates.Turnover;
-            UpdateCycleReport(room, cycle =>
+            var cycleIndex = _completedCycles.FindIndex(cycle => cycle.RoomId == room.RoomId && cycle.SeatedAt == room.SeatedAt);
+            if (cycleIndex < 0 && !CanCreateLegacyCompletionCycle(room))
             {
-                cycle.DoctorCompleteAt = now;
-                cycle.DoctorInRoomSeconds = SecondsBetween(room.DoctorArrivedAt.Value, now);
-            });
+                return null;
+            }
+            var candidateRoom = CopyRoomState(room);
+            var candidateCycle = cycleIndex >= 0
+                ? CopyCompletedCycle(_completedCycles[cycleIndex])
+                : CreateLegacyCompletionCycle(room);
+            candidateRoom.DoctorCompleteAt = now;
+            candidateRoom.State = RoomStates.Turnover;
+            candidateCycle.DoctorCompleteAt = now;
+            candidateCycle.DoctorInRoomSeconds = SecondsBetween(room.DoctorArrivedAt.Value, now);
+            var committed = _repository.SaveCompletedCycleAndRoom(candidateCycle, candidateRoom, _doctors, _procedures);
+            ApplyCommittedRoom(room, committed.Room);
+            if (cycleIndex >= 0)
+            {
+                _completedCycles[cycleIndex] = committed.CompletedCycle!;
+            }
+            else
+            {
+                _completedCycles.Add(committed.CompletedCycle!);
+            }
             AddEvent(new RoomEvent(room.RoomId, "DoctorComplete", now, room.AssignedDoctor, room.ProcedureCode));
-            PersistRoom(room);
-            PersistCycleForRoom(room);
-
             return ToRoomStatus(room, now);
         }
     }
@@ -487,20 +763,31 @@ public sealed class DemoBoardStore
             {
                 return null;
             }
+            if (!CanCreateLegacyCompletionCycle(room) && DeriveIntegrityFaults(room).Count > 0)
+            {
+                return null;
+            }
 
             var now = Now;
-            room.RoomAvailableAt = now;
-            UpdateCycleReport(room, cycle =>
+            var cycleIndex = _completedCycles.FindIndex(cycle =>
+                cycle.RoomId == room.RoomId && cycle.SeatedAt == room.SeatedAt.Value);
+            if (cycleIndex < 0)
             {
-                cycle.RoomAvailableAt = now;
-                cycle.TurnoverSeconds = SecondsBetween(room.DoctorCompleteAt.Value, now);
-                cycle.TotalRoomCycleSeconds = SecondsBetween(room.SeatedAt.Value, now);
-            });
-            AddEvent(new RoomEvent(room.RoomId, "RoomAvailable", now, room.AssignedDoctor, room.ProcedureCode));
-            PersistCycleForRoom(room);
+                throw new InvalidOperationException(
+                    $"Cannot mark room {room.RoomId} available: turnover room has no completed-cycle record.");
+            }
 
-            ResetRoom(room);
-            PersistRoom(room);
+            var cycle = CopyCompletedCycle(_completedCycles[cycleIndex]);
+            cycle.RoomAvailableAt = now;
+            cycle.TurnoverSeconds = SecondsBetween(room.DoctorCompleteAt.Value, now);
+            cycle.TotalRoomCycleSeconds = SecondsBetween(room.SeatedAt.Value, now);
+            var resetRoom = new RoomState(room.RoomId);
+
+            var committed = _repository.SaveCompletedCycleAndRoom(cycle, resetRoom, _doctors, _procedures);
+
+            _completedCycles[cycleIndex] = committed.CompletedCycle!;
+            ApplyCommittedRoom(room, committed.Room);
+            AddEvent(new RoomEvent(room.RoomId, "RoomAvailable", now, cycle.AssignedDoctor, cycle.ProcedureCode));
 
             return ToRoomStatus(room, now);
         }
@@ -648,9 +935,7 @@ public sealed class DemoBoardStore
     // in-memory) to Available. Must be called inside _syncRoot. Returns the number of cleared cycles.
     private int ClearCompletedAndResetRoomsLocked()
     {
-        var clearedCompleted = _completedCycles.Count;
-        _repository.ClearCompletedCycles();
-        _repository.ResetActiveRooms(_roomCount);
+        var clearedCompleted = _repository.ResetMaintenanceState(_roomCount);
         _completedCycles.Clear();
         foreach (var room in _rooms)
         {
@@ -946,7 +1231,7 @@ public sealed class DemoBoardStore
     // Deterministic stress fixtures (maintenance-only, additive). These profiles never modify
     // WriteSyntheticCase, UpsertSyntheticCycle, or the existing seeders above; they compose the
     // same private helpers (FindActiveProcedure, ApplyExpectedAllocation, ComposeProcedureCode,
-    // UpdateRoomState, the threshold-relative Aging/Stale/EarlySeated samples, and - for
+    // the threshold-relative Aging/Stale/EarlySeated samples, and - for
     // scenario-rich - WriteSyntheticCase itself) plus a small set of new, purpose-built builders.
     // See MaintenanceCommands.StressFixtureProfiles for the accepted --profile values.
     // ---------------------------------------------------------------------------
@@ -1140,17 +1425,29 @@ public sealed class DemoBoardStore
                 continue;
             }
 
-            _rooms[index] = BuildLiveRoom(fixture.RoomId, fixture.DoctorId, fixture.ProcedureCode, fixture.Sedation, fixture.TargetState, now);
+            var room = BuildLiveRoom(fixture.RoomId, fixture.DoctorId, fixture.ProcedureCode, fixture.Sedation, fixture.TargetState, now);
+            if (IsReadyFixtureTarget(fixture.TargetState))
+            {
+                var handoff = _repository.CreateReadyHandoff(
+                    room,
+                    GetCanonicalAssignment(room).ToContract(),
+                    room.ReadyForDoctorAt!.Value,
+                    _doctors,
+                    _procedures);
+                room.ActiveReadyHandoffId = handoff.HandoffId;
+            }
+
+            _rooms[index] = room;
         }
 
         _repository.SaveRooms(_rooms, _doctors, _procedures);
     }
 
-    // Builds one fully consistent active room for a stress fixture. Seated/ReadyForDoctor/Aging/
-    // Stale timestamps are threshold-relative (via the same EarlySeatedSample/AgingSample/StaleSample
-    // helpers the first-run demo seed uses) so the derived state is correct regardless of configured
-    // AgingMinutes/StaleMinutes, then UpdateRoomState derives the final state/aging/stale fields.
-    // DoctorInRoom/Turnover are terminal for UpdateRoomState, so their timestamps are set directly
+    // Builds one fully consistent active room for a stress fixture. Seated and ReadyForDoctor
+    // timestamps are threshold-relative (via the same EarlySeatedSample/AgingSample/StaleSample
+    // helpers the first-run demo seed uses), so ReadyUrgency projects correctly regardless of
+    // configured AgingMinutes/StaleMinutes while the primary state remains ReadyForDoctor.
+    // DoctorInRoom/Turnover timestamps are set directly
     // from small fixed "recent" offsets - deterministic and stable across expiration/recompute
     // (well under the default 8-hour max-active-duration sweep) - and a matching in-progress
     // completed-cycle row is upserted so the room's reporting bookkeeping stays consistent with the
@@ -1173,14 +1470,11 @@ public sealed class DemoBoardStore
         {
             case RoomStates.Seated:
                 room.SeatedAt = now - EarlySeatedSample(thresholds);
+                room.State = RoomStates.Seated;
                 break;
 
             case RoomStates.ReadyForDoctor:
             {
-                // UpdateRoomState's "still in prep" gate only lets a room reach the ready-for-doctor
-                // escalation logic once its State is no longer Available/Seated (a fresh RoomState
-                // defaults to Available) - see ReadyForDoctorRoom for the same requirement. The exact
-                // final state (ReadyForDoctor/Aging/Stale) is re-derived from ReadyForDoctorAt below.
                 room.State = RoomStates.ReadyForDoctor;
                 var readyElapsed = EarlySeatedSample(thresholds);
                 room.ReadyForDoctorAt = now - readyElapsed;
@@ -1225,8 +1519,22 @@ public sealed class DemoBoardStore
                 throw new InvalidOperationException($"Stress fixture target state '{targetState}' is not a supported live-room target state.");
         }
 
-        UpdateRoomState(room, now);
-
+        if (IsReadyFixtureTarget(targetState))
+        {
+            var doctor = _activeDoctors.FirstOrDefault(item => item.Id == doctorId)
+                ?? throw new InvalidOperationException($"Stress fixture doctor '{doctorId}' is not active.");
+            var assignment = CreateLegacyCompatibleAssignment(doctor, procedure, sedation, expectedAllocationUnits: null);
+            var persistedAssignment = PersistedRoomAssignment.FromCanonicalContract(
+                assignment,
+                doctor.Name,
+                ResolveProcedure(assignment.ProcedureCode)?.Label);
+            ApplyPersistedAssignment(room, persistedAssignment);
+            room.EpisodeId = NewEpisodeId();
+            room.PrestageStartedAt = room.SeatedAt!.Value - StressLiveSeatToReadyPad;
+            room.State = RoomStates.ReadyForDoctor;
+            room.AgingStartedAt = null;
+            room.StaleStartedAt = null;
+        }
         if (room.State is RoomStates.DoctorInRoom or RoomStates.Turnover)
         {
             UpsertLiveCompletedCycle(room);
@@ -1235,9 +1543,11 @@ public sealed class DemoBoardStore
         return room;
     }
 
+    private static bool IsReadyFixtureTarget(string targetState) =>
+        targetState is RoomStates.ReadyForDoctor or RoomStates.Aging or RoomStates.Stale;
+
     // Small fixed "recent" elapsed offsets for the two terminal live-room target states.
-    // UpdateRoomState never recomputes DoctorInRoom/Turnover, so these do not need to be
-    // threshold-relative like the Seated/ReadyForDoctor/Aging/Stale cases above - they only need to
+    // These do not need to be threshold-relative like the Ready fixture cases above - they only need to
     // stay well inside the default 8-hour room-expiration ceiling, which minutes-scale offsets do.
     private static readonly TimeSpan StressLiveSeatToReadyPad = TimeSpan.FromMinutes(5);
     private static readonly TimeSpan StressLiveDoctorInRoomSeatedElapsed = TimeSpan.FromMinutes(40);
@@ -1251,8 +1561,8 @@ public sealed class DemoBoardStore
     // Upserts the in-progress completed-cycle row paired with a directly-seeded DoctorInRoom/Turnover
     // room, mirroring the fields ApplyDoctorArrived/MarkDoctorComplete would have set through the real
     // lifecycle (RoomAvailableAt stays null - Room Available has not been clicked yet). Without this,
-    // a later manual Doctor Complete/Room Available click on a seeded room would silently no-op
-    // (UpdateCycleReport only updates a cycle that already exists for that RoomId/SeatedAt).
+    // a later manual Doctor Complete/Room Available click on a seeded room would have no matching
+    // lifecycle row to update for that RoomId/SeatedAt.
     private void UpsertLiveCompletedCycle(RoomState room)
     {
         var seatedAt = room.SeatedAt!.Value;
@@ -1298,12 +1608,9 @@ public sealed class DemoBoardStore
         });
     }
 
-    // Computes what the pre-arrival wait state and aging/stale threshold flags would have been at
-    // the moment DoctorArrivedAt occurred, using the exact same elapsed-vs-threshold comparison
-    // UpdateRoomState uses for the ready-for-doctor escalation phase (elapsed = DoctorArrivedAt -
-    // ReadyForDoctorAt, compared against AgingThreshold/StaleThreshold). AgingThresholdReached is
-    // true whenever the Stale threshold is also reached, matching UpdateRoomState's Stale branch
-    // (which sets AgingStartedAt too, not just StaleStartedAt).
+    // Computes the Ready urgency and threshold flags at DoctorArrivedAt from the same
+    // elapsed-vs-threshold comparison used by the active projection (DoctorArrivedAt -
+    // ReadyForDoctorAt). AgingThresholdReached is true whenever Stale is also reached.
     private (string FinalWaitState, bool AgingThresholdReached, bool StaleThresholdReached) ComputeArrivalWaitState(
         DateTimeOffset readyForDoctorAt, DateTimeOffset doctorArrivedAt)
     {
@@ -1390,8 +1697,8 @@ public sealed class DemoBoardStore
     ];
 
     // doctor-view-stress: fixed 1/3/4/4 active-room split across all four doctors (Otte 1, Pledger 3,
-    // Gibson 4, Schroeder 4 = 12), every counted room in a pre-arrival state (Seated/ReadyForDoctor/
-    // Aging/Stale) so each doctor's Doctor View posture count is exact - see the assignment-based
+    // Gibson 4, Schroeder 4 = 12), every counted room in a pre-arrival primary state (Seated or
+    // ReadyForDoctor, with threshold-relative urgency) so each Doctor View posture count is exact - see the assignment-based
     // current-room-frame filter documented in docs/knowledge/ui/doctor-view-operational-header.md.
     private static IReadOnlyList<LiveRoomFixture> DoctorViewStressFixtures() =>
     [
@@ -1894,9 +2201,10 @@ public sealed class DemoBoardStore
     }
 
     /// <summary>
-    /// Checks all active room cycles for exceeding MaxActiveDurationHours and expires any
-    /// that do. Each expired room is archived as an exception cycle, reset to Available,
-    /// and logged with reason ExceededMaxActiveDuration.
+    /// Checks all active room assignments for exceeding MaxActiveDurationHours and expires any
+    /// that do. Pre-arrival assignments are archived as aborted assignments; post-arrival rooms
+    /// are archived as review-required exception cycles. Each room is reset to Available atomically
+    /// with its archive.
     /// Returns the room IDs that were expired.
     /// </summary>
     public IReadOnlyList<int> CheckAndExpireActiveCycles()
@@ -1915,18 +2223,23 @@ public sealed class DemoBoardStore
 
             foreach (var room in _rooms)
             {
-                if (room.State == RoomStates.Available || room.SeatedAt is null)
+                if (room.State == RoomStates.Available)
                 {
                     continue;
                 }
 
-                if (now - room.SeatedAt.Value <= maxDuration)
+                var activeStartedAt = room.State == RoomStates.Prestaging
+                    ? room.PrestageStartedAt
+                    : room.SeatedAt;
+                if (activeStartedAt is null || now - activeStartedAt.Value <= maxDuration)
                 {
                     continue;
                 }
 
-                ExpireRoom(room, now, ExceptionReasons.ExceededMaxActiveDuration);
-                expired.Add(room.RoomId);
+                if (ExpireRoom(room, now, ExceptionReasons.ExceededMaxActiveDuration))
+                {
+                    expired.Add(room.RoomId);
+                }
             }
 
             return expired;
@@ -1935,7 +2248,8 @@ public sealed class DemoBoardStore
 
     /// <summary>
     /// Checks whether the after-hours sweep should fire for the current clinic day and,
-    /// if so, expires all still-active room cycles as AfterHoursSweep exceptions.
+    /// if so, expires all still-active room assignments. Prestaging assignments are archived as
+    /// aborted assignments before arrival; post-arrival rooms become AfterHoursSweep exceptions.
     /// Runs at most once per clinic day; skips Available rooms.
     /// Returns the room IDs that were expired.
     /// </summary>
@@ -1984,13 +2298,18 @@ public sealed class DemoBoardStore
             var expired = new List<int>();
             foreach (var room in _rooms)
             {
-                if (room.State == RoomStates.Available || room.SeatedAt is null)
+                if (room.State == RoomStates.Available
+                    || (room.State == RoomStates.Prestaging
+                        ? room.PrestageStartedAt is null
+                        : room.SeatedAt is null))
                 {
                     continue;
                 }
 
-                ExpireRoom(room, now, ExceptionReasons.AfterHoursSweep);
-                expired.Add(room.RoomId);
+                if (ExpireRoom(room, now, ExceptionReasons.AfterHoursSweep))
+                {
+                    expired.Add(room.RoomId);
+                }
             }
 
             return expired;
@@ -1998,57 +2317,122 @@ public sealed class DemoBoardStore
     }
 
     /// <summary>
-    /// Archives an active room as an exception cycle and resets it to Available.
-    /// Does not manufacture DoctorCompleteAt. Must be called inside _syncRoot.
+    /// Expires an active room. Before Doctor Arrived the room is archived as aborted history (no
+    /// throughput). Once Doctor Arrived has occurred the room is recovered as a review-required
+    /// exception cycle instead. Either way the room is released to Available. Never manufactures
+    /// SeatedAt or DoctorCompleteAt. Must be called inside _syncRoot.
     /// </summary>
-    private void ExpireRoom(RoomState room, DateTimeOffset now, string reason)
+    private bool ExpireRoom(RoomState room, DateTimeOffset now, string reason)
     {
-        // SuggestedAction depends on whether the doctor had arrived at the time of expiry.
-        var suggestedAction = room.DoctorArrivedAt.HasValue
-            ? "Review timing"
-            : "Exclude abandoned cycle";
-
-        // For rooms where DoctorArrived was never called, no cycle exists yet - create one.
-        // For rooms already past DoctorArrived, a cycle was created at MarkDoctorArrived.
-        var cycle = _completedCycles.FirstOrDefault(c => c.RoomId == room.RoomId && c.SeatedAt == room.SeatedAt!.Value);
-
-        if (cycle is null)
+        var snapshot = CopyRoomState(room);
+        if (snapshot.DoctorArrivedAt is not null)
         {
-            cycle = new CompletedRoomCycle
-            {
-                RoomId = room.RoomId,
-                AssignedDoctor = room.AssignedDoctor ?? "",
-                ProcedureCode = room.ProcedureCode ?? "",
-                SeatedAt = room.SeatedAt!.Value,
-                ReadyForDoctorAt = room.ReadyForDoctorAt,
-                DoctorArrivedAt = null,  // doctor never arrived
-                SeatedToDoctorSeconds = SecondsBetween(room.SeatedAt.Value, now),
-                PrepSeconds = room.ReadyForDoctorAt.HasValue
-                    ? SecondsBetween(room.SeatedAt.Value, room.ReadyForDoctorAt.Value)
-                    : null,
-                ReadyToDoctorSeconds = null,
-                FinalWaitState = room.State,
-                AgingThresholdReached = room.AgingStartedAt is not null,
-                StaleThresholdReached = room.StaleStartedAt is not null,
-                OriginalDefaultExpectedUnits = room.OriginalDefaultExpectedUnits,
-                ExpectedAllocationUnits = room.ExpectedAllocationUnits,
-                ExpectedAllocationMinutes = room.ExpectedAllocationMinutes,
-                AllocationAdjustedFromDefault = room.AllocationAdjustedFromDefault
-            };
-            _completedCycles.Add(cycle);
+            // Post-arrival: recover the room as a review-required exception cycle. Never aborted
+            // pre-arrival history, and never a fabricated Doctor Complete.
+            ExpireArrivedRoom(room, snapshot, now, reason);
+            return true;
         }
+
+        // Pre-arrival (Prestaging, Seated, Ready, Aging, Stale): aborted history, not throughput.
+        var record = new AbortedRoomAssignment
+        {
+            EpisodeId = snapshot.EpisodeId ?? NewEpisodeId(),
+            RoomId = snapshot.RoomId,
+            AssignedDoctor = snapshot.AssignedDoctor,
+            AssignedDoctorDisplayName = snapshot.AssignedDoctorDisplayName,
+            ProcedureCode = snapshot.ProcedureCode,
+            ProcedureCategory = snapshot.ProcedureCategory,
+            SedationState = snapshot.SedationState,
+            ExpectedAllocationState = snapshot.ExpectedAllocationState,
+            ExpectedAllocationSuggestedUnits = snapshot.ExpectedAllocationSuggestedUnits,
+            ExpectedAllocationConfirmedUnits = snapshot.ExpectedAllocationConfirmedUnits,
+            OriginalDefaultExpectedUnits = snapshot.OriginalDefaultExpectedUnits,
+            ExpectedAllocationUnits = snapshot.ExpectedAllocationUnits,
+            ExpectedAllocationMinutes = snapshot.ExpectedAllocationMinutes,
+            AllocationAdjustedFromDefault = snapshot.AllocationAdjustedFromDefault,
+            PrestageStartedAt = snapshot.PrestageStartedAt,
+            SeatedAt = snapshot.SeatedAt,
+            ReadyForDoctorAt = snapshot.ReadyForDoctorAt,
+            TerminatedAt = now,
+            TerminatedFromState = snapshot.State,
+            TerminationKind = reason == ExceptionReasons.AfterHoursSweep ? TerminationKinds.AfterHoursExpired : TerminationKinds.MaxDurationExpired
+        };
+        if (!string.IsNullOrWhiteSpace(snapshot.ActiveReadyHandoffId))
+        {
+            _repository.TerminateReadyHandoffAndIncompleteAssignment(record, snapshot, snapshot.ActiveReadyHandoffId, now, ReadyHandoffTerminationKinds.Expired, _doctors, _procedures);
+        }
+        else
+        {
+            _repository.TerminateIncompleteAssignment(record, new RoomState(room.RoomId), _doctors, _procedures);
+        }
+        ResetRoom(room);
+        AddEvent(new RoomEvent(room.RoomId, "ForceExpired", now, record.AssignedDoctor, record.ProcedureCode));
+        return true;
+    }
+
+    // Recovers an already-arrived room whose active cycle exceeded the maximum duration or was swept
+    // after hours. Doctor Arrived created a completed cycle; that cycle is re-marked as a review-
+    // required exception (SuggestedAction "Review timing") rather than stranding the room in
+    // DoctorInRoom. Truthful timestamps are preserved and DoctorCompleteAt is never manufactured.
+    // Durable persistence happens before any live in-memory mutation. Must be called inside _syncRoot.
+    private void ExpireArrivedRoom(RoomState room, RoomState snapshot, DateTimeOffset now, string reason)
+    {
+        var seatedAt = snapshot.SeatedAt
+            ?? throw new InvalidOperationException($"Cannot expire arrived room {snapshot.RoomId} without SeatedAt.");
+        var doctorArrivedAt = snapshot.DoctorArrivedAt!.Value;
+
+        // The cycle created at Doctor Arrived is keyed by (RoomId, SeatedAt). Reuse it so truthful
+        // timestamps and the accepted-handoff snapshot are preserved; only fall back to reconstructing
+        // one for a legacy arrived room that has no persisted cycle.
+        var cycleIndex = _completedCycles.FindIndex(c => c.RoomId == snapshot.RoomId && c.SeatedAt == seatedAt);
+        var cycle = cycleIndex >= 0
+            ? CopyCompletedCycle(_completedCycles[cycleIndex])
+            : new CompletedRoomCycle
+            {
+                EpisodeId = snapshot.EpisodeId,
+                RoomId = snapshot.RoomId,
+                AssignedDoctor = snapshot.AssignedDoctor ?? "",
+                ProcedureCode = snapshot.ProcedureCode ?? "",
+                PrestageStartedAt = snapshot.PrestageStartedAt,
+                SeatedAt = seatedAt,
+                ReadyForDoctorAt = snapshot.ReadyForDoctorAt,
+                DoctorArrivedAt = doctorArrivedAt,
+                SeatedToDoctorSeconds = SecondsBetween(seatedAt, doctorArrivedAt),
+                PrepSeconds = snapshot.ReadyForDoctorAt.HasValue
+                    ? SecondsBetween(seatedAt, snapshot.ReadyForDoctorAt.Value)
+                    : null,
+                ReadyToDoctorSeconds = snapshot.ReadyForDoctorAt.HasValue
+                    ? SecondsBetween(snapshot.ReadyForDoctorAt.Value, doctorArrivedAt)
+                    : null,
+                FinalWaitState = snapshot.State,
+                AgingThresholdReached = snapshot.AgingStartedAt is not null,
+                StaleThresholdReached = snapshot.StaleStartedAt is not null,
+                OriginalDefaultExpectedUnits = snapshot.OriginalDefaultExpectedUnits,
+                ExpectedAllocationUnits = snapshot.ExpectedAllocationUnits,
+                ExpectedAllocationMinutes = snapshot.ExpectedAllocationMinutes,
+                AllocationAdjustedFromDefault = snapshot.AllocationAdjustedFromDefault
+            };
 
         cycle.IsException = true;
         cycle.RequiresReview = true;
         cycle.ExceptionReason = reason;
-        cycle.SuggestedAction = suggestedAction;
+        cycle.SuggestedAction = "Review timing";
         cycle.ReviewStatus = ReviewStatuses.PendingReview;
-        PersistCycle(cycle);
 
-        AddEvent(new RoomEvent(room.RoomId, "ForceExpired", now, room.AssignedDoctor, room.ProcedureCode));
+        // Persist durably before mutating live state.
+        _repository.SaveCompletedCycleAndRoom(cycle, new RoomState(room.RoomId), _doctors, _procedures);
+
+        if (cycleIndex >= 0)
+        {
+            _completedCycles[cycleIndex] = cycle;
+        }
+        else
+        {
+            _completedCycles.Add(cycle);
+        }
 
         ResetRoom(room);
-        PersistRoom(room);
+        AddEvent(new RoomEvent(room.RoomId, "ForceExpired", now, snapshot.AssignedDoctor, snapshot.ProcedureCode));
     }
 
     // Returns null if timeZone is a non-blank, non-UTC value that cannot be resolved.
@@ -2100,6 +2484,8 @@ public sealed class DemoBoardStore
         var elapsed = room.SeatedAt is null ? TimeSpan.Zero : now - room.SeatedAt.Value;
         var doctor = room.AssignedDoctor is null ? null : _doctors.FirstOrDefault(item => item.Id == room.AssignedDoctor);
         var procedure = ResolveProcedure(room.ProcedureCode);
+        var urgency = ProjectReadyUrgency(room, now);
+        var faults = DeriveIntegrityFaults(room);
 
         return new RoomStatus(
             room.RoomId,
@@ -2120,62 +2506,161 @@ public sealed class DemoBoardStore
             room.OriginalDefaultExpectedUnits,
             room.ExpectedAllocationUnits,
             room.ExpectedAllocationMinutes,
-            room.AllocationAdjustedFromDefault);
+            room.AllocationAdjustedFromDefault,
+            urgency,
+            faults);
     }
 
-    private void UpdateRoomState(RoomState room, DateTimeOffset now)
+    private ReadyUrgency ProjectReadyUrgency(RoomState room, DateTimeOffset now)
     {
-        // Doctor In Room and Turnover are terminal - no further automatic transitions.
-        if (room.State is RoomStates.DoctorInRoom or RoomStates.Turnover)
+        if (room.State == RoomStates.Aging)
         {
+            return ReadyUrgency.Aging;
+        }
+        if (room.State == RoomStates.Stale)
+        {
+            return ReadyUrgency.Stale;
+        }
+        if (room.State != RoomStates.ReadyForDoctor || string.IsNullOrWhiteSpace(room.ActiveReadyHandoffId))
+        {
+            return ReadyUrgency.None;
+        }
+
+        var handoff = _repository.LoadReadyHandoff(room.ActiveReadyHandoffId);
+        if (handoff is null || handoff.ContractStatus != ReadyHandoffStatus.Active)
+        {
+            return ReadyUrgency.None;
+        }
+        var elapsed = now - handoff.ReadyAt;
+        return elapsed >= Thresholds.StaleThreshold
+            ? ReadyUrgency.Stale
+            : elapsed >= Thresholds.AgingThreshold
+                ? ReadyUrgency.Aging
+                : ReadyUrgency.None;
+    }
+
+    private IReadOnlyList<RoomIntegrityFault> DeriveIntegrityFaults(RoomState room)
+    {
+        if (room.State is not (RoomStates.ReadyForDoctor or RoomStates.Aging or RoomStates.Stale or RoomStates.DoctorInRoom or RoomStates.Turnover))
+        {
+            return [];
+        }
+
+        var assignment = GetCanonicalAssignment(room);
+        var faultAssignment = RoomAssignmentContract.Create(
+            null,
+            null,
+            SedationContract.UnavailableNoProcedure(),
+            ExpectedAllocationContract.Unknown());
+        var faults = new List<RoomIntegrityFault>();
+        // Malformed persisted assignment data must project a fault, not throw and hide the room.
+        if (assignment.TryToContract(out var canonicalAssignment))
+        {
+            if (room.State is RoomStates.ReadyForDoctor or RoomStates.Aging or RoomStates.Stale
+                && canonicalAssignment.Completeness != AssignmentCompleteness.Complete)
+            {
+                faults.Add(new RoomIntegrityFault(RoomIntegrityFaultCode.ReadyAssignmentIncomplete, canonicalAssignment));
+            }
+        }
+        else
+        {
+            faults.Add(new RoomIntegrityFault(RoomIntegrityFaultCode.ReadyAssignmentIncomplete, faultAssignment));
+        }
+
+        var faultAssignmentValue = canonicalAssignment ?? faultAssignment;
+        var readyCompatible = room.State is RoomStates.ReadyForDoctor or RoomStates.Aging or RoomStates.Stale;
+        var arrivedOrLater = room.State is RoomStates.DoctorInRoom or RoomStates.Turnover;
+        if (!string.IsNullOrWhiteSpace(room.ActiveReadyHandoffId)
+            && !string.IsNullOrWhiteSpace(room.AcceptedReadyHandoffId))
+        {
+            faults.Add(new RoomIntegrityFault(RoomIntegrityFaultCode.ContradictoryHandoffReferences, faultAssignmentValue));
+        }
+
+        if (readyCompatible)
+        {
+            AddActiveHandoffFaults(room, faultAssignmentValue, faults);
+        }
+        else if (arrivedOrLater)
+        {
+            AddAcceptedHandoffFaults(room, faultAssignmentValue, faults);
+        }
+
+        return faults;
+    }
+
+    private void AddActiveHandoffFaults(
+        RoomState room,
+        RoomAssignmentContract assignment,
+        List<RoomIntegrityFault> faults)
+    {
+        if (string.IsNullOrWhiteSpace(room.ActiveReadyHandoffId))
+        {
+            faults.Add(new RoomIntegrityFault(RoomIntegrityFaultCode.ReadyHandoffMissing, assignment));
             return;
         }
 
-        if (room.SeatedAt is null)
+        var handoff = _repository.LoadReadyHandoff(room.ActiveReadyHandoffId);
+        if (handoff is null)
         {
-            room.State = RoomStates.Available;
+            faults.Add(new RoomIntegrityFault(RoomIntegrityFaultCode.ReadyHandoffMissing, assignment));
             return;
         }
 
-        // Patient Seated / In Prep: aging/stale thresholds do NOT apply here.
-        // This state is a neutral prep limbo; it stays Seated until staff clicks Ready for Doctor.
-        if (room.State is RoomStates.Available or RoomStates.Seated)
+        if (handoff.RoomId != room.RoomId || !string.Equals(handoff.EpisodeId, room.EpisodeId, StringComparison.Ordinal))
         {
-            room.AgingStartedAt = null;
-            room.StaleStartedAt = null;
-            room.State = RoomStates.Seated;
+            faults.Add(new RoomIntegrityFault(RoomIntegrityFaultCode.ReadyHandoffOwnershipMismatch, assignment));
+        }
+        if (handoff.WithdrawnAt.HasValue || handoff.AcceptedAt.HasValue || handoff.TerminatedAt.HasValue)
+        {
+            faults.Add(new RoomIntegrityFault(RoomIntegrityFaultCode.ReadyHandoffNotActive, assignment));
+        }
+        if (!TryGetCompleteHandoffAssignment(handoff, out _))
+        {
+            faults.Add(new RoomIntegrityFault(RoomIntegrityFaultCode.ReadyHandoffAssignmentIncomplete, assignment));
+        }
+    }
+
+    private void AddAcceptedHandoffFaults(
+        RoomState room,
+        RoomAssignmentContract assignment,
+        List<RoomIntegrityFault> faults)
+    {
+        if (string.IsNullOrWhiteSpace(room.AcceptedReadyHandoffId))
+        {
+            // Pre-handoff persistence rows remain completable for legacy compatibility.
+            if (room.SedationState.HasValue || room.ExpectedAllocationState.HasValue)
+            {
+                faults.Add(new RoomIntegrityFault(RoomIntegrityFaultCode.AcceptedHandoffMissing, assignment));
+            }
             return;
         }
 
-        // Ready for Doctor phase (ReadyForDoctor, Aging, Stale): escalate based on elapsed
-        // time from ReadyForDoctorAt. These states all mean "doctor has been requested."
-        if (room.ReadyForDoctorAt is null)
+        var handoff = _repository.LoadReadyHandoff(room.AcceptedReadyHandoffId);
+        if (handoff is null)
         {
-            // Defensive: state is in the ready-for-doctor phase but the timestamp is missing.
+            faults.Add(new RoomIntegrityFault(RoomIntegrityFaultCode.AcceptedHandoffMissing, assignment));
             return;
         }
 
-        var elapsed = now - room.ReadyForDoctorAt.Value;
-        var thresholds = Thresholds;
-        if (elapsed >= thresholds.StaleThreshold)
+        if (handoff.RoomId != room.RoomId || !string.Equals(handoff.EpisodeId, room.EpisodeId, StringComparison.Ordinal))
         {
-            room.AgingStartedAt = room.ReadyForDoctorAt.Value.Add(thresholds.AgingThreshold);
-            room.StaleStartedAt = room.ReadyForDoctorAt.Value.Add(thresholds.StaleThreshold);
-            room.State = RoomStates.Stale;
-            return;
+            faults.Add(new RoomIntegrityFault(RoomIntegrityFaultCode.AcceptedHandoffOwnershipMismatch, assignment));
         }
-
-        if (elapsed >= thresholds.AgingThreshold)
+        if (!handoff.AcceptedAt.HasValue || handoff.WithdrawnAt.HasValue || handoff.TerminatedAt.HasValue)
         {
-            room.AgingStartedAt = room.ReadyForDoctorAt.Value.Add(thresholds.AgingThreshold);
-            room.StaleStartedAt = null;
-            room.State = RoomStates.Aging;
-            return;
+            faults.Add(new RoomIntegrityFault(RoomIntegrityFaultCode.AcceptedHandoffNotAccepted, assignment));
         }
+        if (!TryGetCompleteHandoffAssignment(handoff, out _))
+        {
+            faults.Add(new RoomIntegrityFault(RoomIntegrityFaultCode.AcceptedHandoffAssignmentIncomplete, assignment));
+        }
+    }
 
-        room.AgingStartedAt = null;
-        room.StaleStartedAt = null;
-        room.State = RoomStates.ReadyForDoctor;
+    private static bool TryGetCompleteHandoffAssignment(PersistedReadyHandoff handoff, out RoomAssignmentContract? assignment)
+    {
+        // Malformed persisted handoff assignment data must project a fault, not throw and hide the room.
+        return handoff.Assignment.TryToContract(out assignment)
+            && assignment.Completeness == AssignmentCompleteness.Complete;
     }
 
     private ProcedureCategory? FindProcedure(string procedureCode) =>
@@ -2292,14 +2777,6 @@ public sealed class DemoBoardStore
         _rooms.Sort((left, right) => left.RoomId.CompareTo(right.RoomId));
     }
 
-    private void RecomputeLoadedRoomStates(DateTimeOffset now)
-    {
-        foreach (var room in _rooms)
-        {
-            UpdateRoomState(room, now);
-        }
-    }
-
     private void SeedDemoRooms(DateTimeOffset now)
     {
         var thresholds = Thresholds;
@@ -2329,7 +2806,7 @@ public sealed class DemoBoardStore
         yield return new("gibson", "CON", thresholds => EarlySeatedSample(thresholds));
         yield return new("schroeder", "EXT", thresholds => StaleSample(thresholds, TimeSpan.FromMinutes(4)));
 
-        // Rooms in Ready for Doctor phase - ReadyForDoctorAt triggers aging/stale escalation
+        // Canonical Ready rooms: ReadyForDoctorAt drives the projected ReadyUrgency.
         yield return new("pledger", "EXT",
             thresholds => StaleSample(thresholds),
             thresholds => StaleSample(thresholds));
@@ -2380,11 +2857,228 @@ public sealed class DemoBoardStore
         room.AllocationAdjustedFromDefault = finalUnits != defaultUnits;
     }
 
+    private static bool HasValidExpectedAllocation(ProcedureCategory procedure) =>
+        procedure.DefaultExpectedUnits >= MinExpectedUnits;
+
+    // Canonical-assignment domain validation. The RoomAssignmentContract only
+    // guarantees its own shape; this confirms it is truthful against the current active roster before
+    // it is persisted or promoted to Ready. Presence-conditional so partial drafts stay legal: any
+    // present doctor must be active; any present procedure must resolve to an active procedure and
+    // carry a sedation state - and "+SED" code representation - consistent with that procedure's
+    // eligibility. When no procedure is present, expected allocation must be Unknown so clearing a
+    // procedure cannot retain procedure-derived units.
+    // Reuses the existing roster/procedure-resolution helpers; introduces no parallel validation model.
+    private bool IsAssignmentValidForRoster(RoomAssignmentContract assignment)
+    {
+        if (assignment.DoctorId is { } doctorId
+            && !_activeDoctors.Any(doctor => string.Equals(doctor.Id, doctorId, StringComparison.Ordinal)))
+        {
+            return false;
+        }
+
+        if (assignment.ProcedureCode is not { } procedureCode)
+        {
+            // No procedure: sedation is UnavailableNoProcedure by contract, and allocation must reset.
+            return assignment.ExpectedAllocation.State == ExpectedAllocationState.Unknown;
+        }
+
+        var procedure = FindActiveProcedure(ResolveBaseProcedureCode(procedureCode));
+        if (procedure is null)
+        {
+            return false;
+        }
+
+        var hasSedationModifier = HasSedationModifier(procedureCode);
+        var sedationState = assignment.Sedation.State;
+        if (!procedure.SedationEligible)
+        {
+            // Ineligible procedure: no "+SED" modifier and only the ineligible sedation state.
+            return !hasSedationModifier && sedationState == SedationState.UnavailableProcedureIneligible;
+        }
+
+        // Eligible procedure: the "+SED" modifier must be present iff sedation resolved to Yes.
+        return sedationState switch
+        {
+            SedationState.EligibleYes => hasSedationModifier,
+            SedationState.EligibleNo or SedationState.EligibleUnresolved => !hasSedationModifier,
+            _ => false
+        };
+    }
+
+    private static RoomState CopyRoomState(RoomState room) =>
+        new(room.RoomId)
+        {
+            EpisodeId = room.EpisodeId,
+            AssignedDoctor = room.AssignedDoctor,
+            AssignedDoctorDisplayName = room.AssignedDoctorDisplayName,
+            ProcedureCode = room.ProcedureCode,
+            ProcedureCategory = room.ProcedureCategory,
+            SedationState = room.SedationState,
+            ExpectedAllocationState = room.ExpectedAllocationState,
+            ExpectedAllocationSuggestedUnits = room.ExpectedAllocationSuggestedUnits,
+            ExpectedAllocationConfirmedUnits = room.ExpectedAllocationConfirmedUnits,
+            ActiveReadyHandoffId = room.ActiveReadyHandoffId,
+            AcceptedReadyHandoffId = room.AcceptedReadyHandoffId,
+            State = room.State,
+            PrestageStartedAt = room.PrestageStartedAt,
+            SeatedAt = room.SeatedAt,
+            AgingStartedAt = room.AgingStartedAt,
+            StaleStartedAt = room.StaleStartedAt,
+            ReadyForDoctorAt = room.ReadyForDoctorAt,
+            DoctorArrivedAt = room.DoctorArrivedAt,
+            DoctorCompleteAt = room.DoctorCompleteAt,
+            RoomAvailableAt = room.RoomAvailableAt,
+            OriginalDefaultExpectedUnits = room.OriginalDefaultExpectedUnits,
+            ExpectedAllocationUnits = room.ExpectedAllocationUnits,
+            ExpectedAllocationMinutes = room.ExpectedAllocationMinutes,
+            AllocationAdjustedFromDefault = room.AllocationAdjustedFromDefault
+        };
+
+    private static void ApplyCommittedRoom(RoomState destination, RoomState source)
+    {
+        var committed = CopyRoomState(source);
+        destination.EpisodeId = committed.EpisodeId;
+        destination.AssignedDoctor = committed.AssignedDoctor;
+        destination.AssignedDoctorDisplayName = committed.AssignedDoctorDisplayName;
+        destination.ProcedureCode = committed.ProcedureCode;
+        destination.ProcedureCategory = committed.ProcedureCategory;
+        destination.SedationState = committed.SedationState;
+        destination.ExpectedAllocationState = committed.ExpectedAllocationState;
+        destination.ExpectedAllocationSuggestedUnits = committed.ExpectedAllocationSuggestedUnits;
+        destination.ExpectedAllocationConfirmedUnits = committed.ExpectedAllocationConfirmedUnits;
+        destination.ActiveReadyHandoffId = committed.ActiveReadyHandoffId;
+        destination.AcceptedReadyHandoffId = committed.AcceptedReadyHandoffId;
+        destination.State = committed.State;
+        destination.PrestageStartedAt = committed.PrestageStartedAt;
+        destination.SeatedAt = committed.SeatedAt;
+        destination.AgingStartedAt = committed.AgingStartedAt;
+        destination.StaleStartedAt = committed.StaleStartedAt;
+        destination.ReadyForDoctorAt = committed.ReadyForDoctorAt;
+        destination.DoctorArrivedAt = committed.DoctorArrivedAt;
+        destination.DoctorCompleteAt = committed.DoctorCompleteAt;
+        destination.RoomAvailableAt = committed.RoomAvailableAt;
+        destination.OriginalDefaultExpectedUnits = committed.OriginalDefaultExpectedUnits;
+        destination.ExpectedAllocationUnits = committed.ExpectedAllocationUnits;
+        destination.ExpectedAllocationMinutes = committed.ExpectedAllocationMinutes;
+        destination.AllocationAdjustedFromDefault = committed.AllocationAdjustedFromDefault;
+    }
+
+    private static void ApplyPersistedAssignment(RoomState room, PersistedRoomAssignment assignment)
+    {
+        room.AssignedDoctor = assignment.DoctorId;
+        room.AssignedDoctorDisplayName = assignment.DoctorDisplayName;
+        room.ProcedureCode = assignment.ProcedureCode;
+        room.ProcedureCategory = assignment.ProcedureCategory;
+        room.SedationState = assignment.SedationState;
+        room.ExpectedAllocationState = assignment.ExpectedAllocationState;
+        room.ExpectedAllocationSuggestedUnits = assignment.ExpectedAllocationSuggestedUnits;
+        room.ExpectedAllocationConfirmedUnits = assignment.ExpectedAllocationConfirmedUnits;
+        room.OriginalDefaultExpectedUnits = assignment.ExpectedAllocationSuggestedUnits ?? assignment.ExpectedAllocationConfirmedUnits ?? 0;
+        room.ExpectedAllocationUnits = assignment.ExpectedAllocationConfirmedUnits ?? 0;
+        room.ExpectedAllocationMinutes = room.ExpectedAllocationUnits * 10;
+        room.AllocationAdjustedFromDefault = assignment.ExpectedAllocationSuggestedUnits.HasValue
+            && assignment.ExpectedAllocationConfirmedUnits.HasValue
+            && assignment.ExpectedAllocationSuggestedUnits != assignment.ExpectedAllocationConfirmedUnits;
+    }
+
+    private static PersistedRoomAssignment GetCanonicalAssignment(RoomState room) =>
+        new(
+            room.AssignedDoctor,
+            room.AssignedDoctorDisplayName,
+            room.ProcedureCode,
+            room.ProcedureCategory,
+            room.SedationState,
+            room.ExpectedAllocationState,
+            room.ExpectedAllocationSuggestedUnits,
+            room.ExpectedAllocationConfirmedUnits);
+
+    private static RoomAssignmentContract CreateLegacyCompatibleAssignment(
+        Doctor doctor,
+        ProcedureCategory procedure,
+        bool sedation,
+        int? expectedAllocationUnits)
+    {
+        var sedationContract = procedure.SedationEligible
+            ? (sedation ? SedationContract.EligibleYes() : SedationContract.EligibleNo())
+            : SedationContract.UnavailableProcedureIneligible();
+        var defaultUnits = Math.Clamp(procedure.DefaultExpectedUnits, MinExpectedUnits, MaxExpectedUnits);
+        var units = Math.Clamp(expectedAllocationUnits ?? procedure.DefaultExpectedUnits, MinExpectedUnits, MaxExpectedUnits);
+        var allocation = units == defaultUnits
+            ? ExpectedAllocationContract.ConfirmedSuggestedValue(units)
+            : ExpectedAllocationContract.ConfirmedAdjustedValue(defaultUnits, units);
+        return RoomAssignmentContract.Create(
+            doctor.Id,
+            ComposeProcedureCode(procedure.Code, sedation),
+            sedationContract,
+            allocation);
+    }
+
+    private static CompletedRoomCycle CopyCompletedCycle(CompletedRoomCycle cycle) =>
+        new()
+        {
+            CompletedCycleId = cycle.CompletedCycleId,
+            EpisodeId = cycle.EpisodeId,
+            RoomId = cycle.RoomId,
+            AcceptedReadyHandoffId = cycle.AcceptedReadyHandoffId,
+            AssignedDoctor = cycle.AssignedDoctor,
+            ProcedureCode = cycle.ProcedureCode,
+            PrestageStartedAt = cycle.PrestageStartedAt,
+            SeatedAt = cycle.SeatedAt,
+            ReadyForDoctorAt = cycle.ReadyForDoctorAt,
+            DoctorArrivedAt = cycle.DoctorArrivedAt,
+            DoctorCompleteAt = cycle.DoctorCompleteAt,
+            RoomAvailableAt = cycle.RoomAvailableAt,
+            SeatedToDoctorSeconds = cycle.SeatedToDoctorSeconds,
+            PrepSeconds = cycle.PrepSeconds,
+            ReadyToDoctorSeconds = cycle.ReadyToDoctorSeconds,
+            DoctorInRoomSeconds = cycle.DoctorInRoomSeconds,
+            TurnoverSeconds = cycle.TurnoverSeconds,
+            TotalRoomCycleSeconds = cycle.TotalRoomCycleSeconds,
+            OriginalDefaultExpectedUnits = cycle.OriginalDefaultExpectedUnits,
+            ExpectedAllocationUnits = cycle.ExpectedAllocationUnits,
+            ExpectedAllocationMinutes = cycle.ExpectedAllocationMinutes,
+            AllocationAdjustedFromDefault = cycle.AllocationAdjustedFromDefault,
+            DoctorOccupiedWaitSeconds = cycle.DoctorOccupiedWaitSeconds,
+            DoctorAvailableWaitSeconds = cycle.DoctorAvailableWaitSeconds,
+            HasReportingException = cycle.HasReportingException,
+            ReportingExceptionReasons = cycle.ReportingExceptionReasons.ToArray(),
+            IsExcludedFromStandardMetrics = cycle.IsExcludedFromStandardMetrics,
+            DisplayProcedureLabel = cycle.DisplayProcedureLabel,
+            IsLegacyProcedure = cycle.IsLegacyProcedure,
+            IsUnmappedProcedure = cycle.IsUnmappedProcedure,
+            MeasuredCaseFlowMinutes = cycle.MeasuredCaseFlowMinutes,
+            AllocationVarianceMinutes = cycle.AllocationVarianceMinutes,
+            HasAllocationVariance = cycle.HasAllocationVariance,
+            IsOverExpectedAllocation = cycle.IsOverExpectedAllocation,
+            IsUnderExpectedAllocation = cycle.IsUnderExpectedAllocation,
+            IsAtExpectedAllocation = cycle.IsAtExpectedAllocation,
+            FinalWaitState = cycle.FinalWaitState,
+            AgingThresholdReached = cycle.AgingThresholdReached,
+            StaleThresholdReached = cycle.StaleThresholdReached,
+            IsException = cycle.IsException,
+            RequiresReview = cycle.RequiresReview,
+            ExceptionReason = cycle.ExceptionReason,
+            ReviewStatus = cycle.ReviewStatus,
+            SuggestedAction = cycle.SuggestedAction,
+            ReviewedAt = cycle.ReviewedAt,
+            ReviewedBy = cycle.ReviewedBy
+        };
+
     private static void ResetRoom(RoomState room)
     {
+        room.EpisodeId = null;
         room.AssignedDoctor = null;
+        room.AssignedDoctorDisplayName = null;
         room.ProcedureCode = null;
+        room.ProcedureCategory = null;
+        room.SedationState = null;
+        room.ExpectedAllocationState = null;
+        room.ExpectedAllocationSuggestedUnits = null;
+        room.ExpectedAllocationConfirmedUnits = null;
+        room.ActiveReadyHandoffId = null;
+        room.AcceptedReadyHandoffId = null;
         room.State = RoomStates.Available;
+        room.PrestageStartedAt = null;
         room.SeatedAt = null;
         room.AgingStartedAt = null;
         room.StaleStartedAt = null;
@@ -2403,9 +3097,43 @@ public sealed class DemoBoardStore
         var index = _rooms.FindIndex(room => room.RoomId == roomId);
         if (index >= 0)
         {
-            _rooms[index] = readyForDoctorAt.HasValue
-                ? ReadyForDoctorRoom(roomId, doctorId, procedureCode, seatedAt, readyForDoctorAt.Value)
-                : Seated(roomId, doctorId, procedureCode, seatedAt);
+            if (!readyForDoctorAt.HasValue)
+            {
+                _rooms[index] = Seated(roomId, doctorId, procedureCode, seatedAt);
+                return;
+            }
+
+            var doctor = _activeDoctors.FirstOrDefault(item => item.Id == doctorId)
+                ?? throw new InvalidOperationException($"Demo seed doctor '{doctorId}' is not active.");
+            var sedation = HasSedationModifier(procedureCode);
+            var procedure = FindActiveProcedure(ResolveBaseProcedureCode(procedureCode))
+                ?? throw new InvalidOperationException($"Demo seed procedure '{procedureCode}' is not active.");
+            var assignment = CreateLegacyCompatibleAssignment(
+                doctor,
+                procedure,
+                sedation,
+                expectedAllocationUnits: null);
+            var persistedAssignment = PersistedRoomAssignment.FromCanonicalContract(
+                assignment,
+                doctor.Name,
+                ResolveProcedure(assignment.ProcedureCode)?.Label);
+            var room = new RoomState(roomId)
+            {
+                EpisodeId = NewEpisodeId(),
+                State = RoomStates.ReadyForDoctor,
+                PrestageStartedAt = seatedAt - TimeSpan.FromMinutes(5),
+                SeatedAt = seatedAt,
+                ReadyForDoctorAt = readyForDoctorAt.Value
+            };
+            ApplyPersistedAssignment(room, persistedAssignment);
+            var handoff = _repository.CreateReadyHandoff(
+                room,
+                assignment,
+                readyForDoctorAt.Value,
+                _doctors,
+                _procedures);
+            room.ActiveReadyHandoffId = handoff.HandoffId;
+            _rooms[index] = room;
         }
     }
 
@@ -2419,29 +3147,35 @@ public sealed class DemoBoardStore
             SeatedAt = seatedAt
         };
 
-        UpdateRoomState(room, Now);
         return room;
     }
 
-    private RoomState ReadyForDoctorRoom(int roomId, string doctorId, string procedureCode, DateTimeOffset seatedAt, DateTimeOffset readyForDoctorAt)
-    {
-        var room = new RoomState(roomId)
-        {
-            AssignedDoctor = doctorId,
-            ProcedureCode = procedureCode,
-            State = RoomStates.ReadyForDoctor,
-            SeatedAt = seatedAt,
-            ReadyForDoctorAt = readyForDoctorAt
-        };
+    private static string NewEpisodeId() => Guid.NewGuid().ToString("N");
 
-        UpdateRoomState(room, Now);
-        return room;
-    }
+    private bool IsDemoElapsedMinutesAllowed(int demoElapsedMinutes) =>
+        demoElapsedMinutes is >= 0 and <= 240
+        && (demoElapsedMinutes == 0 || _demoOffsetsAllowed);
 
-    private static bool CanSeat(RoomState room) => room.State == RoomStates.Available && room.SeatedAt is null;
+    private static bool CanBeginPrestage(RoomState room) =>
+        room.State == RoomStates.Available && room.PrestageStartedAt is null && room.SeatedAt is null;
 
-    private static bool CanEditSeatedRoom(RoomState room) =>
-        room.State is RoomStates.Seated or RoomStates.Aging or RoomStates.Stale or RoomStates.ReadyForDoctor;
+    private static bool CanSeat(RoomState room) =>
+        room.State == RoomStates.Prestaging && room.PrestageStartedAt is not null && room.SeatedAt is null;
+
+    private static bool CanCancelPrestage(RoomState room) =>
+        room.State == RoomStates.Prestaging && room.PrestageStartedAt is not null && room.SeatedAt is null;
+
+    private static bool CanCancelSeating(RoomState room) =>
+        room.State is RoomStates.Seated or RoomStates.ReadyForDoctor or RoomStates.Aging or RoomStates.Stale;
+
+    private static bool IsValidCancellationReason(string? cancellationReason) =>
+        cancellationReason is null
+            or CancellationReasons.PatientCanceled
+            or CancellationReasons.NoShow
+            or CancellationReasons.MovedRoom
+            or CancellationReasons.SchedulingError
+            or CancellationReasons.ProcedureChanged
+            or CancellationReasons.Other;
 
     private static bool CanMarkReadyForDoctor(RoomState room) =>
         room.State is RoomStates.Seated;
@@ -2458,42 +3192,8 @@ public sealed class DemoBoardStore
         }
     }
 
-    private bool HasCycleReport(int roomId, DateTimeOffset seatedAt) =>
-        _completedCycles.Any(cycle => cycle.RoomId == roomId && cycle.SeatedAt == seatedAt);
-
-    private void UpdateCycleReport(RoomState room, Action<CompletedRoomCycle> update)
-    {
-        if (room.SeatedAt is null)
-        {
-            return;
-        }
-
-        var cycle = _completedCycles.FirstOrDefault(item => item.RoomId == room.RoomId && item.SeatedAt == room.SeatedAt);
-        if (cycle is not null)
-        {
-            update(cycle);
-        }
-    }
-
-    private void PersistRoom(RoomState room) =>
-        _repository.SaveRoom(room, _doctors, _procedures);
-
     private void PersistCycle(CompletedRoomCycle cycle) =>
         _repository.SaveCompletedCycle(cycle, _doctors, _procedures);
-
-    private void PersistCycleForRoom(RoomState room)
-    {
-        if (room.SeatedAt is null)
-        {
-            return;
-        }
-
-        var cycle = _completedCycles.FirstOrDefault(item => item.RoomId == room.RoomId && item.SeatedAt == room.SeatedAt);
-        if (cycle is not null)
-        {
-            PersistCycle(cycle);
-        }
-    }
 
     private BoardThresholdOptions Thresholds => _thresholdOptions.CurrentValue;
 
@@ -3088,7 +3788,9 @@ public sealed record RoomStatus(
     int OriginalDefaultExpectedUnits = 0,
     int ExpectedAllocationUnits = 0,
     int ExpectedAllocationMinutes = 0,
-    bool AllocationAdjustedFromDefault = false);
+    bool AllocationAdjustedFromDefault = false,
+    ReadyUrgency ReadyUrgency = ReadyUrgency.None,
+    IReadOnlyList<RoomIntegrityFault>? IntegrityFaults = null);
 
 public sealed record RoomEvent(
     int RoomNumber,
@@ -3311,9 +4013,23 @@ public sealed class CompletedRoomCycle
     // once. Reporting and exception actions can target a single cycle by this value without
     // relying on the legacy (RoomId, SeatedAt) compound key.
     public long CompletedCycleId { get; set; }
+
+    // Opaque per-episode identity minted at Begin Prestage and carried through the whole
+    // occupancy episode into this completed cycle. Null on legacy rows persisted before the
+    // Prestaging feature. Distinct from CompletedCycleId (a per-row SQLite id): EpisodeId ties a
+    // completed cycle back to the single occupancy episode it belongs to, so an episode can be
+    // proven to appear in exactly one of completed_room_cycles / aborted_room_assignments.
+    public string? EpisodeId { get; set; }
+    public string? AcceptedReadyHandoffId { get; set; }
     public int RoomId { get; set; }
     public string AssignedDoctor { get; set; } = "";
     public string ProcedureCode { get; set; } = "";
+
+    // Room-unavailable clock start. Set when the episode began with Begin Prestage; null on legacy
+    // rows or any cycle whose room was never prestaged. When present, room-unavailable time for a
+    // successful cycle is measured from here rather than from SeatedAt. Not yet consumed by any
+    // report calculation.
+    public DateTimeOffset? PrestageStartedAt { get; set; }
     public DateTimeOffset SeatedAt { get; set; }
     public DateTimeOffset? ReadyForDoctorAt { get; set; }
     /// <summary>
@@ -3552,9 +4268,28 @@ public sealed record StressFixtureResult(
 public sealed class RoomState(int roomId)
 {
     public int RoomId { get; } = roomId;
+
+    // Opaque per-episode identity minted at Begin Prestage and cleared on ResetRoom. Carried
+    // through Seat/Ready/Arrive into the eventual completed cycle or aborted-assignment record so
+    // the whole occupancy episode shares one id. Null while Available and on legacy rows that
+    // predate the Prestaging feature.
+    public string? EpisodeId { get; set; }
     public string? AssignedDoctor { get; set; }
+    public string? AssignedDoctorDisplayName { get; set; }
     public string? ProcedureCode { get; set; }
+    public string? ProcedureCategory { get; set; }
+    public SedationState? SedationState { get; set; }
+    public ExpectedAllocationState? ExpectedAllocationState { get; set; }
+    public int? ExpectedAllocationSuggestedUnits { get; set; }
+    public int? ExpectedAllocationConfirmedUnits { get; set; }
+    public string? ActiveReadyHandoffId { get; set; }
+    public string? AcceptedReadyHandoffId { get; set; }
     public string State { get; set; } = RoomStates.Available;
+
+    // Room-unavailable clock start, set at Begin Prestage and cleared on ResetRoom. Null while
+    // Available and on legacy rows persisted before the Prestaging feature (which reload with their
+    // existing state and are never forced through Prestaging).
+    public DateTimeOffset? PrestageStartedAt { get; set; }
     public DateTimeOffset? SeatedAt { get; set; }
     public DateTimeOffset? AgingStartedAt { get; set; }
     public DateTimeOffset? StaleStartedAt { get; set; }
@@ -3574,12 +4309,101 @@ public sealed class RoomState(int roomId)
 public static class RoomStates
 {
     public const string Available = "available";
+    public const string Prestaging = "prestaging";
     public const string Seated = "seated";
     public const string Aging = "aging";
     public const string Stale = "stale";
     public const string ReadyForDoctor = "readyForDoctor";
     public const string DoctorInRoom = "doctorInRoom";
     public const string Turnover = "turnover";
+}
+
+/// <summary>
+/// How an occupancy episode was terminated before it produced a normal completed cycle. This is the
+/// mechanism, deliberately kept separate from any staff-selected operational reason (see
+/// <see cref="CancellationReasons"/>): a record always has a termination kind, and only staff
+/// cancellations additionally carry a reason.
+/// </summary>
+public static class TerminationKinds
+{
+    /// <summary>A staff member explicitly canceled the prestage or seating from the room panel.</summary>
+    public const string StaffCanceled = "StaffCanceled";
+
+    /// <summary>The active-cycle safety sweep expired the episode for exceeding the max active duration.</summary>
+    public const string MaxDurationExpired = "MaxDurationExpired";
+
+    /// <summary>The after-hours clinic-local sweep expired the episode at end of day.</summary>
+    public const string AfterHoursExpired = "AfterHoursExpired";
+}
+
+/// <summary>
+/// Optional, staff-selected operational reason accompanying a <see cref="TerminationKinds.StaffCanceled"/>
+/// termination. Never inferred; null when not supplied or when the termination was an automatic sweep.
+/// Operational metadata only - never PHI.
+/// </summary>
+public static class CancellationReasons
+{
+    public const string PatientCanceled = "PatientCanceled";
+    public const string NoShow = "NoShow";
+    public const string MovedRoom = "MovedRoom";
+    public const string SchedulingError = "SchedulingError";
+    public const string ProcedureChanged = "ProcedureChanged";
+    public const string Other = "Other";
+}
+
+/// <summary>
+/// Durable record of an occupancy episode that left Available but returned to Available without
+/// producing a normal completed cycle (a canceled prestage, a canceled seating, or a sweep-expired
+/// prestage). Preserves the full assignment snapshot so room-unavailable time stays attributable.
+/// Non-PHI: identity, procedure, allocation, timestamps, and operational termination metadata only.
+///
+/// Populations are disjoint by construction: an episode either reaches a normal completed cycle
+/// (completed_room_cycles) or terminates incomplete (this record), never both, so summing spans
+/// across the two tables counts each episode's room-unavailable time exactly once.
+/// </summary>
+public sealed class AbortedRoomAssignment
+{
+    // Stable per-row identity assigned by SQLite (aborted_room_assignments.id). Zero until persisted.
+    public long AbortedAssignmentId { get; set; }
+
+    // Per-episode identity and idempotency key (UNIQUE in storage). Minted at Begin Prestage for
+    // new episodes, or at termination time for a legacy row that never had one. Two genuinely
+    // distinct episodes always carry distinct EpisodeIds even under an identical (fixed-clock)
+    // termination instant; re-terminating the same episode reuses the same id and is a no-op.
+    public string EpisodeId { get; set; } = "";
+    public int RoomId { get; set; }
+
+    // Assignment snapshot. Canonical Prestaging can terminate with no or partial assignment, so
+    // doctor/procedure are nullable. Legacy rows may also have null canonical state fields when a
+    // truthful migration cannot prove sedation or allocation intent.
+    public string? AssignedDoctor { get; set; }
+    public string? AssignedDoctorDisplayName { get; set; }
+    public string? ProcedureCode { get; set; }
+    public string? ProcedureCategory { get; set; }
+    public SedationState? SedationState { get; set; }
+    public ExpectedAllocationState? ExpectedAllocationState { get; set; }
+    public int? ExpectedAllocationSuggestedUnits { get; set; }
+    public int? ExpectedAllocationConfirmedUnits { get; set; }
+    public string? TerminalReadyHandoffId { get; set; }
+    public int OriginalDefaultExpectedUnits { get; set; }
+    public int ExpectedAllocationUnits { get; set; }
+    public int ExpectedAllocationMinutes { get; set; }
+    public bool AllocationAdjustedFromDefault { get; set; }
+
+    // Phase timestamps captured up to the point of termination. PrestageStartedAt is null only for a
+    // legacy row that was seated before the Prestaging feature; SeatedAt/ReadyForDoctorAt are present
+    // only if the episode had reached those phases before termination.
+    public DateTimeOffset? PrestageStartedAt { get; set; }
+    public DateTimeOffset? SeatedAt { get; set; }
+    public DateTimeOffset? ReadyForDoctorAt { get; set; }
+
+    // Termination facts. TerminatedFromState is the room state at termination; TerminationKind is the
+    // mechanism (see TerminationKinds); CancellationReason is the optional staff reason (see
+    // CancellationReasons) and is only meaningful for a StaffCanceled termination.
+    public DateTimeOffset TerminatedAt { get; set; }
+    public string TerminatedFromState { get; set; } = "";
+    public string TerminationKind { get; set; } = "";
+    public string? CancellationReason { get; set; }
 }
 
 public static class ReviewStatuses

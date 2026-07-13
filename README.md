@@ -15,9 +15,11 @@ It tracks rooms, assigned doctors, procedure categories, timers, and seated-to-d
 Each room tracks only non-PHI operational state:
 
 - `roomId`
+- `episodeId`
 - `assignedDoctor`
 - `procedureCode`
 - `state`
+- `activeReadyHandoffId`
 - `seatedAt`
 - `readyForDoctorAt`
 - `agingStartedAt`
@@ -51,31 +53,35 @@ Default server-side thresholds:
 - Aging starts 7 minutes after `readyForDoctorAt`
 - Stale starts 12 minutes after `readyForDoctorAt`
 
-The room lifecycle is:
+The canonical room lifecycle is:
 
 - Available
+- Prestaging
 - In Prep
-- Ready, Aging, or Stale
+- Ready, with None/Aging/Stale urgency projected from the Active handoff
 - Doctor In Room
 - Turnover
 - Available
 
-`Seat Room` starts the room cycle and records only doctor, procedure, and operational timestamps. `Ready for Doctor` is available while the room is in prep; it records `readyForDoctorAt` and starts the ready-to-doctor wait window. `Doctor Arrived` is available only for ready, aging, or stale rooms; it records `doctorArrivedAt`, calculates `readyToDoctorSeconds` and `seatedToDoctorSeconds`, and moves the room to Doctor In Room. `Doctor Complete` is available only while the doctor is in the room; it records `doctorCompleteAt` and starts Turnover. `Room Available` is available only during Turnover; it records `roomAvailableAt`, calculates turnover and total cycle durations, and resets the active room card to available.
+`Begin Prestage` creates an episode without requiring assignment. `Save Details` explicitly commits absent, partial, or complete assignment details while Prestaging or Seated. `Seat Room` records truthful `seatedAt`; an assignment-bearing Seat can persist its canonical draft atomically. `Ready for Doctor` requires a complete, currently valid, durably saved assignment, creates an immutable Active handoff, records `readyForDoctorAt`, and locks assignment editing. Draft-bearing Ready is deferred to API/UI issues #120 and #121.
 
-Before `Doctor Arrived`, staff can safely correct common seating mistakes:
+`Withdraw Ready` returns the same episode to Seated, clears urgency, and leaves the handoff historical as Withdrawn so corrected details can be saved. Reissuing Ready creates a new handoff and a new urgency interval. `Doctor Arrived` accepts the current handoff, clears urgency, records `doctorArrivedAt`, calculates wait timing, and moves the room to Doctor In Room. `Doctor Complete` enters Turnover, and `Room Available` completes the cycle and resets the active room.
 
-- `Update Assignment` changes the assigned doctor and procedure while preserving the original `seatedAt` timestamp.
+Before Ready, staff can safely correct common assignment mistakes:
+
+- `Update Assignment` changes the draft assignment only while Prestaging or Seated and preserves episode/lifecycle timestamps.
+- A Ready assignment must first be withdrawn before it can be edited.
 - `Cancel Seating` requires confirmation, resets the room to available, and does not create a report entry.
 
 After `Doctor Arrived`, correction actions are blocked. Seated-to-doctor reporting is recorded only at `Doctor Arrived`.
 
-The server calculates the ready wait state from `readyForDoctorAt`, `agingStartedAt`, `staleStartedAt`, and the configured thresholds:
+The server projects Ready urgency from the owned Active handoff's `ReadyAt` and the configured thresholds:
 
 - Available when there is no active `seatedAt`
 - In Prep after seating and before `Ready for Doctor`
-- Ready before the configured aging threshold
-- Aging from the configured aging threshold until the stale threshold
-- Stale after the configured stale threshold
+- Ready with no urgency before the configured aging threshold
+- Ready with Aging urgency from the configured aging threshold until the stale threshold
+- Ready with Stale urgency after the configured stale threshold
 - Doctor In Room after `doctorArrivedAt`
 - Turnover after `doctorCompleteAt`
 
@@ -163,7 +169,9 @@ Change those values to adjust room timing without code edits. `StaleMinutes` mus
 dotnet run --project .\src\ChairSide.Board\ChairSide.Board.csproj --BoardPersistenceOptions:DatabasePath="C:\ChairSide\Data\chairside.db"
 ```
 
-The app creates the SQLite database and schema on startup if they do not exist. Persisted data remains non-PHI and is limited to room assignments, procedure categories, lifecycle state, operational timestamps, and completed-cycle durations.
+The app creates the SQLite database and schema on startup if they do not exist. Persisted data remains non-PHI and is limited to room episodes, canonical assignments, immutable Ready handoffs, lifecycle state, operational timestamps, aborted assignments, and completed-cycle durations.
+
+Canonical assignment writes use a persistence-level compare-and-swap guard over the originally loaded room id, nullable episode id, lifecycle state, and nullable Active handoff id. A stale write returns no result and is not automatically retried or reloaded, so stale intent cannot regress Ready or orphan its handoff. SQLite failures remain exceptions and transaction-local writes roll back before live memory changes.
 
 Startup schema creation and additive migrations fail fast on unexpected SQLite errors; only duplicate-column cases are treated as benign idempotent startup repeats.
 
@@ -216,7 +224,7 @@ The room-panel Demo Timer is available by default outside Production and hidden/
 
 Room expiration:
 
-ChairSide automatically protects against abandoned active room cycles. By default, room expiration is enabled, active rooms older than 8 hours are archived as exception cycles, and an after-hours sweep expires any still-active rooms once per clinic day at 19:00 in the configured clinic timezone. Expired rooms return to available and the exception cycles remain non-PHI operational records for review.
+ChairSide automatically protects against abandoned active room cycles. By default, room expiration is enabled and an after-hours sweep runs once per clinic day at 19:00 in the configured clinic timezone. Pre-arrival expiration creates aborted history outside throughput. Post-arrival expiration creates a review-required exception without fabricating `DoctorCompleteAt`. In both cases, durable persistence succeeds before live room state changes.
 
 Configure or disable this behavior with `RoomExpirationOptions` if needed:
 
@@ -293,7 +301,7 @@ Doctors:
 Rooms:
 
 - Room 1 through the configured `RoomCount`
-- Mixed demo room states using fake seated timers
+- Mixed durable demo room states using fake seated timers; Ready rooms have canonical episodes, assignments, and owned Active handoffs
 - Procedure categories: `CON`, `EXT`, `SED`, `POST`, `IMP`, `BX`
 
 ## Run Locally
@@ -426,7 +434,7 @@ Deployment smoke checklist:
 
 The development database is stored at `src/ChairSide.Board/data/chairside-dev.db` by default. Stop the app and delete that file, plus any matching `chairside-dev.db-wal` or `chairside-dev.db-shm` files, to reset local demo data.
 
-Demo room states are only seeded when a non-Production database is brand new. Production starts with configured rooms in the available state and does not seed demo room activity.
+Demo room states are seeded only outside Production when `active_rooms`, `completed_room_cycles`, `ready_handoffs`, and `aborted_room_assignments` are all empty before configured rooms are initialized. The seed is persisted, canonical Ready rooms own Active handoffs, and restart restores the seed or any subsequently modified durable state without overwriting or reseeding it. Production starts with configured Available rooms and never seeds demo activity.
 
 ## Deterministic Stress Fixtures (Maintenance)
 
@@ -441,7 +449,7 @@ dotnet run --project .\src\ChairSide.Board\ChairSide.Board.csproj -- --environme
 There is no default profile - `--profile` is required so a stress fixture can never be seeded by accident. Choose one of seven profiles:
 
 - `reporting-volume` - the existing large synthetic completed-cycle dataset (the same shape as `reset-large-synthetic-report-data`), for reporting-volume testing.
-- `live-board-stress` - fills all 12 master-board room cards, with every room state (`AVAILABLE`, `IN PREP`, `READY`, `AGING`, `STALE`, `IN ROOM`, `TURNOVER`) present at least once, including sedation cases and a long-label procedure, to catch board layout regressions.
+- `live-board-stress` - fills all 12 master-board room cards with every presentation posture (`AVAILABLE`, `IN PREP`, `READY` with None/Aging/Stale urgency, `IN ROOM`, and `TURNOVER`) present, including sedation cases and a long-label procedure.
 - `doctor-view-stress` - a fixed 1/3/4/4 active-room split across the four doctors, so Doctor View's 1-room, 3-room (2x2 with a quiet fourth quadrant), and 4-room (full 2x2) postures can all be reviewed.
 - `doctor-view-overflow-stress` - one doctor with 5 active rooms (a ragged extra row), so Doctor View's beyond-4-room overflow behavior can be reviewed, alongside 3-room and 2-room postures for the other doctors.
 - `scenario-rich` - an extended multi-month completed-cycle history plus a small set of explicit edge-case cycles (one clean cycle in each of the Today, Last-7, Last-30, and older-than-Last-30 report windows; one cycle per derived reporting-exception reason; and one manual audit-review candidate), for reporting/trend/exception-review testing.
@@ -460,11 +468,11 @@ dotnet run --project .\src\ChairSide.Board\ChairSide.Board.csproj -- --environme
 dotnet run --project .\src\ChairSide.Board\ChairSide.Board.csproj -- --environment Development --BoardPersistenceOptions:DatabasePath=.\src\ChairSide.Board\data\chairside-dev.db --maintenance reset-stress-fixture --confirm RESET_STRESS_FIXTURE --profile all-scenarios
 ```
 
-Like `reset-large-synthetic-report-data`, this command is destructive to whatever database it targets: it clears all completed cycles and resets every active room to Available before seeding the requested fixture. Use it only against a Development/test database, never against production data. It hard-refuses to run in Production regardless of confirmation token, and there is no HTTP endpoint - it never runs as part of normal application startup or serving.
+Like `reset-large-synthetic-report-data`, this command is destructive to whatever database it targets. One transaction deletes completed cycles, every Active handoff, and active rooms, then recreates configured Available rooms before the selected fixture runs. Withdrawn, Accepted, and Terminated handoffs and aborted assignments are preserved. Repeated runs converge in current room state and Active-handoff counts; preserved resolved-history counts and generated GUID identities are not deterministic promises. Use it only against a Development/test database. It hard-refuses Production and has no HTTP or startup path.
 
 ## Reports
 
-The reports page shows completed room cycle count, prep timing, ready-to-doctor timing, seated-to-doctor timing, doctor-in-room average and median, turnover average and median, aging event count, stale event count, trend summaries, and recent completed cycles. Active room state and completed cycles are stored in SQLite and survive app restarts.
+The reports page shows completed room cycle count, prep timing, ready-to-doctor timing, seated-to-doctor timing, doctor-in-room average and median, turnover average and median, aging event count, stale event count, trend summaries, and recent completed cycles. The accepted Ready handoff is the finalized assignment attribution; withdrawn handoffs are audit history, pre-arrival aborts stay outside throughput, and post-arrival expiration appears only in review-required exceptions. Threshold flags are captured without persisting new Aging/Stale primary states.
 
 The underlying completed-cycle records include assigned doctor and completion timestamps so monthly doctor-level reporting can be added later without introducing PHI.
 
@@ -502,4 +510,4 @@ Room panels include a `Demo Timer` select outside Production. Use `Start now`, `
 
 ## Persistence
 
-SQLite persistence is intentionally narrow for the MVP. It stores only room number, doctor id/display name, procedure code/category, room state, lifecycle timestamps, completed-cycle durations, and operational audit timestamps. It does not store patient names, DOBs, chart numbers, medical notes, diagnosis, insurance, billing data, or free-text patient notes.
+SQLite persistence is intentionally narrow for the MVP. It stores only room/episode identity, canonical non-PHI assignment data, Ready handoffs, lifecycle state and timestamps, aborted assignments, completed-cycle durations, and operational audit timestamps. It does not store patient names, DOBs, chart numbers, medical notes, diagnosis, insurance, billing data, or free-text patient notes.

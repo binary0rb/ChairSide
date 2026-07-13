@@ -1,7 +1,7 @@
 ﻿{
     "generatedStamp":  "deterministic",
     "root":  ".",
-    "fileCount":  76,
+    "fileCount":  88,
     "files":  [
                   {
                       "path":  ".github/pull_request_template.md",
@@ -33,7 +33,7 @@
                   {
                       "path":  "AGENTS.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  11645,
+                      "sizeBytes":  13344,
                       "typeSymbols":  [
 
                                       ],
@@ -126,6 +126,43 @@
                                           ],
                       "headings":  [
                                        "Claude Code note"
+                                   ]
+                  },
+                  {
+                      "path":  "docs/design/prestage-assignment-lifecycle.md",
+                      "kind":  "Markdown",
+                      "sizeBytes":  7524,
+                      "typeSymbols":  [
+
+                                      ],
+                      "methodSymbols":  [
+
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+                                       "Prestaging Assignment Lifecycle",
+                                       "Status and traceability",
+                                       "Primary lifecycle",
+                                       "Assignment completeness",
+                                       "Ready boundary",
+                                       "Ready urgency, withdrawal, and acceptance",
+                                       "Cancellation, expiration, and recovery",
+                                       "Persistence, compare-and-swap, and failure ordering",
+                                       "Reporting",
+                                       "Development and maintenance fixtures",
+                                       "Explicit non-goals and separate issues",
+                                       "Acceptance summary"
                                    ]
                   },
                   {
@@ -287,7 +324,7 @@
                   {
                       "path":  "docs/knowledge/reports/reporting-population.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  3513,
+                      "sizeBytes":  2764,
                       "typeSymbols":  [
 
                                       ],
@@ -308,11 +345,10 @@
                                           ],
                       "headings":  [
                                        "Reporting population",
-                                       "Intent",
-                                       "The population funnel",
-                                       "Constraints",
-                                       "Source anchors",
-                                       "Verification notes"
+                                       "Population funnel",
+                                       "Assignment and handoff attribution",
+                                       "Termination populations",
+                                       "Source and test anchors"
                                    ]
                   },
                   {
@@ -349,7 +385,7 @@
                   {
                       "path":  "docs/knowledge/tests/deterministic-stress-fixtures.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  8795,
+                      "sizeBytes":  3383,
                       "typeSymbols":  [
 
                                       ],
@@ -371,17 +407,16 @@
                       "headings":  [
                                        "Deterministic stress fixtures",
                                        "Intent",
+                                       "Canonical live-room representation",
                                        "Profiles",
-                                       "Constraints",
-                                       "Day-offset shift (all-scenarios only)",
-                                       "Source anchors",
-                                       "Verification notes"
+                                       "Atomic reset contract",
+                                       "Source and test anchors"
                                    ]
                   },
                   {
                       "path":  "docs/knowledge/ui/doctor-view-operational-header.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  5558,
+                      "sizeBytes":  5673,
                       "typeSymbols":  [
 
                                       ],
@@ -414,7 +449,7 @@
                   {
                       "path":  "docs/knowledge/workflow/room-lifecycle.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  4369,
+                      "sizeBytes":  4406,
                       "typeSymbols":  [
 
                                       ],
@@ -435,12 +470,13 @@
                                           ],
                       "headings":  [
                                        "Room lifecycle",
-                                       "Intent",
-                                       "Lifecycle events and states",
-                                       "Mutation surface and authorization",
-                                       "Conflict handling",
-                                       "Source anchors",
-                                       "Verification notes"
+                                       "Canonical sequence",
+                                       "Ready handoff and urgency",
+                                       "Cancellation, expiration, and recovery",
+                                       "Concurrency and durability",
+                                       "Authorization and conflict handling",
+                                       "Source and test anchors",
+                                       "Separate known issue"
                                    ]
                   },
                   {
@@ -475,7 +511,7 @@
                   {
                       "path":  "docs/knowledge-graph/chairside.graph.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  6096,
+                      "sizeBytes":  6299,
                       "typeSymbols":  [
 
                                       ],
@@ -498,14 +534,15 @@
                                        "ChairSide knowledge graph",
                                        "Conceptual graph",
                                        "Core invariants",
-                                       "Current reporting semantics captured by the graph",
-                                       "Known development affordances"
+                                       "Fixture and seed invariants",
+                                       "Reporting semantics",
+                                       "Deferred and separate work"
                                    ]
                   },
                   {
                       "path":  "docs/knowledge-graph/decisions.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  2171,
+                      "sizeBytes":  5428,
                       "typeSymbols":  [
 
                                       ],
@@ -527,17 +564,23 @@
                       "headings":  [
                                        "ChairSide durable decisions",
                                        "Knowledge graph scope",
-                                       "Runtime isolation",
-                                       "Human-readable first",
                                        "Non-PHI boundary",
+                                       "Prestaging and assignment drafts",
+                                       "Ready handoff boundary",
+                                       "Ready urgency",
+                                       "Cancellation, expiration, and recovery",
+                                       "Concurrency and durable ordering",
+                                       "Development seed",
+                                       "Maintenance reset",
+                                       "Reporting population semantics",
                                        "Reporting UI philosophy",
-                                       "Reporting population semantics"
+                                       "Explicitly separate issues"
                                    ]
                   },
                   {
                       "path":  "docs/knowledge-graph/README.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  3177,
+                      "sizeBytes":  3222,
                       "typeSymbols":  [
 
                                       ],
@@ -735,7 +778,7 @@
                   {
                       "path":  "README.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  31588,
+                      "sizeBytes":  33307,
                       "typeSymbols":  [
 
                                       ],
@@ -1223,7 +1266,7 @@
                   {
                       "path":  "src/ChairSide.Board/Options/RoomExpirationOptions.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  1436,
+                      "sizeBytes":  1507,
                       "typeSymbols":  [
                                           "RoomExpirationOptions"
                                       ],
@@ -1249,10 +1292,19 @@
                   {
                       "path":  "src/ChairSide.Board/Program.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  43075,
+                      "sizeBytes":  71971,
                       "typeSymbols":  [
+                                          "BeginPrestageRequest",
                                           "SeatRoomRequest",
+                                          "CancelRoomAssignmentRequest",
                                           "UpdateAssignmentRequest",
+                                          "ProcedureAliasResolver",
+                                          "struct",
+                                          "StrictJsonRequestReader",
+                                          "ParsedSeatRequest",
+                                          "SeatRequestParser",
+                                          "CancelRequestParser",
+                                          "RoomLifecycleEndpointHandler",
                                           "MarkExceptionRequest",
                                           "DoctorArrivedConflictResponse",
                                           "ResolveDoctorArrivalConflictRequest",
@@ -1261,6 +1313,16 @@
                                           "AuditRequestContext"
                                       ],
                       "methodSymbols":  [
+                                            "Resolve",
+                                            "IsBlankButSupplied",
+                                            "ValidatePropertySet",
+                                            "TryParse",
+                                            "TryGetInt",
+                                            "TryGetNullableInt",
+                                            "TryGetNullableString",
+                                            "CancelPrestageAsync",
+                                            "CancelSeatingAsync",
+                                            "ValidateCompatibilityDemoElapsedMinutes",
                                             "From",
                                             "Build"
                                         ],
@@ -1273,8 +1335,11 @@
                                      "/api/reports/cycles/{completedCycleId:long}/confirm-exclusion",
                                      "/api/rooms/{roomNumber:int}",
                                      "/api/client-errors",
+                                     "/api/rooms/{roomNumber:int}/prestage",
                                      "/api/rooms/{roomNumber:int}/seat",
+                                     "/api/rooms/{roomNumber:int}/update-assignment",
                                      "/api/rooms/{roomNumber:int}/assignment",
+                                     "/api/rooms/{roomNumber:int}/cancel-prestage",
                                      "/api/rooms/{roomNumber:int}/cancel-seating",
                                      "/api/rooms/{roomNumber:int}/ready-for-doctor",
                                      "/api/rooms/{roomNumber:int}/doctor-arrived",
@@ -1380,7 +1445,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/DemoBoardStore.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  174993,
+                      "sizeBytes":  219054,
                       "typeSymbols":  [
                                           "ExceptionReasons",
                                           "ReportingExceptionReasons",
@@ -1409,7 +1474,13 @@
                                           "LiveRoomFixture",
                                           "StressFixtureResult",
                                           "RoomState",
+                                          "so",
                                           "RoomStates",
+                                          "always",
+                                          "TerminationKinds",
+                                          "CancellationReasons",
+                                          "of",
+                                          "AbortedRoomAssignment",
                                           "ReviewStatuses",
                                           "ExceptionReviewers",
                                           "ReviewExceptionOutcome",
@@ -1420,16 +1491,25 @@
                                             "GetSnapshot",
                                             "GetRoom",
                                             "IsConfiguredRoom",
+                                            "BeginPrestage",
+                                            "SaveAssignmentDetails",
+                                            "UpdateRoomAssignment",
                                             "SeatRoom",
+                                            "SeatRoomWithAssignment",
                                             "UpdateAssignment",
+                                            "CancelPrestage",
                                             "CancelSeating",
+                                            "CancelIncompleteAssignment",
                                             "MarkReadyForDoctor",
+                                            "WithdrawReady",
                                             "MarkDoctorArrived",
                                             "TryMarkDoctorArrived",
                                             "ResolveDoctorArrivalConflict",
                                             "PrepareDoctorArrived",
                                             "ApplyDoctorArrived",
                                             "FindActiveDoctorRoom",
+                                            "CanCreateLegacyCompletionCycle",
+                                            "CreateLegacyCompletionCycle",
                                             "ResolveDoctorDisplayName",
                                             "MarkDoctorComplete",
                                             "MarkRoomAvailable",
@@ -1444,19 +1524,10 @@
                                             "ResetAndSeedStressFixture",
                                             "SeedLiveRoomFixtures",
                                             "BuildLiveRoom",
+                                            "IsReadyFixtureTarget",
                                             "UpsertLiveCompletedCycle",
                                             "UpsertExplicitCompletedCycle",
-                                            "LiveBoardStressFixtures",
-                                            "DoctorViewStressFixtures",
-                                            "DoctorViewOverflowStressFixtures",
-                                            "FullStressLiveFixtures",
-                                            "SeedScenarioRichHistory",
-                                            "SeedScenarioRichEdgeCases",
-                                            "RoomForEdgeCase",
-                                            "BuildCleanCompletedCycle",
-                                            "BuildMissingTimingCycle",
-                                            "DeterministicSeed",
-                                            "CasesForDayOffset"
+                                            "LiveBoardStressFixtures"
                                         ],
                       "routes":  [
 
@@ -1570,6 +1641,77 @@
                                    ]
                   },
                   {
+                      "path":  "src/ChairSide.Board/Services/ReadyHandoffContracts.cs",
+                      "kind":  "CSharp",
+                      "sizeBytes":  5550,
+                      "typeSymbols":  [
+                                          "ReadyHandoffStatus",
+                                          "ReadyHandoffContract"
+                                      ],
+                      "methodSymbols":  [
+                                            "Active",
+                                            "Withdrawn",
+                                            "Accepted",
+                                            "Create",
+                                            "ValidateStatusTimestamps",
+                                            "ValidateTimestamp",
+                                            "EnsureNotBeforeReady"
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
+                      "path":  "src/ChairSide.Board/Services/ReadyHandoffPersistenceRecords.cs",
+                      "kind":  "CSharp",
+                      "sizeBytes":  6729,
+                      "typeSymbols":  [
+                                          "ActiveRoomWriteExpectation",
+                                          "ReadyHandoffTerminationKinds",
+                                          "PersistedRoomAssignment",
+                                          "PersistedReadyHandoff",
+                                          "CommittedReadyHandoffResult",
+                                          "CommittedRoomResult"
+                                      ],
+                      "methodSymbols":  [
+                                            "FromRoom",
+                                            "IsValid",
+                                            "FromCanonicalContract",
+                                            "FromContract",
+                                            "ToContract",
+                                            "TryToContract",
+                                            "ValidateCanonicalValues",
+                                            "ValidateCanonicalWrite"
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
                       "path":  "src/ChairSide.Board/Services/ReportTrendSnapshot.cs",
                       "kind":  "CSharp",
                       "sizeBytes":  3942,
@@ -1584,6 +1726,62 @@
                                             "FormatDate",
                                             "Average",
                                             "Median"
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
+                      "path":  "src/ChairSide.Board/Services/RoomAssignmentContracts.cs",
+                      "kind":  "CSharp",
+                      "sizeBytes":  14494,
+                      "typeSymbols":  [
+                                          "AssignmentCompleteness",
+                                          "SedationState",
+                                          "ExpectedAllocationState",
+                                          "CanonicalRoomLifecycleState",
+                                          "ReadyUrgency",
+                                          "RoomIntegrityFaultCode",
+                                          "SedationContract",
+                                          "ExpectedAllocationContract",
+                                          "RoomAssignmentContract",
+                                          "AssignmentCompletenessEvaluator",
+                                          "ReadyUrgencyEvaluator",
+                                          "RoomCapabilities",
+                                          "RoomCapabilitiesEvaluator",
+                                          "RoomIntegrityFault",
+                                          "RoomIntegrityFaultEvaluator"
+                                      ],
+                      "methodSymbols":  [
+                                            "UnavailableNoProcedure",
+                                            "UnavailableProcedureIneligible",
+                                            "EligibleUnresolved",
+                                            "EligibleYes",
+                                            "EligibleNo",
+                                            "FromProcedure",
+                                            "Create",
+                                            "Unknown",
+                                            "Suggested",
+                                            "ConfirmedSuggestedValue",
+                                            "ConfirmedAdjustedValue",
+                                            "ValidatePositiveValue",
+                                            "NormalizeToken",
+                                            "ValidateProcedureSedationCompatibility",
+                                            "Evaluate",
+                                            "Validate",
+                                            "IsReadyOrLater"
                                         ],
                       "routes":  [
 
@@ -1764,40 +1962,55 @@
                   {
                       "path":  "src/ChairSide.Board/Services/SqliteBoardRepository.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  48433,
+                      "sizeBytes":  120595,
                       "typeSymbols":  [
-                                          "SqliteBoardRepository"
+                                          "SqliteBoardRepository",
+                                          "the",
+                                          "and",
+                                          "carries",
+                                          "on"
                                       ],
                       "methodSymbols":  [
-                                            "HasAnyRoomRows",
+                                            "HasOperationalData",
                                             "LoadRooms",
                                             "EnsureConfiguredRooms",
-                                            "ClearCompletedCycles",
-                                            "ResetActiveRooms",
+                                            "ResetMaintenanceState",
                                             "SaveRooms",
                                             "SaveRoom",
                                             "LoadCompletedCycles",
                                             "SaveCompletedCycle",
+                                            "SaveCompletedCycleAndRoom",
+                                            "TerminateIncompleteAssignment",
+                                            "SaveCanonicalAssignment",
+                                            "CreateReadyHandoff",
+                                            "WithdrawReadyHandoff",
+                                            "AcceptReadyHandoffAndSaveCycle",
+                                            "TerminateReadyHandoffAndIncompleteAssignment",
+                                            "CancelReadyRoom",
+                                            "LoadAbortedAssignments",
+                                            "LoadReadyHandoffsByEpisode",
+                                            "LoadActiveReadyHandoff",
+                                            "LoadReadyHandoff",
+                                            "ReadReadyHandoffs",
+                                            "LoadOwnedActiveReadyHandoff",
+                                            "TryLoadOwnedActiveReadyHandoff",
+                                            "ValidateRoomHandoffReference",
+                                            "ValidateCompletedCycleMatchesRoom",
+                                            "ValidateAbortedAssignmentMatchesRoom",
+                                            "ValidateRoomEpisode",
+                                            "InsertReadyHandoff",
+                                            "UpdateReadyHandoffOutcome",
+                                            "TerminateReadyHandoff",
+                                            "InsertAbortedAssignment",
                                             "Initialize",
                                             "EnsureCompletedCycleIdColumn",
                                             "MigrateNullableDoctorArrivedAt",
+                                            "MigrateAbortedAssignmentCanonicalSchema",
+                                            "CreateReadyHandoffIndexes",
+                                            "ApplyLosslessCanonicalBackfills",
                                             "TableExists",
                                             "GetColumnNames",
-                                            "Execute",
-                                            "TryAddColumn",
-                                            "IsDuplicateColumnError",
-                                            "OpenConnection",
-                                            "ValidateDatabasePath",
-                                            "IsPathInsideContentRoot",
-                                            "NormalizeDirectoryPath",
-                                            "VerifyDirectoryWritable",
-                                            "ResolveDatabasePath",
-                                            "FormatDateTimeOffset",
-                                            "ToDbValue",
-                                            "ReadNullableString",
-                                            "ReadNullableInt32",
-                                            "ReadNullableDateTimeOffset",
-                                            "ReadRequiredDateTimeOffset"
+                                            "Execute"
                                         ],
                       "routes":  [
 
@@ -1846,7 +2059,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/board.js",
                       "kind":  "JavaScript",
-                      "sizeBytes":  171949,
+                      "sizeBytes":  171965,
                       "typeSymbols":  [
 
                                       ],
@@ -2219,11 +2432,14 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/BoardStoreTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  313908,
+                      "sizeBytes":  481502,
                       "typeSymbols":  [
                                           "BoardStoreTests",
                                           "is",
                                           "persisted",
+                                          "exists",
+                                          "a",
+                                          "for",
                                           "StoreContext",
                                           "TestWorkspace",
                                           "TestWebHostEnvironment",
@@ -2236,9 +2452,33 @@
                                       ],
                       "methodSymbols":  [
                                             "Lifecycle_actions_preserve_expected_state_and_report_behavior",
+                                            "Begin_prestage_succeeds_only_from_available_and_captures_snapshot",
+                                            "Begin_prestage_invalid_inputs_leave_room_unchanged",
+                                            "Prestaging_survives_store_restart_reconstruction",
+                                            "Seat_room_rejects_available_and_accepts_prestaging_without_replacing_snapshot",
+                                            "Fixed_clock_new_episodes_receive_distinct_episode_ids",
+                                            "Development_demo_offset_shifts_prestage_and_seated_timestamps_together",
+                                            "Development_negative_demo_offset_is_rejected_without_mutating_room",
+                                            "Development_demo_offset_above_maximum_is_rejected_without_mutating_room",
+                                            "Production_demo_offset_is_rejected_before_state_derivation_or_mutation",
+                                            "Development_demo_offset_boundaries_zero_and_240_are_applied_without_clamping",
+                                            "Legacy_active_rows_without_episode_or_prestage_continue_normally",
+                                            "Normally_completed_new_episode_persists_episode_id_and_prestage_started_at",
+                                            "Cancel_prestage_persists_full_abort_snapshot_and_resets_room",
+                                            "Composite_sedation_cancellation_persists_canonical_procedure_category",
+                                            "Cancellation_retains_begin_prestage_display_snapshots_after_roster_change",
+                                            "Cancel_seating_persists_complete_new_episode_snapshot_and_reset_across_reload",
+                                            "Cancel_prestage_rejects_available_and_post_prestage_states",
+                                            "Cancel_seating_persists_exact_allowed_pre_arrival_state",
+                                            "Cancel_seating_rejects_available_and_at_or_after_doctor_arrived",
+                                            "Cancellation_rejects_blank_or_unknown_reason_without_mutation",
+                                            "Legacy_ready_room_cancellation_mints_episode_id_without_prestage_timestamp",
                                             "Active_seated_room_survives_store_restart",
                                             "Completed_report_survives_store_restart",
-                                            "Stale_elapsed_ready_for_doctor_room_reloads_as_stale",
+                                            "Room_available_atomically_finalizes_cycle_and_available_room_across_reload",
+                                            "Legacy_cycle_with_null_episode_and_prestage_completes_normally",
+                                            "Room_available_rejects_repeat_after_reset_without_duplicate_completed_cycle",
+                                            "Stale_elapsed_ready_room_reloads_as_ready_with_stale_urgency",
                                             "Doctor_in_room_and_turnover_rooms_survive_reload_without_wait_state_downgrade",
                                             "Turnover_seconds_calculated_from_doctor_complete_to_room_available",
                                             "Room_status_preserves_seated_at_through_doctor_in_room_and_turnover",
@@ -2250,31 +2490,59 @@
                                             "Default_rosters_load_current_doctors_and_procedures",
                                             "Procedure_roster_exposes_allocation_behavior_and_default_expected_units",
                                             "Procedure_allocation_behavior_classification_matches_known_and_variable_lists",
-                                            "Seating_without_units_applies_procedure_default_allocation",
-                                            "Seating_with_explicit_units_stores_final_allocation",
-                                            "Allocation_adjusted_flag_is_false_when_units_equal_default",
-                                            "Allocation_adjusted_flag_is_true_when_units_differ_from_default",
-                                            "Seating_with_zero_units_clamps_to_minimum_and_never_yields_zero_minutes",
-                                            "Seating_with_negative_units_clamps_to_minimum",
-                                            "Seating_with_units_above_maximum_clamps_to_maximum",
-                                            "Allocation_snapshot_carries_from_active_room_into_completed_cycle",
-                                            "Allocation_snapshot_survives_restart_for_active_rooms",
-                                            "Allocation_snapshot_survives_restart_for_completed_cycles",
-                                            "Sedation_variant_inherits_base_procedure_default_allocation",
-                                            "Inactive_doctors_and_procedures_are_not_selectable",
-                                            "Sedation_is_not_a_standalone_selectable_procedure",
-                                            "Eligible_procedure_seated_without_sedation_stays_a_base_procedure",
-                                            "Eligible_procedure_with_sedation_is_stored_and_displayed_as_a_variant",
-                                            "New_all_on_four_procedure_supports_sedation_modifier_and_resolves_label",
-                                            "New_all_on_four_sedation_variant_rolls_up_under_base_in_reports",
-                                            "Sedation_modifier_is_rejected_for_non_eligible_procedures",
-                                            "Sedation_modifier_can_be_added_and_removed_via_update_assignment",
-                                            "Sedation_cases_report_as_distinct_variants_from_base_procedure",
-                                            "Variant_summaries_carry_base_code_and_sedation_flag",
-                                            "Doctor_procedure_mix_groups_by_doctor_and_variant_with_shares",
-                                            "Doctor_procedure_mix_isolates_rows_and_denominators_per_doctor",
-                                            "Doctor_procedure_mix_excludes_incomplete_and_reporting_exception_cycles",
-                                            "Doctor_procedure_mix_skips_cycles_with_blank_doctor"
+                                            "Seating_without_units_applies_procedure_default_allocation"
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
+                      "path":  "tests/ChairSide.Board.Tests/CanonicalAssignmentDomainValidationTests.cs",
+                      "kind":  "CSharp",
+                      "sizeBytes":  26411,
+                      "typeSymbols":  [
+                                          "CanonicalAssignmentDomainValidationTests",
+                                          "LiveRoomSnapshot"
+                                      ],
+                      "methodSymbols":  [
+                                            "Save_details_rejects_unknown_doctor",
+                                            "Save_details_rejects_absent_procedure_with_retained_allocation",
+                                            "Save_details_rejects_inactive_or_unknown_procedure",
+                                            "Save_details_rejects_sedation_yes_for_ineligible_procedure",
+                                            "Save_details_rejects_procedure_code_sedation_mismatch",
+                                            "Seat_room_rejects_unknown_doctor_without_mutation",
+                                            "Seat_room_rejects_sedation_yes_for_ineligible_procedure_without_mutation",
+                                            "Seat_room_rejects_absent_procedure_with_retained_allocation_without_mutation",
+                                            "Stale_save_details_cannot_regress_ready_room_or_orphan_handoff",
+                                            "Stale_assignment_bearing_seat_cannot_overwrite_ready_room",
+                                            "Mark_ready_rejects_assignment_whose_doctor_is_no_longer_active",
+                                            "Mark_ready_rejects_assignment_whose_procedure_is_no_longer_active",
+                                            "Mark_ready_rejects_impossible_stored_procedure_sedation_combination",
+                                            "Doctor_only_assignment_with_unknown_allocation_is_valid_partial_draft",
+                                            "Fully_absent_assignment_is_valid",
+                                            "Current_save_details_succeeds",
+                                            "Current_assignment_bearing_seat_room_succeeds",
+                                            "Begin_prestage_still_succeeds_from_existing_available_row",
+                                            "Valid_canonical_contract_saves_seats_and_reaches_ready",
+                                            "AssertSaveDetailsRejectedWithoutMutation",
+                                            "AssertSeatRoomRejectedWithoutMutation",
+                                            "AssertPersistedAssignmentUnchanged",
+                                            "AssertRoomStillSeatedWithoutHandoff",
+                                            "AssertReadyTruthUnchanged",
+                                            "CaptureLiveRoom",
+                                            "SaveSeatedRoom"
                                         ],
                       "routes":  [
 
@@ -2319,6 +2587,284 @@
                                    ]
                   },
                   {
+                      "path":  "tests/ChairSide.Board.Tests/DurableFailureInjectionTests.cs",
+                      "kind":  "CSharp",
+                      "sizeBytes":  20999,
+                      "typeSymbols":  [
+                                          "DurableFailureInjectionTests",
+                                          "HandoffSnapshot",
+                                          "CycleSnapshot",
+                                          "RoomSnapshot"
+                                      ],
+                      "methodSymbols":  [
+                                            "Cancel_seating_database_abort_rolls_back_aborted_history_and_preserves_live_room",
+                                            "Cancel_ready_room_database_abort_rolls_back_handoff_and_aborted_history",
+                                            "Ready_expiration_database_abort_rolls_back_handoff_and_aborted_history",
+                                            "Arrived_expiration_database_abort_rolls_back_exception_cycle",
+                                            "Save_assignment_details_database_abort_throws_and_preserves_live_room",
+                                            "EnabledExpiration",
+                                            "LoadRoom",
+                                            "GetLiveRoom",
+                                            "GetLiveCycles",
+                                            "InstallResetFailureTrigger",
+                                            "InstallCanonicalFailureTrigger",
+                                            "DropTrigger",
+                                            "ExecuteSql",
+                                            "AssertInjectedAbort",
+                                            "From"
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
+                      "path":  "tests/ChairSide.Board.Tests/FaultedReadyCancellationTests.cs",
+                      "kind":  "CSharp",
+                      "sizeBytes":  17737,
+                      "typeSymbols":  [
+                                          "truthful",
+                                          "FaultedReadyCancellationTests"
+                                      ],
+                      "methodSymbols":  [
+                                            "Cancellation_of_ready_room_with_dangling_handoff_reference_aborts_without_touching_any_handoff",
+                                            "Cancellation_of_ready_room_referencing_another_rooms_handoff_leaves_that_handoff_active",
+                                            "Cancellation_of_ready_room_referencing_another_episodes_handoff_preserves_that_handoff",
+                                            "Cancellation_of_ready_room_referencing_withdrawn_handoff_preserves_that_handoff",
+                                            "Cancellation_of_ready_room_referencing_accepted_handoff_preserves_that_handoff",
+                                            "Cancellation_of_ready_room_referencing_terminated_handoff_preserves_that_handoff",
+                                            "Cancellation_of_clean_owned_active_ready_room_still_terminates_its_handoff",
+                                            "Cancellation_of_legacy_ready_room_without_handoff_reference_still_cancels",
+                                            "AssertVisibleFaultAndBlocked",
+                                            "AssertCancelReleasesRoomWithAbortedHistory",
+                                            "AssertHandoffUnchanged",
+                                            "CompleteAssignment",
+                                            "NewReadyRoomState",
+                                            "SaveReadyRoom",
+                                            "InsertHandoffRow",
+                                            "OpenConnection",
+                                            "FormatDateTimeOffset"
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
+                      "path":  "tests/ChairSide.Board.Tests/LifecycleFixtureCorrectionTests.cs",
+                      "kind":  "CSharp",
+                      "sizeBytes":  34706,
+                      "typeSymbols":  [
+                                          "LifecycleFixtureCorrectionTests",
+                                          "RoomStatusSnapshot",
+                                          "PersistedRoomSnapshot",
+                                          "HandoffSnapshot",
+                                          "AbortedSnapshot"
+                                      ],
+                      "methodSymbols":  [
+                                            "Development_first_run_demo_seed_persists_across_restart_without_reseeding_existing_state",
+                                            "Development_ready_demo_seed_is_canonical_immediately_and_after_restart",
+                                            "Development_database_with_history_and_no_active_rooms_is_not_demo_seeded",
+                                            "Repeated_live_fixture_replaces_active_handoffs_without_orphans_and_converges",
+                                            "Switching_live_fixture_profiles_replaces_active_handoffs_with_second_profile_count",
+                                            "Switching_from_live_fixture_to_history_only_profile_leaves_no_active_handoffs",
+                                            "Maintenance_reset_removes_preexisting_orphaned_active_handoff",
+                                            "Maintenance_reset_preserves_resolved_handoffs_and_aborted_history",
+                                            "Maintenance_reset_database_abort_rolls_back_durable_and_live_state",
+                                            "Maintenance_urgency_fixture_persists_primary_ready_with_owned_active_handoff",
+                                            "Reissued_ready_uses_new_handoff_interval_and_clears_urgency_on_withdrawal_and_arrival",
+                                            "Legacy_ready_peer_state_with_owned_active_handoff_can_withdraw",
+                                            "Legacy_ready_peer_state_with_missing_handoff_remains_blocked_and_cancelable",
+                                            "InitialAssignment",
+                                            "CorrectedAssignment",
+                                            "SeedReadyRoom",
+                                            "LoadRoom",
+                                            "SetLegacyReadyState",
+                                            "AssertCanonicalDemoReadyRoom",
+                                            "ProjectedRoomFixture",
+                                            "LoadActiveHandoffIds",
+                                            "AssertActiveHandoffIntegrity",
+                                            "CountOrphanedActiveHandoffs",
+                                            "LoadPersistedRoomSnapshots",
+                                            "CountRows",
+                                            "OpenConnection",
+                                            "ExecuteNonQuery",
+                                            "From"
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
+                      "path":  "tests/ChairSide.Board.Tests/MalformedAssignmentIntegrityTests.cs",
+                      "kind":  "CSharp",
+                      "sizeBytes":  10386,
+                      "typeSymbols":  [
+                                          "MalformedAssignmentIntegrityTests"
+                                      ],
+                      "methodSymbols":  [
+                                            "Malformed_active_room_with_contradictory_sedation_recovers_visibly_faulted",
+                                            "Malformed_active_room_with_non_positive_allocation_recovers_visibly_faulted",
+                                            "Malformed_active_room_with_inconsistent_allocation_confirmation_recovers_visibly_faulted",
+                                            "Ready_handoff_schema_rejects_contradictory_sedation_state",
+                                            "Ready_handoff_schema_rejects_non_positive_allocation",
+                                            "Ready_handoff_schema_rejects_inconsistent_allocation_confirmation",
+                                            "SaveMalformedActiveRoom",
+                                            "AssertActiveRoomRecoversVisiblyFaulted",
+                                            "InsertRawReadyHandoff",
+                                            "OpenConnection",
+                                            "FormatDateTimeOffset"
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
+                      "path":  "tests/ChairSide.Board.Tests/PrestagingAssignmentContractTests.cs",
+                      "kind":  "CSharp",
+                      "sizeBytes":  20147,
+                      "typeSymbols":  [
+                                          "PrestagingAssignmentContractTests",
+                                          "HandoffEnvelope"
+                                      ],
+                      "methodSymbols":  [
+                                            "Sedation_without_procedure_is_unavailable",
+                                            "Sedation_for_ineligible_procedure_is_unavailable_but_complete_for_sedation",
+                                            "Eligible_sedation_without_explicit_choice_is_unresolved",
+                                            "Eligible_sedation_yes_is_explicit_and_complete_for_sedation",
+                                            "Eligible_sedation_no_is_explicit_and_complete_for_sedation",
+                                            "Illegal_sedation_combinations_are_rejected",
+                                            "Unknown_allocation_has_no_values",
+                                            "Suggested_allocation_has_suggested_value_only",
+                                            "Confirmed_suggestion_has_matching_suggested_and_confirmed_values",
+                                            "Confirmed_adjustment_has_distinct_confirmed_value",
+                                            "Zero_and_negative_allocation_values_are_rejected",
+                                            "Suggested_allocation_alone_does_not_complete_assignment",
+                                            "Entirely_absent_assignment_is_absent",
+                                            "Doctor_only_assignment_is_partial",
+                                            "Procedure_only_assignment_is_partial",
+                                            "Doctor_and_eligible_procedure_with_unresolved_sedation_is_partial",
+                                            "Assignment_missing_allocation_confirmation_is_partial",
+                                            "Ineligible_procedure_assignment_can_be_complete_without_sedation_decision",
+                                            "Eligible_yes_assignment_can_be_complete",
+                                            "Eligible_no_assignment_can_be_complete",
+                                            "Active_handoff_contains_complete_assignment_snapshot",
+                                            "Withdrawn_handoff_requires_withdrawn_timestamp",
+                                            "Accepted_handoff_requires_accepted_timestamp",
+                                            "Handoff_rejects_incomplete_assignment",
+                                            "Handoff_rejects_invalid_timestamp_and_status_combinations",
+                                            "Handoff_rejects_empty_identifier",
+                                            "None_urgency_is_valid_outside_ready",
+                                            "Aging_and_stale_urgency_are_valid_while_ready",
+                                            "Aging_and_stale_urgency_are_rejected_outside_ready",
+                                            "Ready_or_later_incomplete_assignment_yields_integrity_fault",
+                                            "Integrity_fault_is_separate_from_assignment_completeness",
+                                            "Legacy_false_sentinel_is_not_automatically_canonical_eligible_no",
+                                            "Legacy_zero_sentinel_is_not_canonical_confirmed_allocation",
+                                            "Procedure_suggestion_is_not_allocation_confirmation",
+                                            "Capabilities_follow_canonical_lifecycle",
+                                            "New_contract_status_values_serialize_as_strings_with_web_property_names",
+                                            "Nullable_handoff_absence_serializes_as_null",
+                                            "AbsentAssignment",
+                                            "CompleteIneligibleAssignment"
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
+                      "path":  "tests/ChairSide.Board.Tests/PrestagingLifecycleTransitionTests.cs",
+                      "kind":  "CSharp",
+                      "sizeBytes":  12572,
+                      "typeSymbols":  [
+                                          "PrestagingLifecycleTransitionTests"
+                                      ],
+                      "methodSymbols":  [
+                                            "Bare_begin_persists_a_truthful_absent_assignment",
+                                            "Ready_withdrawal_returns_to_editable_seated_and_preserves_episode",
+                                            "Doctor_arrived_accepts_the_immutable_ready_snapshot",
+                                            "Seat_with_draft_persists_the_assignment_and_seating_in_one_transition",
+                                            "Changed_procedure_with_incompatible_dependent_state_is_rejected",
+                                            "Changed_procedure_with_valid_replacement_values_is_accepted",
+                                            "Partial_replacement_remains_partial_and_cannot_reach_ready",
+                                            "Same_procedure_legitimate_edits_remain_accepted",
+                                            "Faulted_legacy_ready_blocks_arrival_but_still_allows_prearrival_cancellation"
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
                       "path":  "tests/ChairSide.Board.Tests/ProjectionAssumptionChecklistTests.cs",
                       "kind":  "CSharp",
                       "sizeBytes":  9442,
@@ -2338,6 +2884,73 @@
                                             "Preset_identity_and_report_window_are_copied_but_do_not_affect_observed_calculation",
                                             "Public_model_does_not_expose_projection_or_capacity_promise_names",
                                             "ScheduleFitReport"
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
+                      "path":  "tests/ChairSide.Board.Tests/ReadyHandoffPersistenceTests.cs",
+                      "kind":  "CSharp",
+                      "sizeBytes":  58276,
+                      "typeSymbols":  [
+                                          "ReadyHandoffPersistenceTests",
+                                          "RoomSnapshot",
+                                          "HandoffSnapshot"
+                                      ],
+                      "methodSymbols":  [
+                                            "Fresh_database_contains_ready_handoff_schema_and_canonical_columns",
+                                            "Legacy_schema_migrates_without_fabricating_ready_handoffs_or_accepted_snapshots",
+                                            "Canonical_active_room_assignment_round_trips",
+                                            "Canonical_assignment_compare_and_swap_rejects_wrong_expected_identity",
+                                            "Canonical_assignment_compare_and_swap_rejects_expected_null_active_handoff",
+                                            "Canonical_assignment_database_abort_does_not_mutate_supplied_room",
+                                            "Ready_handoff_creation_persists_active_reference_and_complete_snapshot",
+                                            "Ready_handoff_rejects_incomplete_assignment_without_persisting_side_effects",
+                                            "Withdrawn_handoff_allows_reissued_active_handoff_and_preserves_history",
+                                            "Accepted_handoff_updates_room_and_completed_cycle_atomically",
+                                            "Canceled_ready_handoff_termination_is_distinct_from_withdrawal",
+                                            "Expired_ready_handoff_termination_is_distinct_from_withdrawal",
+                                            "Failed_acceptance_rolls_back_handoff_outcome",
+                                            "Database_constraints_reject_second_active_and_second_accepted_handoff_for_episode",
+                                            "Ready_handoff_operations_reject_wrong_episode",
+                                            "Ready_handoff_operations_reject_wrong_room",
+                                            "Ready_handoff_operations_reject_stale_handoff_after_reissued_ready",
+                                            "Ready_handoff_operations_reject_missing_active_room_reference",
+                                            "Ready_handoff_operations_reject_changed_active_room_reference",
+                                            "Accepted_handoff_derives_completed_cycle_assignment_from_immutable_snapshot",
+                                            "New_canonical_assignment_writes_reject_legacy_ambiguous_state",
+                                            "Canonical_absent_assignment_is_a_strict_new_write",
+                                            "Create_ready_handoff_does_not_mutate_caller_on_duplicate_active_failure",
+                                            "Create_ready_handoff_does_not_mutate_caller_when_room_save_fails",
+                                            "Failed_withdrawal_rolls_back_room_and_handoff",
+                                            "Failed_ready_termination_rolls_back_room_handoff_and_aborted_history",
+                                            "AmbiguousCanonicalAssignments",
+                                            "CanonicalAssignments",
+                                            "ReadyRoom",
+                                            "CompleteAssignment",
+                                            "CompletePersistedAssignment",
+                                            "CompletedCycle",
+                                            "AbortedAssignment",
+                                            "LoadRoom",
+                                            "CopyRoom",
+                                            "AssertOperationFailsWithoutChanges",
+                                            "InvokeReadyHandoffOperation",
+                                            "CountRows",
+                                            "From",
+                                            "OpenConnection"
                                         ],
                       "routes":  [
 

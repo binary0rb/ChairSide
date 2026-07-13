@@ -179,13 +179,13 @@ Avoid tiny detailed tooth icons because they blur together from a distance.
 
 The master view should be a responsive grid of room cards showing the configured surgical rooms.
 
-Room states:
+Primary room states and Ready urgency presentation:
 
 - AVAILABLE = slate
 - IN PREP = blue
 - READY = gold
-- AGING = orange
-- STALE = red
+- AGING = orange secondary urgency while primary state remains READY
+- STALE = red secondary urgency while primary state remains READY
 - IN ROOM = green
 - TURNOVER = purple
 
@@ -208,14 +208,22 @@ Rooms should be configurable, with the default early prototype using:
 
 ## Core workflow
 
-1. Staff seat a room from the room tablet.
-2. Staff select assigned doctor and procedure category.
-3. Before `Doctor Arrived`, staff may use `Update Assignment` or `Cancel Seating` for safe corrections.
-4. `Ready for Doctor` marks the room ready and starts the ready-to-doctor wait window.
-5. `Doctor Arrived` records timing and moves the room to `IN ROOM`.
-6. `Doctor Complete` starts `TURNOVER`.
-7. `Room Available` returns the room to `AVAILABLE`.
-8. The system logs non-PHI operational timing.
+1. `Begin Prestage` creates an episode and starts prep without requiring assignment details.
+2. During `PRESTAGING` and `SEATED`, `Save Details` may persist an absent, partial, or complete canonical assignment.
+3. `Seat Room` records truthful `SeatedAt`; an assignment-bearing Seat may persist its supplied draft atomically.
+4. `Ready for Doctor` requires a complete, currently valid, durably saved assignment. It creates an immutable Active handoff and starts the ready-to-doctor wait window.
+5. Aging and stale are urgency projections from the Active handoff's `ReadyAt`, not newly persisted primary lifecycle states.
+6. `Withdraw Ready` returns to `SEATED`, clears urgency, and permits assignment correction; reissuing Ready creates a new handoff and urgency interval.
+7. `Doctor Arrived` accepts the Active handoff, clears urgency, records timing, and moves the room to `IN ROOM`.
+8. `Doctor Complete` starts `TURNOVER`.
+9. `Room Available` returns the room to `AVAILABLE`.
+10. The system logs non-PHI operational timing.
+
+Ready is the assignment-lock boundary. Cancellation and expiration before Doctor Arrived produce aborted history outside throughput. Post-arrival expiration produces a review-required exception without fabricating `DoctorCompleteAt`. Legacy persisted Aging/Stale rows remain readable recovery states.
+
+Canonical assignment persistence is compare-and-swap guarded by the originally loaded room, episode, lifecycle state, and Active handoff identity. Stale writes return no result and do not mutate live state, reload, or retry. SQLite failures throw, roll back transaction-local writes, and leave live memory unchanged.
+
+Draft-bearing Ready is deferred to API/UI issues #120 and #121; do not add a `MarkReadyForDoctor` assignment overload without that follow-up scope.
 
 Doctors should be able to view room status from a phone or workstation, but they should not be able to acknowledge or clear the room remotely.
 
@@ -256,6 +264,8 @@ Reports should eventually include:
 - Total above-threshold wait time
 - Trends by doctor, room, procedure, and time of day
 
+The accepted Ready handoff is the finalized reporting assignment. Withdrawn handoffs do not become accepted attribution, pre-arrival aborts stay outside throughput, and post-arrival expiration belongs only to the review-required exception population.
+
 Reports should be operational, non-punitive, and team-process oriented. Avoid doctor or staff rankings, best/worst framing, scoreboards, awards, shame language, or productivity theater. Use summary cards, median/average timing context, plain-English explanations, progressive disclosure, and operational questions.
 
 Workshop and projection language should frame outputs as scenario exploration, not prediction. Do not imply ChairSide can perfectly predict capacity or that observed slack is automatically recoverable time.
@@ -270,7 +280,7 @@ Build the MVP around:
 - Doctor color coding
 - Distinctive procedure icons
 - Seated timer
-- Aging and stale states
+- Aging and stale Ready urgency presentations
 - Room-local lifecycle actions
 - Event logging
 - Basic reporting
