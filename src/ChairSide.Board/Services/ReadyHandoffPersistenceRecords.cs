@@ -1,4 +1,26 @@
+using System.Diagnostics.CodeAnalysis;
+using System.Runtime.CompilerServices;
+
+[assembly: InternalsVisibleTo("ChairSide.Board.Tests")]
+
 namespace ChairSide.Board.Services;
+
+internal sealed record ActiveRoomWriteExpectation(
+    int RoomId,
+    string? EpisodeId,
+    string State,
+    string? ActiveReadyHandoffId)
+{
+    public static ActiveRoomWriteExpectation FromRoom(RoomState room)
+    {
+        ArgumentNullException.ThrowIfNull(room);
+        return new ActiveRoomWriteExpectation(
+            room.RoomId,
+            room.EpisodeId,
+            room.State,
+            room.ActiveReadyHandoffId);
+    }
+}
 
 public static class ReadyHandoffTerminationKinds
 {
@@ -68,6 +90,32 @@ public sealed record PersistedRoomAssignment(
             ExpectedAllocationSuggestedUnits,
             ExpectedAllocationConfirmedUnits);
         return RoomAssignmentContract.Create(DoctorId, ProcedureCode, sedation, allocation);
+    }
+
+    // Safe counterpart to ToContract for read/projection paths. A persisted row can hold malformed or
+    // contradictory assignment data (ambiguous legacy state, procedure/sedation mismatch, non-positive
+    // or inconsistent allocation). ToContract surfaces those as the contract-conversion exception
+    // family - InvalidOperationException or ArgumentException (ArgumentOutOfRangeException derives from
+    // ArgumentException). Integrity projection and recovery must treat such rows as faulted history
+    // rather than throwing and hiding the room, so this returns false instead of propagating. It never
+    // rewrites or normalizes the malformed record.
+    public bool TryToContract([NotNullWhen(true)] out RoomAssignmentContract? assignment)
+    {
+        try
+        {
+            assignment = ToContract();
+            return true;
+        }
+        catch (InvalidOperationException)
+        {
+            assignment = null;
+            return false;
+        }
+        catch (ArgumentException)
+        {
+            assignment = null;
+            return false;
+        }
     }
 
     public void ValidateCanonicalValues()
@@ -140,3 +188,13 @@ public sealed class PersistedReadyHandoff
             _ => throw new InvalidOperationException("A terminated Ready handoff is audit history, not a ReadyHandoffContract status.")
         };
 }
+
+public sealed record CommittedReadyHandoffResult(
+    PersistedReadyHandoff Handoff,
+    RoomState Room,
+    CompletedRoomCycle? CompletedCycle = null,
+    AbortedRoomAssignment? AbortedAssignment = null);
+
+public sealed record CommittedRoomResult(
+    RoomState Room,
+    CompletedRoomCycle? CompletedCycle = null);

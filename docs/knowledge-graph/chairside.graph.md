@@ -1,6 +1,6 @@
 # ChairSide knowledge graph
 
-This is the hand-authored map of ChairSide's important concepts. Keep it readable for humans first. The generated inventory in `generated/` helps locate files, but this document explains why the pieces matter.
+This hand-authored map records ChairSide's important concepts and relationships. Generated inventory files help locate symbols but are not runtime inputs or substitutes for this intent.
 
 ## Conceptual graph
 
@@ -8,86 +8,94 @@ This is the hand-authored map of ChairSide's important concepts. Keep it readabl
 flowchart LR
     LightBoardReplacement["DomainConcept: Replace light board / pager"] --> BoardUi["UiSurface: ChairSide board"]
     BoardUi --> RoomCards["UiSurface: Room cards"]
-    BoardUi --> DoctorRail["UiSurface: Doctor rail"]
-    BoardUi --> MasterKey["UiSurface: Master key / legend"]
+    BoardUi --> DoctorView["UiSurface: Doctor read-only view"]
 
-    RoomLifecycle["DomainConcept: Room lifecycle"] --> Seat["LifecycleEvent: Seat"]
-    RoomLifecycle --> Update["LifecycleEvent: Update"]
-    RoomLifecycle --> Cancel["LifecycleEvent: Cancel"]
+    RoomLifecycle["DomainConcept: Room episode lifecycle"] --> BeginPrestage["LifecycleEvent: Begin Prestage"]
+    RoomLifecycle --> SaveDetails["LifecycleEvent: Save Details"]
+    RoomLifecycle --> Seat["LifecycleEvent: Seat"]
+    RoomLifecycle --> Ready["LifecycleEvent: Ready for Doctor"]
+    RoomLifecycle --> Withdraw["LifecycleEvent: Withdraw Ready"]
     RoomLifecycle --> DoctorArrived["LifecycleEvent: Doctor Arrived"]
     RoomLifecycle --> DoctorComplete["LifecycleEvent: Doctor Complete"]
     RoomLifecycle --> RoomAvailable["LifecycleEvent: Room Available"]
 
-    Seat --> InPrep["WorkflowState: In Prep"]
-    Seat --> Ready["WorkflowState: Ready"]
-    Ready --> Aging["WorkflowState: Aging"]
-    Aging --> Stale["WorkflowState: Stale"]
-    DoctorArrived --> InRoom["WorkflowState: In Room"]
+    BeginPrestage --> Prestaging["WorkflowState: Prestaging"]
+    Seat --> Seated["WorkflowState: Seated / In Prep"]
+    Ready --> ReadyState["WorkflowState: ReadyForDoctor"]
+    ReadyState --> ReadyUrgency["DomainConcept: Ready urgency None / Aging / Stale"]
+    Withdraw --> Seated
+    DoctorArrived --> InRoom["WorkflowState: Doctor In Room"]
     DoctorComplete --> Turnover["WorkflowState: Turnover"]
     RoomAvailable --> Available["WorkflowState: Available"]
 
-    DoctorRoster["ConfigOption: Doctor roster"] --> DoctorRail
-    ProcedureRoster["ConfigOption: Procedure roster"] --> ProcedureChips["UiSurface: Procedure chips"]
-    ProcedureColors["DesignDecision: Procedure color language"] --> ProcedureChips
-    SedationModifier["DomainConcept: Sedation modifier"] --> ProcedureChips
-    SedationModifier --> SedationMetrics["ReportMetric: Sedation vs non-sedation"]
+    SaveDetails --> CanonicalAssignment["DomainConcept: Canonical assignment draft"]
+    Seat --> CanonicalAssignment
+    CanonicalAssignment --> CasGuard["DesignDecision: Persistence compare-and-swap"]
+    Ready --> ReadyHandoff["DomainConcept: Immutable Ready handoff"]
+    ReadyHandoff --> ReadyUrgency
+    Withdraw --> WithdrawnHandoff["DomainConcept: Withdrawn handoff history"]
+    DoctorArrived --> AcceptedHandoff["DomainConcept: Accepted reporting assignment"]
 
     BoardStore["StoreOrService: Board store"] --> RoomLifecycle
     BoardStore --> Persistence["StoreOrService: SQLite persistence"]
-    Persistence --> ProdDb["DeploymentAsset: C:\\ChairSide\\Data\\chairside.db"]
-    Realtime["StoreOrService: SignalR + polling fallback"] --> BoardUi
-    DeviceBinding["DomainConcept: Room device binding"] --> HeaderToken["ConfigOption: Header token per room"]
-    HeaderToken --> Mutations["LifecycleEvent: Write actions"]
+    Persistence --> ActiveRooms["PersistenceModel: active_rooms"]
+    Persistence --> Handoffs["PersistenceModel: ready_handoffs"]
+    Persistence --> Aborts["PersistenceModel: aborted_room_assignments"]
+    Persistence --> Cycles["PersistenceModel: completed_room_cycles"]
+    CasGuard --> ActiveRooms
+
+    PreArrivalTermination["DomainConcept: Pre-arrival cancellation / expiration"] --> Aborts
+    PostArrivalExpiration["DomainConcept: Post-arrival expiration"] --> ReviewException["ReportMetric: Review-required exception"]
+    ReviewException --> Cycles
 
     Reports["UiSurface: Reports"] --> SummaryCards["UiSurface: Summary cards"]
-    Reports --> Filters["UiSurface: Report filters"]
-    Reports --> PlainEnglish["DesignDecision: Plain-English explanations"]
     ReportsBuilder["StoreOrService: Report snapshot builder"] --> Reports
+    AcceptedHandoff --> StandardPopulation["ReportMetric: Standard completed population"]
+    StandardPopulation --> ReportsBuilder
+    WithdrawnHandoff --> AuditOnly["DesignDecision: Not accepted attribution"]
+    Aborts --> OutsideThroughput["DesignDecision: Outside throughput"]
 
-    DoctorComplete --> CompletedWindow["ReportMetric: Completed-cycle window anchor"]
-    CompletedWindow --> UtcDays["DesignDecision: Whole UTC calendar days"]
-    CompletedWindow --> MondayWeeks["DesignDecision: Monday-start UTC weeks"]
-    PhaseTimings["ReportMetric: Phase-complete timings"] --> Reports
-    FullyCompletedPopulation["ReportMetric: Fully completed population"] --> Reports
-    ReportingException["ReportMetric: Reporting exception count"] --> Reports
-    ReportsBuilder --> ProcedureMix["ReportMetric: Doctor procedure mix"]
-    FullyCompletedPopulation --> ProcedureMix
-    SedationModifier --> ProcedureMix
-    ProcedureMix --> ProcedureMixTab["UiSurface: Procedure Mix tab"]
+    DoctorRoster["ConfigOption: Doctor roster"] --> CanonicalAssignment
+    ProcedureRoster["ConfigOption: Procedure roster"] --> CanonicalAssignment
+    SedationModifier["DomainConcept: Sedation modifier"] --> CanonicalAssignment
+    DeviceBinding["DomainConcept: Room device binding"] --> Mutations["LifecycleEvent: Room-local writes"]
+    Realtime["StoreOrService: SignalR + polling fallback"] --> BoardUi
 
-    ReportingTests["TestGuard: Reporting semantics tests"] --> PhaseTimings
-    ReportingTests --> FullyCompletedPopulation
-    ReportingTests --> CompletedWindow
-    ReportingTests --> ProcedureMix
-    ReportingDocs["TestGuard: Reporting time-window docs"] --> UtcDays
-    ReportingDocs --> MondayWeeks
-
-    BetaTraining["DeploymentAsset: Beta/training sandbox"] --> SandboxData["DesignDecision: Training may generate sandbox data"]
-    SandboxData --> FreshBetaDb["DesignDecision: Archive/reset before official beta"]
+    DevelopmentSeed["DeploymentAsset: Development demo seed"] --> Persistence
+    MaintenanceReset["DeploymentAsset: Stress fixture reset"] --> Persistence
+    MaintenanceReset --> CanonicalFixtures["TestGuard: Canonical Ready fixtures"]
 ```
 
 ## Core invariants
 
-- ChairSide is non-PHI and must stay non-PHI.
-- Room lifecycle order is the spine of the app: Seat, Doctor Arrived, Doctor Complete, Room Available.
-- Board usability matters more than decorative polish. Avoid visual changes that reduce readability.
-- Reports should answer operational questions without turning into a wall of numbers.
-- Reporting semantics are test-guarded. Do not “simplify” them without updating tests and documentation intentionally.
-- Generated graph artifacts are development aids only; they must not become runtime dependencies.
+- ChairSide tracks rooms, never patients, and remains non-PHI.
+- Begin Prestage creates an episode without requiring assignment. Prestaging and Seated allow absent, partial, or complete canonical assignment.
+- Ready requires a complete, valid, durably saved assignment and is the immutable handoff/assignment-lock boundary.
+- `ReadyForDoctor` is the primary state. Aging and Stale are urgency projections from the owned Active handoff's `ReadyAt`.
+- Withdrawal returns to Seated and starts no new urgency until a different handoff is issued. Doctor Arrived accepts the current handoff.
+- Pre-arrival termination is aborted history outside throughput. Post-arrival expiration is review-required exception history without a fabricated completion timestamp.
+- Canonical assignment writes are compare-and-swap guarded against originally loaded room/episode/state/handoff identity. Stale writes do not retry or mutate live state.
+- Live state changes only after durable persistence succeeds; SQLite failures roll back transaction-local writes.
+- Legacy persisted Aging/Stale rows remain readable; recovery never fabricates or rewrites invalid handoffs.
+- Generated knowledge artifacts are development aids and never runtime dependencies.
 
-## Current reporting semantics captured by the graph
+## Fixture and seed invariants
 
-- Report date filters use whole UTC calendar days.
-- Weekly trends use Monday-start UTC weeks.
-- Completed-cycle reporting windows are anchored on `DoctorCompleteAt`.
-- Phase-complete timings can contribute before full Room Available completion.
-- Fully completed throughput, allocation, schedule-fit, and trend populations exclude incomplete cycles.
-- Exception completed cycles can affect relationships between total completed cycles and included completed cycle counts.
-- Selected-doctor procedure mix (`ReportsSnapshot.DoctorProcedureMix`, built by `BuildDoctorProcedureMix` in `DemoBoardStore.cs`) is an additive read model over the same standard/included completed-cycle population (`standardCompletedCycles`) as the other calculated metrics. It groups by doctor + procedure variant so sedation variants such as `EXT+SED` stay separate from the base `EXT`, keeping sedation a modifier of the primary procedure via `BaseProcedureCode`/`IsSedationCase`; each `DoctorProcedureMixRow` carries the case count, the doctor's completed-case denominator, and that procedure's share of the doctor's cases.
-- Procedure mix renders in the selected-doctor detail panel's `Procedure Mix` tab through `renderSelectedDoctorProcedures` in `board.js`, is guarded by `BoardStoreTests.cs` tests (grouping/shares, per-doctor denominators, excluded/incomplete cycles, blank-doctor skip), and introduced no schema or existing-metric-semantics changes.
+- Non-Production demo seeding occurs only when all operational tables are empty, persists canonical Ready handoffs, and does not overwrite durable state on restart.
+- Maintenance reset atomically deletes completed cycles, all Active handoffs, and active rooms, then recreates Available rooms.
+- Withdrawn, Accepted, and Terminated handoffs and aborted assignments survive maintenance reset.
+- Repeated fixtures converge in current state and Active-handoff counts, not total resolved-history rows or generated identities.
 
-## Known development affordances
+## Reporting semantics
 
-- Keep PRs small and reviewable.
-- Prefer tests and comments that lock intended semantics before bigger refactors.
-- Use the graph to preserve deferred ideas, not to force end users into graph concepts.
+- Accepted Ready handoff is finalized assignment attribution.
+- Withdrawn handoffs are audit history and never accepted attribution.
+- Whole UTC days, Monday-start UTC weeks, and `DoctorCompleteAt` completed-window anchoring remain unchanged.
+- Standard completed metrics exclude incomplete cycles and exception populations.
+- Ready urgency threshold flags are captured without newly persisting Aging/Stale primary states.
+
+## Deferred and separate work
+
+- Draft-bearing Ready and Program/UI workflow changes are deferred to #120/#121.
+- After-hours sweep retry and batch atomicity remain separate from #119.
+- Knowledge-graph comment/string false-positive extraction remains issue #126.

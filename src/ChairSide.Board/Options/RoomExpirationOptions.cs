@@ -12,7 +12,8 @@ public sealed class RoomExpirationOptions
 
     /// <summary>
     /// Active room cycles that have been running longer than this duration
-    /// are automatically archived as exception cycles.
+    /// are automatically archived as aborted history before arrival or review-required exception
+    /// cycles after arrival.
     /// </summary>
     public int MaxActiveDurationHours { get; set; } = 8;
 

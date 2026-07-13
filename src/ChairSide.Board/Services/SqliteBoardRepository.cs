@@ -32,11 +32,17 @@ public sealed class SqliteBoardRepository
 
     public string DatabasePath => _databasePath;
 
-    public bool HasAnyRoomRows()
+    public bool HasOperationalData()
     {
         using var connection = OpenConnection();
         using var command = connection.CreateCommand();
-        command.CommandText = "SELECT EXISTS(SELECT 1 FROM active_rooms LIMIT 1);";
+        command.CommandText = """
+            SELECT
+                EXISTS(SELECT 1 FROM active_rooms LIMIT 1)
+                OR EXISTS(SELECT 1 FROM completed_room_cycles LIMIT 1)
+                OR EXISTS(SELECT 1 FROM ready_handoffs LIMIT 1)
+                OR EXISTS(SELECT 1 FROM aborted_room_assignments LIMIT 1);
+            """;
         return Convert.ToInt32(command.ExecuteScalar()) == 1;
     }
 
@@ -142,32 +148,60 @@ public sealed class SqliteBoardRepository
         transaction.Commit();
     }
 
-    /// <summary>
-    /// Maintenance only: deletes every completed-cycle row. Operates through the app's WAL-mode
-    /// SQLite connection so sidecar files stay consistent; no raw file manipulation.
-    /// </summary>
-    public void ClearCompletedCycles()
+    public int ResetMaintenanceState(int roomCount)
     {
         using var connection = OpenConnection();
-        using var command = connection.CreateCommand();
-        command.CommandText = "DELETE FROM completed_room_cycles;";
-        command.ExecuteNonQuery();
-    }
+        using var transaction = connection.BeginTransaction();
 
-    /// <summary>
-    /// Maintenance only: clears every active-room row and recreates the configured rooms as
-    /// Available with no lifecycle/allocation residue, reusing the standard initialization path.
-    /// </summary>
-    public void ResetActiveRooms(int roomCount)
-    {
-        using (var connection = OpenConnection())
-        using (var command = connection.CreateCommand())
+        int completedCyclesCleared;
+        using (var countCommand = connection.CreateCommand())
         {
-            command.CommandText = "DELETE FROM active_rooms;";
-            command.ExecuteNonQuery();
+            countCommand.Transaction = transaction;
+            countCommand.CommandText = "SELECT COUNT(*) FROM completed_room_cycles;";
+            completedCyclesCleared = Convert.ToInt32(countCommand.ExecuteScalar());
         }
 
-        EnsureConfiguredRooms(roomCount);
+        using (var resetCommand = connection.CreateCommand())
+        {
+            resetCommand.Transaction = transaction;
+            resetCommand.CommandText = """
+                DELETE FROM completed_room_cycles;
+
+                DELETE FROM ready_handoffs
+                WHERE withdrawn_at IS NULL
+                    AND accepted_at IS NULL
+                    AND terminated_at IS NULL;
+
+                DELETE FROM active_rooms;
+                """;
+            resetCommand.ExecuteNonQuery();
+        }
+
+        var updatedAt = FormatDateTimeOffset(DateTimeOffset.UtcNow);
+        for (var roomId = 1; roomId <= roomCount; roomId++)
+        {
+            using var roomCommand = connection.CreateCommand();
+            roomCommand.Transaction = transaction;
+            roomCommand.CommandText = """
+                INSERT INTO active_rooms (
+                    room_id,
+                    state,
+                    updated_at
+                )
+                VALUES (
+                    $roomId,
+                    $state,
+                    $updatedAt
+                );
+                """;
+            roomCommand.Parameters.AddWithValue("$roomId", roomId);
+            roomCommand.Parameters.AddWithValue("$state", RoomStates.Available);
+            roomCommand.Parameters.AddWithValue("$updatedAt", updatedAt);
+            roomCommand.ExecuteNonQuery();
+        }
+
+        transaction.Commit();
+        return completedCyclesCleared;
     }
 
     public void SaveRooms(IEnumerable<RoomState> rooms, IReadOnlyList<Doctor> doctors, IReadOnlyList<ProcedureCategory> procedures)
@@ -471,7 +505,7 @@ public sealed class SqliteBoardRepository
     /// Available" writes succeed or fail together. Used by the ordinary Room Available completion and
     /// the seated-room force-expire archive, both of which were previously two separate commits.
     /// </summary>
-    public void SaveCompletedCycleAndRoom(
+    public CommittedRoomResult SaveCompletedCycleAndRoom(
         CompletedRoomCycle cycle,
         RoomState room,
         IReadOnlyList<Doctor> doctors,
@@ -482,6 +516,7 @@ public sealed class SqliteBoardRepository
         SaveCompletedCycle(connection, transaction, cycle, doctors, procedures);
         SaveRoom(connection, transaction, room, doctors, procedures);
         transaction.Commit();
+        return new CommittedRoomResult(CopyRoomForPersistence(room), CopyCompletedCycleForPersistence(cycle));
     }
 
     /// <summary>
@@ -504,19 +539,39 @@ public sealed class SqliteBoardRepository
         transaction.Commit();
     }
 
-    public void SaveCanonicalAssignment(
+    internal CommittedRoomResult? SaveCanonicalAssignment(
         RoomState room,
         PersistedRoomAssignment assignment,
+        ActiveRoomWriteExpectation expectation,
         IReadOnlyList<Doctor> doctors,
         IReadOnlyList<ProcedureCategory> procedures)
     {
         ArgumentNullException.ThrowIfNull(room);
         ArgumentNullException.ThrowIfNull(assignment);
+        ArgumentNullException.ThrowIfNull(expectation);
+        if (room.RoomId != expectation.RoomId)
+        {
+            throw new InvalidOperationException("Canonical assignment write expectation must identify the candidate room.");
+        }
         assignment.ValidateCanonicalWrite();
 
         var persistedRoom = CopyRoomForPersistence(room);
         ApplyAssignment(persistedRoom, assignment);
-        SaveRoom(persistedRoom, doctors, procedures);
+        using var connection = OpenConnection();
+        using var transaction = connection.BeginTransaction();
+        var rows = UpdateCanonicalRoom(connection, transaction, persistedRoom, expectation);
+        if (rows == 0)
+        {
+            transaction.Rollback();
+            return null;
+        }
+        if (rows != 1)
+        {
+            throw new InvalidOperationException("Canonical assignment compare-and-swap must affect exactly one active room.");
+        }
+
+        transaction.Commit();
+        return new CommittedRoomResult(persistedRoom);
     }
 
     public PersistedReadyHandoff CreateReadyHandoff(
@@ -567,7 +622,7 @@ public sealed class SqliteBoardRepository
         return handoff;
     }
 
-    public void WithdrawReadyHandoff(
+    public CommittedReadyHandoffResult WithdrawReadyHandoff(
         RoomState room,
         string handoffId,
         DateTimeOffset withdrawnAt,
@@ -586,9 +641,12 @@ public sealed class SqliteBoardRepository
         persistedRoom.ActiveReadyHandoffId = null;
         SaveRoom(connection, transaction, persistedRoom, doctors, procedures);
         transaction.Commit();
+        return new CommittedReadyHandoffResult(
+            CopyReadyHandoff(handoff, withdrawnAt: withdrawnAt),
+            persistedRoom);
     }
 
-    public void AcceptReadyHandoffAndSaveCycle(
+    public CommittedReadyHandoffResult AcceptReadyHandoffAndSaveCycle(
         RoomState room,
         CompletedRoomCycle cycle,
         string handoffId,
@@ -614,9 +672,13 @@ public sealed class SqliteBoardRepository
         SaveCompletedCycle(connection, transaction, persistedCycle, doctors, procedures);
         SaveRoom(connection, transaction, persistedRoom, doctors, procedures);
         transaction.Commit();
+        return new CommittedReadyHandoffResult(
+            CopyReadyHandoff(handoff, acceptedAt: acceptedAt),
+            persistedRoom,
+            persistedCycle);
     }
 
-    public void TerminateReadyHandoffAndIncompleteAssignment(
+    public CommittedReadyHandoffResult TerminateReadyHandoffAndIncompleteAssignment(
         AbortedRoomAssignment record,
         RoomState room,
         string handoffId,
@@ -643,6 +705,47 @@ public sealed class SqliteBoardRepository
         var persistedRoom = new RoomState(room.RoomId);
         InsertAbortedAssignment(connection, transaction, persistedRecord, doctors, procedures);
         SaveRoom(connection, transaction, persistedRoom, doctors, procedures);
+        transaction.Commit();
+        return new CommittedReadyHandoffResult(
+            CopyReadyHandoff(handoff, terminatedAt: terminatedAt, terminationKind: readyHandoffTerminationKind),
+            persistedRoom,
+            AbortedAssignment: persistedRecord);
+    }
+
+    /// <summary>
+    /// Atomically cancels a Ready room. If the room genuinely owns the referenced Active handoff, that
+    /// handoff is terminated (Canceled) as part of the cancellation and linked to the abort record.
+    /// Otherwise the referenced handoff row - dangling, foreign, or already resolved - is left untouched
+    /// and the abort record carries no terminal handoff link. Either way, the aborted-assignment history
+    /// is inserted and the persisted active room is reset in the same transaction, which commits before
+    /// the caller mutates live in-memory state. Never terminates a handoff the room does not own.
+    /// </summary>
+    public void CancelReadyRoom(
+        AbortedRoomAssignment record,
+        RoomState room,
+        string handoffId,
+        DateTimeOffset canceledAt,
+        IReadOnlyList<Doctor> doctors,
+        IReadOnlyList<ProcedureCategory> procedures)
+    {
+        ArgumentNullException.ThrowIfNull(record);
+        ArgumentNullException.ThrowIfNull(room);
+        ValidateRequiredId(handoffId, nameof(handoffId));
+        ValidateAbortedAssignmentMatchesRoom(record, room);
+
+        using var connection = OpenConnection();
+        using var transaction = connection.BeginTransaction();
+
+        var ownedActiveHandoff = TryLoadOwnedActiveReadyHandoff(connection, transaction, room, handoffId);
+        var persistedRecord = CopyAbortedAssignmentForPersistence(record);
+        if (ownedActiveHandoff is not null)
+        {
+            TerminateReadyHandoff(connection, transaction, ownedActiveHandoff, canceledAt, ReadyHandoffTerminationKinds.Canceled);
+            persistedRecord.TerminalReadyHandoffId = handoffId;
+        }
+
+        InsertAbortedAssignment(connection, transaction, persistedRecord, doctors, procedures);
+        SaveRoom(connection, transaction, new RoomState(room.RoomId), doctors, procedures);
         transaction.Commit();
     }
 
@@ -818,6 +921,27 @@ public sealed class SqliteBoardRepository
     {
         ValidateRoomHandoffReference(room, handoffId);
 
+        return TryLoadOwnedActiveReadyHandoff(connection, transaction, room, handoffId)
+            ?? throw new InvalidOperationException("Ready handoff operation requires the supplied room to own the active handoff.");
+    }
+
+    // Non-throwing sibling of LoadOwnedActiveReadyHandoff: returns the handoff only when it is genuinely
+    // the room's own Active handoff (matching id/episode/room, not withdrawn/accepted/terminated, and
+    // referenced by the persisted active room). Returns null for any reference the room does not own -
+    // dangling, foreign room/episode, or already resolved - without throwing. Used by cancellation to
+    // decide whether to terminate the owned handoff or preserve an unrelated/historical one untouched.
+    private static PersistedReadyHandoff? TryLoadOwnedActiveReadyHandoff(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        RoomState room,
+        string handoffId)
+    {
+        if (string.IsNullOrWhiteSpace(room.EpisodeId)
+            || !string.Equals(room.ActiveReadyHandoffId, handoffId, StringComparison.Ordinal))
+        {
+            return null;
+        }
+
         using var command = connection.CreateCommand();
         command.Transaction = transaction;
         command.CommandText = ReadyHandoffSelectSql + "\n" + """
@@ -836,11 +960,10 @@ public sealed class SqliteBoardRepository
                 );
             """;
         command.Parameters.AddWithValue("$handoffId", handoffId);
-        command.Parameters.AddWithValue("$episodeId", room.EpisodeId!);
+        command.Parameters.AddWithValue("$episodeId", room.EpisodeId);
         command.Parameters.AddWithValue("$roomId", room.RoomId);
 
-        return ReadReadyHandoffs(command).SingleOrDefault()
-            ?? throw new InvalidOperationException("Ready handoff operation requires the supplied room to own the active handoff.");
+        return ReadReadyHandoffs(command).SingleOrDefault();
     }
 
     private static void ValidateRoomHandoffReference(RoomState room, string handoffId)
@@ -1869,6 +1992,79 @@ public sealed class SqliteBoardRepository
         ex.SqliteErrorCode == 1
         && ex.Message.Contains("duplicate column name", StringComparison.OrdinalIgnoreCase);
 
+    private static int UpdateCanonicalRoom(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        RoomState room,
+        ActiveRoomWriteExpectation expectation)
+    {
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = """
+            UPDATE active_rooms
+            SET assigned_doctor_id = $assignedDoctorId,
+                assigned_doctor_display_name = $assignedDoctorDisplayName,
+                procedure_code = $procedureCode,
+                procedure_category = $procedureCategory,
+                state = $state,
+                seated_at = $seatedAt,
+                aging_started_at = $agingStartedAt,
+                stale_started_at = $staleStartedAt,
+                ready_for_doctor_at = $readyForDoctorAt,
+                doctor_arrived_at = $doctorArrivedAt,
+                doctor_complete_at = $doctorCompleteAt,
+                room_available_at = $roomAvailableAt,
+                original_default_expected_units = $originalDefaultExpectedUnits,
+                expected_allocation_units = $expectedAllocationUnits,
+                expected_allocation_minutes = $expectedAllocationMinutes,
+                allocation_adjusted_from_default = $allocationAdjustedFromDefault,
+                prestage_started_at = $prestageStartedAt,
+                episode_id = $episodeId,
+                sedation_state = $sedationState,
+                expected_allocation_state = $expectedAllocationState,
+                expected_allocation_suggested_units = $expectedAllocationSuggestedUnits,
+                expected_allocation_confirmed_units = $expectedAllocationConfirmedUnits,
+                active_ready_handoff_id = $activeReadyHandoffId,
+                accepted_ready_handoff_id = $acceptedReadyHandoffId,
+                updated_at = $updatedAt
+            WHERE room_id = $expectedRoomId
+                AND episode_id IS $expectedEpisodeId
+                AND state = $expectedState
+                AND active_ready_handoff_id IS $expectedActiveReadyHandoffId;
+            """;
+
+        command.Parameters.AddWithValue("$assignedDoctorId", ToDbValue(room.AssignedDoctor));
+        command.Parameters.AddWithValue("$assignedDoctorDisplayName", ToDbValue(room.AssignedDoctorDisplayName));
+        command.Parameters.AddWithValue("$procedureCode", ToDbValue(room.ProcedureCode));
+        command.Parameters.AddWithValue("$procedureCategory", ToDbValue(room.ProcedureCategory));
+        command.Parameters.AddWithValue("$state", room.State);
+        command.Parameters.AddWithValue("$seatedAt", ToDbValue(room.SeatedAt));
+        command.Parameters.AddWithValue("$agingStartedAt", ToDbValue(room.AgingStartedAt));
+        command.Parameters.AddWithValue("$staleStartedAt", ToDbValue(room.StaleStartedAt));
+        command.Parameters.AddWithValue("$readyForDoctorAt", ToDbValue(room.ReadyForDoctorAt));
+        command.Parameters.AddWithValue("$doctorArrivedAt", ToDbValue(room.DoctorArrivedAt));
+        command.Parameters.AddWithValue("$doctorCompleteAt", ToDbValue(room.DoctorCompleteAt));
+        command.Parameters.AddWithValue("$roomAvailableAt", ToDbValue(room.RoomAvailableAt));
+        command.Parameters.AddWithValue("$originalDefaultExpectedUnits", room.OriginalDefaultExpectedUnits);
+        command.Parameters.AddWithValue("$expectedAllocationUnits", room.ExpectedAllocationUnits);
+        command.Parameters.AddWithValue("$expectedAllocationMinutes", room.ExpectedAllocationMinutes);
+        command.Parameters.AddWithValue("$allocationAdjustedFromDefault", room.AllocationAdjustedFromDefault ? 1 : 0);
+        command.Parameters.AddWithValue("$prestageStartedAt", ToDbValue(room.PrestageStartedAt));
+        command.Parameters.AddWithValue("$episodeId", ToDbValue(room.EpisodeId));
+        command.Parameters.AddWithValue("$sedationState", ToDbValue(room.SedationState));
+        command.Parameters.AddWithValue("$expectedAllocationState", ToDbValue(room.ExpectedAllocationState));
+        command.Parameters.AddWithValue("$expectedAllocationSuggestedUnits", ToDbValue(room.ExpectedAllocationSuggestedUnits));
+        command.Parameters.AddWithValue("$expectedAllocationConfirmedUnits", ToDbValue(room.ExpectedAllocationConfirmedUnits));
+        command.Parameters.AddWithValue("$activeReadyHandoffId", ToDbValue(room.ActiveReadyHandoffId));
+        command.Parameters.AddWithValue("$acceptedReadyHandoffId", ToDbValue(room.AcceptedReadyHandoffId));
+        command.Parameters.AddWithValue("$updatedAt", FormatDateTimeOffset(DateTimeOffset.UtcNow));
+        command.Parameters.AddWithValue("$expectedRoomId", expectation.RoomId);
+        command.Parameters.AddWithValue("$expectedEpisodeId", ToDbValue(expectation.EpisodeId));
+        command.Parameters.AddWithValue("$expectedState", expectation.State);
+        command.Parameters.AddWithValue("$expectedActiveReadyHandoffId", ToDbValue(expectation.ActiveReadyHandoffId));
+        return command.ExecuteNonQuery();
+    }
+
     private void SaveRoom(
         SqliteConnection connection,
         SqliteTransaction transaction,
@@ -2019,6 +2215,25 @@ public sealed class SqliteBoardRepository
             ExpectedAllocationUnits = room.ExpectedAllocationUnits,
             ExpectedAllocationMinutes = room.ExpectedAllocationMinutes,
             AllocationAdjustedFromDefault = room.AllocationAdjustedFromDefault
+        };
+
+    private static PersistedReadyHandoff CopyReadyHandoff(
+        PersistedReadyHandoff handoff,
+        DateTimeOffset? withdrawnAt = null,
+        DateTimeOffset? acceptedAt = null,
+        DateTimeOffset? terminatedAt = null,
+        string? terminationKind = null) =>
+        new()
+        {
+            HandoffId = handoff.HandoffId,
+            EpisodeId = handoff.EpisodeId,
+            RoomId = handoff.RoomId,
+            ReadyAt = handoff.ReadyAt,
+            WithdrawnAt = withdrawnAt ?? handoff.WithdrawnAt,
+            AcceptedAt = acceptedAt ?? handoff.AcceptedAt,
+            TerminatedAt = terminatedAt ?? handoff.TerminatedAt,
+            TerminationKind = terminationKind ?? handoff.TerminationKind,
+            Assignment = handoff.Assignment
         };
 
     private static CompletedRoomCycle CopyCompletedCycleForPersistence(CompletedRoomCycle cycle) =>

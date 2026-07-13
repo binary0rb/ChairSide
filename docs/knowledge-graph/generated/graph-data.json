@@ -447,16 +447,52 @@
                       "path":  "tests/ChairSide.Board.Tests/BoardStoreTests.cs"
                   },
                   {
+                      "id":  "file:tests/ChairSide.Board.Tests/CanonicalAssignmentDomainValidationTests.cs",
+                      "label":  "tests/ChairSide.Board.Tests/CanonicalAssignmentDomainValidationTests.cs",
+                      "type":  "File",
+                      "path":  "tests/ChairSide.Board.Tests/CanonicalAssignmentDomainValidationTests.cs"
+                  },
+                  {
                       "id":  "file:tests/ChairSide.Board.Tests/ChairSide.Board.Tests.csproj",
                       "label":  "tests/ChairSide.Board.Tests/ChairSide.Board.Tests.csproj",
                       "type":  "File",
                       "path":  "tests/ChairSide.Board.Tests/ChairSide.Board.Tests.csproj"
                   },
                   {
+                      "id":  "file:tests/ChairSide.Board.Tests/DurableFailureInjectionTests.cs",
+                      "label":  "tests/ChairSide.Board.Tests/DurableFailureInjectionTests.cs",
+                      "type":  "File",
+                      "path":  "tests/ChairSide.Board.Tests/DurableFailureInjectionTests.cs"
+                  },
+                  {
+                      "id":  "file:tests/ChairSide.Board.Tests/FaultedReadyCancellationTests.cs",
+                      "label":  "tests/ChairSide.Board.Tests/FaultedReadyCancellationTests.cs",
+                      "type":  "File",
+                      "path":  "tests/ChairSide.Board.Tests/FaultedReadyCancellationTests.cs"
+                  },
+                  {
+                      "id":  "file:tests/ChairSide.Board.Tests/LifecycleFixtureCorrectionTests.cs",
+                      "label":  "tests/ChairSide.Board.Tests/LifecycleFixtureCorrectionTests.cs",
+                      "type":  "File",
+                      "path":  "tests/ChairSide.Board.Tests/LifecycleFixtureCorrectionTests.cs"
+                  },
+                  {
+                      "id":  "file:tests/ChairSide.Board.Tests/MalformedAssignmentIntegrityTests.cs",
+                      "label":  "tests/ChairSide.Board.Tests/MalformedAssignmentIntegrityTests.cs",
+                      "type":  "File",
+                      "path":  "tests/ChairSide.Board.Tests/MalformedAssignmentIntegrityTests.cs"
+                  },
+                  {
                       "id":  "file:tests/ChairSide.Board.Tests/PrestagingAssignmentContractTests.cs",
                       "label":  "tests/ChairSide.Board.Tests/PrestagingAssignmentContractTests.cs",
                       "type":  "File",
                       "path":  "tests/ChairSide.Board.Tests/PrestagingAssignmentContractTests.cs"
+                  },
+                  {
+                      "id":  "file:tests/ChairSide.Board.Tests/PrestagingLifecycleTransitionTests.cs",
+                      "label":  "tests/ChairSide.Board.Tests/PrestagingLifecycleTransitionTests.cs",
+                      "type":  "File",
+                      "path":  "tests/ChairSide.Board.Tests/PrestagingLifecycleTransitionTests.cs"
                   },
                   {
                       "id":  "file:tests/ChairSide.Board.Tests/ProjectionAssumptionChecklistTests.cs",
@@ -621,10 +657,28 @@
                       "path":  "src/ChairSide.Board/Program.cs"
                   },
                   {
+                      "id":  "symbol:type:a",
+                      "label":  "a",
+                      "type":  "CodeType",
+                      "path":  "tests/ChairSide.Board.Tests/BoardStoreTests.cs"
+                  },
+                  {
                       "id":  "symbol:type:AbortedRoomAssignment",
                       "label":  "AbortedRoomAssignment",
                       "type":  "CodeType",
                       "path":  "src/ChairSide.Board/Services/DemoBoardStore.cs"
+                  },
+                  {
+                      "id":  "symbol:type:AbortedSnapshot",
+                      "label":  "AbortedSnapshot",
+                      "type":  "CodeType",
+                      "path":  "tests/ChairSide.Board.Tests/LifecycleFixtureCorrectionTests.cs"
+                  },
+                  {
+                      "id":  "symbol:type:ActiveRoomWriteExpectation",
+                      "label":  "ActiveRoomWriteExpectation",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/ReadyHandoffPersistenceRecords.cs"
                   },
                   {
                       "id":  "symbol:type:AdminAccessGuard",
@@ -771,6 +825,12 @@
                       "path":  "src/ChairSide.Board/Program.cs"
                   },
                   {
+                      "id":  "symbol:type:CanonicalAssignmentDomainValidationTests",
+                      "label":  "CanonicalAssignmentDomainValidationTests",
+                      "type":  "CodeType",
+                      "path":  "tests/ChairSide.Board.Tests/CanonicalAssignmentDomainValidationTests.cs"
+                  },
+                  {
                       "id":  "symbol:type:CanonicalRoomLifecycleState",
                       "label":  "CanonicalRoomLifecycleState",
                       "type":  "CodeType",
@@ -801,10 +861,28 @@
                       "path":  "src/ChairSide.Board/Program.cs"
                   },
                   {
+                      "id":  "symbol:type:CommittedReadyHandoffResult",
+                      "label":  "CommittedReadyHandoffResult",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/ReadyHandoffPersistenceRecords.cs"
+                  },
+                  {
+                      "id":  "symbol:type:CommittedRoomResult",
+                      "label":  "CommittedRoomResult",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/ReadyHandoffPersistenceRecords.cs"
+                  },
+                  {
                       "id":  "symbol:type:CompletedRoomCycle",
                       "label":  "CompletedRoomCycle",
                       "type":  "CodeType",
                       "path":  "src/ChairSide.Board/Services/DemoBoardStore.cs"
+                  },
+                  {
+                      "id":  "symbol:type:CycleSnapshot",
+                      "label":  "CycleSnapshot",
+                      "type":  "CodeType",
+                      "path":  "tests/ChairSide.Board.Tests/DurableFailureInjectionTests.cs"
                   },
                   {
                       "id":  "symbol:type:DemoBoardStore",
@@ -909,6 +987,12 @@
                       "path":  "src/ChairSide.Board/Services/DemoBoardStore.cs"
                   },
                   {
+                      "id":  "symbol:type:DurableFailureInjectionTests",
+                      "label":  "DurableFailureInjectionTests",
+                      "type":  "CodeType",
+                      "path":  "tests/ChairSide.Board.Tests/DurableFailureInjectionTests.cs"
+                  },
+                  {
                       "id":  "symbol:type:ExceptionReasons",
                       "label":  "ExceptionReasons",
                       "type":  "CodeType",
@@ -939,6 +1023,12 @@
                       "path":  "src/ChairSide.Board/Services/RoomAssignmentContracts.cs"
                   },
                   {
+                      "id":  "symbol:type:FaultedReadyCancellationTests",
+                      "label":  "FaultedReadyCancellationTests",
+                      "type":  "CodeType",
+                      "path":  "tests/ChairSide.Board.Tests/FaultedReadyCancellationTests.cs"
+                  },
+                  {
                       "id":  "symbol:type:for",
                       "label":  "for",
                       "type":  "CodeType",
@@ -954,7 +1044,7 @@
                       "id":  "symbol:type:HandoffSnapshot",
                       "label":  "HandoffSnapshot",
                       "type":  "CodeType",
-                      "path":  "tests/ChairSide.Board.Tests/ReadyHandoffPersistenceTests.cs"
+                      "path":  "tests/ChairSide.Board.Tests/DurableFailureInjectionTests.cs"
                   },
                   {
                       "id":  "symbol:type:is",
@@ -963,10 +1053,22 @@
                       "path":  "tests/ChairSide.Board.Tests/BoardStoreTests.cs"
                   },
                   {
+                      "id":  "symbol:type:LifecycleFixtureCorrectionTests",
+                      "label":  "LifecycleFixtureCorrectionTests",
+                      "type":  "CodeType",
+                      "path":  "tests/ChairSide.Board.Tests/LifecycleFixtureCorrectionTests.cs"
+                  },
+                  {
                       "id":  "symbol:type:LiveRoomFixture",
                       "label":  "LiveRoomFixture",
                       "type":  "CodeType",
                       "path":  "src/ChairSide.Board/Services/DemoBoardStore.cs"
+                  },
+                  {
+                      "id":  "symbol:type:LiveRoomSnapshot",
+                      "label":  "LiveRoomSnapshot",
+                      "type":  "CodeType",
+                      "path":  "tests/ChairSide.Board.Tests/CanonicalAssignmentDomainValidationTests.cs"
                   },
                   {
                       "id":  "symbol:type:MaintenanceCommands",
@@ -991,6 +1093,12 @@
                       "label":  "MaintenanceResolution",
                       "type":  "CodeType",
                       "path":  "src/ChairSide.Board/Services/MaintenanceCommands.cs"
+                  },
+                  {
+                      "id":  "symbol:type:MalformedAssignmentIntegrityTests",
+                      "label":  "MalformedAssignmentIntegrityTests",
+                      "type":  "CodeType",
+                      "path":  "tests/ChairSide.Board.Tests/MalformedAssignmentIntegrityTests.cs"
                   },
                   {
                       "id":  "symbol:type:ManualTimeProvider",
@@ -1077,10 +1185,22 @@
                       "path":  "src/ChairSide.Board/Services/ReadyHandoffPersistenceRecords.cs"
                   },
                   {
+                      "id":  "symbol:type:PersistedRoomSnapshot",
+                      "label":  "PersistedRoomSnapshot",
+                      "type":  "CodeType",
+                      "path":  "tests/ChairSide.Board.Tests/LifecycleFixtureCorrectionTests.cs"
+                  },
+                  {
                       "id":  "symbol:type:PrestagingAssignmentContractTests",
                       "label":  "PrestagingAssignmentContractTests",
                       "type":  "CodeType",
                       "path":  "tests/ChairSide.Board.Tests/PrestagingAssignmentContractTests.cs"
+                  },
+                  {
+                      "id":  "symbol:type:PrestagingLifecycleTransitionTests",
+                      "label":  "PrestagingLifecycleTransitionTests",
+                      "type":  "CodeType",
+                      "path":  "tests/ChairSide.Board.Tests/PrestagingLifecycleTransitionTests.cs"
                   },
                   {
                       "id":  "symbol:type:ProcedureAliasResolver",
@@ -1338,7 +1458,7 @@
                       "id":  "symbol:type:RoomSnapshot",
                       "label":  "RoomSnapshot",
                       "type":  "CodeType",
-                      "path":  "tests/ChairSide.Board.Tests/ReadyHandoffPersistenceTests.cs"
+                      "path":  "tests/ChairSide.Board.Tests/DurableFailureInjectionTests.cs"
                   },
                   {
                       "id":  "symbol:type:RoomState",
@@ -1357,6 +1477,12 @@
                       "label":  "RoomStatus",
                       "type":  "CodeType",
                       "path":  "src/ChairSide.Board/Services/DemoBoardStore.cs"
+                  },
+                  {
+                      "id":  "symbol:type:RoomStatusSnapshot",
+                      "label":  "RoomStatusSnapshot",
+                      "type":  "CodeType",
+                      "path":  "tests/ChairSide.Board.Tests/LifecycleFixtureCorrectionTests.cs"
                   },
                   {
                       "id":  "symbol:type:ScheduleFitCalculator",
@@ -1501,6 +1627,12 @@
                       "label":  "the",
                       "type":  "CodeType",
                       "path":  "src/ChairSide.Board/Services/SqliteBoardRepository.cs"
+                  },
+                  {
+                      "id":  "symbol:type:truthful",
+                      "label":  "truthful",
+                      "type":  "CodeType",
+                      "path":  "tests/ChairSide.Board.Tests/FaultedReadyCancellationTests.cs"
                   },
                   {
                       "id":  "symbol:type:UpdateAssignmentRequest",
@@ -2067,6 +2199,21 @@
                   },
                   {
                       "from":  "file:src/ChairSide.Board/Services/ReadyHandoffPersistenceRecords.cs",
+                      "to":  "symbol:type:ActiveRoomWriteExpectation",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/ReadyHandoffPersistenceRecords.cs",
+                      "to":  "symbol:type:CommittedReadyHandoffResult",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/ReadyHandoffPersistenceRecords.cs",
+                      "to":  "symbol:type:CommittedRoomResult",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/ReadyHandoffPersistenceRecords.cs",
                       "to":  "symbol:type:PersistedReadyHandoff",
                       "label":  "declares"
                   },
@@ -2242,6 +2389,11 @@
                   },
                   {
                       "from":  "file:tests/ChairSide.Board.Tests/BoardStoreTests.cs",
+                      "to":  "symbol:type:a",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:tests/ChairSide.Board.Tests/BoardStoreTests.cs",
                       "to":  "symbol:type:BoardStoreTests",
                       "label":  "declares"
                   },
@@ -2311,6 +2463,76 @@
                       "label":  "declares"
                   },
                   {
+                      "from":  "file:tests/ChairSide.Board.Tests/CanonicalAssignmentDomainValidationTests.cs",
+                      "to":  "symbol:type:CanonicalAssignmentDomainValidationTests",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:tests/ChairSide.Board.Tests/CanonicalAssignmentDomainValidationTests.cs",
+                      "to":  "symbol:type:LiveRoomSnapshot",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:tests/ChairSide.Board.Tests/DurableFailureInjectionTests.cs",
+                      "to":  "symbol:type:CycleSnapshot",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:tests/ChairSide.Board.Tests/DurableFailureInjectionTests.cs",
+                      "to":  "symbol:type:DurableFailureInjectionTests",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:tests/ChairSide.Board.Tests/DurableFailureInjectionTests.cs",
+                      "to":  "symbol:type:HandoffSnapshot",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:tests/ChairSide.Board.Tests/DurableFailureInjectionTests.cs",
+                      "to":  "symbol:type:RoomSnapshot",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:tests/ChairSide.Board.Tests/FaultedReadyCancellationTests.cs",
+                      "to":  "symbol:type:FaultedReadyCancellationTests",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:tests/ChairSide.Board.Tests/FaultedReadyCancellationTests.cs",
+                      "to":  "symbol:type:truthful",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:tests/ChairSide.Board.Tests/LifecycleFixtureCorrectionTests.cs",
+                      "to":  "symbol:type:AbortedSnapshot",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:tests/ChairSide.Board.Tests/LifecycleFixtureCorrectionTests.cs",
+                      "to":  "symbol:type:HandoffSnapshot",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:tests/ChairSide.Board.Tests/LifecycleFixtureCorrectionTests.cs",
+                      "to":  "symbol:type:LifecycleFixtureCorrectionTests",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:tests/ChairSide.Board.Tests/LifecycleFixtureCorrectionTests.cs",
+                      "to":  "symbol:type:PersistedRoomSnapshot",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:tests/ChairSide.Board.Tests/LifecycleFixtureCorrectionTests.cs",
+                      "to":  "symbol:type:RoomStatusSnapshot",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:tests/ChairSide.Board.Tests/MalformedAssignmentIntegrityTests.cs",
+                      "to":  "symbol:type:MalformedAssignmentIntegrityTests",
+                      "label":  "declares"
+                  },
+                  {
                       "from":  "file:tests/ChairSide.Board.Tests/PrestagingAssignmentContractTests.cs",
                       "to":  "symbol:type:HandoffEnvelope",
                       "label":  "declares"
@@ -2318,6 +2540,11 @@
                   {
                       "from":  "file:tests/ChairSide.Board.Tests/PrestagingAssignmentContractTests.cs",
                       "to":  "symbol:type:PrestagingAssignmentContractTests",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:tests/ChairSide.Board.Tests/PrestagingLifecycleTransitionTests.cs",
+                      "to":  "symbol:type:PrestagingLifecycleTransitionTests",
                       "label":  "declares"
                   },
                   {
@@ -2727,12 +2954,42 @@
                   },
                   {
                       "from":  "repo:chairside",
+                      "to":  "file:tests/ChairSide.Board.Tests/CanonicalAssignmentDomainValidationTests.cs",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
                       "to":  "file:tests/ChairSide.Board.Tests/ChairSide.Board.Tests.csproj",
                       "label":  "contains"
                   },
                   {
                       "from":  "repo:chairside",
+                      "to":  "file:tests/ChairSide.Board.Tests/DurableFailureInjectionTests.cs",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:tests/ChairSide.Board.Tests/FaultedReadyCancellationTests.cs",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:tests/ChairSide.Board.Tests/LifecycleFixtureCorrectionTests.cs",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:tests/ChairSide.Board.Tests/MalformedAssignmentIntegrityTests.cs",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
                       "to":  "file:tests/ChairSide.Board.Tests/PrestagingAssignmentContractTests.cs",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:tests/ChairSide.Board.Tests/PrestagingLifecycleTransitionTests.cs",
                       "label":  "contains"
                   },
                   {

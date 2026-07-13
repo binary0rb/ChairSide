@@ -1,54 +1,59 @@
 ---
 title: Room lifecycle
-tags: [room, board, room-lifecycle, permissions, device-binding, domain-rule, active, last-verified]
-last_verified_commit: e2badc2
+tags: [room, board, room-lifecycle, data-persistence, permissions, device-binding, domain-rule, active, last-verified]
+last_verified_commit: pending-issue-119
 ---
 
 # Room lifecycle
 
-## Intent
+## Canonical sequence
 
-The room lifecycle is the spine of ChairSide. Every room moves through an ordered sequence of states driven by explicit staff actions from the room-local tablet/panel. Reporting timings and board urgency cues are all derived from this sequence, so its order and the events that advance it are load-bearing and should not be reordered or shortcut casually.
+ChairSide tracks room episodes, not patients. The canonical lifecycle is:
 
-## Lifecycle events and states
+1. Begin Prestage creates `EpisodeId`, records `PrestageStartedAt`, and enters `Prestaging` without requiring an assignment.
+2. Save Details explicitly persists an absent, partial, or complete assignment while `Prestaging` or `Seated`.
+3. Seat Room records truthful `SeatedAt`. An assignment-bearing Seat may persist the supplied canonical draft in the same transaction.
+4. Ready for Doctor requires a complete, currently valid, durably saved assignment. It enters primary state `ReadyForDoctor`, creates an owned Active handoff, and locks the assignment.
+5. Doctor Arrived accepts that handoff, clears Ready urgency, records `DoctorArrivedAt`, and enters `DoctorInRoom`.
+6. Doctor Complete records `DoctorCompleteAt` and enters `Turnover`.
+7. Room Available records completion and releases the room to `Available`.
 
-Happy-path sequence (event -> resulting state):
+Draft-bearing Ready is not part of the current store/API/UI boundary. It is deferred to issues #120 and #121.
 
-1. Seat Room -> IN PREP (patient preparing, not yet ready)
-2. Ready for Doctor -> READY (starts the ready-to-doctor wait window; can escalate to AGING, then STALE)
-3. Doctor Arrived -> IN ROOM
-4. Doctor Complete -> TURNOVER
-5. Room Available -> AVAILABLE
+## Ready handoff and urgency
 
-Before Doctor Arrived, staff may correct a seating with Update Assignment or Cancel Seating. AGING and STALE are time-threshold escalations of the READY wait, not separate staff actions.
+`ReadyForDoctor` is the primary persisted state. `Aging` and `Stale` are `ReadyUrgency` projections from the owned Active handoff's `ReadyAt`; new canonical writes do not persist them as primary states. Legacy persisted `Aging` and `Stale` rows remain readable recovery states.
 
-## Mutation surface and authorization
+Withdraw Ready terminates the current handoff as `Withdrawn`, returns the room to `Seated`, preserves `EpisodeId`, `PrestageStartedAt`, and `SeatedAt`, and clears urgency immediately. Assignment details may then be corrected. Reissuing Ready creates a different `HandoffId` and a new `ReadyAt`, so the withdrawn interval does not contribute to the new urgency interval. Doctor Arrived accepts the current handoff and also clears urgency immediately.
 
-Room lifecycle mutation happens from the room-local tablet/panel only. Doctors can view room status from a phone or workstation but cannot acknowledge or clear a room remotely. Write actions are authorized per room by a device/room binding token (see [non-phi-boundary](../product/non-phi-boundary.md) for why prompts and audits stay non-PHI).
+A valid legacy `Aging` or `Stale` row with a matching owned Active handoff may withdraw safely. Recovery never fabricates a missing handoff or rewrites an invalid or unrelated handoff.
 
-The store methods that implement the lifecycle (all on `DemoBoardStore`):
+## Cancellation, expiration, and recovery
 
-- `SeatRoom`, `UpdateAssignment`, `CancelSeating`
-- `MarkReadyForDoctor`, `MarkDoctorArrived`, `MarkDoctorComplete`, `MarkRoomAvailable`
+Pre-arrival cancellation and expiration create aborted-assignment history, not throughput. Faulted pre-arrival Ready rows remain visible and safely cancellable; unrelated or invalid handoff records are not rewritten. Post-arrival expiration creates a review-required exception cycle without inventing `DoctorCompleteAt` or other lifecycle timestamps.
 
-## Conflict handling
+Restart recovery restores durable truth and projects urgency and integrity without mutating the database. Live room state changes only after the repository transaction succeeds.
 
-Verified as implemented at `e2badc2`. Doctor Arrived is guarded because one doctor cannot be physically in two rooms at once:
+## Concurrency and durability
 
-- `TryMarkDoctorArrived` refuses the mutation and returns a `Conflict` outcome if the room's assigned doctor is already marked doctor-in-room in another room. The conflict context is non-PHI: conflicting room number plus doctor id/display name (`DoctorArrivalConflict`). The API returns HTTP 409 so the UI can prompt.
-- `ResolveDoctorArrivalConflict` revalidates the conflict against current server state first (the client-supplied conflicting room id is not trusted). If the conflict is gone or now points at a different room, nothing is mutated and a `StaleConflict` outcome is returned so the caller refreshes and retries.
-- On a valid resolve, the previous conflicting room is auto-completed with `MarkDoctorComplete` (which moves it to TURNOVER, never directly to AVAILABLE), then the current room is marked Doctor Arrived. Audit entries are written for both affected rooms.
+Canonical assignment writes capture the originally loaded `RoomId`, nullable `EpisodeId`, state, and nullable `ActiveReadyHandoffId`. The guarded SQLite update compares all four values, using null-safe `IS` for nullable identities. A stale context receives `null`; it does not mutate live memory, retry, reload, append an event, regress Ready, overwrite the locked assignment, or orphan a handoff. SQLite failures throw and roll back transaction-local writes.
 
-## Source anchors
+## Authorization and conflict handling
 
-- `AGENTS.md` - "Core workflow", "Rooms", "Visual language" (room-state palette).
-- `src/ChairSide.Board/Services/DemoBoardStore.cs` - lifecycle methods `SeatRoom` (~line 154), `UpdateAssignment` (~195), `CancelSeating` (~230), `MarkReadyForDoctor` (~255), `MarkDoctorArrived` (~281), `MarkDoctorComplete` (~455), `MarkRoomAvailable` (~481); conflict path `TryMarkDoctorArrived` (~296), `FindActiveDoctorRoom` (~444), `ResolveDoctorArrivalConflict` (~332); DTOs `DoctorArrivalOutcome`, `DoctorArrivalConflict`, `DoctorArrivalResult`.
-- `src/ChairSide.Board/Program.cs` - endpoint `/api/rooms/{roomNumber}/doctor-arrived/resolve-conflict` and `DoctorArrivalConflictEndpointHandler.ResolveAsync`; dual audit entries `doctor-arrived-resolve-autocomplete` and `doctor-arrived-resolve`.
-- `src/ChairSide.Board/Services/RoomDeviceBindingGuard.cs` - room-scoped write authorization.
-- `docs/knowledge-graph/chairside.graph.md` - LifecycleEvent and WorkflowState nodes.
+Room lifecycle mutation remains room-local and device-token guarded. Doctors are read-only. Doctor-arrival conflict resolution revalidates current server state, auto-completes the previous room only into `Turnover`, and audits both rooms.
 
-## Verification notes
+## Source and test anchors
 
-Verified at `e2badc2`: all seven lifecycle method signatures exist as listed; the conflict-detection and conflict-resolution methods, their outcomes, the "TURNOVER not AVAILABLE" auto-complete behavior, and the both-rooms audit writes are present in source. Line numbers are approximate and may drift; prefer the method/record names as anchors.
+- `src/ChairSide.Board/Services/DemoBoardStore.cs`
+- `src/ChairSide.Board/Services/SqliteBoardRepository.cs`
+- `src/ChairSide.Board/Services/RoomAssignmentContracts.cs`
+- `tests/ChairSide.Board.Tests/PrestagingLifecycleTransitionTests.cs`
+- `tests/ChairSide.Board.Tests/ReadyHandoffPersistenceTests.cs`
+- `tests/ChairSide.Board.Tests/CanonicalAssignmentDomainValidationTests.cs`
+- `tests/ChairSide.Board.Tests/FaultedReadyCancellationTests.cs`
+- `tests/ChairSide.Board.Tests/MalformedAssignmentIntegrityTests.cs`
+- `tests/ChairSide.Board.Tests/DurableFailureInjectionTests.cs`
 
-Known limits: this note describes intended behavior and the room-local mutation model. It does not enumerate every validation branch (for example NotConfigured / no-room outcomes) or the exact device-token handshake, which live in the guard and endpoint handlers.
+## Separate known issue
+
+The after-hours sweep currently advances `_lastSweepDate` before persistence succeeds. A failure can suppress same-day retry, and earlier rooms can commit before a later room fails. That retry and batch-atomicity defect is separate from issue #119.

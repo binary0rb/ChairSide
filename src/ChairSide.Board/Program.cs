@@ -314,9 +314,9 @@ app.MapPost("/api/client-errors", async (
 app.MapPost("/api/rooms/{roomNumber:int}/prestage", RoomLifecycleEndpointHandler.BeginPrestageAsync);
 app.MapPost("/api/rooms/{roomNumber:int}/seat", RoomLifecycleEndpointHandler.SeatAsync);
 
-// Pre-arrival assignment correction: distinct from the legacy /assignment route below (which does
-// not support Prestaging or allocation updates and remains untouched for the currently-checked-in
-// UI). Allowed only before Doctor Arrived; see DemoBoardStore.UpdateRoomAssignment.
+// Canonical draft assignment correction: distinct from the legacy /assignment route below because
+// this request shape also carries expected-allocation updates. Allowed only while the room is
+// Prestaging or Seated; see DemoBoardStore.UpdateRoomAssignment.
 app.MapPost("/api/rooms/{roomNumber:int}/update-assignment", RoomLifecycleEndpointHandler.UpdateRoomAssignmentAsync);
 
 app.MapPost("/api/rooms/{roomNumber:int}/assignment", async Task<IResult> (
@@ -362,7 +362,7 @@ app.MapPost("/api/rooms/{roomNumber:int}/assignment", async Task<IResult> (
             "update-assignment", roomNumber, previousRoom, null, false, reason,
             doctorId, procedureCode));
         return store.IsConfiguredRoom(roomNumber)
-            ? Results.BadRequest("Update Assignment is only available for seated, aging, stale, or ready-for-doctor rooms with a valid doctor and procedure.")
+            ? Results.BadRequest("Update Assignment is only available while the room is prestaging or seated, with a valid doctor and procedure.")
             : Results.NotFound("Room is not configured.");
     }
 
@@ -407,7 +407,7 @@ app.MapPost("/api/rooms/{roomNumber:int}/ready-for-doctor", async Task<IResult> 
             "ready-for-doctor", roomNumber, previousRoom, null, false, reason,
             previousRoom?.AssignedDoctor, previousRoom?.ProcedureCode));
         return store.IsConfiguredRoom(roomNumber)
-            ? Results.BadRequest("Ready for Doctor is only available for seated, aging, or stale rooms.")
+            ? Results.BadRequest("Ready for Doctor requires a seated room with a complete, currently valid, durably saved assignment.")
             : Results.NotFound("Room is not configured.");
     }
 
@@ -1097,9 +1097,8 @@ public static class RoomLifecycleEndpointHandler
         return Results.Ok(result);
     }
 
-    // Pre-arrival assignment correction. Distinct from the legacy /assignment endpoint above (which
-    // remains untouched): this route allows Prestaging as well as Seated/ReadyForDoctor/Aging/Stale,
-    // and also corrects the expected-allocation snapshot. Reuses BeginPrestageRequest unchanged - the
+    // Canonical draft assignment correction. Distinct from the legacy /assignment endpoint above
+    // because this route also corrects the expected-allocation snapshot. Reuses BeginPrestageRequest unchanged - the
     // request shape is identical (doctorId, procedureCode/procedureId, sedation,
     // expectedAllocationUnits; no demo timing field) - and the same alias-resolution and
     // doctor/procedure validation BeginPrestage already uses, so there is no second, competing
@@ -1158,7 +1157,7 @@ public static class RoomLifecycleEndpointHandler
                 action, roomNumber, previousRoom, null, false, reason,
                 doctorId, procedureCode));
             return store.IsConfiguredRoom(roomNumber)
-                ? Results.BadRequest("Update Room Assignment is only available before Doctor Arrived, with a valid doctor and procedure.")
+                ? Results.BadRequest("Update Room Assignment is only available while the room is prestaging or seated, with a valid doctor and procedure.")
                 : Results.NotFound("Room is not configured.");
         }
 

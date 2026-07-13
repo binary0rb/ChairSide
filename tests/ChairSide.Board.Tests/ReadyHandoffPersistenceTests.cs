@@ -186,7 +186,8 @@ public sealed class ReadyHandoffPersistenceTests
             PrestageStartedAt = new DateTimeOffset(2026, 7, 12, 14, 0, 0, TimeSpan.Zero)
         };
 
-        context.Repository.SaveCanonicalAssignment(room, assignment, context.Doctors, context.Procedures);
+        var expectation = ActiveRoomWriteExpectation.FromRoom(LoadRoom(context));
+        context.Repository.SaveCanonicalAssignment(room, assignment, expectation, context.Doctors, context.Procedures);
 
         var loaded = context.Repository.LoadRooms(3).Single(item => item.RoomId == 1);
         Assert.Equal(assignment.DoctorId, loaded.AssignedDoctor);
@@ -195,6 +196,146 @@ public sealed class ReadyHandoffPersistenceTests
         Assert.Equal(assignment.ExpectedAllocationState, loaded.ExpectedAllocationState);
         Assert.Equal(assignment.ExpectedAllocationSuggestedUnits, loaded.ExpectedAllocationSuggestedUnits);
         Assert.Equal(assignment.ExpectedAllocationConfirmedUnits, loaded.ExpectedAllocationConfirmedUnits);
+    }
+
+    [Theory]
+    [InlineData("episode")]
+    [InlineData("state")]
+    public void Canonical_assignment_compare_and_swap_rejects_wrong_expected_identity(
+        string mismatch)
+    {
+        using var workspace = TestWorkspace.Create();
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production);
+        var durableBefore = LoadRoom(context);
+        var candidate = new RoomState(1)
+        {
+            EpisodeId = "episode-candidate",
+            State = RoomStates.Prestaging,
+            PrestageStartedAt = new DateTimeOffset(2026, 7, 12, 14, 0, 0, TimeSpan.Zero)
+        };
+        var candidateBefore = RoomSnapshot.From(candidate);
+        var expectation = ActiveRoomWriteExpectation.FromRoom(durableBefore);
+        expectation = mismatch switch
+        {
+            "episode" => expectation with { EpisodeId = "wrong-episode" },
+            "state" => expectation with { State = RoomStates.Seated },
+            _ => throw new InvalidOperationException($"Unexpected mismatch '{mismatch}'.")
+        };
+
+        var result = context.Repository.SaveCanonicalAssignment(
+            candidate,
+            CompletePersistedAssignment(),
+            expectation,
+            context.Doctors,
+            context.Procedures);
+
+        Assert.Null(result);
+        Assert.Equal(candidateBefore, RoomSnapshot.From(candidate));
+        Assert.Equal(RoomSnapshot.From(durableBefore), RoomSnapshot.From(LoadRoom(context)));
+    }
+
+    [Fact]
+    public void Canonical_assignment_compare_and_swap_rejects_expected_null_active_handoff()
+    {
+        using var workspace = TestWorkspace.Create();
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production);
+        var readyAt = new DateTimeOffset(2026, 7, 12, 15, 0, 0, TimeSpan.Zero);
+        var handoff = context.Repository.CreateReadyHandoff(
+            ReadyRoom(readyAt),
+            CompleteAssignment(),
+            readyAt,
+            context.Doctors,
+            context.Procedures);
+        var durableBefore = LoadRoom(context);
+        var candidate = CopyRoom(durableBefore);
+        var candidateBefore = RoomSnapshot.From(candidate);
+        var expectation = ActiveRoomWriteExpectation.FromRoom(durableBefore) with
+        {
+            ActiveReadyHandoffId = null
+        };
+
+        var result = context.Repository.SaveCanonicalAssignment(
+            candidate,
+            CompletePersistedAssignment(),
+            expectation,
+            context.Doctors,
+            context.Procedures);
+
+        Assert.Null(result);
+        Assert.Equal(candidateBefore, RoomSnapshot.From(candidate));
+        Assert.Equal(RoomSnapshot.From(durableBefore), RoomSnapshot.From(LoadRoom(context)));
+        Assert.Equal(ReadyHandoffStatus.Active, context.Repository.LoadReadyHandoff(handoff.HandoffId)?.ContractStatus);
+    }
+
+    [Fact]
+    public void Canonical_assignment_database_abort_does_not_mutate_supplied_room()
+    {
+        using var workspace = TestWorkspace.Create();
+        var databasePath = workspace.ProductionDatabasePath();
+        var context = StoreContext.Create(
+            workspace,
+            environmentName: Environments.Production,
+            databasePath: databasePath);
+        Assert.NotNull(context.Store.BeginPrestage(1, "otte", "CON"));
+
+        var durableBefore = LoadRoom(context);
+        var candidate = CopyRoom(durableBefore);
+        var candidateBefore = RoomSnapshot.From(candidate);
+        var assignment = PersistedRoomAssignment.FromCanonicalContract(
+            RoomAssignmentContract.Create(
+                "pledger",
+                "EXT",
+                SedationContract.EligibleNo(),
+                ExpectedAllocationContract.ConfirmedSuggestedValue(3)),
+            doctorDisplayName: "Dr. Pledger",
+            procedureCategory: "Extraction");
+
+        using (var connection = OpenConnection(databasePath))
+        {
+            ExecuteSql(connection, """
+                CREATE TRIGGER fail_room_1_canonical_assignment
+                BEFORE UPDATE OF assigned_doctor_id, procedure_code ON active_rooms
+                FOR EACH ROW
+                WHEN OLD.room_id = 1
+                    AND OLD.episode_id IS NEW.episode_id
+                    AND OLD.state = NEW.state
+                    AND OLD.active_ready_handoff_id IS NEW.active_ready_handoff_id
+                    AND OLD.assigned_doctor_id = 'otte'
+                    AND OLD.procedure_code = 'CON'
+                    AND NEW.assigned_doctor_id = 'pledger'
+                    AND NEW.procedure_code = 'EXT'
+                BEGIN
+                    SELECT RAISE(ABORT, 'injected canonical assignment failure');
+                END;
+                """);
+        }
+
+        SqliteException exception;
+        try
+        {
+            exception = Assert.Throws<SqliteException>(() => context.Repository.SaveCanonicalAssignment(
+                candidate,
+                assignment,
+                ActiveRoomWriteExpectation.FromRoom(durableBefore),
+                context.Doctors,
+                context.Procedures));
+        }
+        finally
+        {
+            using var connection = OpenConnection(databasePath);
+            ExecuteSql(connection, "DROP TRIGGER IF EXISTS fail_room_1_canonical_assignment;");
+        }
+
+        Assert.Equal(19, exception.SqliteErrorCode);
+        Assert.Contains("injected canonical assignment failure", exception.Message, StringComparison.Ordinal);
+        Assert.Equal(candidateBefore, RoomSnapshot.From(candidate));
+        Assert.Equal(RoomSnapshot.From(durableBefore), RoomSnapshot.From(LoadRoom(context)));
+
+        var reloaded = StoreContext.Create(
+            workspace,
+            environmentName: Environments.Production,
+            databasePath: databasePath);
+        Assert.Equal(RoomSnapshot.From(durableBefore), RoomSnapshot.From(LoadRoom(reloaded)));
     }
 
     [Fact]
@@ -584,7 +725,12 @@ public sealed class ReadyHandoffPersistenceTests
         var room = ReadyRoom(new DateTimeOffset(2026, 7, 12, 15, 0, 0, TimeSpan.Zero));
 
         Assert.Throws<InvalidOperationException>(() =>
-            context.Repository.SaveCanonicalAssignment(room, assignment, context.Doctors, context.Procedures));
+            context.Repository.SaveCanonicalAssignment(
+                room,
+                assignment,
+                ActiveRoomWriteExpectation.FromRoom(LoadRoom(context)),
+                context.Doctors,
+                context.Procedures));
 
         var loaded = LoadRoom(context);
         Assert.Null(loaded.SedationState);
@@ -608,7 +754,12 @@ public sealed class ReadyHandoffPersistenceTests
             SedationContract.UnavailableNoProcedure(),
             ExpectedAllocationContract.Unknown()));
 
-        context.Repository.SaveCanonicalAssignment(room, absent, context.Doctors, context.Procedures);
+        context.Repository.SaveCanonicalAssignment(
+            room,
+            absent,
+            ActiveRoomWriteExpectation.FromRoom(LoadRoom(context)),
+            context.Doctors,
+            context.Procedures);
 
         var loaded = LoadRoom(context);
         Assert.Null(loaded.AssignedDoctor);
@@ -776,6 +927,9 @@ public sealed class ReadyHandoffPersistenceTests
             "CON",
             SedationContract.UnavailableProcedureIneligible(),
             ExpectedAllocationContract.ConfirmedSuggestedValue(3));
+
+    private static PersistedRoomAssignment CompletePersistedAssignment() =>
+        PersistedRoomAssignment.FromCanonicalContract(CompleteAssignment());
 
     private static CompletedRoomCycle CompletedCycle(RoomState room, DateTimeOffset doctorArrivedAt) =>
         new()

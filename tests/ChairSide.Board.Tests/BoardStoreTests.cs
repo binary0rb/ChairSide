@@ -450,8 +450,10 @@ public sealed class BoardStoreTests
         Assert.Null(storedRooms.Single(room => room.RoomId == 2).EpisodeId);
         Assert.Null(storedRooms.Single(room => room.RoomId == 2).PrestageStartedAt);
 
-        Assert.NotNull(context.Store.MarkReadyForDoctor(1));
-        Assert.NotNull(context.Store.MarkDoctorArrived(2));
+        Assert.Null(context.Store.MarkReadyForDoctor(1));
+        Assert.Contains(ready.IntegrityFaults!, fault => fault.Code == RoomIntegrityFaultCode.ReadyHandoffMissing);
+        Assert.Null(context.Store.MarkDoctorArrived(2));
+        Assert.NotNull(context.Store.CancelSeating(2));
     }
 
     [Fact]
@@ -752,7 +754,9 @@ public sealed class BoardStoreTests
         DriveRoomToCancellationState(context, clock, state);
 
         Assert.Null(context.Store.CancelPrestage(1));
-        Assert.Equal(state, context.Store.GetRoom(1)?.State);
+        Assert.Equal(
+            state is RoomStates.Aging or RoomStates.Stale ? RoomStates.ReadyForDoctor : state,
+            context.Store.GetRoom(1)?.State);
         Assert.Empty(context.Repository.LoadAbortedAssignments());
     }
 
@@ -775,7 +779,9 @@ public sealed class BoardStoreTests
         Assert.Equal(RoomStates.Available, canceled.State);
         var abort = Assert.Single(context.Repository.LoadAbortedAssignments());
         Assert.Equal(episodeId, abort.EpisodeId);
-        Assert.Equal(state, abort.TerminatedFromState);
+        Assert.Equal(
+            state is RoomStates.Aging or RoomStates.Stale ? RoomStates.ReadyForDoctor : state,
+            abort.TerminatedFromState);
         Assert.Equal(TerminationKinds.StaffCanceled, abort.TerminationKind);
         Assert.Null(abort.CancellationReason);
         Assert.NotNull(abort.PrestageStartedAt);
@@ -1037,11 +1043,18 @@ public sealed class BoardStoreTests
         {
             command.CommandText = """
                 UPDATE active_rooms
-                SET episode_id = NULL, prestage_started_at = NULL
+                SET episode_id = NULL,
+                    prestage_started_at = NULL,
+                    sedation_state = NULL,
+                    expected_allocation_state = NULL,
+                    expected_allocation_suggested_units = NULL,
+                    expected_allocation_confirmed_units = NULL,
+                    active_ready_handoff_id = NULL,
+                    accepted_ready_handoff_id = NULL
                 WHERE room_id = 1;
 
                 UPDATE completed_room_cycles
-                SET episode_id = NULL, prestage_started_at = NULL
+                SET episode_id = NULL, prestage_started_at = NULL, accepted_ready_handoff_id = NULL
                 WHERE id = $cycleId;
                 """;
             command.Parameters.AddWithValue("$cycleId", cycleId);
@@ -1084,11 +1097,10 @@ public sealed class BoardStoreTests
     }
 
     [Fact]
-    public void Stale_elapsed_ready_for_doctor_room_reloads_as_stale()
+    public void Stale_elapsed_ready_room_reloads_as_ready_with_stale_urgency()
     {
-        // Stale escalation is now based on ReadyForDoctorAt. A room that has been seated for a
-        // long time but has NOT clicked Ready for Doctor stays Seated. Only after Ready for Doctor
-        // can the room escalate to Aging/Stale based on elapsed time from ReadyForDoctorAt.
+        // Stale urgency is based on ReadyForDoctorAt. A room seated for a long time without Ready
+        // stays Seated; only the Ready phase projects Aging/Stale urgency.
         using var workspace = TestWorkspace.Create();
         var databasePath = workspace.ProductionDatabasePath();
 
@@ -1116,6 +1128,10 @@ public sealed class BoardStoreTests
                     aging_started_at = NULL,
                     stale_started_at = NULL
                 WHERE room_id = 1;
+
+                UPDATE ready_handoffs
+                SET ready_at = $readyAt
+                WHERE room_id = 1;
                 """;
             command.Parameters.AddWithValue("$seatedAt", FormatDateTimeOffset(seatedAt));
             command.Parameters.AddWithValue("$readyAt", FormatDateTimeOffset(staleReadyAt));
@@ -1131,16 +1147,17 @@ public sealed class BoardStoreTests
         var reloaded = second.Store.GetRoom(1);
 
         Assert.NotNull(reloaded);
-        Assert.Equal(RoomStates.Stale, reloaded.State);
-        Assert.NotNull(reloaded.AgingStartedAt);
-        Assert.NotNull(reloaded.StaleStartedAt);
+        Assert.Equal(RoomStates.ReadyForDoctor, reloaded.State);
+        Assert.Equal(ReadyUrgency.Stale, reloaded.ReadyUrgency);
+        Assert.Null(reloaded.AgingStartedAt);
+        Assert.Null(reloaded.StaleStartedAt);
 
         Assert.NotNull(second.Store.MarkDoctorArrived(1));
         Assert.NotNull(second.Store.MarkDoctorComplete(1));
         Assert.NotNull(second.Store.MarkRoomAvailable(1));
 
         var cycle = Assert.Single(second.Store.GetReports().RecentCompletedCycles);
-        Assert.Equal(RoomStates.Stale, cycle.FinalWaitState);
+        Assert.Equal(RoomStates.ReadyForDoctor, cycle.FinalWaitState);
         Assert.True(cycle.AgingThresholdReached);
         Assert.True(cycle.StaleThresholdReached);
     }
@@ -1286,9 +1303,18 @@ public sealed class BoardStoreTests
         var room = context.Store.GetRoom(1);
 
         Assert.NotNull(room);
-        Assert.Equal(expectedState, room.State);
-        Assert.Equal(expectedAgingStarted, room.AgingStartedAt is not null);
-        Assert.Equal(expectedStaleStarted, room.StaleStartedAt is not null);
+        Assert.Equal(RoomStates.ReadyForDoctor, room.State);
+        Assert.Equal(
+            expectedState == RoomStates.Stale
+                ? ReadyUrgency.Stale
+                : expectedState == RoomStates.Aging
+                    ? ReadyUrgency.Aging
+                    : ReadyUrgency.None,
+            room.ReadyUrgency);
+        Assert.Equal(expectedAgingStarted, room.ReadyUrgency is ReadyUrgency.Aging or ReadyUrgency.Stale);
+        Assert.Equal(expectedStaleStarted, room.ReadyUrgency == ReadyUrgency.Stale);
+        Assert.False(room.AgingStartedAt.HasValue);
+        Assert.False(room.StaleStartedAt.HasValue);
     }
 
     [Fact]
@@ -3105,13 +3131,8 @@ public sealed class BoardStoreTests
     }
 
     [Fact]
-    public void Fresh_room_state_constructions_never_carry_over_episode_or_prestage_fields()
+    public void Development_demo_room_constructions_use_episode_identity_only_for_canonical_ready_seed()
     {
-        // BuildLiveRoom, Available, Seated, and ReadyForDoctorRoom all build a *new* RoomState via an
-        // object initializer rather than copying from an existing instance, so EpisodeId/
-        // PrestageStartedAt correctly default to null on every one of them. This is a direct
-        // characterization of that default, guarding against a future refactor that turns one of
-        // these into a field-by-field copy of a stale RoomState.
         using var workspace = TestWorkspace.Create();
         var context = StoreContext.Create(workspace, environmentName: Environments.Development, roomCount: 12);
 
@@ -3119,8 +3140,19 @@ public sealed class BoardStoreTests
         Assert.NotEmpty(rooms);
         Assert.All(rooms, room =>
         {
-            Assert.Null(room.EpisodeId);
-            Assert.Null(room.PrestageStartedAt);
+            if (room.RoomId is >= 6 and <= 9)
+            {
+                Assert.Equal(RoomStates.ReadyForDoctor, room.State);
+                Assert.False(string.IsNullOrWhiteSpace(room.EpisodeId));
+                Assert.NotNull(room.PrestageStartedAt);
+                Assert.False(string.IsNullOrWhiteSpace(room.ActiveReadyHandoffId));
+            }
+            else
+            {
+                Assert.Null(room.EpisodeId);
+                Assert.Null(room.PrestageStartedAt);
+                Assert.Null(room.ActiveReadyHandoffId);
+            }
         });
     }
 
@@ -4338,12 +4370,11 @@ public sealed class BoardStoreTests
     }
 
     // -------------------------------------------------------------------------
-    // Pre-arrival Update Room Assignment (store)
+    // Draft Update Room Assignment (store)
     //
-    // The assignment remains provisional and correctable until Doctor Arrived. Allowed effective
-    // states are Prestaging, Seated, ReadyForDoctor, Aging, and Stale; DoctorArrivedAt is an
-    // independent hard guard. The same episode and every existing phase timestamp are preserved;
-    // only the doctor/procedure/sedation/allocation snapshot is replaced.
+    // Prestaging and Seated assignments remain provisional and correctable. Ready is the immutable
+    // handoff boundary, including Aging/Stale urgency projections. Accepted changes preserve the
+    // same episode and every existing phase timestamp.
     // -------------------------------------------------------------------------
 
     [Theory]
@@ -4352,7 +4383,7 @@ public sealed class BoardStoreTests
     [InlineData(RoomStates.ReadyForDoctor)]
     [InlineData(RoomStates.Aging)]
     [InlineData(RoomStates.Stale)]
-    public void Update_room_assignment_succeeds_from_each_allowed_pre_arrival_state_and_preserves_history(string effectiveState)
+    public void Update_room_assignment_allows_draft_states_but_rejects_ready_lock_without_mutation(string effectiveState)
     {
         using var workspace = TestWorkspace.Create();
         var now = new DateTimeOffset(2026, 8, 1, 9, 0, 0, TimeSpan.Zero);
@@ -4378,17 +4409,13 @@ public sealed class BoardStoreTests
             }
         }
 
-        // Confirm the fixture actually reached the intended effective state before correcting it.
-        Assert.Equal(effectiveState, context.Store.GetRoom(1)?.State);
+        // Ready is the primary state; Aging/Stale are derived urgency only.
+        Assert.Equal(
+            effectiveState is RoomStates.Aging or RoomStates.Stale ? RoomStates.ReadyForDoctor : effectiveState,
+            context.Store.GetRoom(1)?.State);
         var before = context.Repository.LoadRooms(3).Single(room => room.RoomId == 1);
 
         var updated = context.Store.UpdateRoomAssignment(1, "pledger", "EXT", sedation: true, expectedAllocationUnits: 5);
-
-        Assert.NotNull(updated);
-        Assert.Equal(effectiveState, updated.State);
-        Assert.Equal("pledger", updated.AssignedDoctor);
-        Assert.Equal("EXT+SED", updated.ProcedureCode);
-        Assert.Equal(5, updated.ExpectedAllocationUnits);
 
         var after = context.Repository.LoadRooms(3).Single(room => room.RoomId == 1);
 
@@ -4401,15 +4428,24 @@ public sealed class BoardStoreTests
         Assert.Null(after.DoctorCompleteAt);
         Assert.Null(after.RoomAvailableAt);
 
-        // Replaced: the complete provisional assignment/allocation snapshot.
-        Assert.Equal("pledger", after.AssignedDoctor);
-        Assert.Equal("Dr. Pledger", after.AssignedDoctorDisplayName);
-        Assert.Equal("EXT+SED", after.ProcedureCode);
-        Assert.Equal("Extraction + Sedation", after.ProcedureCategory);
-        Assert.Equal(3, after.OriginalDefaultExpectedUnits);
-        Assert.Equal(5, after.ExpectedAllocationUnits);
-        Assert.Equal(50, after.ExpectedAllocationMinutes);
-        Assert.True(after.AllocationAdjustedFromDefault);
+        if (effectiveState is RoomStates.Prestaging or RoomStates.Seated)
+        {
+            Assert.NotNull(updated);
+            Assert.Equal("pledger", after.AssignedDoctor);
+            Assert.Equal("Dr. Pledger", after.AssignedDoctorDisplayName);
+            Assert.Equal("EXT+SED", after.ProcedureCode);
+            Assert.Equal("Extraction + Sedation", after.ProcedureCategory);
+            Assert.Equal(3, after.OriginalDefaultExpectedUnits);
+            Assert.Equal(5, after.ExpectedAllocationUnits);
+            Assert.Equal(50, after.ExpectedAllocationMinutes);
+            Assert.True(after.AllocationAdjustedFromDefault);
+        }
+        else
+        {
+            Assert.Null(updated);
+            Assert.Equal(before.AssignedDoctor, after.AssignedDoctor);
+            Assert.Equal(before.ProcedureCode, after.ProcedureCode);
+        }
     }
 
     [Theory]
@@ -4599,14 +4635,14 @@ public sealed class BoardStoreTests
 
         var updated = context.Store.UpdateRoomAssignment(1, "pledger", "EXT", sedation: true, expectedAllocationUnits: 5);
 
-        Assert.NotNull(updated);
+        Assert.Null(updated);
         var after = context.Repository.LoadRooms(3).Single(room => room.RoomId == 1);
         Assert.Null(after.EpisodeId);
         Assert.Null(after.PrestageStartedAt);
         Assert.Equal(before.SeatedAt, after.SeatedAt);
         Assert.Equal(before.ReadyForDoctorAt, after.ReadyForDoctorAt);
-        Assert.Equal("pledger", after.AssignedDoctor);
-        Assert.Equal("EXT+SED", after.ProcedureCode);
+        Assert.Equal(before.AssignedDoctor, after.AssignedDoctor);
+        Assert.Equal(before.ProcedureCode, after.ProcedureCode);
     }
 
     [Fact]
@@ -4873,10 +4909,9 @@ public sealed class BoardStoreTests
     }
 
     [Fact]
-    public void Ready_for_doctor_aging_and_stale_allow_doctor_arrived()
+    public void Aging_ready_urgency_allows_doctor_arrived_and_captures_threshold()
     {
-        // Aging/stale are now part of the Ready for Doctor phase (doctor requested too long).
-        // Doctor Arrived must be accepted from any of: ready-for-doctor, aging, stale.
+        // Aging is a projection of the Ready for Doctor phase, not a primary lifecycle state.
         using var workspace = TestWorkspace.Create();
         var now = new DateTimeOffset(2026, 6, 1, 10, 0, 0, TimeSpan.Zero);
         var clock = new ManualTimeProvider(now);
@@ -4894,8 +4929,9 @@ public sealed class BoardStoreTests
 
         var aging = context.Store.GetRoom(1);
         Assert.NotNull(aging);
-        Assert.Equal(RoomStates.Aging, aging.State);
-        Assert.NotNull(aging.AgingStartedAt);
+        Assert.Equal(RoomStates.ReadyForDoctor, aging.State);
+        Assert.Equal(ReadyUrgency.Aging, aging.ReadyUrgency);
+        Assert.Null(aging.AgingStartedAt);
         Assert.Null(aging.StaleStartedAt);
 
         var arrived = context.Store.MarkDoctorArrived(1);
@@ -4906,7 +4942,7 @@ public sealed class BoardStoreTests
         Assert.NotNull(context.Store.MarkRoomAvailable(1));
 
         var cycle = Assert.Single(context.Store.GetReports().RecentCompletedCycles);
-        Assert.Equal(RoomStates.Aging, cycle.FinalWaitState);
+        Assert.Equal(RoomStates.ReadyForDoctor, cycle.FinalWaitState);
         Assert.True(cycle.AgingThresholdReached);
         Assert.False(cycle.StaleThresholdReached);
     }
@@ -5349,7 +5385,7 @@ public sealed class BoardStoreTests
     }
 
     [Fact]
-    public void Malformed_prestaging_max_duration_expiration_throws_without_terminal_records()
+    public void Absent_assignment_prestaging_max_duration_expiration_preserves_truthful_abort_history()
     {
         using var workspace = TestWorkspace.Create();
         var databasePath = workspace.ProductionDatabasePath();
@@ -5380,11 +5416,12 @@ public sealed class BoardStoreTests
                 MaxActiveDurationHours = 8
             });
 
-        var exception = Assert.Throws<InvalidOperationException>(context.Store.CheckAndExpireActiveCycles);
-        Assert.Contains("prestaging room 1", exception.Message, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("assigned doctor", exception.Message, StringComparison.OrdinalIgnoreCase);
-        Assert.Equal(RoomStates.Prestaging, context.Store.GetRoom(1)?.State);
-        Assert.Empty(context.Repository.LoadAbortedAssignments());
+        Assert.Equal([1], context.Store.CheckAndExpireActiveCycles());
+        Assert.Equal(RoomStates.Available, context.Store.GetRoom(1)?.State);
+        var aborted = Assert.Single(context.Repository.LoadAbortedAssignments());
+        Assert.Null(aborted.AssignedDoctor);
+        Assert.Null(aborted.ProcedureCode);
+        Assert.Null(aborted.SeatedAt);
         Assert.Empty(context.Repository.LoadCompletedCycles());
     }
 
@@ -5515,7 +5552,7 @@ public sealed class BoardStoreTests
     }
 
     [Fact]
-    public void Malformed_prestaging_after_hours_expiration_throws_without_terminal_records()
+    public void Absent_assignment_prestaging_after_hours_expiration_preserves_truthful_abort_history()
     {
         using var workspace = TestWorkspace.Create();
         var databasePath = workspace.ProductionDatabasePath();
@@ -5548,11 +5585,12 @@ public sealed class BoardStoreTests
                 TimeZone = "UTC"
             });
 
-        var exception = Assert.Throws<InvalidOperationException>(context.Store.TryRunAfterHoursSweep);
-        Assert.Contains("prestaging room 1", exception.Message, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("assigned doctor", exception.Message, StringComparison.OrdinalIgnoreCase);
-        Assert.Equal(RoomStates.Prestaging, context.Store.GetRoom(1)?.State);
-        Assert.Empty(context.Repository.LoadAbortedAssignments());
+        Assert.Equal([1], context.Store.TryRunAfterHoursSweep());
+        Assert.Equal(RoomStates.Available, context.Store.GetRoom(1)?.State);
+        var aborted = Assert.Single(context.Repository.LoadAbortedAssignments());
+        Assert.Null(aborted.AssignedDoctor);
+        Assert.Null(aborted.ProcedureCode);
+        Assert.Null(aborted.SeatedAt);
         Assert.Empty(context.Repository.LoadCompletedCycles());
     }
 
@@ -5646,27 +5684,21 @@ public sealed class BoardStoreTests
         Assert.Equal([1], expired);
         Assert.Equal(RoomStates.Available, context.Store.GetRoom(1)?.State);
 
-        var exception = Assert.Single(context.Store.GetReports().ExceptionCycles);
-        Assert.Equal(1, exception.RoomId);
-        Assert.Equal(ExceptionReasons.ExceededMaxActiveDuration, exception.ExceptionReason);
-        Assert.Equal("Exclude abandoned cycle", exception.SuggestedAction);
-        Assert.Null(exception.DoctorArrivedAt);
-        Assert.Null(exception.DoctorCompleteAt);
-        Assert.Equal(ReviewStatuses.PendingReview, exception.ReviewStatus);
-        Assert.True(exception.IsException);
-        Assert.True(exception.RequiresReview);
-        Assert.Equal(active.EpisodeId, exception.EpisodeId);
-        Assert.Equal(active.PrestageStartedAt, exception.PrestageStartedAt);
+        var aborted = Assert.Single(context.Repository.LoadAbortedAssignments());
+        Assert.Equal(active.EpisodeId, aborted.EpisodeId);
+        Assert.Equal(active.PrestageStartedAt, aborted.PrestageStartedAt);
+        Assert.Equal(TerminationKinds.MaxDurationExpired, aborted.TerminationKind);
         Assert.Equal(0, context.Store.GetReports().CompletedRoomCyclesCount);
-        var durableException = Assert.Single(context.Repository.LoadCompletedCycles());
-        Assert.Equal(active.EpisodeId, durableException.EpisodeId);
-        Assert.Equal(active.PrestageStartedAt, durableException.PrestageStartedAt);
+        Assert.Empty(context.Store.GetReports().ExceptionCycles);
+        Assert.Empty(context.Repository.LoadCompletedCycles());
     }
 
     [Fact]
     public void Active_room_over_max_duration_with_doctor_arrived_is_expired_with_review_timing_suggestion()
     {
-        // Room reached DoctorArrived - should produce SuggestedAction "Review timing".
+        // Room reached DoctorArrived - post-arrival expiration releases the room and records a
+        // review-required exception cycle with SuggestedAction "Review timing". It must not fabricate
+        // DoctorCompleteAt and must not create aborted pre-arrival history.
         using var workspace = TestWorkspace.Create();
         var now = new DateTimeOffset(2026, 6, 9, 10, 0, 0, TimeSpan.Zero);
         var clock = new ManualTimeProvider(now);
@@ -5691,13 +5723,17 @@ public sealed class BoardStoreTests
         Assert.Equal([1], expired);
         Assert.Equal(RoomStates.Available, context.Store.GetRoom(1)?.State);
 
-        var exception = Assert.Single(context.Store.GetReports().ExceptionCycles);
+        var reports = context.Store.GetReports();
+        var exception = Assert.Single(reports.ExceptionCycles);
         Assert.Equal(1, exception.RoomId);
         Assert.Equal(ExceptionReasons.ExceededMaxActiveDuration, exception.ExceptionReason);
         Assert.Equal("Review timing", exception.SuggestedAction);
         Assert.NotNull(exception.DoctorArrivedAt);
-        Assert.Null(exception.DoctorCompleteAt);   // Doctor Complete was never called.
-        Assert.True(exception.IsException);
+        Assert.Null(exception.DoctorCompleteAt);
+
+        // Post-arrival expiration is not throughput and not aborted pre-arrival history.
+        Assert.Equal(0, reports.CompletedRoomCyclesCount);
+        Assert.Empty(context.Repository.LoadAbortedAssignments());
     }
 
     [Fact]
@@ -5734,17 +5770,16 @@ public sealed class BoardStoreTests
         Assert.Equal(RoomStates.Available, context.Store.GetRoom(1)?.State);
         Assert.Equal(RoomStates.Available, context.Store.GetRoom(2)?.State);
 
-        var exceptions = context.Store.GetReports().ExceptionCycles;
-        Assert.Equal(2, exceptions.Count);
-        Assert.All(exceptions, ex =>
+        var aborted = context.Repository.LoadAbortedAssignments();
+        Assert.Equal(2, aborted.Count);
+        Assert.All(aborted, record =>
         {
-            Assert.Equal(ExceptionReasons.AfterHoursSweep, ex.ExceptionReason);
-            Assert.True(ex.IsException);
-            Assert.True(ex.RequiresReview);
-            Assert.Equal(activeRooms[ex.RoomId].EpisodeId, ex.EpisodeId);
-            Assert.Equal(activeRooms[ex.RoomId].PrestageStartedAt, ex.PrestageStartedAt);
+            Assert.Equal(TerminationKinds.AfterHoursExpired, record.TerminationKind);
+            Assert.Equal(activeRooms[record.RoomId].EpisodeId, record.EpisodeId);
+            Assert.Equal(activeRooms[record.RoomId].PrestageStartedAt, record.PrestageStartedAt);
         });
-        Assert.Equal(2, context.Repository.LoadCompletedCycles().Count);
+        Assert.Empty(context.Repository.LoadCompletedCycles());
+        Assert.Empty(context.Store.GetReports().ExceptionCycles);
         Assert.Equal(0, context.Store.GetReports().CompletedRoomCyclesCount);
     }
 
@@ -5788,13 +5823,13 @@ public sealed class BoardStoreTests
             });
 
         Assert.Equal([1], context.Store.CheckAndExpireActiveCycles());
-        var exception = Assert.Single(context.Repository.LoadCompletedCycles());
-        Assert.Null(exception.EpisodeId);
-        Assert.Null(exception.PrestageStartedAt);
-        Assert.Equal(seatedAt, exception.SeatedAt);
-        Assert.Equal(ExceptionReasons.ExceededMaxActiveDuration, exception.ExceptionReason);
+        var aborted = Assert.Single(context.Repository.LoadAbortedAssignments());
+        Assert.NotNull(aborted.EpisodeId);
+        Assert.Null(aborted.PrestageStartedAt);
+        Assert.Equal(seatedAt, aborted.SeatedAt);
+        Assert.Equal(TerminationKinds.MaxDurationExpired, aborted.TerminationKind);
         Assert.Equal(RoomStates.Available, context.Store.GetRoom(1)?.State);
-        Assert.Empty(context.Repository.LoadAbortedAssignments());
+        Assert.Empty(context.Repository.LoadCompletedCycles());
     }
 
     [Fact]
@@ -5830,10 +5865,9 @@ public sealed class BoardStoreTests
         var secondSweep = context.Store.TryRunAfterHoursSweep();
         Assert.Empty(secondSweep);
 
-        // Only the one exception from the first sweep should exist.
-        var exceptions = context.Store.GetReports().ExceptionCycles;
-        Assert.Single(exceptions);
-        Assert.Equal(ExceptionReasons.AfterHoursSweep, exceptions[0].ExceptionReason);
+        // Only the one aborted pre-arrival episode from the first sweep should exist.
+        var aborted = Assert.Single(context.Repository.LoadAbortedAssignments());
+        Assert.Equal(TerminationKinds.AfterHoursExpired, aborted.TerminationKind);
     }
 
     [Fact]
@@ -5915,8 +5949,8 @@ public sealed class BoardStoreTests
 
         Assert.Equal([1], expired);
         Assert.Equal(RoomStates.Available, context.Store.GetRoom(1)?.State);
-        var exception = Assert.Single(context.Store.GetReports().ExceptionCycles);
-        Assert.Equal(ExceptionReasons.ExceededMaxActiveDuration, exception.ExceptionReason);
+        var aborted = Assert.Single(context.Repository.LoadAbortedAssignments());
+        Assert.Equal(TerminationKinds.MaxDurationExpired, aborted.TerminationKind);
     }
 
     [Fact]
@@ -5946,8 +5980,8 @@ public sealed class BoardStoreTests
 
         Assert.Equal([1], expired);
         Assert.Equal(RoomStates.Available, context.Store.GetRoom(1)?.State);
-        var exception = Assert.Single(context.Store.GetReports().ExceptionCycles);
-        Assert.Equal(ExceptionReasons.AfterHoursSweep, exception.ExceptionReason);
+        var aborted = Assert.Single(context.Repository.LoadAbortedAssignments());
+        Assert.Equal(TerminationKinds.AfterHoursExpired, aborted.TerminationKind);
     }
 
     [Fact]
@@ -5986,7 +6020,8 @@ public sealed class BoardStoreTests
     [Fact]
     public void Expired_active_cycles_do_not_manufacture_doctor_complete_at()
     {
-        // Force-expiring a DoctorInRoom room must NOT set DoctorCompleteAt.
+        // Post-arrival expiration releases the room and records the review-required exception cycle,
+        // but must NEVER set DoctorCompleteAt (Doctor Complete was never called).
         using var workspace = TestWorkspace.Create();
         var now = new DateTimeOffset(2026, 6, 9, 10, 0, 0, TimeSpan.Zero);
         var clock = new ManualTimeProvider(now);
@@ -6006,16 +6041,133 @@ public sealed class BoardStoreTests
         // Note: MarkDoctorComplete is intentionally NOT called.
 
         clock.SetUtcNow(now.AddHours(8).AddSeconds(1));
-        context.Store.CheckAndExpireActiveCycles();
+        Assert.Equal([1], context.Store.CheckAndExpireActiveCycles());
+
+        // Room is released, not stranded in DoctorInRoom.
+        Assert.Equal(RoomStates.Available, context.Store.GetRoom(1)?.State);
+        var exception = Assert.Single(context.Store.GetReports().ExceptionCycles);
+        Assert.Null(exception.DoctorCompleteAt);
+    }
+
+    [Fact]
+    public void After_hours_sweep_expires_arrived_room_as_review_required_exception_cycle()
+    {
+        // The after-hours sweep must handle an already-arrived room the same way as the max-duration
+        // check: release it and record a review-required exception cycle, without fabricating
+        // DoctorCompleteAt or aborted pre-arrival history.
+        using var workspace = TestWorkspace.Create();
+        var now = new DateTimeOffset(2026, 6, 9, 19, 0, 0, TimeSpan.Zero);
+        var clock = new ManualTimeProvider(now);
+        var context = StoreContext.Create(
+            workspace,
+            environmentName: Environments.Production,
+            timeProvider: clock,
+            expirationOptions: new RoomExpirationOptions
+            {
+                Enabled = true,
+                AfterHoursSweepEnabled = true,
+                AfterHoursSweepTime = "19:00",
+                TimeZone = "UTC"
+            });
+
+        Assert.NotNull(SeatViaPrestage(context.Store, 1, "otte", "CON"));
+        Assert.NotNull(context.Store.MarkReadyForDoctor(1));
+        Assert.NotNull(context.Store.MarkDoctorArrived(1));
+
+        var expired = context.Store.TryRunAfterHoursSweep();
+
+        Assert.Equal([1], expired);
+        Assert.Equal(RoomStates.Available, context.Store.GetRoom(1)?.State);
 
         var exception = Assert.Single(context.Store.GetReports().ExceptionCycles);
+        Assert.Equal(1, exception.RoomId);
+        Assert.Equal(ExceptionReasons.AfterHoursSweep, exception.ExceptionReason);
+        Assert.Equal("Review timing", exception.SuggestedAction);
+        Assert.NotNull(exception.DoctorArrivedAt);
+        Assert.Null(exception.DoctorCompleteAt);
+        Assert.Empty(context.Repository.LoadAbortedAssignments());
+    }
+
+    [Fact]
+    public void Pre_arrival_seated_room_over_max_duration_expires_into_aborted_history_not_throughput()
+    {
+        // Seated (In Prep) but never marked Ready or Arrived: pre-arrival expiration must record
+        // aborted history and create no completed/exception throughput cycle.
+        using var workspace = TestWorkspace.Create();
+        var now = new DateTimeOffset(2026, 6, 9, 10, 0, 0, TimeSpan.Zero);
+        var clock = new ManualTimeProvider(now);
+        var context = StoreContext.Create(
+            workspace,
+            environmentName: Environments.Production,
+            timeProvider: clock,
+            expirationOptions: new RoomExpirationOptions
+            {
+                Enabled = true,
+                MaxActiveDurationHours = 8
+            });
+
+        Assert.NotNull(SeatViaPrestage(context.Store, 1, "otte", "CON"));
+        var active = context.Repository.LoadRooms(3).Single(room => room.RoomId == 1);
+        Assert.Equal(RoomStates.Seated, context.Store.GetRoom(1)?.State);
+
+        clock.SetUtcNow(now.AddHours(8).AddSeconds(1));
+        Assert.Equal([1], context.Store.CheckAndExpireActiveCycles());
+
+        Assert.Equal(RoomStates.Available, context.Store.GetRoom(1)?.State);
+        var aborted = Assert.Single(context.Repository.LoadAbortedAssignments());
+        Assert.Equal(active.EpisodeId, aborted.EpisodeId);
+        Assert.Equal(TerminationKinds.MaxDurationExpired, aborted.TerminationKind);
+
+        // No throughput: no completed or exception cycles.
+        Assert.Empty(context.Repository.LoadCompletedCycles());
+        Assert.Equal(0, context.Store.GetReports().CompletedRoomCyclesCount);
+        Assert.Empty(context.Store.GetReports().ExceptionCycles);
+    }
+
+    [Fact]
+    public void Post_arrival_expiration_persists_review_required_exception_cycle_across_reload()
+    {
+        // Durable-before-live: after post-arrival expiration a fresh store on the same database must
+        // observe the released room and the persisted review-required exception cycle, with a truthful
+        // DoctorArrivedAt and no fabricated DoctorCompleteAt.
+        using var workspace = TestWorkspace.Create();
+        var now = new DateTimeOffset(2026, 6, 9, 10, 0, 0, TimeSpan.Zero);
+        var clock = new ManualTimeProvider(now);
+        var context = StoreContext.Create(
+            workspace,
+            environmentName: Environments.Production,
+            timeProvider: clock,
+            expirationOptions: new RoomExpirationOptions
+            {
+                Enabled = true,
+                MaxActiveDurationHours = 8
+            });
+
+        Assert.NotNull(SeatViaPrestage(context.Store, 1, "otte", "CON"));
+        Assert.NotNull(context.Store.MarkReadyForDoctor(1));
+        Assert.NotNull(context.Store.MarkDoctorArrived(1));
+        clock.SetUtcNow(now.AddHours(8).AddSeconds(1));
+        Assert.Equal([1], context.Store.CheckAndExpireActiveCycles());
+
+        var reloaded = StoreContext.Create(
+            workspace,
+            environmentName: Environments.Production,
+            timeProvider: clock);
+        Assert.Equal(RoomStates.Available, reloaded.Store.GetRoom(1)?.State);
+        var exception = Assert.Single(reloaded.Store.GetReports().ExceptionCycles);
+        Assert.Equal(1, exception.RoomId);
+        Assert.Equal("Review timing", exception.SuggestedAction);
+        Assert.NotNull(exception.DoctorArrivedAt);
         Assert.Null(exception.DoctorCompleteAt);
     }
 
     [Fact]
     public void Expired_exception_cycles_are_excluded_from_normal_metrics()
     {
-        // Normal cycle + force-expired cycle: only the normal cycle contributes to metrics.
+        // Normal completed cycle (room 1) + post-arrival force-expired exception cycle (room 2):
+        // only the normal cycle contributes to throughput/metrics; the review-required exception is
+        // excluded. Post-arrival expiration preserves DoctorArrivedAt and never fabricates
+        // DoctorCompleteAt or aborted pre-arrival history.
         using var workspace = TestWorkspace.Create();
         var now = new DateTimeOffset(2026, 6, 9, 10, 0, 0, TimeSpan.Zero);
         var clock = new ManualTimeProvider(now);
@@ -6036,17 +6188,31 @@ public sealed class BoardStoreTests
         Assert.NotNull(context.Store.MarkDoctorComplete(1));
         Assert.NotNull(context.Store.MarkRoomAvailable(1));
 
-        // Room 2: gets force-expired - exception cycle.
+        // Room 2: reaches Doctor Arrived, then gets force-expired - review-required exception cycle.
         Assert.NotNull(SeatViaPrestage(context.Store, 2, "pledger", "EXT"));
+        Assert.NotNull(context.Store.MarkReadyForDoctor(2));
+        Assert.NotNull(context.Store.MarkDoctorArrived(2));
         clock.SetUtcNow(now.AddHours(8).AddSeconds(1));
-        context.Store.CheckAndExpireActiveCycles();
+        Assert.Equal([2], context.Store.CheckAndExpireActiveCycles());
+
+        // Room 2 is released.
+        Assert.Equal(RoomStates.Available, context.Store.GetRoom(2)?.State);
 
         var reports = context.Store.GetReports();
+        // Normal throughput/metric population excludes the exception cycle.
         Assert.Equal(1, reports.CompletedRoomCyclesCount);
         Assert.Single(reports.RecentCompletedCycles);
         Assert.Equal(1, reports.RecentCompletedCycles[0].RoomId);
-        Assert.Single(reports.ExceptionCycles);
-        Assert.Equal(2, reports.ExceptionCycles[0].RoomId);
+        Assert.DoesNotContain(reports.RecentCompletedCycles, cycle => cycle.RoomId == 2);
+
+        // The exception cycle exists for room 2, preserving DoctorArrivedAt and no DoctorCompleteAt.
+        var exception = Assert.Single(reports.ExceptionCycles);
+        Assert.Equal(2, exception.RoomId);
+        Assert.NotNull(exception.DoctorArrivedAt);
+        Assert.Null(exception.DoctorCompleteAt);
+
+        // Post-arrival expiration records no aborted pre-arrival history.
+        Assert.Empty(context.Repository.LoadAbortedAssignments());
     }
 
     [Fact]
@@ -6065,17 +6231,31 @@ public sealed class BoardStoreTests
                 MaxActiveDurationHours = 8
             });
 
+        // Room reaches Doctor Arrived, then is force-expired past the max active duration.
         Assert.NotNull(SeatViaPrestage(context.Store, 1, "otte", "CON"));
+        Assert.NotNull(context.Store.MarkReadyForDoctor(1));
+        Assert.NotNull(context.Store.MarkDoctorArrived(1));
         clock.SetUtcNow(now.AddHours(8).AddSeconds(1));
-        context.Store.CheckAndExpireActiveCycles();
+        Assert.Equal([1], context.Store.CheckAndExpireActiveCycles());
+
+        // Room is released.
+        Assert.Equal(RoomStates.Available, context.Store.GetRoom(1)?.State);
 
         var reports = context.Store.GetReports();
+        // Excluded from the normal completed population...
         Assert.Empty(reports.RecentCompletedCycles);
+        // ...and present in the pending-review exceptions population.
         var exception = Assert.Single(reports.ExceptionCycles);
         Assert.Equal(1, exception.RoomId);
-        Assert.Equal(ExceptionReasons.ExceededMaxActiveDuration, exception.ExceptionReason);
         Assert.True(exception.RequiresReview);
         Assert.Equal(ReviewStatuses.PendingReview, exception.ReviewStatus);
+        Assert.Equal(ExceptionReasons.ExceededMaxActiveDuration, exception.ExceptionReason);
+        Assert.Equal("Review timing", exception.SuggestedAction);
+        Assert.NotNull(exception.DoctorArrivedAt);
+        Assert.Null(exception.DoctorCompleteAt);
+
+        // Post-arrival expiration records no aborted pre-arrival history.
+        Assert.Empty(context.Repository.LoadAbortedAssignments());
     }
 
     [Fact]
@@ -6105,21 +6285,20 @@ public sealed class BoardStoreTests
         var expired = first.Store.CheckAndExpireActiveCycles();
         Assert.Equal([1], expired);
 
-        // Verify in-memory: room available, exception cycle recorded.
+        // Verify in-memory: room available, aborted pre-arrival history recorded.
         Assert.Equal(RoomStates.Available, first.Store.GetRoom(1)?.State);
-        Assert.Single(first.Store.GetReports().ExceptionCycles);
+        Assert.Single(first.Repository.LoadAbortedAssignments());
 
-        // Reload from DB: room must still be Available, exception cycle preserved.
+        // Reload from DB: room must still be Available, aborted history preserved.
         var second = StoreContext.Create(
             workspace,
             environmentName: Environments.Production,
             databasePath: databasePath);
 
         Assert.Equal(RoomStates.Available, second.Store.GetRoom(1)?.State);
-        var exception = Assert.Single(second.Store.GetReports().ExceptionCycles);
-        Assert.Equal(1, exception.RoomId);
-        Assert.Equal(ExceptionReasons.ExceededMaxActiveDuration, exception.ExceptionReason);
-        Assert.True(exception.IsException);
+        var aborted = Assert.Single(second.Repository.LoadAbortedAssignments());
+        Assert.Equal(1, aborted.RoomId);
+        Assert.Equal(TerminationKinds.MaxDurationExpired, aborted.TerminationKind);
     }
 
     // -------------------------------------------------------------------------
@@ -7425,7 +7604,7 @@ public sealed class BoardStoreTests
     }
 
     [Fact]
-    public void Live_board_stress_fills_all_twelve_rooms_with_every_state_present()
+    public void Live_board_stress_fills_all_twelve_rooms_with_every_primary_state_and_ready_urgency_present()
     {
         using var workspace = TestWorkspace.Create();
         var context = StoreContext.Create(workspace, environmentName: Environments.Production, roomCount: 12);
@@ -7437,15 +7616,19 @@ public sealed class BoardStoreTests
         Assert.Equal(1, result.RoomStateCounts.GetValueOrDefault(RoomStates.Available));
         foreach (var state in new[]
                  {
-                     RoomStates.Available, RoomStates.Seated, RoomStates.ReadyForDoctor, RoomStates.Aging,
-                     RoomStates.Stale, RoomStates.DoctorInRoom, RoomStates.Turnover
+                     RoomStates.Available, RoomStates.Seated, RoomStates.ReadyForDoctor,
+                     RoomStates.DoctorInRoom, RoomStates.Turnover
                  })
         {
             Assert.True(result.RoomStateCounts.GetValueOrDefault(state) >= 1, $"Expected at least one room in state '{state}'.");
         }
+        Assert.Equal(0, result.RoomStateCounts.GetValueOrDefault(RoomStates.Aging));
+        Assert.Equal(0, result.RoomStateCounts.GetValueOrDefault(RoomStates.Stale));
 
         var rooms = context.Store.GetSnapshot().Rooms;
         Assert.Contains(rooms, room => room.State == RoomStates.Available && room.AssignedDoctor is null);
+        Assert.Contains(rooms, room => room.State == RoomStates.ReadyForDoctor && room.ReadyUrgency == ReadyUrgency.Aging);
+        Assert.Contains(rooms, room => room.State == RoomStates.ReadyForDoctor && room.ReadyUrgency == ReadyUrgency.Stale);
         Assert.Contains(rooms, room => room.ProcedureCode != null && room.ProcedureCode.EndsWith("+SED", StringComparison.Ordinal));
         Assert.Contains(rooms, room => room.ProcedureCode == "PCOC");
     }
@@ -7514,7 +7697,7 @@ public sealed class BoardStoreTests
         // Every counted room stays pre-arrival, so Doctor View's assignment-based (not
         // state-filtered) current-room-frame count can never be accidentally inflated by an
         // assigned IN ROOM/TURNOVER room.
-        var preArrivalStates = new[] { RoomStates.Seated, RoomStates.ReadyForDoctor, RoomStates.Aging, RoomStates.Stale };
+        var preArrivalStates = new[] { RoomStates.Seated, RoomStates.ReadyForDoctor };
         var assignedRooms = context.Store.GetSnapshot().Rooms.Where(room => room.AssignedDoctor is not null);
         Assert.All(assignedRooms, room => Assert.Contains(room.State, preArrivalStates));
     }
@@ -7532,7 +7715,7 @@ public sealed class BoardStoreTests
         Assert.Equal(2, result.ActiveRoomDoctorCounts.GetValueOrDefault("gibson"));
         Assert.Equal(2, result.ActiveRoomDoctorCounts.GetValueOrDefault("schroeder"));
 
-        var preArrivalStates = new[] { RoomStates.Seated, RoomStates.ReadyForDoctor, RoomStates.Aging, RoomStates.Stale };
+        var preArrivalStates = new[] { RoomStates.Seated, RoomStates.ReadyForDoctor };
         var assignedRooms = context.Store.GetSnapshot().Rooms.Where(room => room.AssignedDoctor is not null);
         Assert.All(assignedRooms, room => Assert.Contains(room.State, preArrivalStates));
     }

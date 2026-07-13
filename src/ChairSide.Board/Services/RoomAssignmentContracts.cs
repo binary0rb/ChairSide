@@ -52,7 +52,16 @@ public enum ReadyUrgency
 [JsonConverter(typeof(JsonStringEnumConverter<RoomIntegrityFaultCode>))]
 public enum RoomIntegrityFaultCode
 {
-    ReadyAssignmentIncomplete
+    ReadyAssignmentIncomplete,
+    ReadyHandoffMissing,
+    ReadyHandoffOwnershipMismatch,
+    ReadyHandoffNotActive,
+    ReadyHandoffAssignmentIncomplete,
+    AcceptedHandoffMissing,
+    AcceptedHandoffOwnershipMismatch,
+    AcceptedHandoffNotAccepted,
+    AcceptedHandoffAssignmentIncomplete,
+    ContradictoryHandoffReferences
 }
 
 public sealed record SedationContract

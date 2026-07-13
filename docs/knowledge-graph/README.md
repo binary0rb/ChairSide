@@ -25,7 +25,7 @@ Use these node categories when adding durable knowledge:
 | Type | Use |
 | --- | --- |
 | `DomainConcept` | ChairSide concepts such as room lifecycle, procedure selection, sedation modifier, or reporting windows. |
-| `WorkflowState` | Board-visible states such as Available, In Prep, Ready, Aging, Stale, In Room, and Turnover. |
+| `WorkflowState` | Primary states such as Available, Prestaging, Seated/In Prep, Ready, In Room, and Turnover. Aging and Stale are Ready urgency projections. |
 | `LifecycleEvent` | User actions such as Seat, Doctor Arrived, Doctor Complete, Room Available, Update, and Cancel. |
 | `ReportMetric` | Metrics such as completed cycles, wait time, turnover, exception counts, schedule fit, and trend populations. |
 | `UiSurface` | Screens, cards, panels, chips, legends, filters, and training-facing explanations. |
