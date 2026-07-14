@@ -311,7 +311,8 @@ app.MapPost("/api/client-errors", async (
     return Results.NoContent();
 });
 
-app.MapPost("/api/rooms/{roomNumber:int}/prestage", RoomLifecycleEndpointHandler.BeginPrestageAsync);
+app.MapPost("/api/rooms/{roomNumber:int}/prestage", RoomLifecycleEndpointHandler.BeginPrestageRouteAsync);
+app.MapPut("/api/rooms/{roomNumber:int}/assignment-details", RoomLifecycleEndpointHandler.SaveAssignmentDetailsAsync);
 app.MapPost("/api/rooms/{roomNumber:int}/seat", RoomLifecycleEndpointHandler.SeatAsync);
 
 // Canonical draft assignment correction: distinct from the legacy /assignment route below because
@@ -1033,6 +1034,152 @@ internal static class CancelRequestParser
 
 public static class RoomLifecycleEndpointHandler
 {
+    private static readonly IReadOnlyCollection<string> LegacyBeginProperties = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+    {
+        "doctorId", "procedureCode", "procedureId", "sedation", "expectedAllocationUnits"
+    };
+
+    public static async Task<IResult> BeginPrestageRouteAsync(
+        int roomNumber, HttpContext httpContext, RoomDeviceTokenValidator roomDeviceTokenValidator,
+        DemoBoardStore store, DiagnosticLogger diagnosticLogger, IHubContext<BoardHub> hubContext)
+    {
+        var auditCtx = AuditRequestContext.From(httpContext);
+        var previousRoom = store.GetRoom(roomNumber);
+        var bindingFailure = RoomDeviceBindingGuard.ValidateMutationRequest(roomNumber, httpContext.Request, roomDeviceTokenValidator);
+        if (bindingFailure is not null)
+        {
+            await LogCanonicalValidationFailureAsync(
+                "begin-prestage", roomNumber, previousRoom, "binding-rejected", auditCtx, diagnosticLogger);
+            return bindingFailure;
+        }
+        var (root, bodyError) = await StrictJsonRequestReader.ReadObjectAsync(httpContext.Request);
+        if (bodyError is not null)
+        {
+            await LogCanonicalValidationFailureAsync(
+                "begin-prestage", roomNumber, previousRoom, "validation-failed", auditCtx, diagnosticLogger);
+            return CanonicalError(PrestagingLifecycleErrorCodes.MalformedRequest, "The request body is malformed.");
+        }
+        if (!root.EnumerateObject().Any())
+        {
+            return await CompleteCanonicalMutationAsync(
+                "begin-prestage", roomNumber, previousRoom, auditCtx,
+                store.BeginPrestageCanonical(roomNumber), store, diagnosticLogger, hubContext);
+        }
+        var propertyError = StrictJsonRequestReader.ValidatePropertySet(root, LegacyBeginProperties);
+        if (propertyError is not null)
+        {
+            await LogCanonicalValidationFailureAsync(
+                "begin-prestage", roomNumber, previousRoom, "validation-failed", auditCtx, diagnosticLogger);
+            return CanonicalError(PrestagingLifecycleErrorCodes.MalformedRequest, "The request contains unknown or duplicate properties.");
+        }
+        BeginPrestageRequest? request;
+        try { request = JsonSerializer.Deserialize<BeginPrestageRequest>(root.GetRawText(), new JsonSerializerOptions(JsonSerializerDefaults.Web)); }
+        catch (JsonException)
+        {
+            await LogCanonicalValidationFailureAsync(
+                "begin-prestage", roomNumber, previousRoom, "validation-failed", auditCtx, diagnosticLogger);
+            return CanonicalError(PrestagingLifecycleErrorCodes.MalformedRequest, "The compatibility request is malformed.");
+        }
+        return await BeginPrestageAsync(roomNumber, request ?? new(), httpContext, roomDeviceTokenValidator, store, diagnosticLogger, hubContext);
+    }
+
+    public static async Task<IResult> SaveAssignmentDetailsAsync(
+        int roomNumber, HttpContext httpContext, RoomDeviceTokenValidator roomDeviceTokenValidator,
+        DemoBoardStore store, DiagnosticLogger diagnosticLogger, IHubContext<BoardHub> hubContext)
+    {
+        var auditCtx = AuditRequestContext.From(httpContext);
+        var previousRoom = store.GetRoom(roomNumber);
+        var bindingFailure = RoomDeviceBindingGuard.ValidateMutationRequest(roomNumber, httpContext.Request, roomDeviceTokenValidator);
+        if (bindingFailure is not null)
+        {
+            await LogCanonicalValidationFailureAsync(
+                "save-assignment-details", roomNumber, previousRoom, "binding-rejected", auditCtx, diagnosticLogger);
+            return bindingFailure;
+        }
+        if (!httpContext.Request.HasJsonContentType())
+        {
+            await LogCanonicalValidationFailureAsync(
+                "save-assignment-details", roomNumber, previousRoom, "validation-failed", auditCtx, diagnosticLogger);
+            return CanonicalError(PrestagingLifecycleErrorCodes.MalformedRequest, "The request body must use an application/json-compatible content type.");
+        }
+        using var reader = new StreamReader(httpContext.Request.Body, leaveOpen: true);
+        var body = await reader.ReadToEndAsync();
+        var parsed = PrestagingLifecycleRequestParser.ParseAssignment(string.IsNullOrWhiteSpace(body) ? null : body);
+        if (parsed.Error is not null)
+        {
+            await LogCanonicalValidationFailureAsync(
+                "save-assignment-details", roomNumber, previousRoom, "validation-failed", auditCtx, diagnosticLogger);
+            return CanonicalError(parsed.Error, StatusCodes.Status400BadRequest);
+        }
+        var converted = store.ConvertCanonicalAssignment(parsed.Value!);
+        if (converted.Error is not null)
+        {
+            await LogCanonicalValidationFailureAsync(
+                "save-assignment-details", roomNumber, previousRoom, "validation-failed", auditCtx, diagnosticLogger);
+            return CanonicalError(converted.Error, StatusCodes.Status400BadRequest);
+        }
+        return await CompleteCanonicalMutationAsync(
+            "save-assignment-details", roomNumber, previousRoom, auditCtx,
+            store.SaveAssignmentDetailsCanonical(roomNumber, converted.Value!), store, diagnosticLogger, hubContext);
+    }
+
+    private static async Task<IResult> CompleteCanonicalMutationAsync(
+        string action, int roomNumber, RoomStatus? previousRoom, AuditRequestContext auditCtx,
+        PrestagingLifecycleMutationResult mutation,
+        DemoBoardStore store, DiagnosticLogger diagnosticLogger, IHubContext<BoardHub> hubContext)
+    {
+        if (mutation.Outcome != PrestagingLifecycleMutationOutcome.Success)
+        {
+            var mapped = MapCanonicalFailure(mutation);
+            await diagnosticLogger.LogRoomAuditAsync(auditCtx.Build(
+                action, roomNumber, previousRoom, null, false, mapped.Error.Code,
+                previousRoom?.AssignedDoctor, previousRoom?.ProcedureCode));
+            return CanonicalError(mapped.Error, mapped.StatusCode);
+        }
+        var room = mutation.Room!;
+        var state = room.State == RoomStates.Prestaging ? CanonicalRoomLifecycleState.Prestaging : CanonicalRoomLifecycleState.SeatedInPrep;
+        await diagnosticLogger.LogRoomAuditAsync(auditCtx.Build(
+            action, roomNumber, previousRoom, room, true, null, room.AssignedDoctor, room.ProcedureCode));
+        await hubContext.Clients.All.SendAsync("boardUpdated", store.GetSnapshot());
+        return Results.Ok(PrestagingLifecycleResponseProjector.Create(room, state, mutation.Assignment!));
+    }
+
+    private static Task LogCanonicalValidationFailureAsync(
+        string action,
+        int roomNumber,
+        RoomStatus? previousRoom,
+        string reason,
+        AuditRequestContext auditCtx,
+        DiagnosticLogger diagnosticLogger) =>
+        diagnosticLogger.LogRoomAuditAsync(auditCtx.Build(
+            action,
+            roomNumber,
+            previousRoom,
+            null,
+            false,
+            reason,
+            previousRoom?.AssignedDoctor,
+            previousRoom?.ProcedureCode));
+
+    internal static (PrestagingLifecycleErrorResponse Error, int StatusCode) MapCanonicalFailure(
+        PrestagingLifecycleMutationResult mutation)
+    {
+        var (code, status, message) = mutation.Outcome switch
+        {
+            PrestagingLifecycleMutationOutcome.RoomNotFound => (PrestagingLifecycleErrorCodes.RoomNotFound, 404, "Room is not configured."),
+            PrestagingLifecycleMutationOutcome.InvalidAssignment => (PrestagingLifecycleErrorCodes.InvalidAssignment, 400, "The assignment is invalid."),
+            PrestagingLifecycleMutationOutcome.AssignmentLocked => (PrestagingLifecycleErrorCodes.AssignmentLocked, 409, "The Ready assignment is locked."),
+            PrestagingLifecycleMutationOutcome.IntegrityFault => (PrestagingLifecycleErrorCodes.IntegrityFault, 409, "The room has an integrity fault."),
+            PrestagingLifecycleMutationOutcome.StaleWrite => (PrestagingLifecycleErrorCodes.StaleWrite, 409, "The room changed; reload before retrying."),
+            PrestagingLifecycleMutationOutcome.PersistenceFailure => (PrestagingLifecycleErrorCodes.PersistenceFailure, 500, "The room could not be persisted."),
+            _ => (PrestagingLifecycleErrorCodes.LifecycleConflict, 409, "The room is not in a valid lifecycle state for this action.")
+        };
+
+        return (new(code, message, [], mutation.IntegrityFaults ?? []), status);
+    }
+
+    private static IResult CanonicalError(string code, string message) => CanonicalError(new(code, message, [], []), 400);
+    private static IResult CanonicalError(PrestagingLifecycleErrorResponse error, int status) => Results.Json(error, statusCode: status);
     public static async Task<IResult> BeginPrestageAsync(
         int roomNumber,
         BeginPrestageRequest request,
@@ -1198,7 +1345,51 @@ public static class RoomLifecycleEndpointHandler
             await diagnosticLogger.LogRoomAuditAsync(auditCtx.Build(
                 "seat", roomNumber, previousRoom, null, false, "validation-failed",
                 previousRoom?.AssignedDoctor, previousRoom?.ProcedureCode));
-            return bodyError;
+            return CanonicalError(PrestagingLifecycleErrorCodes.MalformedRequest, "The request body is malformed.");
+        }
+
+        var properties = root.EnumerateObject().Select(property => property.Name).ToArray();
+        var hasCanonicalAssignment = properties.Any(name => string.Equals(name, "assignment", StringComparison.Ordinal));
+        var hasLegacyFields = properties.Any(name => SeatRequestParser.AllowedProperties.Contains(name, StringComparer.OrdinalIgnoreCase));
+        var hasUnknownFields = properties.Any(name =>
+            !string.Equals(name, "assignment", StringComparison.Ordinal)
+            && !SeatRequestParser.AllowedProperties.Contains(name, StringComparer.OrdinalIgnoreCase));
+        if (hasUnknownFields)
+        {
+            await LogCanonicalValidationFailureAsync(
+                "seat", roomNumber, previousRoom, "validation-failed", auditCtx, diagnosticLogger);
+            return CanonicalError(PrestagingLifecycleErrorCodes.MalformedRequest, "The Seat request contains an unknown property.");
+        }
+        if (hasCanonicalAssignment && hasLegacyFields)
+        {
+            await LogCanonicalValidationFailureAsync(
+                "seat", roomNumber, previousRoom, "validation-failed", auditCtx, diagnosticLogger);
+            return CanonicalError(PrestagingLifecycleErrorCodes.MalformedRequest, "Canonical and compatibility Seat properties cannot be mixed.");
+        }
+        if (properties.Length == 0 || hasCanonicalAssignment)
+        {
+            var parsedCanonical = PrestagingLifecycleRequestParser.ParseSeatAction(root.GetRawText());
+            if (parsedCanonical.Error is not null)
+            {
+                await LogCanonicalValidationFailureAsync(
+                    "seat", roomNumber, previousRoom, "validation-failed", auditCtx, diagnosticLogger);
+                return CanonicalError(parsedCanonical.Error, 400);
+            }
+            RoomAssignmentContract? assignment = null;
+            if (parsedCanonical.Value!.Assignment is { } requestAssignment)
+            {
+                var converted = store.ConvertCanonicalAssignment(requestAssignment);
+                if (converted.Error is not null)
+                {
+                    await LogCanonicalValidationFailureAsync(
+                        "seat", roomNumber, previousRoom, "validation-failed", auditCtx, diagnosticLogger);
+                    return CanonicalError(converted.Error, 400);
+                }
+                assignment = converted.Value;
+            }
+            return await CompleteCanonicalMutationAsync(
+                "seat", roomNumber, previousRoom, auditCtx,
+                store.SeatRoomCanonical(roomNumber, assignment), store, diagnosticLogger, hubContext);
         }
 
         var propertyError = StrictJsonRequestReader.ValidatePropertySet(root, SeatRequestParser.AllowedProperties);

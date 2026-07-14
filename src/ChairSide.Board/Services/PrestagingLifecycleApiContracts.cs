@@ -46,6 +46,24 @@ public static class PrestagingLifecycleErrorCodes
     ];
 }
 
+public enum PrestagingLifecycleMutationOutcome
+{
+    Success,
+    RoomNotFound,
+    InvalidAssignment,
+    LifecycleConflict,
+    AssignmentLocked,
+    IntegrityFault,
+    StaleWrite,
+    PersistenceFailure
+}
+
+public sealed record PrestagingLifecycleMutationResult(
+    PrestagingLifecycleMutationOutcome Outcome,
+    RoomStatus? Room = null,
+    RoomAssignmentContract? Assignment = null,
+    IReadOnlyList<RoomIntegrityFault>? IntegrityFaults = null,
+    Exception? PersistenceException = null);
 public sealed record PrestagingLifecycleParseResult<T>(
     T? Value,
     PrestagingLifecycleErrorResponse? Error)

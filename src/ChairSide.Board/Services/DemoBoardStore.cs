@@ -1,6 +1,7 @@
 using System.Globalization;
 
 using ChairSide.Board.Options;
+using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Options;
 
 namespace ChairSide.Board.Services;
@@ -149,6 +150,103 @@ public sealed class DemoBoardStore
         }
     }
 
+    public CanonicalAssignmentConversionResult ConvertCanonicalAssignment(CanonicalAssignmentRequest request)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        var procedure = request.ProcedureCode is null ? null : FindActiveProcedure(request.ProcedureCode);
+        var converted = CanonicalAssignmentRequestConverter.Convert(request, procedure);
+        if (converted.Value is not { } assignment || assignment.Sedation.State != SedationState.EligibleYes) return converted;
+        return new(RoomAssignmentContract.Create(assignment.DoctorId, ComposeProcedureCode(assignment.ProcedureCode!, true), assignment.Sedation, assignment.ExpectedAllocation), null);
+    }
+
+    public PrestagingLifecycleMutationResult BeginPrestageCanonical(int roomNumber)
+    {
+        var assignment = RoomAssignmentContract.Create(null, null, SedationContract.UnavailableNoProcedure(), ExpectedAllocationContract.Unknown());
+        try
+        {
+            lock (_syncRoot)
+            {
+                var room = _rooms.FirstOrDefault(item => item.RoomId == roomNumber);
+                if (room is null) return CanonicalFailure(PrestagingLifecycleMutationOutcome.RoomNotFound);
+                if (!CanBeginPrestage(room)) return CanonicalFailure(PrestagingLifecycleMutationOutcome.LifecycleConflict);
+                var expectation = ActiveRoomWriteExpectation.FromRoom(room);
+                var now = Now;
+                var candidate = new RoomState(room.RoomId) { EpisodeId = NewEpisodeId(), State = RoomStates.Prestaging, PrestageStartedAt = now };
+                var persisted = PersistedRoomAssignment.FromCanonicalContract(assignment, null, null);
+                ApplyPersistedAssignment(candidate, persisted);
+                var committed = _repository.SaveCanonicalAssignment(candidate, persisted, expectation, _doctors, _procedures);
+                if (committed is null) return CanonicalFailure(PrestagingLifecycleMutationOutcome.StaleWrite);
+                ApplyCommittedRoom(room, committed.Room);
+                AddEvent(new RoomEvent(room.RoomId, "PrestageStarted", now, null, null));
+                return CanonicalSuccess(room, assignment, now);
+            }
+        }
+        catch (SqliteException exception) { return CanonicalFailure(PrestagingLifecycleMutationOutcome.PersistenceFailure, exception: exception); }
+    }
+
+    public PrestagingLifecycleMutationResult SaveAssignmentDetailsCanonical(int roomNumber, RoomAssignmentContract assignment)
+    {
+        ArgumentNullException.ThrowIfNull(assignment);
+        try
+        {
+            lock (_syncRoot)
+            {
+                var room = _rooms.FirstOrDefault(item => item.RoomId == roomNumber);
+                if (room is null) return CanonicalFailure(PrestagingLifecycleMutationOutcome.RoomNotFound);
+                var faults = DeriveIntegrityFaults(room);
+                if (faults.Count > 0) return CanonicalFailure(PrestagingLifecycleMutationOutcome.IntegrityFault, faults);
+                if (room.State is RoomStates.ReadyForDoctor or RoomStates.Aging or RoomStates.Stale || room.DoctorArrivedAt is not null) return CanonicalFailure(PrestagingLifecycleMutationOutcome.AssignmentLocked);
+                if (room.State is not (RoomStates.Prestaging or RoomStates.Seated)) return CanonicalFailure(PrestagingLifecycleMutationOutcome.LifecycleConflict);
+                if (!IsAssignmentValidForRoster(assignment)) return CanonicalFailure(PrestagingLifecycleMutationOutcome.InvalidAssignment);
+                var expectation = ActiveRoomWriteExpectation.FromRoom(room);
+                var persisted = PersistedRoomAssignment.FromCanonicalContract(assignment, ResolveDoctorDisplayName(assignment.DoctorId), ResolveProcedure(assignment.ProcedureCode)?.Label);
+                var candidate = CopyRoomState(room);
+                ApplyPersistedAssignment(candidate, persisted);
+                var committed = _repository.SaveCanonicalAssignment(candidate, persisted, expectation, _doctors, _procedures);
+                if (committed is null) return CanonicalFailure(PrestagingLifecycleMutationOutcome.StaleWrite);
+                ApplyCommittedRoom(room, committed.Room);
+                var now = Now;
+                AddEvent(new RoomEvent(room.RoomId, "AssignmentSaved", now, room.AssignedDoctor, room.ProcedureCode));
+                return CanonicalSuccess(room, assignment, now);
+            }
+        }
+        catch (SqliteException exception) { return CanonicalFailure(PrestagingLifecycleMutationOutcome.PersistenceFailure, exception: exception); }
+    }
+
+    public PrestagingLifecycleMutationResult SeatRoomCanonical(int roomNumber, RoomAssignmentContract? assignment)
+    {
+        try
+        {
+            lock (_syncRoot)
+            {
+                var room = _rooms.FirstOrDefault(item => item.RoomId == roomNumber);
+                if (room is null) return CanonicalFailure(PrestagingLifecycleMutationOutcome.RoomNotFound);
+                var faults = DeriveIntegrityFaults(room);
+                if (faults.Count > 0) return CanonicalFailure(PrestagingLifecycleMutationOutcome.IntegrityFault, faults);
+                if (!CanSeat(room) || room.PrestageStartedAt is null) return CanonicalFailure(PrestagingLifecycleMutationOutcome.LifecycleConflict);
+                if (assignment is not null && !IsAssignmentValidForRoster(assignment)) return CanonicalFailure(PrestagingLifecycleMutationOutcome.InvalidAssignment);
+                var expectation = ActiveRoomWriteExpectation.FromRoom(room);
+                var now = Now;
+                var candidate = CopyRoomState(room);
+                var persisted = assignment is null ? GetCanonicalAssignment(candidate) : PersistedRoomAssignment.FromCanonicalContract(assignment, ResolveDoctorDisplayName(assignment.DoctorId), ResolveProcedure(assignment.ProcedureCode)?.Label);
+                ApplyPersistedAssignment(candidate, persisted);
+                candidate.SeatedAt = now;
+                candidate.State = RoomStates.Seated;
+                var committed = _repository.SaveCanonicalAssignment(candidate, persisted, expectation, _doctors, _procedures);
+                if (committed is null) return CanonicalFailure(PrestagingLifecycleMutationOutcome.StaleWrite);
+                ApplyCommittedRoom(room, committed.Room);
+                AddEvent(new RoomEvent(room.RoomId, "Seated", now, room.AssignedDoctor, room.ProcedureCode));
+                return CanonicalSuccess(room, persisted.ToContract(), now);
+            }
+        }
+        catch (SqliteException exception) { return CanonicalFailure(PrestagingLifecycleMutationOutcome.PersistenceFailure, exception: exception); }
+    }
+
+    private PrestagingLifecycleMutationResult CanonicalSuccess(RoomState room, RoomAssignmentContract assignment, DateTimeOffset now) =>
+        new(PrestagingLifecycleMutationOutcome.Success, ToRoomStatus(room, now), assignment, []);
+
+    private static PrestagingLifecycleMutationResult CanonicalFailure(PrestagingLifecycleMutationOutcome outcome, IReadOnlyList<RoomIntegrityFault>? faults = null, Exception? exception = null) =>
+        new(outcome, IntegrityFaults: faults ?? [], PersistenceException: exception);
     public RoomStatus? BeginPrestage(int roomNumber)
     {
         return BeginPrestage(

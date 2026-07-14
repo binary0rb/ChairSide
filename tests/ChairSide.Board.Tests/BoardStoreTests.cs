@@ -3748,7 +3748,7 @@ public sealed class BoardStoreTests
         var bypass = await global::RoomLifecycleEndpointHandler.SeatAsync(
             2, NewJsonBodyContext(2, token: null, "{}"),
             CreateBindingValidator(enabled: false), context.Store, environment, logger, new NoopBoardHubContext());
-        Assert.Equal(400, await ExecuteBindingResult(bypass));
+        Assert.Equal(409, await ExecuteBindingResult(bypass));
         Assert.Equal(RoomStates.Available, context.Store.GetRoom(2)?.State);
     }
 
