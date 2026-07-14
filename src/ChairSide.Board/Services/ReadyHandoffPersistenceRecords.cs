@@ -9,7 +9,28 @@ internal sealed record ActiveRoomWriteExpectation(
     int RoomId,
     string? EpisodeId,
     string State,
-    string? ActiveReadyHandoffId)
+    string? AssignedDoctorId,
+    string? AssignedDoctorDisplayName,
+    string? ProcedureCode,
+    string? ProcedureCategory,
+    SedationState? SedationState,
+    ExpectedAllocationState? ExpectedAllocationState,
+    int? ExpectedAllocationSuggestedUnits,
+    int? ExpectedAllocationConfirmedUnits,
+    string? ActiveReadyHandoffId,
+    string? AcceptedReadyHandoffId,
+    DateTimeOffset? PrestageStartedAt,
+    DateTimeOffset? SeatedAt,
+    DateTimeOffset? AgingStartedAt,
+    DateTimeOffset? StaleStartedAt,
+    DateTimeOffset? ReadyForDoctorAt,
+    DateTimeOffset? DoctorArrivedAt,
+    DateTimeOffset? DoctorCompleteAt,
+    DateTimeOffset? RoomAvailableAt,
+    int OriginalDefaultExpectedUnits,
+    int ExpectedAllocationUnits,
+    int ExpectedAllocationMinutes,
+    bool AllocationAdjustedFromDefault)
 {
     public static ActiveRoomWriteExpectation FromRoom(RoomState room)
     {
@@ -18,9 +39,41 @@ internal sealed record ActiveRoomWriteExpectation(
             room.RoomId,
             room.EpisodeId,
             room.State,
-            room.ActiveReadyHandoffId);
+            room.AssignedDoctor,
+            room.AssignedDoctorDisplayName,
+            room.ProcedureCode,
+            room.ProcedureCategory,
+            room.SedationState,
+            room.ExpectedAllocationState,
+            room.ExpectedAllocationSuggestedUnits,
+            room.ExpectedAllocationConfirmedUnits,
+            room.ActiveReadyHandoffId,
+            room.AcceptedReadyHandoffId,
+            room.PrestageStartedAt,
+            room.SeatedAt,
+            room.AgingStartedAt,
+            room.StaleStartedAt,
+            room.ReadyForDoctorAt,
+            room.DoctorArrivedAt,
+            room.DoctorCompleteAt,
+            room.RoomAvailableAt,
+            room.OriginalDefaultExpectedUnits,
+            room.ExpectedAllocationUnits,
+            room.ExpectedAllocationMinutes,
+            room.AllocationAdjustedFromDefault);
     }
 }
+
+internal enum GuardedReadyHandoffPersistenceOutcome
+{
+    Success,
+    StaleWrite,
+    IntegrityFault
+}
+
+internal sealed record GuardedReadyHandoffPersistenceResult(
+    GuardedReadyHandoffPersistenceOutcome Outcome,
+    CommittedReadyHandoffResult? Committed = null);
 
 public static class ReadyHandoffTerminationKinds
 {

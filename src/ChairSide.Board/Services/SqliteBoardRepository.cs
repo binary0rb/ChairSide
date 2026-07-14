@@ -622,6 +622,77 @@ public sealed class SqliteBoardRepository
         return handoff;
     }
 
+    internal GuardedReadyHandoffPersistenceResult CreateReadyHandoffGuarded(
+        RoomState room,
+        RoomAssignmentContract assignment,
+        DateTimeOffset readyAt,
+        ActiveRoomWriteExpectation expectation,
+        IReadOnlyList<Doctor> doctors,
+        IReadOnlyList<ProcedureCategory> procedures)
+    {
+        ArgumentNullException.ThrowIfNull(room);
+        ArgumentNullException.ThrowIfNull(assignment);
+        ArgumentNullException.ThrowIfNull(expectation);
+        if (room.RoomId != expectation.RoomId)
+        {
+            throw new InvalidOperationException("Ready handoff write expectation must identify the candidate room.");
+        }
+        if (assignment.Completeness != AssignmentCompleteness.Complete)
+        {
+            throw new ArgumentException("Ready handoff persistence requires a complete assignment.", nameof(assignment));
+        }
+        if (string.IsNullOrWhiteSpace(room.EpisodeId))
+        {
+            throw new InvalidOperationException("Ready handoff persistence requires an active episode id.");
+        }
+
+        var handoffId = Guid.NewGuid().ToString("N");
+        var persistedAssignment = PersistedRoomAssignment.FromCanonicalContract(
+            assignment,
+            ResolveDoctorDisplayName(doctors, assignment.DoctorId),
+            ResolveProcedureCategory(procedures, assignment.ProcedureCode));
+        var handoff = new PersistedReadyHandoff
+        {
+            HandoffId = handoffId,
+            EpisodeId = room.EpisodeId,
+            RoomId = room.RoomId,
+            ReadyAt = readyAt,
+            Assignment = persistedAssignment
+        };
+        _ = ReadyHandoffContract.Active(handoffId, readyAt, assignment);
+        var persistedRoom = CopyRoomForPersistence(room);
+        ApplyAssignment(persistedRoom, persistedAssignment);
+        persistedRoom.ReadyForDoctorAt = readyAt;
+        persistedRoom.ActiveReadyHandoffId = handoffId;
+        persistedRoom.AcceptedReadyHandoffId = null;
+
+        using var connection = OpenConnection();
+        using var transaction = connection.BeginTransaction();
+        var existingHandoffs = LoadReadyHandoffsByEpisode(connection, transaction, room.EpisodeId);
+        var rows = UpdateCanonicalRoom(connection, transaction, persistedRoom, expectation);
+        if (rows == 0)
+        {
+            transaction.Rollback();
+            return new GuardedReadyHandoffPersistenceResult(GuardedReadyHandoffPersistenceOutcome.StaleWrite);
+        }
+        if (rows != 1)
+        {
+            throw new InvalidOperationException("Ready handoff compare-and-swap must affect exactly one active room.");
+        }
+        if (existingHandoffs.Any(existing =>
+                existing.RoomId != room.RoomId
+                || existing.ContractStatus != ReadyHandoffStatus.Withdrawn))
+        {
+            transaction.Rollback();
+            return new GuardedReadyHandoffPersistenceResult(GuardedReadyHandoffPersistenceOutcome.IntegrityFault);
+        }
+        InsertReadyHandoff(connection, transaction, handoff);
+        transaction.Commit();
+        return new GuardedReadyHandoffPersistenceResult(
+            GuardedReadyHandoffPersistenceOutcome.Success,
+            new CommittedReadyHandoffResult(handoff, persistedRoom));
+    }
+
     public CommittedReadyHandoffResult WithdrawReadyHandoff(
         RoomState room,
         string handoffId,
@@ -829,6 +900,21 @@ public sealed class SqliteBoardRepository
             """;
         command.Parameters.AddWithValue("$episodeId", episodeId);
 
+        return ReadReadyHandoffs(command);
+    }
+
+    private static IReadOnlyList<PersistedReadyHandoff> LoadReadyHandoffsByEpisode(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        string episodeId)
+    {
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = ReadyHandoffSelectSql + "\n" + """
+            WHERE episode_id = $episodeId
+            ORDER BY ready_at ASC;
+            """;
+        command.Parameters.AddWithValue("$episodeId", episodeId);
         return ReadReadyHandoffs(command);
     }
 
@@ -2030,7 +2116,28 @@ public sealed class SqliteBoardRepository
             WHERE room_id = $expectedRoomId
                 AND episode_id IS $expectedEpisodeId
                 AND state = $expectedState
-                AND active_ready_handoff_id IS $expectedActiveReadyHandoffId;
+                AND assigned_doctor_id IS $expectedAssignedDoctorId
+                AND assigned_doctor_display_name IS $expectedAssignedDoctorDisplayName
+                AND procedure_code IS $expectedProcedureCode
+                AND procedure_category IS $expectedProcedureCategory
+                AND sedation_state IS $expectedSedationState
+                AND expected_allocation_state IS $expectedExpectedAllocationState
+                AND expected_allocation_suggested_units IS $expectedExpectedAllocationSuggestedUnits
+                AND expected_allocation_confirmed_units IS $expectedExpectedAllocationConfirmedUnits
+                AND active_ready_handoff_id IS $expectedActiveReadyHandoffId
+                AND accepted_ready_handoff_id IS $expectedAcceptedReadyHandoffId
+                AND prestage_started_at IS $expectedPrestageStartedAt
+                AND seated_at IS $expectedSeatedAt
+                AND aging_started_at IS $expectedAgingStartedAt
+                AND stale_started_at IS $expectedStaleStartedAt
+                AND ready_for_doctor_at IS $expectedReadyForDoctorAt
+                AND doctor_arrived_at IS $expectedDoctorArrivedAt
+                AND doctor_complete_at IS $expectedDoctorCompleteAt
+                AND room_available_at IS $expectedRoomAvailableAt
+                AND original_default_expected_units IS $expectedOriginalDefaultExpectedUnits
+                AND expected_allocation_units IS $expectedExpectedAllocationUnits
+                AND expected_allocation_minutes IS $expectedExpectedAllocationMinutes
+                AND allocation_adjusted_from_default IS $expectedAllocationAdjustedFromDefault;
             """;
 
         command.Parameters.AddWithValue("$assignedDoctorId", ToDbValue(room.AssignedDoctor));
@@ -2061,7 +2168,28 @@ public sealed class SqliteBoardRepository
         command.Parameters.AddWithValue("$expectedRoomId", expectation.RoomId);
         command.Parameters.AddWithValue("$expectedEpisodeId", ToDbValue(expectation.EpisodeId));
         command.Parameters.AddWithValue("$expectedState", expectation.State);
+        command.Parameters.AddWithValue("$expectedAssignedDoctorId", ToDbValue(expectation.AssignedDoctorId));
+        command.Parameters.AddWithValue("$expectedAssignedDoctorDisplayName", ToDbValue(expectation.AssignedDoctorDisplayName));
+        command.Parameters.AddWithValue("$expectedProcedureCode", ToDbValue(expectation.ProcedureCode));
+        command.Parameters.AddWithValue("$expectedProcedureCategory", ToDbValue(expectation.ProcedureCategory));
+        command.Parameters.AddWithValue("$expectedSedationState", ToDbValue(expectation.SedationState));
+        command.Parameters.AddWithValue("$expectedExpectedAllocationState", ToDbValue(expectation.ExpectedAllocationState));
+        command.Parameters.AddWithValue("$expectedExpectedAllocationSuggestedUnits", ToDbValue(expectation.ExpectedAllocationSuggestedUnits));
+        command.Parameters.AddWithValue("$expectedExpectedAllocationConfirmedUnits", ToDbValue(expectation.ExpectedAllocationConfirmedUnits));
         command.Parameters.AddWithValue("$expectedActiveReadyHandoffId", ToDbValue(expectation.ActiveReadyHandoffId));
+        command.Parameters.AddWithValue("$expectedAcceptedReadyHandoffId", ToDbValue(expectation.AcceptedReadyHandoffId));
+        command.Parameters.AddWithValue("$expectedPrestageStartedAt", ToDbValue(expectation.PrestageStartedAt));
+        command.Parameters.AddWithValue("$expectedSeatedAt", ToDbValue(expectation.SeatedAt));
+        command.Parameters.AddWithValue("$expectedAgingStartedAt", ToDbValue(expectation.AgingStartedAt));
+        command.Parameters.AddWithValue("$expectedStaleStartedAt", ToDbValue(expectation.StaleStartedAt));
+        command.Parameters.AddWithValue("$expectedReadyForDoctorAt", ToDbValue(expectation.ReadyForDoctorAt));
+        command.Parameters.AddWithValue("$expectedDoctorArrivedAt", ToDbValue(expectation.DoctorArrivedAt));
+        command.Parameters.AddWithValue("$expectedDoctorCompleteAt", ToDbValue(expectation.DoctorCompleteAt));
+        command.Parameters.AddWithValue("$expectedRoomAvailableAt", ToDbValue(expectation.RoomAvailableAt));
+        command.Parameters.AddWithValue("$expectedOriginalDefaultExpectedUnits", expectation.OriginalDefaultExpectedUnits);
+        command.Parameters.AddWithValue("$expectedExpectedAllocationUnits", expectation.ExpectedAllocationUnits);
+        command.Parameters.AddWithValue("$expectedExpectedAllocationMinutes", expectation.ExpectedAllocationMinutes);
+        command.Parameters.AddWithValue("$expectedAllocationAdjustedFromDefault", expectation.AllocationAdjustedFromDefault ? 1 : 0);
         return command.ExecuteNonQuery();
     }
 

@@ -51,6 +51,7 @@ public enum PrestagingLifecycleMutationOutcome
     Success,
     RoomNotFound,
     InvalidAssignment,
+    AssignmentIncomplete,
     LifecycleConflict,
     AssignmentLocked,
     IntegrityFault,
@@ -63,7 +64,8 @@ public sealed record PrestagingLifecycleMutationResult(
     RoomStatus? Room = null,
     RoomAssignmentContract? Assignment = null,
     IReadOnlyList<RoomIntegrityFault>? IntegrityFaults = null,
-    Exception? PersistenceException = null);
+    Exception? PersistenceException = null,
+    ReadyHandoffContract? Handoff = null);
 public sealed record PrestagingLifecycleParseResult<T>(
     T? Value,
     PrestagingLifecycleErrorResponse? Error)

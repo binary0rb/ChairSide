@@ -370,6 +370,46 @@ public sealed class ReadyHandoffPersistenceTests
     }
 
     [Fact]
+    public void Guarded_ready_handoff_compare_and_swap_rolls_back_stale_candidate_handoff()
+    {
+        using var workspace = TestWorkspace.Create();
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production);
+        Assert.Equal(PrestagingLifecycleMutationOutcome.Success, context.Store.BeginPrestageCanonical(1).Outcome);
+        Assert.Equal(PrestagingLifecycleMutationOutcome.Success, context.Store.SeatRoomCanonical(1, CompleteAssignment()).Outcome);
+        var seated = LoadRoom(context);
+        var expectation = ActiveRoomWriteExpectation.FromRoom(seated);
+        var staleCandidate = CopyRoom(seated);
+        staleCandidate.State = RoomStates.ReadyForDoctor;
+        var staleCandidateBefore = RoomSnapshot.From(staleCandidate);
+        var readyAt = new DateTimeOffset(2026, 7, 14, 14, 0, 0, TimeSpan.Zero);
+        var currentCandidate = CopyRoom(seated);
+        currentCandidate.State = RoomStates.ReadyForDoctor;
+        var current = context.Repository.CreateReadyHandoff(
+            currentCandidate,
+            CompleteAssignment(),
+            readyAt,
+            context.Doctors,
+            context.Procedures);
+
+        var staleResult = context.Repository.CreateReadyHandoffGuarded(
+            staleCandidate,
+            CompleteAssignment(),
+            readyAt.AddMinutes(1),
+            expectation,
+            context.Doctors,
+            context.Procedures);
+
+        Assert.Equal(GuardedReadyHandoffPersistenceOutcome.StaleWrite, staleResult.Outcome);
+        Assert.Null(staleResult.Committed);
+        Assert.Equal(staleCandidateBefore, RoomSnapshot.From(staleCandidate));
+        var durable = LoadRoom(context);
+        Assert.Equal(current.HandoffId, durable.ActiveReadyHandoffId);
+        var handoff = Assert.Single(context.Repository.LoadReadyHandoffsByEpisode(durable.EpisodeId!));
+        Assert.Equal(current.HandoffId, handoff.HandoffId);
+        Assert.Equal(ReadyHandoffStatus.Active, handoff.ContractStatus);
+    }
+
+    [Fact]
     public void Ready_handoff_rejects_incomplete_assignment_without_persisting_side_effects()
     {
         using var workspace = TestWorkspace.Create();
