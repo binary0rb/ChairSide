@@ -221,9 +221,9 @@ Rooms should be configurable, with the default early prototype using:
 
 Ready is the assignment-lock boundary. Cancellation and expiration before Doctor Arrived produce aborted history outside throughput. Post-arrival expiration produces a review-required exception without fabricating `DoctorCompleteAt`. Legacy persisted Aging/Stale rows remain readable recovery states.
 
-Canonical assignment persistence is compare-and-swap guarded by the originally loaded room, episode, lifecycle state, and Active handoff identity. Stale writes return no result and do not mutate live state, reload, or retry. SQLite failures throw, roll back transaction-local writes, and leave live memory unchanged.
+Canonical lifecycle persistence is compare-and-swap guarded by the complete originally loaded room expectation: episode and lifecycle identity, assignment and allocation values, both handoff references, and lifecycle timestamps. Stale writes return a typed failure and do not mutate live state, reload, or retry. Ready, Withdraw Ready, and Doctor Arrived validate handoff history transactionally; Doctor Arrived also serializes durable cross-room doctor ownership. SQLite failures roll back transaction-local writes and leave live memory unchanged.
 
-Draft-bearing Ready is deferred to API/UI issues #120 and #121; do not add a `MarkReadyForDoctor` assignment overload without that follow-up scope.
+Issue #120 exposes optional draft-bearing Ready atomically through the canonical API. Omitted Ready and Doctor Arrived bodies retain the current room-panel `RoomStatus` response, while explicit canonical bodies return the lifecycle action envelope. The room-panel migration remains issue #121.
 
 Doctors should be able to view room status from a phone or workstation, but they should not be able to acknowledge or clear the room remotely.
 

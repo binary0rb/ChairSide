@@ -70,11 +70,12 @@ flowchart LR
 
 - ChairSide tracks rooms, never patients, and remains non-PHI.
 - Begin Prestage creates an episode without requiring assignment. Prestaging and Seated allow absent, partial, or complete canonical assignment.
-- Ready requires a complete, valid, durably saved assignment and is the immutable handoff/assignment-lock boundary.
+- Ready requires a complete, valid assignment, persisted either before or atomically with Ready, and is the immutable handoff/assignment-lock boundary.
 - `ReadyForDoctor` is the primary state. Aging and Stale are urgency projections from the owned Active handoff's `ReadyAt`.
 - Withdrawal returns to Seated and starts no new urgency until a different handoff is issued. Doctor Arrived accepts the current handoff.
 - Pre-arrival termination is aborted history outside throughput. Post-arrival expiration is review-required exception history without a fabricated completion timestamp.
-- Canonical assignment writes are compare-and-swap guarded against originally loaded room/episode/state/handoff identity. Stale writes do not retry or mutate live state.
+- Canonical lifecycle writes are compare-and-swap guarded against the complete originally loaded room, assignment, handoff, and timestamp expectation. Stale writes do not retry or mutate live state.
+- Doctor Arrived serializes durable cross-room doctor ownership and commits the room, Accepted handoff, and reporting cycle together.
 - Live state changes only after durable persistence succeeds; SQLite failures roll back transaction-local writes.
 - Legacy persisted Aging/Stale rows remain readable; recovery never fabricates or rewrites invalid handoffs.
 - Generated knowledge artifacts are development aids and never runtime dependencies.
@@ -96,6 +97,7 @@ flowchart LR
 
 ## Deferred and separate work
 
-- Draft-bearing Ready and Program/UI workflow changes are deferred to #120/#121.
-- After-hours sweep retry and batch atomicity remain separate from #119.
+- Room-panel workflow changes are deferred to #121, and master/doctor-view changes are deferred to #122.
+- Reporting-population work remains #123; issue #120 preserves the existing accepted-handoff attribution contract.
+- After-hours sweep retry and batch atomicity remain issue #129.
 - Knowledge-graph comment/string false-positive extraction remains issue #126.

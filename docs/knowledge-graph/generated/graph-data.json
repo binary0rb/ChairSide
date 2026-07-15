@@ -303,6 +303,12 @@
                       "path":  "src/ChairSide.Board/Services/MaintenanceCommands.cs"
                   },
                   {
+                      "id":  "file:src/ChairSide.Board/Services/PrestagingLifecycleApiContracts.cs",
+                      "label":  "src/ChairSide.Board/Services/PrestagingLifecycleApiContracts.cs",
+                      "type":  "File",
+                      "path":  "src/ChairSide.Board/Services/PrestagingLifecycleApiContracts.cs"
+                  },
+                  {
                       "id":  "file:src/ChairSide.Board/Services/ProjectionAssumptionChecklist.cs",
                       "label":  "src/ChairSide.Board/Services/ProjectionAssumptionChecklist.cs",
                       "type":  "File",
@@ -489,6 +495,18 @@
                       "path":  "tests/ChairSide.Board.Tests/PrestagingAssignmentContractTests.cs"
                   },
                   {
+                      "id":  "file:tests/ChairSide.Board.Tests/PrestagingLifecycleApiContractTests.cs",
+                      "label":  "tests/ChairSide.Board.Tests/PrestagingLifecycleApiContractTests.cs",
+                      "type":  "File",
+                      "path":  "tests/ChairSide.Board.Tests/PrestagingLifecycleApiContractTests.cs"
+                  },
+                  {
+                      "id":  "file:tests/ChairSide.Board.Tests/PrestagingLifecycleEndpointTests.cs",
+                      "label":  "tests/ChairSide.Board.Tests/PrestagingLifecycleEndpointTests.cs",
+                      "type":  "File",
+                      "path":  "tests/ChairSide.Board.Tests/PrestagingLifecycleEndpointTests.cs"
+                  },
+                  {
                       "id":  "file:tests/ChairSide.Board.Tests/PrestagingLifecycleTransitionTests.cs",
                       "label":  "tests/ChairSide.Board.Tests/PrestagingLifecycleTransitionTests.cs",
                       "type":  "File",
@@ -591,6 +609,12 @@
                       "path":  "src/ChairSide.Board/Program.cs"
                   },
                   {
+                      "id":  "route:/api/rooms/{roomNumber:int}/assignment-details",
+                      "label":  "/api/rooms/{roomNumber:int}/assignment-details",
+                      "type":  "Route",
+                      "path":  "src/ChairSide.Board/Program.cs"
+                  },
+                  {
                       "id":  "route:/api/rooms/{roomNumber:int}/available",
                       "label":  "/api/rooms/{roomNumber:int}/available",
                       "type":  "Route",
@@ -647,6 +671,12 @@
                   {
                       "id":  "route:/api/rooms/{roomNumber:int}/update-assignment",
                       "label":  "/api/rooms/{roomNumber:int}/update-assignment",
+                      "type":  "Route",
+                      "path":  "src/ChairSide.Board/Program.cs"
+                  },
+                  {
+                      "id":  "route:/api/rooms/{roomNumber:int}/withdraw-ready",
+                      "label":  "/api/rooms/{roomNumber:int}/withdraw-ready",
                       "type":  "Route",
                       "path":  "src/ChairSide.Board/Program.cs"
                   },
@@ -825,10 +855,46 @@
                       "path":  "src/ChairSide.Board/Program.cs"
                   },
                   {
+                      "id":  "symbol:type:CanonicalAssignmentConversionResult",
+                      "label":  "CanonicalAssignmentConversionResult",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/PrestagingLifecycleApiContracts.cs"
+                  },
+                  {
                       "id":  "symbol:type:CanonicalAssignmentDomainValidationTests",
                       "label":  "CanonicalAssignmentDomainValidationTests",
                       "type":  "CodeType",
                       "path":  "tests/ChairSide.Board.Tests/CanonicalAssignmentDomainValidationTests.cs"
+                  },
+                  {
+                      "id":  "symbol:type:CanonicalAssignmentRequest",
+                      "label":  "CanonicalAssignmentRequest",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/PrestagingLifecycleApiContracts.cs"
+                  },
+                  {
+                      "id":  "symbol:type:CanonicalAssignmentRequestConverter",
+                      "label":  "CanonicalAssignmentRequestConverter",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/PrestagingLifecycleApiContracts.cs"
+                  },
+                  {
+                      "id":  "symbol:type:CanonicalAssignmentRequirements",
+                      "label":  "CanonicalAssignmentRequirements",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/PrestagingLifecycleApiContracts.cs"
+                  },
+                  {
+                      "id":  "symbol:type:CanonicalProcedureCodeTransport",
+                      "label":  "CanonicalProcedureCodeTransport",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/PrestagingLifecycleApiContracts.cs"
+                  },
+                  {
+                      "id":  "symbol:type:CanonicalRoomLifecycleProjection",
+                      "label":  "CanonicalRoomLifecycleProjection",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/PrestagingLifecycleApiContracts.cs"
                   },
                   {
                       "id":  "symbol:type:CanonicalRoomLifecycleState",
@@ -987,10 +1053,28 @@
                       "path":  "src/ChairSide.Board/Services/DemoBoardStore.cs"
                   },
                   {
+                      "id":  "symbol:type:DoctorWorkingRoomLookupResult",
+                      "label":  "DoctorWorkingRoomLookupResult",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/SqliteBoardRepository.cs"
+                  },
+                  {
+                      "id":  "symbol:type:DoctorWorkingRoomRecord",
+                      "label":  "DoctorWorkingRoomRecord",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/SqliteBoardRepository.cs"
+                  },
+                  {
                       "id":  "symbol:type:DurableFailureInjectionTests",
                       "label":  "DurableFailureInjectionTests",
                       "type":  "CodeType",
                       "path":  "tests/ChairSide.Board.Tests/DurableFailureInjectionTests.cs"
+                  },
+                  {
+                      "id":  "symbol:type:EmptyLifecycleActionRequest",
+                      "label":  "EmptyLifecycleActionRequest",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/PrestagingLifecycleApiContracts.cs"
                   },
                   {
                       "id":  "symbol:type:ExceptionReasons",
@@ -1035,6 +1119,42 @@
                       "path":  "tests/ChairSide.Board.Tests/BoardStoreTests.cs"
                   },
                   {
+                      "id":  "symbol:type:GuardedDoctorArrivedPersistenceOutcome",
+                      "label":  "GuardedDoctorArrivedPersistenceOutcome",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/ReadyHandoffPersistenceRecords.cs"
+                  },
+                  {
+                      "id":  "symbol:type:GuardedDoctorArrivedPersistenceResult",
+                      "label":  "GuardedDoctorArrivedPersistenceResult",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/ReadyHandoffPersistenceRecords.cs"
+                  },
+                  {
+                      "id":  "symbol:type:GuardedReadyHandoffPersistenceOutcome",
+                      "label":  "GuardedReadyHandoffPersistenceOutcome",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/ReadyHandoffPersistenceRecords.cs"
+                  },
+                  {
+                      "id":  "symbol:type:GuardedReadyHandoffPersistenceResult",
+                      "label":  "GuardedReadyHandoffPersistenceResult",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/ReadyHandoffPersistenceRecords.cs"
+                  },
+                  {
+                      "id":  "symbol:type:GuardedWithdrawReadyPersistenceOutcome",
+                      "label":  "GuardedWithdrawReadyPersistenceOutcome",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/ReadyHandoffPersistenceRecords.cs"
+                  },
+                  {
+                      "id":  "symbol:type:GuardedWithdrawReadyPersistenceResult",
+                      "label":  "GuardedWithdrawReadyPersistenceResult",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/ReadyHandoffPersistenceRecords.cs"
+                  },
+                  {
                       "id":  "symbol:type:HandoffEnvelope",
                       "label":  "HandoffEnvelope",
                       "type":  "CodeType",
@@ -1045,6 +1165,12 @@
                       "label":  "HandoffSnapshot",
                       "type":  "CodeType",
                       "path":  "tests/ChairSide.Board.Tests/DurableFailureInjectionTests.cs"
+                  },
+                  {
+                      "id":  "symbol:type:Harness",
+                      "label":  "Harness",
+                      "type":  "CodeType",
+                      "path":  "tests/ChairSide.Board.Tests/PrestagingLifecycleEndpointTests.cs"
                   },
                   {
                       "id":  "symbol:type:is",
@@ -1197,6 +1323,66 @@
                       "path":  "tests/ChairSide.Board.Tests/PrestagingAssignmentContractTests.cs"
                   },
                   {
+                      "id":  "symbol:type:PrestagingLifecycleActionResponse",
+                      "label":  "PrestagingLifecycleActionResponse",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/PrestagingLifecycleApiContracts.cs"
+                  },
+                  {
+                      "id":  "symbol:type:PrestagingLifecycleApiContractTests",
+                      "label":  "PrestagingLifecycleApiContractTests",
+                      "type":  "CodeType",
+                      "path":  "tests/ChairSide.Board.Tests/PrestagingLifecycleApiContractTests.cs"
+                  },
+                  {
+                      "id":  "symbol:type:PrestagingLifecycleEndpointTests",
+                      "label":  "PrestagingLifecycleEndpointTests",
+                      "type":  "CodeType",
+                      "path":  "tests/ChairSide.Board.Tests/PrestagingLifecycleEndpointTests.cs"
+                  },
+                  {
+                      "id":  "symbol:type:PrestagingLifecycleErrorCodes",
+                      "label":  "PrestagingLifecycleErrorCodes",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/PrestagingLifecycleApiContracts.cs"
+                  },
+                  {
+                      "id":  "symbol:type:PrestagingLifecycleErrorResponse",
+                      "label":  "PrestagingLifecycleErrorResponse",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/PrestagingLifecycleApiContracts.cs"
+                  },
+                  {
+                      "id":  "symbol:type:PrestagingLifecycleMutationOutcome",
+                      "label":  "PrestagingLifecycleMutationOutcome",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/PrestagingLifecycleApiContracts.cs"
+                  },
+                  {
+                      "id":  "symbol:type:PrestagingLifecycleMutationResult",
+                      "label":  "PrestagingLifecycleMutationResult",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/PrestagingLifecycleApiContracts.cs"
+                  },
+                  {
+                      "id":  "symbol:type:PrestagingLifecycleParseResult",
+                      "label":  "PrestagingLifecycleParseResult",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/PrestagingLifecycleApiContracts.cs"
+                  },
+                  {
+                      "id":  "symbol:type:PrestagingLifecycleRequestParser",
+                      "label":  "PrestagingLifecycleRequestParser",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/PrestagingLifecycleApiContracts.cs"
+                  },
+                  {
+                      "id":  "symbol:type:PrestagingLifecycleResponseProjector",
+                      "label":  "PrestagingLifecycleResponseProjector",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/PrestagingLifecycleApiContracts.cs"
+                  },
+                  {
                       "id":  "symbol:type:PrestagingLifecycleTransitionTests",
                       "label":  "PrestagingLifecycleTransitionTests",
                       "type":  "CodeType",
@@ -1263,6 +1449,12 @@
                       "path":  "src/ChairSide.Board/Services/ProjectionAssumptionChecklist.cs"
                   },
                   {
+                      "id":  "symbol:type:ReadyForDoctorActionRequest",
+                      "label":  "ReadyForDoctorActionRequest",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/PrestagingLifecycleApiContracts.cs"
+                  },
+                  {
                       "id":  "symbol:type:ReadyHandoffContract",
                       "label":  "ReadyHandoffContract",
                       "type":  "CodeType",
@@ -1285,6 +1477,12 @@
                       "label":  "ReadyHandoffTerminationKinds",
                       "type":  "CodeType",
                       "path":  "src/ChairSide.Board/Services/ReadyHandoffPersistenceRecords.cs"
+                  },
+                  {
+                      "id":  "symbol:type:ReadyRoomSnapshot",
+                      "label":  "ReadyRoomSnapshot",
+                      "type":  "CodeType",
+                      "path":  "tests/ChairSide.Board.Tests/PrestagingLifecycleEndpointTests.cs"
                   },
                   {
                       "id":  "symbol:type:ReadyUrgency",
@@ -1339,6 +1537,12 @@
                       "label":  "ResolveDoctorArrivalConflictRequest",
                       "type":  "CodeType",
                       "path":  "src/ChairSide.Board/Program.cs"
+                  },
+                  {
+                      "id":  "symbol:type:Response",
+                      "label":  "Response",
+                      "type":  "CodeType",
+                      "path":  "tests/ChairSide.Board.Tests/PrestagingLifecycleEndpointTests.cs"
                   },
                   {
                       "id":  "symbol:type:ReviewExceptionOutcome",
@@ -1525,6 +1729,12 @@
                       "label":  "SeatRequestParser",
                       "type":  "CodeType",
                       "path":  "src/ChairSide.Board/Program.cs"
+                  },
+                  {
+                      "id":  "symbol:type:SeatRoomActionRequest",
+                      "label":  "SeatRoomActionRequest",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/PrestagingLifecycleApiContracts.cs"
                   },
                   {
                       "id":  "symbol:type:SeatRoomRequest",
@@ -1779,6 +1989,11 @@
                   },
                   {
                       "from":  "file:src/ChairSide.Board/Program.cs",
+                      "to":  "route:/api/rooms/{roomNumber:int}/assignment-details",
+                      "label":  "maps"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Program.cs",
                       "to":  "route:/api/rooms/{roomNumber:int}/available",
                       "label":  "maps"
                   },
@@ -1825,6 +2040,11 @@
                   {
                       "from":  "file:src/ChairSide.Board/Program.cs",
                       "to":  "route:/api/rooms/{roomNumber:int}/update-assignment",
+                      "label":  "maps"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Program.cs",
+                      "to":  "route:/api/rooms/{roomNumber:int}/withdraw-ready",
                       "label":  "maps"
                   },
                   {
@@ -2168,6 +2388,91 @@
                       "label":  "declares"
                   },
                   {
+                      "from":  "file:src/ChairSide.Board/Services/PrestagingLifecycleApiContracts.cs",
+                      "to":  "symbol:type:CanonicalAssignmentConversionResult",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/PrestagingLifecycleApiContracts.cs",
+                      "to":  "symbol:type:CanonicalAssignmentRequest",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/PrestagingLifecycleApiContracts.cs",
+                      "to":  "symbol:type:CanonicalAssignmentRequestConverter",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/PrestagingLifecycleApiContracts.cs",
+                      "to":  "symbol:type:CanonicalAssignmentRequirements",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/PrestagingLifecycleApiContracts.cs",
+                      "to":  "symbol:type:CanonicalProcedureCodeTransport",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/PrestagingLifecycleApiContracts.cs",
+                      "to":  "symbol:type:CanonicalRoomLifecycleProjection",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/PrestagingLifecycleApiContracts.cs",
+                      "to":  "symbol:type:EmptyLifecycleActionRequest",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/PrestagingLifecycleApiContracts.cs",
+                      "to":  "symbol:type:PrestagingLifecycleActionResponse",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/PrestagingLifecycleApiContracts.cs",
+                      "to":  "symbol:type:PrestagingLifecycleErrorCodes",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/PrestagingLifecycleApiContracts.cs",
+                      "to":  "symbol:type:PrestagingLifecycleErrorResponse",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/PrestagingLifecycleApiContracts.cs",
+                      "to":  "symbol:type:PrestagingLifecycleMutationOutcome",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/PrestagingLifecycleApiContracts.cs",
+                      "to":  "symbol:type:PrestagingLifecycleMutationResult",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/PrestagingLifecycleApiContracts.cs",
+                      "to":  "symbol:type:PrestagingLifecycleParseResult",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/PrestagingLifecycleApiContracts.cs",
+                      "to":  "symbol:type:PrestagingLifecycleRequestParser",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/PrestagingLifecycleApiContracts.cs",
+                      "to":  "symbol:type:PrestagingLifecycleResponseProjector",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/PrestagingLifecycleApiContracts.cs",
+                      "to":  "symbol:type:ReadyForDoctorActionRequest",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/PrestagingLifecycleApiContracts.cs",
+                      "to":  "symbol:type:SeatRoomActionRequest",
+                      "label":  "declares"
+                  },
+                  {
                       "from":  "file:src/ChairSide.Board/Services/ProjectionAssumptionChecklist.cs",
                       "to":  "symbol:type:ObservedScheduleFitInputSummary",
                       "label":  "declares"
@@ -2210,6 +2515,36 @@
                   {
                       "from":  "file:src/ChairSide.Board/Services/ReadyHandoffPersistenceRecords.cs",
                       "to":  "symbol:type:CommittedRoomResult",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/ReadyHandoffPersistenceRecords.cs",
+                      "to":  "symbol:type:GuardedDoctorArrivedPersistenceOutcome",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/ReadyHandoffPersistenceRecords.cs",
+                      "to":  "symbol:type:GuardedDoctorArrivedPersistenceResult",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/ReadyHandoffPersistenceRecords.cs",
+                      "to":  "symbol:type:GuardedReadyHandoffPersistenceOutcome",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/ReadyHandoffPersistenceRecords.cs",
+                      "to":  "symbol:type:GuardedReadyHandoffPersistenceResult",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/ReadyHandoffPersistenceRecords.cs",
+                      "to":  "symbol:type:GuardedWithdrawReadyPersistenceOutcome",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/ReadyHandoffPersistenceRecords.cs",
+                      "to":  "symbol:type:GuardedWithdrawReadyPersistenceResult",
                       "label":  "declares"
                   },
                   {
@@ -2370,6 +2705,16 @@
                   {
                       "from":  "file:src/ChairSide.Board/Services/SqliteBoardRepository.cs",
                       "to":  "symbol:type:carries",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/SqliteBoardRepository.cs",
+                      "to":  "symbol:type:DoctorWorkingRoomLookupResult",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/SqliteBoardRepository.cs",
+                      "to":  "symbol:type:DoctorWorkingRoomRecord",
                       "label":  "declares"
                   },
                   {
@@ -2540,6 +2885,31 @@
                   {
                       "from":  "file:tests/ChairSide.Board.Tests/PrestagingAssignmentContractTests.cs",
                       "to":  "symbol:type:PrestagingAssignmentContractTests",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:tests/ChairSide.Board.Tests/PrestagingLifecycleApiContractTests.cs",
+                      "to":  "symbol:type:PrestagingLifecycleApiContractTests",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:tests/ChairSide.Board.Tests/PrestagingLifecycleEndpointTests.cs",
+                      "to":  "symbol:type:Harness",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:tests/ChairSide.Board.Tests/PrestagingLifecycleEndpointTests.cs",
+                      "to":  "symbol:type:PrestagingLifecycleEndpointTests",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:tests/ChairSide.Board.Tests/PrestagingLifecycleEndpointTests.cs",
+                      "to":  "symbol:type:ReadyRoomSnapshot",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:tests/ChairSide.Board.Tests/PrestagingLifecycleEndpointTests.cs",
+                      "to":  "symbol:type:Response",
                       "label":  "declares"
                   },
                   {
@@ -2834,6 +3204,11 @@
                   },
                   {
                       "from":  "repo:chairside",
+                      "to":  "file:src/ChairSide.Board/Services/PrestagingLifecycleApiContracts.cs",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
                       "to":  "file:src/ChairSide.Board/Services/ProjectionAssumptionChecklist.cs",
                       "label":  "contains"
                   },
@@ -2985,6 +3360,16 @@
                   {
                       "from":  "repo:chairside",
                       "to":  "file:tests/ChairSide.Board.Tests/PrestagingAssignmentContractTests.cs",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:tests/ChairSide.Board.Tests/PrestagingLifecycleApiContractTests.cs",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:tests/ChairSide.Board.Tests/PrestagingLifecycleEndpointTests.cs",
                       "label":  "contains"
                   },
                   {
