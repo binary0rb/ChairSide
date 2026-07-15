@@ -86,6 +86,19 @@ internal sealed record GuardedWithdrawReadyPersistenceResult(
     GuardedWithdrawReadyPersistenceOutcome Outcome,
     CommittedReadyHandoffResult? Committed = null);
 
+internal enum GuardedDoctorArrivedPersistenceOutcome
+{
+    Success,
+    StaleWrite,
+    DoctorConflict,
+    IntegrityFault
+}
+
+internal sealed record GuardedDoctorArrivedPersistenceResult(
+    GuardedDoctorArrivedPersistenceOutcome Outcome,
+    CommittedReadyHandoffResult? Committed = null,
+    int? ConflictingRoomId = null);
+
 public static class ReadyHandoffTerminationKinds
 {
     public const string Canceled = "Canceled";

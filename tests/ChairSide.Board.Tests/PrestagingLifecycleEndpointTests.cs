@@ -825,6 +825,668 @@ public sealed class PrestagingLifecycleEndpointTests
         AssertLastAudit(await h.ReadAuditEntriesAsync(), "withdraw-ready", RoomStates.Available, null, false, PrestagingLifecycleErrorCodes.MalformedRequest);
     }
 
+    [Theory]
+    [InlineData(null, true)]
+    [InlineData("", true)]
+    [InlineData("{}", false)]
+    public async Task Canonical_doctor_arrived_accepts_the_owned_handoff_and_preserves_bodyless_compatibility(
+        string? body,
+        bool legacyResponse)
+    {
+        using var h = new Harness();
+        await h.Begin(1, null);
+        await h.Seat(1, """{"assignment":{"doctorId":"otte","procedureCode":"CON","confirmedExpectedAllocationUnits":1}}""");
+        var ready = Action(await h.Ready(1, "{}"));
+        var before = h.Context.Repository.LoadRooms(3).Single(room => room.RoomId == 1);
+
+        var response = await h.DoctorArrived(1, body);
+
+        var arrivedRoom = legacyResponse
+            ? Assert.IsType<RoomStatus>(response.Value)
+            : Action(response).Room;
+        if (legacyResponse)
+        {
+            Assert.Contains("state", Names(response.Json));
+            Assert.DoesNotContain("room", Names(response.Json));
+        }
+        else
+        {
+            var envelope = Action(response);
+            Assert.Equal(["room", "lifecycle", "handoff"], Names(response.Json));
+            Assert.Equal(CanonicalRoomLifecycleState.DoctorWorking, envelope.Lifecycle.State);
+            Assert.True(envelope.Lifecycle.AssignmentLocked);
+            Assert.Equal(ReadyUrgency.None, envelope.Lifecycle.ReadyUrgency);
+            Assert.Equal(ReadyHandoffStatus.Accepted, envelope.Handoff!.Status);
+            Assert.Equal("CON", envelope.Handoff.Assignment.ProcedureCode);
+        }
+
+        var after = h.Context.Repository.LoadRooms(3).Single(room => room.RoomId == 1);
+        var handoff = Assert.Single(h.Context.Repository.LoadReadyHandoffsByEpisode(after.EpisodeId!));
+        Assert.Equal(RoomStates.DoctorInRoom, arrivedRoom.State);
+        Assert.Equal(RoomStates.DoctorInRoom, after.State);
+        Assert.Equal(before.EpisodeId, after.EpisodeId);
+        Assert.Equal(before.PrestageStartedAt, after.PrestageStartedAt);
+        Assert.Equal(before.SeatedAt, after.SeatedAt);
+        Assert.Equal(before.ReadyForDoctorAt, after.ReadyForDoctorAt);
+        Assert.Equal(before.AssignedDoctor, after.AssignedDoctor);
+        Assert.Equal(before.ProcedureCode, after.ProcedureCode);
+        Assert.Equal(before.SedationState, after.SedationState);
+        Assert.Equal(before.ExpectedAllocationState, after.ExpectedAllocationState);
+        Assert.Equal(before.ExpectedAllocationSuggestedUnits, after.ExpectedAllocationSuggestedUnits);
+        Assert.Equal(before.ExpectedAllocationConfirmedUnits, after.ExpectedAllocationConfirmedUnits);
+        Assert.NotNull(after.DoctorArrivedAt);
+        Assert.Null(after.ActiveReadyHandoffId);
+        Assert.Equal(ready.Handoff!.HandoffId, after.AcceptedReadyHandoffId);
+        Assert.Equal(ready.Handoff.HandoffId, handoff.HandoffId);
+        Assert.Equal(ReadyHandoffStatus.Accepted, handoff.ContractStatus);
+        Assert.Equal(after.DoctorArrivedAt, handoff.AcceptedAt);
+        AssertLastAudit(await h.ReadAuditEntriesAsync(), "doctor-arrived", RoomStates.ReadyForDoctor, RoomStates.DoctorInRoom, true, null);
+    }
+
+    [Fact]
+    public async Task Canonical_doctor_arrived_reports_missing_lifecycle_and_repeat_conflicts_without_mutation()
+    {
+        using var h = new Harness();
+        AssertError(await h.DoctorArrived(999, "{}"), 404, PrestagingLifecycleErrorCodes.RoomNotFound);
+        AssertError(await h.DoctorArrived(1, "{}"), 409, PrestagingLifecycleErrorCodes.LifecycleConflict);
+        await h.Begin(1, null);
+        AssertError(await h.DoctorArrived(1, "{}"), 409, PrestagingLifecycleErrorCodes.LifecycleConflict);
+        await h.Seat(1, """{"assignment":{"doctorId":"otte","procedureCode":"CON","confirmedExpectedAllocationUnits":1}}""");
+        AssertError(await h.DoctorArrived(1, "{}"), 409, PrestagingLifecycleErrorCodes.LifecycleConflict);
+        Action(await h.Ready(1, "{}"));
+        Action(await h.DoctorArrived(1, "{}"));
+        var before = ReadyRoomSnapshot.From(h.Context.Repository.LoadRooms(3).Single(room => room.RoomId == 1));
+        var historyBefore = JsonSerializer.Serialize(h.Context.Repository.LoadReadyHandoffsByEpisode(before.EpisodeId!), JsonOptions);
+
+        AssertError(await h.DoctorArrived(1, "{}"), 409, PrestagingLifecycleErrorCodes.LifecycleConflict);
+
+        Assert.Equal(before, ReadyRoomSnapshot.From(h.Context.Repository.LoadRooms(3).Single(room => room.RoomId == 1)));
+        Assert.Equal(historyBefore, JsonSerializer.Serialize(h.Context.Repository.LoadReadyHandoffsByEpisode(before.EpisodeId!), JsonOptions));
+
+        Assert.NotNull(h.Context.Store.MarkDoctorComplete(1));
+        var turnoverBefore = ReadyRoomSnapshot.From(h.Context.Repository.LoadRooms(3).Single(room => room.RoomId == 1));
+        AssertError(await h.DoctorArrived(1, "{}"), 409, PrestagingLifecycleErrorCodes.LifecycleConflict);
+        Assert.Equal(turnoverBefore, ReadyRoomSnapshot.From(h.Context.Repository.LoadRooms(3).Single(room => room.RoomId == 1)));
+    }
+
+    [Fact]
+    public async Task Bodyless_doctor_conflict_preserves_the_room_panel_response_contract()
+    {
+        using var h = new Harness();
+        await h.Begin(2, null);
+        await h.Seat(2, """{"assignment":{"doctorId":"otte","procedureCode":"CON","confirmedExpectedAllocationUnits":1}}""");
+        Action(await h.Ready(2, "{}"));
+        Action(await h.DoctorArrived(2, "{}"));
+        await h.Begin(1, null);
+        await h.Seat(1, """{"assignment":{"doctorId":"otte","procedureCode":"CON","confirmedExpectedAllocationUnits":1}}""");
+        Action(await h.Ready(1, "{}"));
+
+        var bodyless = await h.DoctorArrived(1, null);
+        var conflict = Assert.IsType<DoctorArrivedConflictResponse>(bodyless.Value);
+        Assert.Equal(409, bodyless.StatusCode);
+        Assert.Equal(2, conflict.ConflictingRoomId);
+        Assert.Equal("otte", conflict.DoctorId);
+        Assert.Contains("conflictingRoomId", Names(bodyless.Json));
+
+        AssertError(await h.DoctorArrived(1, "{}"), 409, PrestagingLifecycleErrorCodes.LifecycleConflict);
+        Assert.Equal(RoomStates.ReadyForDoctor, h.Context.Store.GetRoom(1)!.State);
+    }
+
+    [Theory]
+    [InlineData(8, ReadyUrgency.Aging)]
+    [InlineData(13, ReadyUrgency.Stale)]
+    public async Task Canonical_doctor_arrived_clears_ready_urgency_and_keeps_the_accepted_snapshot(
+        int elapsedMinutes,
+        ReadyUrgency expectedBefore)
+    {
+        using var workspace = TestWorkspace.Create();
+        var clock = new ManualTimeProvider(new DateTimeOffset(2026, 7, 15, 14, 0, 0, TimeSpan.Zero));
+        var context = StoreContext.Create(workspace, Environments.Production, timeProvider: clock);
+        using var h = new Harness(workspace, context);
+        await h.Begin(1, null);
+        await h.Seat(1, """{"assignment":{"doctorId":"pledger","procedureCode":"EXT","sedationChoice":"yes","confirmedExpectedAllocationUnits":4}}""");
+        var ready = Action(await h.Ready(1, "{}"));
+        clock.SetUtcNow(clock.GetUtcNow().AddMinutes(elapsedMinutes));
+        Assert.Equal(expectedBefore, context.Store.GetRoom(1)!.ReadyUrgency);
+
+        var arrived = Action(await h.DoctorArrived(1, "{}"));
+        var durableRoom = context.Repository.LoadRooms(3).Single(room => room.RoomId == 1);
+        var accepted = Assert.Single(context.Repository.LoadReadyHandoffsByEpisode(durableRoom.EpisodeId!));
+        var cycle = Assert.Single(context.Repository.LoadCompletedCycles());
+
+        Assert.Equal(ReadyUrgency.None, arrived.Lifecycle.ReadyUrgency);
+        Assert.True(arrived.Lifecycle.AssignmentLocked);
+        Assert.Equal(ReadyHandoffStatus.Accepted, accepted.ContractStatus);
+        Assert.Equal(ready.Handoff!.HandoffId, accepted.HandoffId);
+        Assert.Equal(accepted.HandoffId, cycle.AcceptedReadyHandoffId);
+        Assert.Equal(accepted.Assignment.DoctorId, cycle.AssignedDoctor);
+        Assert.Equal(accepted.Assignment.ProcedureCode, cycle.ProcedureCode);
+        Assert.Equal(accepted.Assignment.ExpectedAllocationConfirmedUnits, cycle.ExpectedAllocationUnits);
+        Assert.Equal(expectedBefore is ReadyUrgency.Aging or ReadyUrgency.Stale, cycle.AgingThresholdReached);
+        Assert.Equal(expectedBefore == ReadyUrgency.Stale, cycle.StaleThresholdReached);
+    }
+
+    [Theory]
+    [InlineData("missing")]
+    [InlineData("wrong-episode")]
+    [InlineData("wrong-room")]
+    [InlineData("withdrawn")]
+    [InlineData("accepted")]
+    [InlineData("terminated")]
+    [InlineData("assignment-mismatch")]
+    [InlineData("conflicting-accepted")]
+    [InlineData("foreign-withdrawn-history")]
+    [InlineData("conflicting-active")]
+    public async Task Canonical_doctor_arrived_rejects_untruthful_handoff_history_without_mutation(string corruption)
+    {
+        using var workspace = TestWorkspace.Create();
+        var seed = StoreContext.Create(workspace, Environments.Production);
+        using (var setup = new Harness(workspace, seed))
+        {
+            await setup.Begin(1, null);
+            await setup.Seat(1, """{"assignment":{"doctorId":"otte","procedureCode":"CON","confirmedExpectedAllocationUnits":1}}""");
+            Action(await setup.Ready(1, "{}"));
+        }
+        var ready = seed.Repository.LoadRooms(3).Single(room => room.RoomId == 1);
+        var handoff = Assert.Single(seed.Repository.LoadReadyHandoffsByEpisode(ready.EpisodeId!));
+        CorruptReadyHandoff(seed.DatabasePath, handoff, corruption);
+        var recovered = StoreContext.Create(workspace, Environments.Production, seed.DatabasePath);
+        var durableBefore = ReadyRoomSnapshot.From(recovered.Repository.LoadRooms(3).Single(room => room.RoomId == 1));
+        var liveBefore = ReadyRoomSnapshot.From(GetLiveRoom(recovered.Store));
+        var historyBefore = JsonSerializer.Serialize(recovered.Repository.LoadReadyHandoffsByEpisode(ready.EpisodeId!), JsonOptions);
+        var eventsBefore = recovered.Store.GetSnapshot().RecentEvents.Count;
+        var reportsBefore = JsonSerializer.Serialize(recovered.Store.GetReports(), JsonOptions);
+
+        using var h = new Harness(workspace, recovered);
+        var response = await h.DoctorArrived(1, "{}");
+
+        AssertError(response, 409, PrestagingLifecycleErrorCodes.IntegrityFault);
+        Assert.Equal(durableBefore, ReadyRoomSnapshot.From(recovered.Repository.LoadRooms(3).Single(room => room.RoomId == 1)));
+        Assert.Equal(liveBefore, ReadyRoomSnapshot.From(GetLiveRoom(recovered.Store)));
+        Assert.Equal(historyBefore, JsonSerializer.Serialize(recovered.Repository.LoadReadyHandoffsByEpisode(ready.EpisodeId!), JsonOptions));
+        Assert.Equal(eventsBefore, recovered.Store.GetSnapshot().RecentEvents.Count);
+        Assert.Equal(reportsBefore, JsonSerializer.Serialize(recovered.Store.GetReports(), JsonOptions));
+        AssertLastAudit(await h.ReadAuditEntriesAsync(), "doctor-arrived", RoomStates.ReadyForDoctor, null, false, PrestagingLifecycleErrorCodes.IntegrityFault);
+    }
+
+    [Theory]
+    [InlineData("assignment")]
+    [InlineData("ownership")]
+    public async Task Concurrent_durable_change_makes_doctor_arrived_stale_without_retry(string change)
+    {
+        using var workspace = TestWorkspace.Create();
+        var seed = StoreContext.Create(workspace, Environments.Production);
+        using (var setup = new Harness(workspace, seed))
+        {
+            await setup.Begin(1, null);
+            await setup.Seat(1, """{"assignment":{"doctorId":"otte","procedureCode":"CON","confirmedExpectedAllocationUnits":1}}""");
+            Action(await setup.Ready(1, "{}"));
+        }
+        var contextA = StoreContext.Create(workspace, Environments.Production, seed.DatabasePath);
+        var contextB = StoreContext.Create(workspace, Environments.Production, seed.DatabasePath);
+        var changed = contextB.Repository.LoadRooms(3).Single(room => room.RoomId == 1);
+        if (change == "assignment") changed.AssignedDoctorDisplayName = "Concurrent durable correction";
+        else changed.ActiveReadyHandoffId = "concurrent-owner";
+        contextB.Repository.SaveRoom(changed, contextB.Doctors, contextB.Procedures);
+        var durableChanged = ReadyRoomSnapshot.From(contextB.Repository.LoadRooms(3).Single(room => room.RoomId == 1));
+        var liveBefore = ReadyRoomSnapshot.From(GetLiveRoom(contextA.Store));
+        var eventsBefore = contextA.Store.GetSnapshot().RecentEvents.Count;
+
+        using var h = new Harness(workspace, contextA);
+        AssertError(await h.DoctorArrived(1, "{}"), 409, PrestagingLifecycleErrorCodes.StaleWrite);
+
+        Assert.Equal(durableChanged, ReadyRoomSnapshot.From(contextA.Repository.LoadRooms(3).Single(room => room.RoomId == 1)));
+        Assert.Equal(liveBefore, ReadyRoomSnapshot.From(GetLiveRoom(contextA.Store)));
+        Assert.Equal(eventsBefore, contextA.Store.GetSnapshot().RecentEvents.Count);
+        Assert.Equal(ReadyHandoffStatus.Active, Assert.Single(contextA.Repository.LoadReadyHandoffsByEpisode(changed.EpisodeId!)).ContractStatus);
+        AssertLastAudit(await h.ReadAuditEntriesAsync(), "doctor-arrived", RoomStates.ReadyForDoctor, null, false, PrestagingLifecycleErrorCodes.StaleWrite);
+    }
+
+    [Fact]
+    public async Task Doctor_arrived_endpoint_database_abort_rolls_back_room_handoff_cycle_live_state_and_event()
+    {
+        using var workspace = TestWorkspace.Create();
+        var context = StoreContext.Create(workspace, Environments.Production);
+        using var h = new Harness(workspace, context);
+        await h.Begin(1, null);
+        await h.Seat(1, """{"assignment":{"doctorId":"otte","procedureCode":"CON","confirmedExpectedAllocationUnits":1}}""");
+        Action(await h.Ready(1, "{}"));
+        var before = ReadyRoomSnapshot.From(context.Repository.LoadRooms(3).Single(room => room.RoomId == 1));
+        var handoffBefore = Assert.Single(context.Repository.LoadReadyHandoffsByEpisode(before.EpisodeId!));
+        Assert.Empty(context.Repository.LoadCompletedCycles());
+        var eventsBefore = context.Store.GetSnapshot().RecentEvents.Count;
+        var reportsBefore = JsonSerializer.Serialize(context.Store.GetReports(), JsonOptions);
+        InstallDoctorArrivedFailureTrigger(context.DatabasePath);
+        try
+        {
+            AssertError(await h.DoctorArrived(1, "{}"), 500, PrestagingLifecycleErrorCodes.PersistenceFailure);
+        }
+        finally
+        {
+            DropDoctorArrivedFailureTrigger(context.DatabasePath);
+        }
+
+        Assert.Equal(before, ReadyRoomSnapshot.From(context.Repository.LoadRooms(3).Single(room => room.RoomId == 1)));
+        Assert.Equal(before, ReadyRoomSnapshot.From(GetLiveRoom(context.Store)));
+        Assert.Equal(eventsBefore, context.Store.GetSnapshot().RecentEvents.Count);
+        Assert.Equal(reportsBefore, JsonSerializer.Serialize(context.Store.GetReports(), JsonOptions));
+        Assert.Empty(context.Repository.LoadCompletedCycles());
+        var handoffAfter = Assert.Single(context.Repository.LoadReadyHandoffsByEpisode(before.EpisodeId!));
+        Assert.Equal(handoffBefore.HandoffId, handoffAfter.HandoffId);
+        Assert.Equal(ReadyHandoffStatus.Active, handoffAfter.ContractStatus);
+        var reloaded = StoreContext.Create(workspace, Environments.Production, context.DatabasePath);
+        Assert.Equal(before, ReadyRoomSnapshot.From(reloaded.Repository.LoadRooms(3).Single(room => room.RoomId == 1)));
+        Assert.Empty(reloaded.Repository.LoadCompletedCycles());
+        Assert.Equal(ReadyHandoffStatus.Active, Assert.Single(
+            reloaded.Repository.LoadReadyHandoffsByEpisode(before.EpisodeId!)).ContractStatus);
+        AssertLastAudit(await h.ReadAuditEntriesAsync(), "doctor-arrived", RoomStates.ReadyForDoctor, null, false, PrestagingLifecycleErrorCodes.PersistenceFailure);
+    }
+
+    [Fact]
+    public async Task Overlapping_contexts_serialize_same_doctor_ownership_before_cross_room_validation()
+    {
+        using var workspace = TestWorkspace.Create();
+        var seed = StoreContext.Create(workspace, Environments.Production);
+        using (var setup = new Harness(workspace, seed))
+        {
+            await setup.Begin(1, null);
+            await setup.Seat(1, """{"assignment":{"doctorId":"otte","procedureCode":"CON","confirmedExpectedAllocationUnits":1}}""");
+            Action(await setup.Ready(1, "{}"));
+            await setup.Begin(2, null);
+            await setup.Seat(2, """{"assignment":{"doctorId":"otte","procedureCode":"CON","confirmedExpectedAllocationUnits":1}}""");
+            Action(await setup.Ready(2, "{}"));
+        }
+
+        var contextA = StoreContext.Create(workspace, Environments.Production, seed.DatabasePath);
+        var contextB = StoreContext.Create(workspace, Environments.Production, seed.DatabasePath);
+        var roomBefore = new Dictionary<int, ReadyRoomSnapshot>
+        {
+            [1] = ReadyRoomSnapshot.From(contextA.Repository.LoadRooms(3).Single(room => room.RoomId == 1)),
+            [2] = ReadyRoomSnapshot.From(contextB.Repository.LoadRooms(3).Single(room => room.RoomId == 2))
+        };
+        var liveBefore = new Dictionary<int, ReadyRoomSnapshot>
+        {
+            [1] = ReadyRoomSnapshot.From(GetLiveRoom(contextA.Store, 1)),
+            [2] = ReadyRoomSnapshot.From(GetLiveRoom(contextB.Store, 2))
+        };
+        var eventsBefore = new Dictionary<int, int>
+        {
+            [1] = contextA.Store.GetSnapshot().RecentEvents.Count,
+            [2] = contextB.Store.GetSnapshot().RecentEvents.Count
+        };
+        var handoffBefore = roomBefore.ToDictionary(
+            pair => pair.Key,
+            pair => JsonSerializer.Serialize(
+                (pair.Key == 1 ? contextA : contextB).Repository.LoadReadyHandoffsByEpisode(pair.Value.EpisodeId!),
+                JsonOptions));
+        using var first = new Harness(workspace, contextA);
+        using var second = new Harness(workspace, contextB);
+
+        using var blockerConnection = new SqliteConnection(
+            new SqliteConnectionStringBuilder
+            {
+                DataSource = seed.DatabasePath,
+                DefaultTimeout = 5
+            }.ToString());
+        blockerConnection.Open();
+        using var blockerTransaction = blockerConnection.BeginTransaction(deferred: false);
+        using var started = new CountdownEvent(2);
+        var firstAttempt = Task.Run(async () =>
+        {
+            started.Signal();
+            return (RoomId: 1, Response: await first.DoctorArrived(1, null));
+        });
+        var secondAttempt = Task.Run(async () =>
+        {
+            started.Signal();
+            return (RoomId: 2, Response: await second.DoctorArrived(2, null));
+        });
+
+        Assert.True(started.Wait(TimeSpan.FromSeconds(2)), "Both Doctor Arrived attempts must start while the writer reservation is held.");
+        await Task.Delay(100);
+        Assert.False(firstAttempt.IsCompleted, "The first context must wait for the existing immediate writer transaction.");
+        Assert.False(secondAttempt.IsCompleted, "The second context must wait for the existing immediate writer transaction.");
+        blockerTransaction.Commit();
+
+        var attempts = await Task.WhenAll(firstAttempt, secondAttempt);
+        var succeeded = Assert.Single(attempts.Where(attempt => attempt.Response.StatusCode == 200));
+        var failed = Assert.Single(attempts.Where(attempt => attempt.Response.StatusCode == 409));
+        Assert.IsType<RoomStatus>(succeeded.Response.Value);
+        var conflict = Assert.IsType<DoctorArrivedConflictResponse>(failed.Response.Value);
+        Assert.Equal(succeeded.RoomId, conflict.ConflictingRoomId);
+        Assert.Equal("otte", conflict.DoctorId);
+        var losingRoomId = failed.RoomId;
+        var losingContext = losingRoomId == 1 ? contextA : contextB;
+        var losingHarness = losingRoomId == 1 ? first : second;
+        var durableRooms = losingContext.Repository.LoadRooms(3);
+        Assert.Equal(1, durableRooms.Count(room => room.State == RoomStates.DoctorInRoom));
+        Assert.Equal(RoomStates.DoctorInRoom, durableRooms.Single(room => room.RoomId == succeeded.RoomId).State);
+        Assert.Equal(roomBefore[losingRoomId], ReadyRoomSnapshot.From(durableRooms.Single(room => room.RoomId == losingRoomId)));
+        Assert.Equal(liveBefore[losingRoomId], ReadyRoomSnapshot.From(GetLiveRoom(losingContext.Store, losingRoomId)));
+        Assert.Equal(eventsBefore[losingRoomId], losingContext.Store.GetSnapshot().RecentEvents.Count);
+        Assert.Equal(
+            handoffBefore[losingRoomId],
+            JsonSerializer.Serialize(losingContext.Repository.LoadReadyHandoffsByEpisode(roomBefore[losingRoomId].EpisodeId!), JsonOptions));
+        Assert.Equal(ReadyHandoffStatus.Accepted, Assert.Single(losingContext.Repository.LoadReadyHandoffsByEpisode(
+            durableRooms.Single(room => room.RoomId == succeeded.RoomId).EpisodeId!)).ContractStatus);
+        Assert.Equal(ReadyHandoffStatus.Active, Assert.Single(losingContext.Repository.LoadReadyHandoffsByEpisode(
+            roomBefore[losingRoomId].EpisodeId!)).ContractStatus);
+        var cycle = Assert.Single(losingContext.Repository.LoadCompletedCycles());
+        Assert.Equal(succeeded.RoomId, cycle.RoomId);
+
+        var reloaded = StoreContext.Create(workspace, Environments.Production, seed.DatabasePath);
+        var reloadedRooms = reloaded.Repository.LoadRooms(3);
+        Assert.Equal(1, reloadedRooms.Count(room => room.State == RoomStates.DoctorInRoom));
+        Assert.Equal(roomBefore[losingRoomId], ReadyRoomSnapshot.From(reloadedRooms.Single(room => room.RoomId == losingRoomId)));
+        Assert.Equal(ReadyHandoffStatus.Accepted, Assert.Single(reloaded.Repository.LoadReadyHandoffsByEpisode(
+            reloadedRooms.Single(room => room.RoomId == succeeded.RoomId).EpisodeId!)).ContractStatus);
+        Assert.Equal(ReadyHandoffStatus.Active, Assert.Single(reloaded.Repository.LoadReadyHandoffsByEpisode(
+            roomBefore[losingRoomId].EpisodeId!)).ContractStatus);
+        Assert.Equal(succeeded.RoomId, Assert.Single(reloaded.Repository.LoadCompletedCycles()).RoomId);
+        Assert.Contains(
+            await losingHarness.ReadAuditEntriesAsync(),
+            entry => entry.Action == "doctor-arrived"
+                && entry.RoomNumber == losingRoomId
+                && !entry.Success
+                && entry.Reason == PrestagingLifecycleErrorCodes.LifecycleConflict);
+    }
+
+    [Fact]
+    public async Task Doctor_arrived_uses_the_other_working_rooms_accepted_handoff_and_rejects_assignment_divergence()
+    {
+        using var workspace = TestWorkspace.Create();
+        var seed = StoreContext.Create(workspace, Environments.Production);
+        using (var setup = new Harness(workspace, seed))
+        {
+            await setup.Begin(1, null);
+            await setup.Seat(1, """{"assignment":{"doctorId":"otte","procedureCode":"CON","confirmedExpectedAllocationUnits":1}}""");
+            Action(await setup.Ready(1, "{}"));
+            await setup.Begin(2, null);
+            await setup.Seat(2, """{"assignment":{"doctorId":"otte","procedureCode":"CON","confirmedExpectedAllocationUnits":1}}""");
+            Action(await setup.Ready(2, "{}"));
+            Action(await setup.DoctorArrived(2, "{}"));
+        }
+
+        ExecuteSql(seed.DatabasePath, "UPDATE active_rooms SET assigned_doctor_id = 'pledger', assigned_doctor_display_name = 'Dr. Pledger' WHERE room_id = 2;");
+        var context = StoreContext.Create(workspace, Environments.Production, seed.DatabasePath);
+        using var h = new Harness(workspace, context);
+        var durableBefore = context.Repository.LoadRooms(3)
+            .ToDictionary(room => room.RoomId, ReadyRoomSnapshot.From);
+        var liveBefore = new Dictionary<int, ReadyRoomSnapshot>
+        {
+            [1] = ReadyRoomSnapshot.From(GetLiveRoom(context.Store, 1)),
+            [2] = ReadyRoomSnapshot.From(GetLiveRoom(context.Store, 2))
+        };
+        var episodeIds = durableBefore.Values
+            .Select(room => room.EpisodeId)
+            .Where(episodeId => !string.IsNullOrWhiteSpace(episodeId))
+            .Select(episodeId => episodeId!)
+            .ToArray();
+        var handoffsBefore = JsonSerializer.Serialize(
+            episodeIds.SelectMany(context.Repository.LoadReadyHandoffsByEpisode).OrderBy(handoff => handoff.HandoffId),
+            JsonOptions);
+        var cyclesBefore = JsonSerializer.Serialize(context.Repository.LoadCompletedCycles(), JsonOptions);
+        var eventsBefore = context.Store.GetSnapshot().RecentEvents.Count;
+
+        AssertError(await h.DoctorArrived(1, "{}"), 409, PrestagingLifecycleErrorCodes.IntegrityFault);
+
+        var durableAfter = context.Repository.LoadRooms(3).ToDictionary(room => room.RoomId, ReadyRoomSnapshot.From);
+        Assert.Equal(durableBefore[1], durableAfter[1]);
+        Assert.Equal(durableBefore[2], durableAfter[2]);
+        Assert.Equal(liveBefore[1], ReadyRoomSnapshot.From(GetLiveRoom(context.Store, 1)));
+        Assert.Equal(liveBefore[2], ReadyRoomSnapshot.From(GetLiveRoom(context.Store, 2)));
+        Assert.Equal(handoffsBefore, JsonSerializer.Serialize(
+            episodeIds.SelectMany(context.Repository.LoadReadyHandoffsByEpisode).OrderBy(handoff => handoff.HandoffId),
+            JsonOptions));
+        Assert.Equal(cyclesBefore, JsonSerializer.Serialize(context.Repository.LoadCompletedCycles(), JsonOptions));
+        Assert.Equal(eventsBefore, context.Store.GetSnapshot().RecentEvents.Count);
+        var reloaded = StoreContext.Create(workspace, Environments.Production, seed.DatabasePath);
+        var reloadedRooms = reloaded.Repository.LoadRooms(3).ToDictionary(room => room.RoomId, ReadyRoomSnapshot.From);
+        Assert.Equal(durableBefore[1], reloadedRooms[1]);
+        Assert.Equal(durableBefore[2], reloadedRooms[2]);
+        Assert.Equal(handoffsBefore, JsonSerializer.Serialize(
+            episodeIds.SelectMany(reloaded.Repository.LoadReadyHandoffsByEpisode).OrderBy(handoff => handoff.HandoffId),
+            JsonOptions));
+        Assert.Equal(cyclesBefore, JsonSerializer.Serialize(reloaded.Repository.LoadCompletedCycles(), JsonOptions));
+        Assert.Contains(
+            await h.ReadAuditEntriesAsync(),
+            entry => entry.Action == "doctor-arrived"
+                && entry.RoomNumber == 1
+                && entry.PreviousState == RoomStates.ReadyForDoctor
+                && entry.NewState is null
+                && !entry.Success
+                && entry.Reason == PrestagingLifecycleErrorCodes.IntegrityFault);
+    }
+
+    [Fact]
+    public async Task Doctor_arrived_uses_a_narrow_room_assignment_fallback_for_legacy_working_rooms()
+    {
+        using var workspace = TestWorkspace.Create();
+        var seed = StoreContext.Create(workspace, Environments.Production);
+        using (var setup = new Harness(workspace, seed))
+        {
+            await setup.Begin(1, null);
+            await setup.Seat(1, """{"assignment":{"doctorId":"otte","procedureCode":"CON","confirmedExpectedAllocationUnits":1}}""");
+            Action(await setup.Ready(1, "{}"));
+        }
+
+        var context = StoreContext.Create(workspace, Environments.Production, seed.DatabasePath);
+        var legacyWriter = StoreContext.Create(workspace, Environments.Production, seed.DatabasePath);
+        var legacyArrivedAt = new DateTimeOffset(2026, 7, 15, 15, 0, 0, TimeSpan.Zero);
+        var legacyRoom = new RoomState(2)
+        {
+            AssignedDoctor = "otte",
+            AssignedDoctorDisplayName = "Dr. Otte",
+            ProcedureCode = "CON",
+            ProcedureCategory = "Consult",
+            SedationState = SedationState.UnavailableProcedureIneligible,
+            ExpectedAllocationState = ExpectedAllocationState.ConfirmedSuggestedValue,
+            ExpectedAllocationSuggestedUnits = 1,
+            ExpectedAllocationConfirmedUnits = 1,
+            State = RoomStates.DoctorInRoom,
+            SeatedAt = legacyArrivedAt.AddMinutes(-5),
+            DoctorArrivedAt = legacyArrivedAt,
+            OriginalDefaultExpectedUnits = 1,
+            ExpectedAllocationUnits = 1,
+            ExpectedAllocationMinutes = 10
+        };
+        legacyWriter.Repository.SaveRoom(legacyRoom, legacyWriter.Doctors, legacyWriter.Procedures);
+        var targetBefore = ReadyRoomSnapshot.From(context.Repository.LoadRooms(3).Single(room => room.RoomId == 1));
+        var legacyBefore = ReadyRoomSnapshot.From(context.Repository.LoadRooms(3).Single(room => room.RoomId == 2));
+        var targetLiveBefore = ReadyRoomSnapshot.From(GetLiveRoom(context.Store, 1));
+        var legacyLiveBefore = ReadyRoomSnapshot.From(GetLiveRoom(context.Store, 2));
+        var handoffsBefore = JsonSerializer.Serialize(
+            context.Repository.LoadReadyHandoffsByEpisode(targetBefore.EpisodeId!),
+            JsonOptions);
+        var eventsBefore = context.Store.GetSnapshot().RecentEvents.Count;
+        using var h = new Harness(workspace, context);
+
+        var response = await h.DoctorArrived(1, null);
+
+        Assert.Equal(409, response.StatusCode);
+        var conflict = Assert.IsType<DoctorArrivedConflictResponse>(response.Value);
+        Assert.Equal(2, conflict.ConflictingRoomId);
+        Assert.Equal("otte", conflict.DoctorId);
+        var durableAfter = context.Repository.LoadRooms(3);
+        Assert.Equal(targetBefore, ReadyRoomSnapshot.From(durableAfter.Single(room => room.RoomId == 1)));
+        Assert.Equal(legacyBefore, ReadyRoomSnapshot.From(durableAfter.Single(room => room.RoomId == 2)));
+        Assert.Equal(targetLiveBefore, ReadyRoomSnapshot.From(GetLiveRoom(context.Store, 1)));
+        Assert.Equal(legacyLiveBefore, ReadyRoomSnapshot.From(GetLiveRoom(context.Store, 2)));
+        Assert.Equal(handoffsBefore, JsonSerializer.Serialize(
+            context.Repository.LoadReadyHandoffsByEpisode(targetBefore.EpisodeId!),
+            JsonOptions));
+        Assert.Empty(context.Repository.LoadCompletedCycles());
+        Assert.Equal(eventsBefore, context.Store.GetSnapshot().RecentEvents.Count);
+        var reloaded = StoreContext.Create(workspace, Environments.Production, seed.DatabasePath);
+        Assert.Equal(targetBefore, ReadyRoomSnapshot.From(reloaded.Repository.LoadRooms(3).Single(room => room.RoomId == 1)));
+        Assert.Equal(legacyBefore, ReadyRoomSnapshot.From(reloaded.Repository.LoadRooms(3).Single(room => room.RoomId == 2)));
+        AssertLastAudit(await h.ReadAuditEntriesAsync(), "doctor-arrived", RoomStates.ReadyForDoctor, null, false, PrestagingLifecycleErrorCodes.LifecycleConflict);
+    }
+
+    [Fact]
+    public async Task Doctor_arrived_rejects_a_preexisting_cycle_without_rewriting_contradictory_history()
+    {
+        using var workspace = TestWorkspace.Create();
+        var context = StoreContext.Create(workspace, Environments.Production);
+        using var h = new Harness(workspace, context);
+        await h.Begin(1, null);
+        await h.Seat(1, """{"assignment":{"doctorId":"otte","procedureCode":"CON","confirmedExpectedAllocationUnits":1}}""");
+        Action(await h.Ready(1, "{}"));
+        var ready = context.Repository.LoadRooms(3).Single(room => room.RoomId == 1);
+        var activeHandoff = Assert.Single(context.Repository.LoadReadyHandoffsByEpisode(ready.EpisodeId!));
+        var contradictoryCycle = new CompletedRoomCycle
+        {
+            EpisodeId = "contradictory-episode",
+            AcceptedReadyHandoffId = "contradictory-handoff",
+            RoomId = 1,
+            AssignedDoctor = "gibson",
+            ProcedureCode = "BX",
+            PrestageStartedAt = ready.PrestageStartedAt,
+            SeatedAt = ready.SeatedAt!.Value,
+            ReadyForDoctorAt = ready.ReadyForDoctorAt,
+            DoctorArrivedAt = ready.ReadyForDoctorAt!.Value.AddMinutes(1),
+            DoctorCompleteAt = ready.ReadyForDoctorAt.Value.AddMinutes(2),
+            RoomAvailableAt = ready.ReadyForDoctorAt.Value.AddMinutes(3),
+            SeatedToDoctorSeconds = 60,
+            PrepSeconds = 30,
+            ReadyToDoctorSeconds = 30,
+            DoctorInRoomSeconds = 60,
+            TurnoverSeconds = 60,
+            TotalRoomCycleSeconds = 180,
+            OriginalDefaultExpectedUnits = 2,
+            ExpectedAllocationUnits = 2,
+            ExpectedAllocationMinutes = 20,
+            AllocationAdjustedFromDefault = false,
+            FinalWaitState = "ContradictoryHistory",
+            IsException = true,
+            RequiresReview = true,
+            ExceptionReason = "preserve-exactly",
+            SuggestedAction = "do-not-rewrite"
+        };
+        context.Repository.SaveCompletedCycle(contradictoryCycle, context.Doctors, context.Procedures);
+        var durableBefore = ReadyRoomSnapshot.From(ready);
+        var liveBefore = ReadyRoomSnapshot.From(GetLiveRoom(context.Store));
+        var cycleBefore = JsonSerializer.Serialize(context.Repository.LoadCompletedCycles(), JsonOptions);
+        var handoffBefore = JsonSerializer.Serialize(activeHandoff, JsonOptions);
+        var eventsBefore = context.Store.GetSnapshot().RecentEvents.Count;
+
+        AssertError(await h.DoctorArrived(1, "{}"), 409, PrestagingLifecycleErrorCodes.IntegrityFault);
+
+        Assert.Equal(durableBefore, ReadyRoomSnapshot.From(context.Repository.LoadRooms(3).Single(room => room.RoomId == 1)));
+        Assert.Equal(liveBefore, ReadyRoomSnapshot.From(GetLiveRoom(context.Store)));
+        Assert.Equal(cycleBefore, JsonSerializer.Serialize(context.Repository.LoadCompletedCycles(), JsonOptions));
+        Assert.Equal(handoffBefore, JsonSerializer.Serialize(context.Repository.LoadReadyHandoff(activeHandoff.HandoffId), JsonOptions));
+        Assert.Equal(eventsBefore, context.Store.GetSnapshot().RecentEvents.Count);
+        Assert.Equal(ReadyHandoffStatus.Active, context.Repository.LoadReadyHandoff(activeHandoff.HandoffId)!.ContractStatus);
+        Assert.Null(context.Repository.LoadRooms(3).Single(room => room.RoomId == 1).DoctorArrivedAt);
+        var reloaded = StoreContext.Create(workspace, Environments.Production, context.DatabasePath);
+        Assert.Equal(durableBefore, ReadyRoomSnapshot.From(reloaded.Repository.LoadRooms(3).Single(room => room.RoomId == 1)));
+        Assert.Equal(cycleBefore, JsonSerializer.Serialize(reloaded.Repository.LoadCompletedCycles(), JsonOptions));
+        AssertLastAudit(await h.ReadAuditEntriesAsync(), "doctor-arrived", RoomStates.ReadyForDoctor, null, false, PrestagingLifecycleErrorCodes.IntegrityFault);
+    }
+
+    [Fact]
+    public async Task Canonical_doctor_arrived_preserves_the_accepted_snapshot_through_final_reporting()
+    {
+        using var workspace = TestWorkspace.Create();
+        var clock = new ManualTimeProvider(new DateTimeOffset(2026, 7, 15, 14, 0, 0, TimeSpan.Zero));
+        var context = StoreContext.Create(workspace, Environments.Production, timeProvider: clock);
+        using var h = new Harness(workspace, context);
+        await h.Begin(1, null);
+        await h.Seat(1, """{"assignment":{"doctorId":"pledger","procedureCode":"EXT","sedationChoice":"yes","confirmedExpectedAllocationUnits":4}}""");
+        var ready = Action(await h.Ready(1, "{}"));
+        clock.SetUtcNow(clock.GetUtcNow().AddMinutes(5));
+        Action(await h.DoctorArrived(1, "{}"));
+        var episodeId = context.Repository.LoadRooms(3).Single(room => room.RoomId == 1).EpisodeId!;
+        clock.SetUtcNow(clock.GetUtcNow().AddMinutes(20));
+        Assert.NotNull(context.Store.MarkDoctorComplete(1));
+        clock.SetUtcNow(clock.GetUtcNow().AddMinutes(5));
+        Assert.NotNull(context.Store.MarkRoomAvailable(1));
+
+        var accepted = Assert.Single(context.Repository.LoadReadyHandoffsByEpisode(episodeId));
+        var durableCycle = Assert.Single(context.Repository.LoadCompletedCycles());
+        var reports = context.Store.GetReports();
+        var reportedCycle = Assert.Single(reports.RecentCompletedCycles);
+
+        Assert.Equal(ReadyHandoffStatus.Accepted, accepted.ContractStatus);
+        Assert.Equal(ready.Handoff!.HandoffId, accepted.HandoffId);
+        Assert.Equal("pledger", accepted.Assignment.DoctorId);
+        Assert.Equal("EXT+SED", accepted.Assignment.ProcedureCode);
+        Assert.Equal(SedationState.EligibleYes, accepted.Assignment.SedationState);
+        Assert.Equal(4, accepted.Assignment.ExpectedAllocationConfirmedUnits);
+        Assert.Equal(accepted.HandoffId, durableCycle.AcceptedReadyHandoffId);
+        Assert.Equal(accepted.Assignment.DoctorId, durableCycle.AssignedDoctor);
+        Assert.Equal(accepted.Assignment.ProcedureCode, durableCycle.ProcedureCode);
+        Assert.Equal(accepted.Assignment.ExpectedAllocationConfirmedUnits, durableCycle.ExpectedAllocationUnits);
+        Assert.Equal(accepted.Assignment.ExpectedAllocationConfirmedUnits!.Value * 10, durableCycle.ExpectedAllocationMinutes);
+        Assert.Equal((int)(accepted.AcceptedAt!.Value - accepted.ReadyAt).TotalSeconds, durableCycle.ReadyToDoctorSeconds);
+        Assert.Equal(300, durableCycle.ReadyToDoctorSeconds);
+        Assert.Equal(durableCycle.AcceptedReadyHandoffId, reportedCycle.AcceptedReadyHandoffId);
+        Assert.Equal(durableCycle.AssignedDoctor, reportedCycle.AssignedDoctor);
+        Assert.Equal(durableCycle.ProcedureCode, reportedCycle.ProcedureCode);
+        Assert.Equal(durableCycle.ExpectedAllocationUnits, reportedCycle.ExpectedAllocationUnits);
+        Assert.Equal(durableCycle.ReadyToDoctorSeconds, reportedCycle.ReadyToDoctorSeconds);
+        Assert.Equal(1, reports.SedationCaseCount);
+        Assert.Equal(0, reports.NonSedationCaseCount);
+
+        var reloaded = StoreContext.Create(workspace, Environments.Production, context.DatabasePath);
+        var reloadedReportCycle = Assert.Single(reloaded.Store.GetReports().RecentCompletedCycles);
+        Assert.Equal(durableCycle.AcceptedReadyHandoffId, reloadedReportCycle.AcceptedReadyHandoffId);
+        Assert.Equal(durableCycle.AssignedDoctor, reloadedReportCycle.AssignedDoctor);
+        Assert.Equal(durableCycle.ProcedureCode, reloadedReportCycle.ProcedureCode);
+        Assert.Equal(durableCycle.ExpectedAllocationUnits, reloadedReportCycle.ExpectedAllocationUnits);
+        Assert.Equal(durableCycle.ReadyToDoctorSeconds, reloadedReportCycle.ReadyToDoctorSeconds);
+    }
+
+    [Fact]
+    public async Task Canonical_doctor_arrived_keeps_assignment_details_locked_without_mutation()
+    {
+        using var workspace = TestWorkspace.Create();
+        var context = StoreContext.Create(workspace, Environments.Production);
+        using var h = new Harness(workspace, context);
+        await h.Begin(1, null);
+        await h.Seat(1, """{"assignment":{"doctorId":"pledger","procedureCode":"EXT","sedationChoice":"yes","confirmedExpectedAllocationUnits":4}}""");
+        Action(await h.Ready(1, "{}"));
+        Action(await h.DoctorArrived(1, "{}"));
+        var roomBefore = ReadyRoomSnapshot.From(h.Context.Repository.LoadRooms(3).Single(room => room.RoomId == 1));
+        var liveBefore = ReadyRoomSnapshot.From(GetLiveRoom(h.Context.Store));
+        var handoffBefore = JsonSerializer.Serialize(h.Context.Repository.LoadReadyHandoffsByEpisode(roomBefore.EpisodeId!), JsonOptions);
+        var cyclesBefore = JsonSerializer.Serialize(h.Context.Repository.LoadCompletedCycles(), JsonOptions);
+        var reportsBefore = JsonSerializer.Serialize(h.Context.Store.GetReports(), JsonOptions);
+        var eventsBefore = h.Context.Store.GetSnapshot().RecentEvents.Count;
+
+        AssertError(
+            await h.Save(1, """{"doctorId":"otte","procedureCode":"CON","confirmedExpectedAllocationUnits":1}"""),
+            409,
+            PrestagingLifecycleErrorCodes.AssignmentLocked);
+
+        Assert.Equal(roomBefore, ReadyRoomSnapshot.From(h.Context.Repository.LoadRooms(3).Single(room => room.RoomId == 1)));
+        Assert.Equal(liveBefore, ReadyRoomSnapshot.From(GetLiveRoom(h.Context.Store)));
+        Assert.Equal(handoffBefore, JsonSerializer.Serialize(h.Context.Repository.LoadReadyHandoffsByEpisode(roomBefore.EpisodeId!), JsonOptions));
+        Assert.Equal(cyclesBefore, JsonSerializer.Serialize(h.Context.Repository.LoadCompletedCycles(), JsonOptions));
+        Assert.Equal(reportsBefore, JsonSerializer.Serialize(h.Context.Store.GetReports(), JsonOptions));
+        Assert.Equal(eventsBefore, h.Context.Store.GetSnapshot().RecentEvents.Count);
+        var reloaded = StoreContext.Create(workspace, Environments.Production, context.DatabasePath);
+        Assert.Equal(roomBefore, ReadyRoomSnapshot.From(reloaded.Repository.LoadRooms(3).Single(room => room.RoomId == 1)));
+        Assert.Equal(handoffBefore, JsonSerializer.Serialize(reloaded.Repository.LoadReadyHandoffsByEpisode(roomBefore.EpisodeId!), JsonOptions));
+        Assert.Equal(cyclesBefore, JsonSerializer.Serialize(reloaded.Repository.LoadCompletedCycles(), JsonOptions));
+        AssertLastAudit(await h.ReadAuditEntriesAsync(), "save-assignment-details", RoomStates.DoctorInRoom, null, false, PrestagingLifecycleErrorCodes.AssignmentLocked);
+    }
+
+    [Theory]
+    [InlineData("text/plain", "{}")]
+    [InlineData("application/json", " ")]
+    [InlineData("application/json", "[]")]
+    [InlineData("application/json", "{not-json}")]
+    [InlineData("application/json", "{\"unknown\":true}")]
+    [InlineData("application/json", "{\"unknown\":true,\"Unknown\":false}")]
+    public async Task Canonical_doctor_arrived_rejects_invalid_wire_shapes(string contentType, string body)
+    {
+        using var h = new Harness();
+        AssertError(await h.DoctorArrived(1, body, contentType), 400, PrestagingLifecycleErrorCodes.MalformedRequest);
+        AssertLastAudit(await h.ReadAuditEntriesAsync(), "doctor-arrived", RoomStates.Available, null, false, PrestagingLifecycleErrorCodes.MalformedRequest);
+    }
+
     private static string[] Names(string json) => JsonDocument.Parse(json).RootElement.EnumerateObject().Select(p => p.Name).ToArray();
     private static RoomAssignmentContract CompleteConsult() =>
         RoomAssignmentContract.Create(
@@ -873,12 +1535,12 @@ public sealed class PrestagingLifecycleEndpointTests
         string? reason) =>
         AssertAudit(Assert.Single(entries.Where(entry => entry.Action == action)), action, previousState, newState, success, reason);
 
-    private static RoomState GetLiveRoom(DemoBoardStore store)
+    private static RoomState GetLiveRoom(DemoBoardStore store, int roomId = 1)
     {
         var field = typeof(DemoBoardStore).GetField("_rooms", BindingFlags.Instance | BindingFlags.NonPublic);
         Assert.NotNull(field);
         var rooms = Assert.IsType<List<RoomState>>(field.GetValue(store));
-        return rooms.Single(room => room.RoomId == 1);
+        return rooms.Single(room => room.RoomId == roomId);
     }
 
     private static RoomState CopyRoom(RoomState room) =>
@@ -933,6 +1595,20 @@ public sealed class PrestagingLifecycleEndpointTests
     private static void DropWithdrawFailureTrigger(string databasePath) =>
         ExecuteSql(databasePath, "DROP TRIGGER IF EXISTS fail_withdraw_endpoint_update;");
 
+    private static void InstallDoctorArrivedFailureTrigger(string databasePath) =>
+        ExecuteSql(databasePath, """
+            CREATE TRIGGER fail_doctor_arrived_endpoint_cycle_insert
+            AFTER INSERT ON completed_room_cycles
+            FOR EACH ROW
+            WHEN NEW.room_id = 1
+            BEGIN
+                SELECT RAISE(ABORT, 'injected doctor arrived cycle failure');
+            END;
+            """);
+
+    private static void DropDoctorArrivedFailureTrigger(string databasePath) =>
+        ExecuteSql(databasePath, "DROP TRIGGER IF EXISTS fail_doctor_arrived_endpoint_cycle_insert;");
+
     private static void CorruptReadyHandoff(string databasePath, PersistedReadyHandoff handoff, string corruption)
     {
         var id = handoff.HandoffId.Replace("'", "''", StringComparison.Ordinal);
@@ -972,6 +1648,11 @@ public sealed class PrestagingLifecycleEndpointTests
                     expected_allocation_state, expected_allocation_suggested_units,
                     expected_allocation_confirmed_units
                 FROM ready_handoffs
+                WHERE handoff_id = '{id}';
+                """,
+            "conflicting-active" => $"""
+                UPDATE ready_handoffs
+                SET handoff_id = 'unreferenced-active'
                 WHERE handoff_id = '{id}';
                 """,
             _ => throw new ArgumentOutOfRangeException(nameof(corruption), corruption, "Unknown handoff corruption.")
@@ -1018,6 +1699,7 @@ public sealed class PrestagingLifecycleEndpointTests
         public async Task<Response> Seat(int room, string? body) => Capture(await global::RoomLifecycleEndpointHandler.SeatAsync(room, Request(room, body), _validator, Context.Store, _environment, _logger, new NoopBoardHubContext()));
         public async Task<Response> Ready(int room, string? body, string? contentType = "application/json") => Capture(await global::RoomLifecycleEndpointHandler.ReadyForDoctorAsync(room, Request(room, body, contentType), _validator, Context.Store, _logger, new NoopBoardHubContext()));
         public async Task<Response> Withdraw(int room, string? body, string? contentType = "application/json") => Capture(await global::RoomLifecycleEndpointHandler.WithdrawReadyAsync(room, Request(room, body, contentType), _validator, Context.Store, _logger, new NoopBoardHubContext()));
+        public async Task<Response> DoctorArrived(int room, string? body, string? contentType = "application/json") => Capture(await global::RoomLifecycleEndpointHandler.DoctorArrivedAsync(room, Request(room, body, contentType), _validator, Context.Store, _logger, new NoopBoardHubContext()));
         public async Task<IReadOnlyList<RoomAuditEntry>> ReadAuditEntriesAsync()
         {
             var path = Path.Combine(_workspace.DataRoot, "logs", "room-audit.log");

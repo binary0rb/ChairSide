@@ -380,69 +380,7 @@ app.MapPost("/api/rooms/{roomNumber:int}/cancel-seating", RoomLifecycleEndpointH
 app.MapPost("/api/rooms/{roomNumber:int}/ready-for-doctor", RoomLifecycleEndpointHandler.ReadyForDoctorAsync);
 app.MapPost("/api/rooms/{roomNumber:int}/withdraw-ready", RoomLifecycleEndpointHandler.WithdrawReadyAsync);
 
-app.MapPost("/api/rooms/{roomNumber:int}/doctor-arrived", async Task<IResult> (
-    int roomNumber,
-    HttpContext httpContext,
-    RoomDeviceTokenValidator roomDeviceTokenValidator,
-    DemoBoardStore store,
-    DiagnosticLogger diagnosticLogger,
-    Microsoft.AspNetCore.SignalR.IHubContext<BoardHub> hubContext) =>
-{
-    var auditCtx = AuditRequestContext.From(httpContext);
-    var previousRoom = store.GetRoom(roomNumber);
-
-    var bindingFailure = RoomDeviceBindingGuard.ValidateMutationRequest(
-        roomNumber,
-        httpContext.Request,
-        roomDeviceTokenValidator);
-    if (bindingFailure is not null)
-    {
-        await diagnosticLogger.LogRoomAuditAsync(auditCtx.Build(
-            "doctor-arrived", roomNumber, previousRoom, null, false, "binding-rejected",
-            previousRoom?.AssignedDoctor, previousRoom?.ProcedureCode));
-        return bindingFailure;
-    }
-
-    var outcome = store.TryMarkDoctorArrived(roomNumber);
-
-    if (outcome.Outcome == DoctorArrivalOutcome.NotConfigured)
-    {
-        await diagnosticLogger.LogRoomAuditAsync(auditCtx.Build(
-            "doctor-arrived", roomNumber, previousRoom, null, false, "room-not-found",
-            previousRoom?.AssignedDoctor, previousRoom?.ProcedureCode));
-        return Results.NotFound("Room is not configured.");
-    }
-
-    if (outcome.Outcome == DoctorArrivalOutcome.Rejected)
-    {
-        await diagnosticLogger.LogRoomAuditAsync(auditCtx.Build(
-            "doctor-arrived", roomNumber, previousRoom, null, false, "state-rejected",
-            previousRoom?.AssignedDoctor, previousRoom?.ProcedureCode));
-        return Results.BadRequest("Doctor Arrived is only available when the room is marked ready for doctor.");
-    }
-
-    if (outcome.Outcome == DoctorArrivalOutcome.Conflict)
-    {
-        var conflict = outcome.Conflict!;
-        await diagnosticLogger.LogRoomAuditAsync(auditCtx.Build(
-            "doctor-arrived", roomNumber, previousRoom, null, false, "doctor-conflict",
-            previousRoom?.AssignedDoctor, previousRoom?.ProcedureCode));
-        return Results.Json(
-            new DoctorArrivedConflictResponse(
-                "Doctor is already marked in another room.",
-                conflict.ConflictingRoomId,
-                conflict.DoctorId,
-                conflict.DoctorDisplayName),
-            statusCode: StatusCodes.Status409Conflict);
-    }
-
-    var result = outcome.Status!;
-    await diagnosticLogger.LogRoomAuditAsync(auditCtx.Build(
-        "doctor-arrived", roomNumber, previousRoom, result, true, null,
-        result.AssignedDoctor, result.ProcedureCode));
-    await hubContext.Clients.All.SendAsync("boardUpdated", store.GetSnapshot());
-    return Results.Ok(result);
-});
+app.MapPost("/api/rooms/{roomNumber:int}/doctor-arrived", RoomLifecycleEndpointHandler.DoctorArrivedAsync);
 
 // Resolve a doctor-arrival conflict: complete the conflicting old room (it moves to TURNOVER, not
 // Available) and then mark the current room Doctor Arrived. The store revalidates the conflict
@@ -1180,6 +1118,63 @@ public static class RoomLifecycleEndpointHandler
             store.WithdrawReadyCanonical(roomNumber), store, diagnosticLogger, hubContext);
     }
 
+    public static async Task<IResult> DoctorArrivedAsync(
+        int roomNumber, HttpContext httpContext, RoomDeviceTokenValidator roomDeviceTokenValidator,
+        DemoBoardStore store, DiagnosticLogger diagnosticLogger, IHubContext<BoardHub> hubContext)
+    {
+        var auditCtx = AuditRequestContext.From(httpContext);
+        var previousRoom = store.GetRoom(roomNumber);
+        var bindingFailure = RoomDeviceBindingGuard.ValidateMutationRequest(
+            roomNumber,
+            httpContext.Request,
+            roomDeviceTokenValidator);
+        if (bindingFailure is not null)
+        {
+            await LogCanonicalValidationFailureAsync(
+                "doctor-arrived", roomNumber, previousRoom, "binding-rejected", auditCtx, diagnosticLogger);
+            return bindingFailure;
+        }
+
+        var (root, bodyError, wasBodyEmpty) = await StrictJsonRequestReader.ReadObjectWithPresenceAsync(
+            httpContext.Request,
+            treatWhitespaceAsEmpty: false);
+        if (bodyError is not null)
+        {
+            await LogCanonicalValidationFailureAsync(
+                "doctor-arrived", roomNumber, previousRoom, PrestagingLifecycleErrorCodes.MalformedRequest, auditCtx, diagnosticLogger);
+            return CanonicalError(PrestagingLifecycleErrorCodes.MalformedRequest, "The request body is malformed.");
+        }
+
+        var parsed = PrestagingLifecycleRequestParser.ParseEmptyAction(root.GetRawText());
+        if (parsed.Error is not null)
+        {
+            await LogCanonicalValidationFailureAsync(
+                "doctor-arrived", roomNumber, previousRoom, parsed.Error.Code, auditCtx, diagnosticLogger);
+            return CanonicalError(parsed.Error, StatusCodes.Status400BadRequest);
+        }
+
+        var mutation = store.MarkDoctorArrivedCanonical(roomNumber);
+        if (wasBodyEmpty
+            && mutation.Outcome == PrestagingLifecycleMutationOutcome.LifecycleConflict
+            && mutation.DoctorArrivalConflict is { } conflict)
+        {
+            await LogCanonicalValidationFailureAsync(
+                "doctor-arrived", roomNumber, previousRoom, PrestagingLifecycleErrorCodes.LifecycleConflict, auditCtx, diagnosticLogger);
+            return Results.Json(
+                new DoctorArrivedConflictResponse(
+                    "Doctor is already marked in another room.",
+                    conflict.ConflictingRoomId,
+                    conflict.DoctorId,
+                    conflict.DoctorDisplayName),
+                statusCode: StatusCodes.Status409Conflict);
+        }
+
+        return await CompleteCanonicalMutationAsync(
+            "doctor-arrived", roomNumber, previousRoom, auditCtx,
+            mutation, store, diagnosticLogger, hubContext,
+            returnLegacyRoomResponse: wasBodyEmpty);
+    }
+
     private static async Task<IResult> CompleteCanonicalMutationAsync(
         string action, int roomNumber, RoomStatus? previousRoom, AuditRequestContext auditCtx,
         PrestagingLifecycleMutationResult mutation,
@@ -1200,6 +1195,7 @@ public static class RoomLifecycleEndpointHandler
             RoomStates.Prestaging => CanonicalRoomLifecycleState.Prestaging,
             RoomStates.Seated => CanonicalRoomLifecycleState.SeatedInPrep,
             RoomStates.ReadyForDoctor or RoomStates.Aging or RoomStates.Stale => CanonicalRoomLifecycleState.ReadyForDoctor,
+            RoomStates.DoctorInRoom => CanonicalRoomLifecycleState.DoctorWorking,
             _ => throw new InvalidOperationException($"Canonical mutation returned unsupported room state '{room.State}'.")
         };
         await diagnosticLogger.LogRoomAuditAsync(auditCtx.Build(
