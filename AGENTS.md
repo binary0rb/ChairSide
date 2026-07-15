@@ -270,6 +270,21 @@ Reports should be operational, non-punitive, and team-process oriented. Avoid do
 
 Workshop and projection language should frame outputs as scenario exploration, not prediction. Do not imply ChairSide can perfectly predict capacity or that observed slack is automatically recoverable time.
 
+## Data Analytics skills for reporting work
+
+The Data Analytics plugin is available as a bundled set of skills. Invoke the narrowest relevant skill explicitly; do not ask the bundle to choose or run every analytics workflow by default.
+
+Use this sequence for ChairSide reporting and metrics work:
+
+1. Use `$create-data-context` only when the task explicitly asks to create or maintain a durable ChairSide reporting semantic layer. Ordinary analysis does not require saved context.
+2. Use `$analyze-data-quality` before relying on new extracts, joins, populations, or dashboards. Check freshness, grain, nulls, duplicates, timestamp ordering, handoff consistency, outliers, and source-definition conflicts.
+3. Use `$metric-diagnostics` when explaining why an approved metric changed across time, doctors, rooms, procedures, sedation, allocation, or other reviewed dimensions.
+4. Use `$validate-data` before sharing analytical conclusions. Verify source selection, population rules, calculations, comparisons, visuals, caveats, and whether the evidence supports the conclusion.
+5. Use `$visualize-data` only after the metric definition and data quality are settled. Keep charts operational, non-punitive, and aligned with the approved reporting populations.
+6. Use `$build-report` when a durable stakeholder-facing analysis is requested. Use `$jupyter-notebooks` when reproducible SQL, Python, statistics, or an auditable calculation materially improves the work.
+
+Defer `$design-kpis`, `$build-dashboard`, and `$kpi-reporting` until canonical metric definitions, sources, and data quality have been reviewed and the user explicitly requests that artifact or framework. Do not create rankings, individual performance scores, quotas, best/worst framing, or causal claims from descriptive operational data. Separate durable source facts, derived metrics, presentation-only values, and proposed future measures. Never include or infer PHI.
+
 ## MVP features
 
 Build the MVP around:
