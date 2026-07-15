@@ -74,6 +74,109 @@ public sealed class PrestagingLifecycleEndpointTests
         Assert.Equal(before, h.Context.Store.GetRoom(1));
     }
 
+    [Theory]
+    [InlineData("   ", "application/json")]
+    [InlineData("   ", null)]
+    [InlineData("{}", "text/plain")]
+    public async Task Begin_rejects_nonempty_malformed_or_non_json_bodies_without_mutation(
+        string body,
+        string? contentType)
+    {
+        using var h = new Harness();
+        var durableBefore = ReadyRoomSnapshot.From(
+            h.Context.Repository.LoadRooms(3).Single(room => room.RoomId == 1));
+        var liveBefore = ReadyRoomSnapshot.From(GetLiveRoom(h.Context.Store));
+        var eventsBefore = h.Context.Store.GetSnapshot().RecentEvents.Count;
+        var auditsBefore = (await h.ReadAuditEntriesAsync()).Count;
+
+        var response = await h.Begin(1, body, contentType);
+
+        AssertError(response, 400, PrestagingLifecycleErrorCodes.MalformedRequest);
+        Assert.Equal(
+            durableBefore,
+            ReadyRoomSnapshot.From(h.Context.Repository.LoadRooms(3).Single(room => room.RoomId == 1)));
+        Assert.Equal(liveBefore, ReadyRoomSnapshot.From(GetLiveRoom(h.Context.Store)));
+        Assert.Equal(eventsBefore, h.Context.Store.GetSnapshot().RecentEvents.Count);
+        var audits = await h.ReadAuditEntriesAsync();
+        Assert.Equal(auditsBefore + 1, audits.Count);
+        AssertLastAudit(
+            audits,
+            "begin-prestage",
+            RoomStates.Available,
+            null,
+            false,
+            PrestagingLifecycleErrorCodes.MalformedRequest);
+    }
+
+    [Theory]
+    [InlineData("   ", "application/json")]
+    [InlineData("   ", null)]
+    [InlineData("{}", "text/plain")]
+    public async Task Seat_rejects_nonempty_malformed_or_non_json_bodies_without_mutation(
+        string body,
+        string? contentType)
+    {
+        using var h = new Harness();
+        await h.Begin(1, null);
+        await h.Save(1, """{"doctorId":"otte","procedureCode":"EXT"}""");
+        var durableBefore = ReadyRoomSnapshot.From(
+            h.Context.Repository.LoadRooms(3).Single(room => room.RoomId == 1));
+        var liveBefore = ReadyRoomSnapshot.From(GetLiveRoom(h.Context.Store));
+        var eventsBefore = h.Context.Store.GetSnapshot().RecentEvents.Count;
+        var auditsBefore = (await h.ReadAuditEntriesAsync()).Count;
+
+        var response = await h.Seat(1, body, contentType);
+
+        AssertError(response, 400, PrestagingLifecycleErrorCodes.MalformedRequest);
+        Assert.Equal(
+            durableBefore,
+            ReadyRoomSnapshot.From(h.Context.Repository.LoadRooms(3).Single(room => room.RoomId == 1)));
+        Assert.Equal(liveBefore, ReadyRoomSnapshot.From(GetLiveRoom(h.Context.Store)));
+        Assert.Equal(eventsBefore, h.Context.Store.GetSnapshot().RecentEvents.Count);
+        var audits = await h.ReadAuditEntriesAsync();
+        Assert.Equal(auditsBefore + 1, audits.Count);
+        AssertLastAudit(
+            audits,
+            "seat",
+            RoomStates.Prestaging,
+            null,
+            false,
+            PrestagingLifecycleErrorCodes.MalformedRequest);
+    }
+
+    [Fact]
+    public async Task Canonical_assignment_conversion_failures_audit_invalid_assignment()
+    {
+        using var h = new Harness();
+        await h.Begin(1, null);
+        await h.Begin(2, null);
+
+        AssertError(
+            await h.Save(1, """{"procedureCode":"EXT+SED"}"""),
+            400,
+            PrestagingLifecycleErrorCodes.InvalidAssignment);
+        AssertError(
+            await h.Seat(2, """{"assignment":{"procedureCode":"EXT+SED"}}"""),
+            400,
+            PrestagingLifecycleErrorCodes.InvalidAssignment);
+
+        var entries = await h.ReadAuditEntriesAsync();
+        AssertAudit(
+            Assert.Single(entries.Where(entry => entry.Action == "save-assignment-details")),
+            "save-assignment-details",
+            RoomStates.Prestaging,
+            null,
+            false,
+            PrestagingLifecycleErrorCodes.InvalidAssignment);
+        AssertAudit(
+            Assert.Single(entries.Where(entry => entry.Action == "seat")),
+            "seat",
+            RoomStates.Prestaging,
+            null,
+            false,
+            PrestagingLifecycleErrorCodes.InvalidAssignment);
+    }
+
     [Fact]
     public async Task Assignment_details_reports_room_not_found()
     {
@@ -90,6 +193,13 @@ public sealed class PrestagingLifecycleEndpointTests
         Assert.NotNull(h.Context.Store.SeatRoom(1));
         Assert.NotNull(h.Context.Store.MarkReadyForDoctor(1));
         AssertError(await h.Save(1, """{"doctorId":"pledger","procedureCode":"EXT","sedationChoice":"no","confirmedExpectedAllocationUnits":3}"""), 409, PrestagingLifecycleErrorCodes.AssignmentLocked);
+        AssertLastAudit(
+            await h.ReadAuditEntriesAsync(),
+            "save-assignment-details",
+            RoomStates.ReadyForDoctor,
+            null,
+            false,
+            PrestagingLifecycleErrorCodes.AssignmentLocked);
     }
 
     [Fact]
@@ -105,6 +215,13 @@ public sealed class PrestagingLifecycleEndpointTests
         Assert.Equal(AssignmentCompleteness.Complete, bearing.Lifecycle.Assignment.Completeness);
         Assert.NotNull(bearing.Room.SeatedAt);
         AssertError(await h.Seat(3, "{}"), 409, PrestagingLifecycleErrorCodes.LifecycleConflict);
+        AssertAudit(
+            (await h.ReadAuditEntriesAsync()).Last(entry => entry.Action == "seat"),
+            "seat",
+            RoomStates.Available,
+            null,
+            false,
+            PrestagingLifecycleErrorCodes.LifecycleConflict);
 
         using var h2 = new Harness();
         await h2.Begin(1, null);
@@ -1694,9 +1811,9 @@ public sealed class PrestagingLifecycleEndpointTests
             _logger = new(Microsoft.Extensions.Options.Options.Create(new DiagnosticOptions { LogDirectory = Path.Combine(_workspace.DataRoot, "logs") }), _environment);
         }
         public StoreContext Context { get; }
-        public async Task<Response> Begin(int room, string? body) => Capture(await global::RoomLifecycleEndpointHandler.BeginPrestageRouteAsync(room, Request(room, body), _validator, Context.Store, _logger, new NoopBoardHubContext()));
+        public async Task<Response> Begin(int room, string? body, string? contentType = "application/json") => Capture(await global::RoomLifecycleEndpointHandler.BeginPrestageRouteAsync(room, Request(room, body, contentType), _validator, Context.Store, _logger, new NoopBoardHubContext()));
         public async Task<Response> Save(int room, string? body, string? contentType = "application/json") => Capture(await global::RoomLifecycleEndpointHandler.SaveAssignmentDetailsAsync(room, Request(room, body, contentType), _validator, Context.Store, _logger, new NoopBoardHubContext()));
-        public async Task<Response> Seat(int room, string? body) => Capture(await global::RoomLifecycleEndpointHandler.SeatAsync(room, Request(room, body), _validator, Context.Store, _environment, _logger, new NoopBoardHubContext()));
+        public async Task<Response> Seat(int room, string? body, string? contentType = "application/json") => Capture(await global::RoomLifecycleEndpointHandler.SeatAsync(room, Request(room, body, contentType), _validator, Context.Store, _environment, _logger, new NoopBoardHubContext()));
         public async Task<Response> Ready(int room, string? body, string? contentType = "application/json") => Capture(await global::RoomLifecycleEndpointHandler.ReadyForDoctorAsync(room, Request(room, body, contentType), _validator, Context.Store, _logger, new NoopBoardHubContext()));
         public async Task<Response> Withdraw(int room, string? body, string? contentType = "application/json") => Capture(await global::RoomLifecycleEndpointHandler.WithdrawReadyAsync(room, Request(room, body, contentType), _validator, Context.Store, _logger, new NoopBoardHubContext()));
         public async Task<Response> DoctorArrived(int room, string? body, string? contentType = "application/json") => Capture(await global::RoomLifecycleEndpointHandler.DoctorArrivedAsync(room, Request(room, body, contentType), _validator, Context.Store, _logger, new NoopBoardHubContext()));

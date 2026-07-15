@@ -959,11 +959,13 @@ public static class RoomLifecycleEndpointHandler
                 "begin-prestage", roomNumber, previousRoom, "binding-rejected", auditCtx, diagnosticLogger);
             return bindingFailure;
         }
-        var (root, bodyError) = await StrictJsonRequestReader.ReadObjectAsync(httpContext.Request);
+        var (root, bodyError, _) = await StrictJsonRequestReader.ReadObjectWithPresenceAsync(
+            httpContext.Request,
+            treatWhitespaceAsEmpty: false);
         if (bodyError is not null)
         {
             await LogCanonicalValidationFailureAsync(
-                "begin-prestage", roomNumber, previousRoom, "validation-failed", auditCtx, diagnosticLogger);
+                "begin-prestage", roomNumber, previousRoom, PrestagingLifecycleErrorCodes.MalformedRequest, auditCtx, diagnosticLogger);
             return CanonicalError(PrestagingLifecycleErrorCodes.MalformedRequest, "The request body is malformed.");
         }
         if (!root.EnumerateObject().Any())
@@ -976,7 +978,7 @@ public static class RoomLifecycleEndpointHandler
         if (propertyError is not null)
         {
             await LogCanonicalValidationFailureAsync(
-                "begin-prestage", roomNumber, previousRoom, "validation-failed", auditCtx, diagnosticLogger);
+                "begin-prestage", roomNumber, previousRoom, PrestagingLifecycleErrorCodes.MalformedRequest, auditCtx, diagnosticLogger);
             return CanonicalError(PrestagingLifecycleErrorCodes.MalformedRequest, "The request contains unknown or duplicate properties.");
         }
         BeginPrestageRequest? request;
@@ -984,7 +986,7 @@ public static class RoomLifecycleEndpointHandler
         catch (JsonException)
         {
             await LogCanonicalValidationFailureAsync(
-                "begin-prestage", roomNumber, previousRoom, "validation-failed", auditCtx, diagnosticLogger);
+                "begin-prestage", roomNumber, previousRoom, PrestagingLifecycleErrorCodes.MalformedRequest, auditCtx, diagnosticLogger);
             return CanonicalError(PrestagingLifecycleErrorCodes.MalformedRequest, "The compatibility request is malformed.");
         }
         return await BeginPrestageAsync(roomNumber, request ?? new(), httpContext, roomDeviceTokenValidator, store, diagnosticLogger, hubContext);
@@ -1006,7 +1008,7 @@ public static class RoomLifecycleEndpointHandler
         if (!httpContext.Request.HasJsonContentType())
         {
             await LogCanonicalValidationFailureAsync(
-                "save-assignment-details", roomNumber, previousRoom, "validation-failed", auditCtx, diagnosticLogger);
+                "save-assignment-details", roomNumber, previousRoom, PrestagingLifecycleErrorCodes.MalformedRequest, auditCtx, diagnosticLogger);
             return CanonicalError(PrestagingLifecycleErrorCodes.MalformedRequest, "The request body must use an application/json-compatible content type.");
         }
         using var reader = new StreamReader(httpContext.Request.Body, leaveOpen: true);
@@ -1015,14 +1017,14 @@ public static class RoomLifecycleEndpointHandler
         if (parsed.Error is not null)
         {
             await LogCanonicalValidationFailureAsync(
-                "save-assignment-details", roomNumber, previousRoom, "validation-failed", auditCtx, diagnosticLogger);
+                "save-assignment-details", roomNumber, previousRoom, parsed.Error.Code, auditCtx, diagnosticLogger);
             return CanonicalError(parsed.Error, StatusCodes.Status400BadRequest);
         }
         var converted = store.ConvertCanonicalAssignment(parsed.Value!);
         if (converted.Error is not null)
         {
             await LogCanonicalValidationFailureAsync(
-                "save-assignment-details", roomNumber, previousRoom, "validation-failed", auditCtx, diagnosticLogger);
+                "save-assignment-details", roomNumber, previousRoom, converted.Error.Code, auditCtx, diagnosticLogger);
             return CanonicalError(converted.Error, StatusCodes.Status400BadRequest);
         }
         return await CompleteCanonicalMutationAsync(
@@ -1408,11 +1410,13 @@ public static class RoomLifecycleEndpointHandler
             return bindingFailure;
         }
 
-        var (root, bodyError) = await StrictJsonRequestReader.ReadObjectAsync(httpContext.Request);
+        var (root, bodyError, _) = await StrictJsonRequestReader.ReadObjectWithPresenceAsync(
+            httpContext.Request,
+            treatWhitespaceAsEmpty: false);
         if (bodyError is not null)
         {
             await diagnosticLogger.LogRoomAuditAsync(auditCtx.Build(
-                "seat", roomNumber, previousRoom, null, false, "validation-failed",
+                "seat", roomNumber, previousRoom, null, false, PrestagingLifecycleErrorCodes.MalformedRequest,
                 previousRoom?.AssignedDoctor, previousRoom?.ProcedureCode));
             return CanonicalError(PrestagingLifecycleErrorCodes.MalformedRequest, "The request body is malformed.");
         }
@@ -1426,13 +1430,13 @@ public static class RoomLifecycleEndpointHandler
         if (hasUnknownFields)
         {
             await LogCanonicalValidationFailureAsync(
-                "seat", roomNumber, previousRoom, "validation-failed", auditCtx, diagnosticLogger);
+                "seat", roomNumber, previousRoom, PrestagingLifecycleErrorCodes.MalformedRequest, auditCtx, diagnosticLogger);
             return CanonicalError(PrestagingLifecycleErrorCodes.MalformedRequest, "The Seat request contains an unknown property.");
         }
         if (hasCanonicalAssignment && hasLegacyFields)
         {
             await LogCanonicalValidationFailureAsync(
-                "seat", roomNumber, previousRoom, "validation-failed", auditCtx, diagnosticLogger);
+                "seat", roomNumber, previousRoom, PrestagingLifecycleErrorCodes.MalformedRequest, auditCtx, diagnosticLogger);
             return CanonicalError(PrestagingLifecycleErrorCodes.MalformedRequest, "Canonical and compatibility Seat properties cannot be mixed.");
         }
         if (properties.Length == 0 || hasCanonicalAssignment)
@@ -1441,7 +1445,7 @@ public static class RoomLifecycleEndpointHandler
             if (parsedCanonical.Error is not null)
             {
                 await LogCanonicalValidationFailureAsync(
-                    "seat", roomNumber, previousRoom, "validation-failed", auditCtx, diagnosticLogger);
+                    "seat", roomNumber, previousRoom, parsedCanonical.Error.Code, auditCtx, diagnosticLogger);
                 return CanonicalError(parsedCanonical.Error, 400);
             }
             RoomAssignmentContract? assignment = null;
@@ -1451,7 +1455,7 @@ public static class RoomLifecycleEndpointHandler
                 if (converted.Error is not null)
                 {
                     await LogCanonicalValidationFailureAsync(
-                        "seat", roomNumber, previousRoom, "validation-failed", auditCtx, diagnosticLogger);
+                        "seat", roomNumber, previousRoom, converted.Error.Code, auditCtx, diagnosticLogger);
                     return CanonicalError(converted.Error, 400);
                 }
                 assignment = converted.Value;
