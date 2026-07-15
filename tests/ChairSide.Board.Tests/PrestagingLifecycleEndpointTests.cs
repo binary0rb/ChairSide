@@ -1503,6 +1503,188 @@ public sealed class PrestagingLifecycleEndpointTests
     }
 
     [Fact]
+    public async Task Recovered_doctor_working_room_assignment_divergence_blocks_later_progression_without_mutation()
+    {
+        using var workspace = TestWorkspace.Create();
+        var seed = StoreContext.Create(workspace, Environments.Production);
+        using (var setup = new Harness(workspace, seed))
+        {
+            await setup.Begin(1, null);
+            await setup.Seat(1, """{"assignment":{"doctorId":"pledger","procedureCode":"EXT","sedationChoice":"yes","confirmedExpectedAllocationUnits":4}}""");
+            Action(await setup.Ready(1, "{}"));
+            Action(await setup.DoctorArrived(1, "{}"));
+        }
+
+        ExecuteSql(
+            seed.DatabasePath,
+            "UPDATE active_rooms SET assigned_doctor_id = 'otte', assigned_doctor_display_name = 'Dr. Otte' WHERE room_id = 1;");
+        var recovered = StoreContext.Create(workspace, Environments.Production, seed.DatabasePath);
+        using var h = new Harness(workspace, recovered);
+        var projected = recovered.Store.GetRoom(1);
+        Assert.NotNull(projected);
+        Assert.Contains(
+            projected.IntegrityFaults!,
+            fault => fault.Code == RoomIntegrityFaultCode.AcceptedHandoffAssignmentMismatch);
+        var roomBefore = ReadyRoomSnapshot.From(recovered.Repository.LoadRooms(3).Single(room => room.RoomId == 1));
+        var liveBefore = ReadyRoomSnapshot.From(GetLiveRoom(recovered.Store));
+        var handoffsBefore = JsonSerializer.Serialize(recovered.Repository.LoadReadyHandoffsByEpisode(roomBefore.EpisodeId!), JsonOptions);
+        var cyclesBefore = JsonSerializer.Serialize(recovered.Repository.LoadCompletedCycles(), JsonOptions);
+        var reportsBefore = JsonSerializer.Serialize(recovered.Store.GetReports(), JsonOptions);
+        var eventsBefore = recovered.Store.GetSnapshot().RecentEvents.Count;
+        var auditsBefore = (await h.ReadAuditEntriesAsync()).Count;
+
+        AssertError(await h.DoctorComplete(1), 409, PrestagingLifecycleErrorCodes.IntegrityFault);
+        AssertError(await h.RoomAvailable(1), 409, PrestagingLifecycleErrorCodes.IntegrityFault);
+
+        Assert.Equal(roomBefore, ReadyRoomSnapshot.From(recovered.Repository.LoadRooms(3).Single(room => room.RoomId == 1)));
+        Assert.Equal(liveBefore, ReadyRoomSnapshot.From(GetLiveRoom(recovered.Store)));
+        Assert.Equal(handoffsBefore, JsonSerializer.Serialize(recovered.Repository.LoadReadyHandoffsByEpisode(roomBefore.EpisodeId!), JsonOptions));
+        Assert.Equal(cyclesBefore, JsonSerializer.Serialize(recovered.Repository.LoadCompletedCycles(), JsonOptions));
+        Assert.Equal(reportsBefore, JsonSerializer.Serialize(recovered.Store.GetReports(), JsonOptions));
+        Assert.Equal(eventsBefore, recovered.Store.GetSnapshot().RecentEvents.Count);
+        var audits = await h.ReadAuditEntriesAsync();
+        Assert.Equal(auditsBefore + 2, audits.Count);
+        AssertLastAudit(audits, "doctor-complete", RoomStates.DoctorInRoom, null, false, PrestagingLifecycleErrorCodes.IntegrityFault);
+        AssertLastAudit(audits, "room-available", RoomStates.DoctorInRoom, null, false, PrestagingLifecycleErrorCodes.IntegrityFault);
+    }
+
+    [Theory]
+    [InlineData("accepted-status", RoomIntegrityFaultCode.AcceptedHandoffNotAccepted)]
+    [InlineData("accepted-timestamp", RoomIntegrityFaultCode.AcceptedHandoffHistoryMismatch)]
+    [InlineData("ready-timestamp", RoomIntegrityFaultCode.AcceptedHandoffHistoryMismatch)]
+    [InlineData("foreign-withdrawn-history", RoomIntegrityFaultCode.AcceptedHandoffHistoryMismatch)]
+    public async Task Recovered_accepted_handoff_history_divergence_blocks_doctor_complete_without_mutation(
+        string corruption,
+        RoomIntegrityFaultCode expectedFault)
+    {
+        using var workspace = TestWorkspace.Create();
+        var seed = StoreContext.Create(workspace, Environments.Production);
+        using (var setup = new Harness(workspace, seed))
+        {
+            await setup.Begin(1, null);
+            await setup.Seat(1, """{"assignment":{"doctorId":"pledger","procedureCode":"EXT","sedationChoice":"yes","confirmedExpectedAllocationUnits":4}}""");
+            Action(await setup.Ready(1, "{}"));
+            Action(await setup.DoctorArrived(1, "{}"));
+        }
+
+        CorruptAcceptedHandoffHistory(seed.DatabasePath, corruption);
+        var recovered = StoreContext.Create(workspace, Environments.Production, seed.DatabasePath);
+        using var h = new Harness(workspace, recovered);
+        var projected = recovered.Store.GetRoom(1);
+        Assert.NotNull(projected);
+        Assert.Contains(projected.IntegrityFaults!, fault => fault.Code == expectedFault);
+        var roomBefore = ReadyRoomSnapshot.From(recovered.Repository.LoadRooms(3).Single(room => room.RoomId == 1));
+        var liveBefore = ReadyRoomSnapshot.From(GetLiveRoom(recovered.Store));
+        var handoffsBefore = JsonSerializer.Serialize(recovered.Repository.LoadReadyHandoffsByEpisode(roomBefore.EpisodeId!), JsonOptions);
+        var cyclesBefore = JsonSerializer.Serialize(recovered.Repository.LoadCompletedCycles(), JsonOptions);
+        var eventsBefore = recovered.Store.GetSnapshot().RecentEvents.Count;
+        var auditsBefore = (await h.ReadAuditEntriesAsync()).Count;
+
+        AssertError(await h.DoctorComplete(1), 409, PrestagingLifecycleErrorCodes.IntegrityFault);
+
+        Assert.Equal(roomBefore, ReadyRoomSnapshot.From(recovered.Repository.LoadRooms(3).Single(room => room.RoomId == 1)));
+        Assert.Equal(liveBefore, ReadyRoomSnapshot.From(GetLiveRoom(recovered.Store)));
+        Assert.Equal(handoffsBefore, JsonSerializer.Serialize(recovered.Repository.LoadReadyHandoffsByEpisode(roomBefore.EpisodeId!), JsonOptions));
+        Assert.Equal(cyclesBefore, JsonSerializer.Serialize(recovered.Repository.LoadCompletedCycles(), JsonOptions));
+        Assert.Equal(eventsBefore, recovered.Store.GetSnapshot().RecentEvents.Count);
+        var audits = await h.ReadAuditEntriesAsync();
+        Assert.Equal(auditsBefore + 1, audits.Count);
+        AssertLastAudit(audits, "doctor-complete", RoomStates.DoctorInRoom, null, false, PrestagingLifecycleErrorCodes.IntegrityFault);
+    }
+
+    [Theory]
+    [InlineData("doctor")]
+    [InlineData("procedure-and-sedation")]
+    [InlineData("allocation")]
+    [InlineData("accepted-handoff")]
+    [InlineData("episode")]
+    [InlineData("ready-to-arrival-timing")]
+    public async Task Recovered_in_progress_cycle_divergence_blocks_doctor_complete_without_mutation(string corruption)
+    {
+        using var workspace = TestWorkspace.Create();
+        var seed = StoreContext.Create(workspace, Environments.Production);
+        using (var setup = new Harness(workspace, seed))
+        {
+            await setup.Begin(1, null);
+            await setup.Seat(1, """{"assignment":{"doctorId":"pledger","procedureCode":"EXT","sedationChoice":"yes","confirmedExpectedAllocationUnits":4}}""");
+            Action(await setup.Ready(1, "{}"));
+            Action(await setup.DoctorArrived(1, "{}"));
+        }
+
+        CorruptAcceptedCycle(seed.DatabasePath, corruption);
+        var recovered = StoreContext.Create(workspace, Environments.Production, seed.DatabasePath);
+        using var h = new Harness(workspace, recovered);
+        var projected = recovered.Store.GetRoom(1);
+        Assert.NotNull(projected);
+        Assert.Contains(
+            projected.IntegrityFaults!,
+            fault => fault.Code == RoomIntegrityFaultCode.AcceptedHandoffCycleMismatch);
+        var roomBefore = ReadyRoomSnapshot.From(recovered.Repository.LoadRooms(3).Single(room => room.RoomId == 1));
+        var liveBefore = ReadyRoomSnapshot.From(GetLiveRoom(recovered.Store));
+        var handoffsBefore = JsonSerializer.Serialize(recovered.Repository.LoadReadyHandoffsByEpisode(roomBefore.EpisodeId!), JsonOptions);
+        var cyclesBefore = JsonSerializer.Serialize(recovered.Repository.LoadCompletedCycles(), JsonOptions);
+        var reportsBefore = JsonSerializer.Serialize(recovered.Store.GetReports(), JsonOptions);
+        var eventsBefore = recovered.Store.GetSnapshot().RecentEvents.Count;
+        var auditsBefore = (await h.ReadAuditEntriesAsync()).Count;
+
+        AssertError(await h.DoctorComplete(1), 409, PrestagingLifecycleErrorCodes.IntegrityFault);
+
+        Assert.Equal(roomBefore, ReadyRoomSnapshot.From(recovered.Repository.LoadRooms(3).Single(room => room.RoomId == 1)));
+        Assert.Equal(liveBefore, ReadyRoomSnapshot.From(GetLiveRoom(recovered.Store)));
+        Assert.Equal(handoffsBefore, JsonSerializer.Serialize(recovered.Repository.LoadReadyHandoffsByEpisode(roomBefore.EpisodeId!), JsonOptions));
+        Assert.Equal(cyclesBefore, JsonSerializer.Serialize(recovered.Repository.LoadCompletedCycles(), JsonOptions));
+        Assert.Equal(reportsBefore, JsonSerializer.Serialize(recovered.Store.GetReports(), JsonOptions));
+        Assert.Equal(eventsBefore, recovered.Store.GetSnapshot().RecentEvents.Count);
+        var audits = await h.ReadAuditEntriesAsync();
+        Assert.Equal(auditsBefore + 1, audits.Count);
+        AssertLastAudit(audits, "doctor-complete", RoomStates.DoctorInRoom, null, false, PrestagingLifecycleErrorCodes.IntegrityFault);
+    }
+
+    [Fact]
+    public async Task Recovered_turnover_cycle_divergence_blocks_room_available_without_finalizing_reporting()
+    {
+        using var workspace = TestWorkspace.Create();
+        var seed = StoreContext.Create(workspace, Environments.Production);
+        using (var setup = new Harness(workspace, seed))
+        {
+            await setup.Begin(1, null);
+            await setup.Seat(1, """{"assignment":{"doctorId":"pledger","procedureCode":"EXT","sedationChoice":"yes","confirmedExpectedAllocationUnits":4}}""");
+            Action(await setup.Ready(1, "{}"));
+            Action(await setup.DoctorArrived(1, "{}"));
+            Assert.Equal(200, (await setup.DoctorComplete(1)).StatusCode);
+        }
+
+        CorruptAcceptedCycle(seed.DatabasePath, "allocation");
+        var recovered = StoreContext.Create(workspace, Environments.Production, seed.DatabasePath);
+        using var h = new Harness(workspace, recovered);
+        var projected = recovered.Store.GetRoom(1);
+        Assert.NotNull(projected);
+        Assert.Equal(RoomStates.Turnover, projected.State);
+        Assert.Contains(
+            projected.IntegrityFaults!,
+            fault => fault.Code == RoomIntegrityFaultCode.AcceptedHandoffCycleMismatch);
+        var roomBefore = ReadyRoomSnapshot.From(recovered.Repository.LoadRooms(3).Single(room => room.RoomId == 1));
+        var liveBefore = ReadyRoomSnapshot.From(GetLiveRoom(recovered.Store));
+        var handoffsBefore = JsonSerializer.Serialize(recovered.Repository.LoadReadyHandoffsByEpisode(roomBefore.EpisodeId!), JsonOptions);
+        var cyclesBefore = JsonSerializer.Serialize(recovered.Repository.LoadCompletedCycles(), JsonOptions);
+        var reportsBefore = JsonSerializer.Serialize(recovered.Store.GetReports(), JsonOptions);
+        var eventsBefore = recovered.Store.GetSnapshot().RecentEvents.Count;
+        var auditsBefore = (await h.ReadAuditEntriesAsync()).Count;
+
+        AssertError(await h.RoomAvailable(1), 409, PrestagingLifecycleErrorCodes.IntegrityFault);
+
+        Assert.Equal(roomBefore, ReadyRoomSnapshot.From(recovered.Repository.LoadRooms(3).Single(room => room.RoomId == 1)));
+        Assert.Equal(liveBefore, ReadyRoomSnapshot.From(GetLiveRoom(recovered.Store)));
+        Assert.Equal(handoffsBefore, JsonSerializer.Serialize(recovered.Repository.LoadReadyHandoffsByEpisode(roomBefore.EpisodeId!), JsonOptions));
+        Assert.Equal(cyclesBefore, JsonSerializer.Serialize(recovered.Repository.LoadCompletedCycles(), JsonOptions));
+        Assert.Equal(reportsBefore, JsonSerializer.Serialize(recovered.Store.GetReports(), JsonOptions));
+        Assert.Equal(eventsBefore, recovered.Store.GetSnapshot().RecentEvents.Count);
+        var audits = await h.ReadAuditEntriesAsync();
+        Assert.Equal(auditsBefore + 1, audits.Count);
+        AssertLastAudit(audits, "room-available", RoomStates.Turnover, null, false, PrestagingLifecycleErrorCodes.IntegrityFault);
+    }
+
+    [Fact]
     public async Task Canonical_doctor_arrived_preserves_the_accepted_snapshot_through_final_reporting()
     {
         using var workspace = TestWorkspace.Create();
@@ -1516,9 +1698,9 @@ public sealed class PrestagingLifecycleEndpointTests
         Action(await h.DoctorArrived(1, "{}"));
         var episodeId = context.Repository.LoadRooms(3).Single(room => room.RoomId == 1).EpisodeId!;
         clock.SetUtcNow(clock.GetUtcNow().AddMinutes(20));
-        Assert.NotNull(context.Store.MarkDoctorComplete(1));
+        Assert.Equal(200, (await h.DoctorComplete(1)).StatusCode);
         clock.SetUtcNow(clock.GetUtcNow().AddMinutes(5));
-        Assert.NotNull(context.Store.MarkRoomAvailable(1));
+        Assert.Equal(200, (await h.RoomAvailable(1)).StatusCode);
 
         var accepted = Assert.Single(context.Repository.LoadReadyHandoffsByEpisode(episodeId));
         var durableCycle = Assert.Single(context.Repository.LoadCompletedCycles());
@@ -1777,6 +1959,60 @@ public sealed class PrestagingLifecycleEndpointTests
         ExecuteSql(databasePath, sql);
     }
 
+    private static void CorruptAcceptedCycle(string databasePath, string corruption)
+    {
+        var sql = corruption switch
+        {
+            "doctor" => "UPDATE completed_room_cycles SET assigned_doctor_id = 'otte' WHERE room_id = 1;",
+            "procedure-and-sedation" => "UPDATE completed_room_cycles SET procedure_code = 'EXT' WHERE room_id = 1;",
+            "allocation" => "UPDATE completed_room_cycles SET expected_allocation_units = 3, expected_allocation_minutes = 30 WHERE room_id = 1;",
+            "accepted-handoff" => "UPDATE completed_room_cycles SET accepted_ready_handoff_id = 'wrong-handoff' WHERE room_id = 1;",
+            "episode" => "UPDATE completed_room_cycles SET episode_id = 'wrong-episode' WHERE room_id = 1;",
+            "ready-to-arrival-timing" => "UPDATE completed_room_cycles SET ready_to_doctor_seconds = ready_to_doctor_seconds + 1 WHERE room_id = 1;",
+            _ => throw new ArgumentOutOfRangeException(nameof(corruption), corruption, "Unknown accepted-cycle corruption.")
+        };
+        ExecuteSql(databasePath, sql);
+    }
+
+    private static void CorruptAcceptedHandoffHistory(string databasePath, string corruption)
+    {
+        var sql = corruption switch
+        {
+            "accepted-status" => """
+                UPDATE ready_handoffs
+                SET accepted_at = NULL,
+                    withdrawn_at = accepted_at
+                WHERE room_id = 1 AND accepted_at IS NOT NULL;
+                """,
+            "accepted-timestamp" => """
+                UPDATE ready_handoffs
+                SET accepted_at = ready_at
+                WHERE room_id = 1 AND accepted_at IS NOT NULL;
+                """,
+            "ready-timestamp" => """
+                UPDATE ready_handoffs
+                SET ready_at = accepted_at
+                WHERE room_id = 1 AND accepted_at IS NOT NULL;
+                """,
+            "foreign-withdrawn-history" => """
+                INSERT INTO ready_handoffs (
+                    handoff_id, episode_id, room_id, ready_at, withdrawn_at, accepted_at,
+                    terminated_at, termination_kind, doctor_id, procedure_code, sedation_state,
+                    expected_allocation_state, expected_allocation_suggested_units,
+                    expected_allocation_confirmed_units)
+                SELECT
+                    'foreign-post-arrival-history', episode_id, 2, ready_at,
+                    accepted_at, NULL, NULL, NULL, doctor_id,
+                    procedure_code, sedation_state, expected_allocation_state,
+                    expected_allocation_suggested_units, expected_allocation_confirmed_units
+                FROM ready_handoffs
+                WHERE room_id = 1 AND accepted_at IS NOT NULL;
+                """,
+            _ => throw new ArgumentOutOfRangeException(nameof(corruption), corruption, "Unknown Accepted handoff corruption.")
+        };
+        ExecuteSql(databasePath, sql);
+    }
+
     private static void ExecuteSql(string databasePath, string sql)
     {
         using var connection = new SqliteConnection(new SqliteConnectionStringBuilder { DataSource = databasePath }.ToString());
@@ -1817,6 +2053,8 @@ public sealed class PrestagingLifecycleEndpointTests
         public async Task<Response> Ready(int room, string? body, string? contentType = "application/json") => Capture(await global::RoomLifecycleEndpointHandler.ReadyForDoctorAsync(room, Request(room, body, contentType), _validator, Context.Store, _logger, new NoopBoardHubContext()));
         public async Task<Response> Withdraw(int room, string? body, string? contentType = "application/json") => Capture(await global::RoomLifecycleEndpointHandler.WithdrawReadyAsync(room, Request(room, body, contentType), _validator, Context.Store, _logger, new NoopBoardHubContext()));
         public async Task<Response> DoctorArrived(int room, string? body, string? contentType = "application/json") => Capture(await global::RoomLifecycleEndpointHandler.DoctorArrivedAsync(room, Request(room, body, contentType), _validator, Context.Store, _logger, new NoopBoardHubContext()));
+        public async Task<Response> DoctorComplete(int room) => Capture(await global::RoomLifecycleEndpointHandler.DoctorCompleteAsync(room, Request(room, null), _validator, Context.Store, _logger, new NoopBoardHubContext()));
+        public async Task<Response> RoomAvailable(int room) => Capture(await global::RoomLifecycleEndpointHandler.RoomAvailableAsync(room, Request(room, null), _validator, Context.Store, _logger, new NoopBoardHubContext()));
         public async Task<IReadOnlyList<RoomAuditEntry>> ReadAuditEntriesAsync()
         {
             var path = Path.Combine(_workspace.DataRoot, "logs", "room-audit.log");

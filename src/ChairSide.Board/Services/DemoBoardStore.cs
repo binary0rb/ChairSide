@@ -3020,7 +3020,88 @@ public sealed class DemoBoardStore
         if (!TryGetCompleteHandoffAssignment(handoff, out _))
         {
             faults.Add(new RoomIntegrityFault(RoomIntegrityFaultCode.AcceptedHandoffAssignmentIncomplete, assignment));
+            return;
         }
+
+        if (!GetCanonicalAssignment(room).MatchesHandoffSnapshot(handoff.Assignment)
+            || !MatchesAcceptedAllocationSnapshot(room, handoff.Assignment))
+        {
+            faults.Add(new RoomIntegrityFault(RoomIntegrityFaultCode.AcceptedHandoffAssignmentMismatch, assignment));
+        }
+
+        var history = string.IsNullOrWhiteSpace(room.EpisodeId)
+            ? []
+            : _repository.LoadReadyHandoffsByEpisode(room.EpisodeId);
+        if (room.ReadyForDoctorAt != handoff.ReadyAt
+            || room.DoctorArrivedAt != handoff.AcceptedAt
+            || history.Any(existing =>
+                existing.RoomId != room.RoomId
+                || !string.Equals(existing.EpisodeId, room.EpisodeId, StringComparison.Ordinal)
+                || (existing.HandoffId != handoff.HandoffId
+                    && existing.ContractStatus != ReadyHandoffStatus.Withdrawn)))
+        {
+            faults.Add(new RoomIntegrityFault(RoomIntegrityFaultCode.AcceptedHandoffHistoryMismatch, assignment));
+        }
+
+        var cycle = room.SeatedAt.HasValue
+            ? _completedCycles.SingleOrDefault(existing =>
+                existing.RoomId == room.RoomId
+                && existing.SeatedAt == room.SeatedAt.Value)
+            : null;
+        if (cycle is null || !CompletedCycleMatchesAcceptedTruth(cycle, room, handoff))
+        {
+            faults.Add(new RoomIntegrityFault(RoomIntegrityFaultCode.AcceptedHandoffCycleMismatch, assignment));
+        }
+    }
+
+    private static bool MatchesAcceptedAllocationSnapshot(
+        RoomState room,
+        PersistedRoomAssignment assignment)
+    {
+        if (assignment.ExpectedAllocationConfirmedUnits is not { } confirmedUnits)
+        {
+            return false;
+        }
+
+        var suggestedUnits = assignment.ExpectedAllocationSuggestedUnits;
+        return room.OriginalDefaultExpectedUnits == (suggestedUnits ?? confirmedUnits)
+            && room.ExpectedAllocationUnits == confirmedUnits
+            && room.ExpectedAllocationMinutes == confirmedUnits * 10
+            && room.AllocationAdjustedFromDefault ==
+                (suggestedUnits.HasValue && suggestedUnits.Value != confirmedUnits);
+    }
+
+    private static bool CompletedCycleMatchesAcceptedTruth(
+        CompletedRoomCycle cycle,
+        RoomState room,
+        PersistedReadyHandoff handoff)
+    {
+        if (handoff.AcceptedAt is not { } acceptedAt
+            || handoff.Assignment.ExpectedAllocationConfirmedUnits is not { } confirmedUnits
+            || room.SeatedAt is not { } seatedAt)
+        {
+            return false;
+        }
+
+        var suggestedUnits = handoff.Assignment.ExpectedAllocationSuggestedUnits;
+        return cycle.RoomId == room.RoomId
+            && string.Equals(cycle.EpisodeId, room.EpisodeId, StringComparison.Ordinal)
+            && cycle.SeatedAt == seatedAt
+            && string.Equals(cycle.AcceptedReadyHandoffId, handoff.HandoffId, StringComparison.Ordinal)
+            && string.Equals(cycle.AssignedDoctor, handoff.Assignment.DoctorId, StringComparison.Ordinal)
+            && string.Equals(cycle.ProcedureCode, handoff.Assignment.ProcedureCode, StringComparison.Ordinal)
+            && cycle.PrestageStartedAt == room.PrestageStartedAt
+            && cycle.ReadyForDoctorAt == handoff.ReadyAt
+            && cycle.DoctorArrivedAt == acceptedAt
+            && cycle.DoctorCompleteAt == room.DoctorCompleteAt
+            && cycle.RoomAvailableAt == room.RoomAvailableAt
+            && cycle.SeatedToDoctorSeconds == SecondsBetween(seatedAt, acceptedAt)
+            && cycle.ReadyToDoctorSeconds == SecondsBetween(handoff.ReadyAt, acceptedAt)
+            && cycle.OriginalDefaultExpectedUnits == (suggestedUnits ?? confirmedUnits)
+            && cycle.ExpectedAllocationUnits == confirmedUnits
+            && cycle.ExpectedAllocationMinutes == confirmedUnits * 10
+            && cycle.AllocationAdjustedFromDefault ==
+                (suggestedUnits.HasValue && suggestedUnits.Value != confirmedUnits);
     }
 
     private static bool TryGetCompleteHandoffAssignment(PersistedReadyHandoff handoff, out RoomAssignmentContract? assignment)

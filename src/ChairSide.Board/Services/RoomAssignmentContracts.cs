@@ -62,6 +62,9 @@ public enum RoomIntegrityFaultCode
     AcceptedHandoffOwnershipMismatch,
     AcceptedHandoffNotAccepted,
     AcceptedHandoffAssignmentIncomplete,
+    AcceptedHandoffAssignmentMismatch,
+    AcceptedHandoffHistoryMismatch,
+    AcceptedHandoffCycleMismatch,
     ContradictoryHandoffReferences
 }
 

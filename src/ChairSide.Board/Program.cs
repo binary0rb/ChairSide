@@ -389,89 +389,9 @@ app.MapPost(
     "/api/rooms/{roomNumber:int}/doctor-arrived/resolve-conflict",
     DoctorArrivalConflictEndpointHandler.ResolveAsync);
 
-app.MapPost("/api/rooms/{roomNumber:int}/doctor-complete", async Task<IResult> (
-    int roomNumber,
-    HttpContext httpContext,
-    RoomDeviceTokenValidator roomDeviceTokenValidator,
-    DemoBoardStore store,
-    DiagnosticLogger diagnosticLogger,
-    Microsoft.AspNetCore.SignalR.IHubContext<BoardHub> hubContext) =>
-{
-    var auditCtx = AuditRequestContext.From(httpContext);
-    var previousRoom = store.GetRoom(roomNumber);
+app.MapPost("/api/rooms/{roomNumber:int}/doctor-complete", RoomLifecycleEndpointHandler.DoctorCompleteAsync);
 
-    var bindingFailure = RoomDeviceBindingGuard.ValidateMutationRequest(
-        roomNumber,
-        httpContext.Request,
-        roomDeviceTokenValidator);
-    if (bindingFailure is not null)
-    {
-        await diagnosticLogger.LogRoomAuditAsync(auditCtx.Build(
-            "doctor-complete", roomNumber, previousRoom, null, false, "binding-rejected",
-            previousRoom?.AssignedDoctor, previousRoom?.ProcedureCode));
-        return bindingFailure;
-    }
-
-    var result = store.MarkDoctorComplete(roomNumber);
-    if (result is null)
-    {
-        var reason = store.IsConfiguredRoom(roomNumber) ? "state-rejected" : "room-not-found";
-        await diagnosticLogger.LogRoomAuditAsync(auditCtx.Build(
-            "doctor-complete", roomNumber, previousRoom, null, false, reason,
-            previousRoom?.AssignedDoctor, previousRoom?.ProcedureCode));
-        return store.IsConfiguredRoom(roomNumber)
-            ? Results.BadRequest("Doctor Complete is only available when the doctor is in the room.")
-            : Results.NotFound("Room is not configured.");
-    }
-
-    await diagnosticLogger.LogRoomAuditAsync(auditCtx.Build(
-        "doctor-complete", roomNumber, previousRoom, result, true, null,
-        result.AssignedDoctor, result.ProcedureCode));
-    await hubContext.Clients.All.SendAsync("boardUpdated", store.GetSnapshot());
-    return Results.Ok(result);
-});
-
-app.MapPost("/api/rooms/{roomNumber:int}/available", async Task<IResult> (
-    int roomNumber,
-    HttpContext httpContext,
-    RoomDeviceTokenValidator roomDeviceTokenValidator,
-    DemoBoardStore store,
-    DiagnosticLogger diagnosticLogger,
-    Microsoft.AspNetCore.SignalR.IHubContext<BoardHub> hubContext) =>
-{
-    var auditCtx = AuditRequestContext.From(httpContext);
-    var previousRoom = store.GetRoom(roomNumber);
-
-    var bindingFailure = RoomDeviceBindingGuard.ValidateMutationRequest(
-        roomNumber,
-        httpContext.Request,
-        roomDeviceTokenValidator);
-    if (bindingFailure is not null)
-    {
-        await diagnosticLogger.LogRoomAuditAsync(auditCtx.Build(
-            "room-available", roomNumber, previousRoom, null, false, "binding-rejected",
-            previousRoom?.AssignedDoctor, previousRoom?.ProcedureCode));
-        return bindingFailure;
-    }
-
-    var result = store.MarkRoomAvailable(roomNumber);
-    if (result is null)
-    {
-        var reason = store.IsConfiguredRoom(roomNumber) ? "state-rejected" : "room-not-found";
-        await diagnosticLogger.LogRoomAuditAsync(auditCtx.Build(
-            "room-available", roomNumber, previousRoom, null, false, reason,
-            previousRoom?.AssignedDoctor, previousRoom?.ProcedureCode));
-        return store.IsConfiguredRoom(roomNumber)
-            ? Results.BadRequest("Room Available is only available during turnover.")
-            : Results.NotFound("Room is not configured.");
-    }
-
-    await diagnosticLogger.LogRoomAuditAsync(auditCtx.Build(
-        "room-available", roomNumber, previousRoom, result, true, null,
-        previousRoom?.AssignedDoctor, previousRoom?.ProcedureCode));
-    await hubContext.Clients.All.SendAsync("boardUpdated", store.GetSnapshot());
-    return Results.Ok(result);
-});
+app.MapPost("/api/rooms/{roomNumber:int}/available", RoomLifecycleEndpointHandler.RoomAvailableAsync);
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -1175,6 +1095,125 @@ public static class RoomLifecycleEndpointHandler
             "doctor-arrived", roomNumber, previousRoom, auditCtx,
             mutation, store, diagnosticLogger, hubContext,
             returnLegacyRoomResponse: wasBodyEmpty);
+    }
+
+    public static async Task<IResult> DoctorCompleteAsync(
+        int roomNumber, HttpContext httpContext, RoomDeviceTokenValidator roomDeviceTokenValidator,
+        DemoBoardStore store, DiagnosticLogger diagnosticLogger, IHubContext<BoardHub> hubContext)
+    {
+        var auditCtx = AuditRequestContext.From(httpContext);
+        var previousRoom = store.GetRoom(roomNumber);
+        var bindingFailure = RoomDeviceBindingGuard.ValidateMutationRequest(
+            roomNumber,
+            httpContext.Request,
+            roomDeviceTokenValidator);
+        if (bindingFailure is not null)
+        {
+            await LogCanonicalValidationFailureAsync(
+                "doctor-complete", roomNumber, previousRoom, "binding-rejected", auditCtx, diagnosticLogger);
+            return bindingFailure;
+        }
+
+        if (previousRoom?.IntegrityFaults is { Count: > 0 })
+        {
+            return await CompleteIntegrityFaultAsync(
+                "doctor-complete", roomNumber, previousRoom, auditCtx, diagnosticLogger);
+        }
+
+        var result = store.MarkDoctorComplete(roomNumber);
+        if (result is null)
+        {
+            var currentRoom = store.GetRoom(roomNumber);
+            if (currentRoom?.IntegrityFaults is { Count: > 0 })
+            {
+                return await CompleteIntegrityFaultAsync(
+                    "doctor-complete", roomNumber, currentRoom, auditCtx, diagnosticLogger);
+            }
+
+            var reason = store.IsConfiguredRoom(roomNumber) ? "state-rejected" : "room-not-found";
+            await LogCanonicalValidationFailureAsync(
+                "doctor-complete", roomNumber, previousRoom, reason, auditCtx, diagnosticLogger);
+            return store.IsConfiguredRoom(roomNumber)
+                ? Results.BadRequest("Doctor Complete is only available when the doctor is in the room.")
+                : Results.NotFound("Room is not configured.");
+        }
+
+        await diagnosticLogger.LogRoomAuditAsync(auditCtx.Build(
+            "doctor-complete", roomNumber, previousRoom, result, true, null,
+            result.AssignedDoctor, result.ProcedureCode));
+        await hubContext.Clients.All.SendAsync("boardUpdated", store.GetSnapshot());
+        return Results.Ok(result);
+    }
+
+    public static async Task<IResult> RoomAvailableAsync(
+        int roomNumber, HttpContext httpContext, RoomDeviceTokenValidator roomDeviceTokenValidator,
+        DemoBoardStore store, DiagnosticLogger diagnosticLogger, IHubContext<BoardHub> hubContext)
+    {
+        var auditCtx = AuditRequestContext.From(httpContext);
+        var previousRoom = store.GetRoom(roomNumber);
+        var bindingFailure = RoomDeviceBindingGuard.ValidateMutationRequest(
+            roomNumber,
+            httpContext.Request,
+            roomDeviceTokenValidator);
+        if (bindingFailure is not null)
+        {
+            await LogCanonicalValidationFailureAsync(
+                "room-available", roomNumber, previousRoom, "binding-rejected", auditCtx, diagnosticLogger);
+            return bindingFailure;
+        }
+
+        if (previousRoom?.IntegrityFaults is { Count: > 0 })
+        {
+            return await CompleteIntegrityFaultAsync(
+                "room-available", roomNumber, previousRoom, auditCtx, diagnosticLogger);
+        }
+
+        var result = store.MarkRoomAvailable(roomNumber);
+        if (result is null)
+        {
+            var currentRoom = store.GetRoom(roomNumber);
+            if (currentRoom?.IntegrityFaults is { Count: > 0 })
+            {
+                return await CompleteIntegrityFaultAsync(
+                    "room-available", roomNumber, currentRoom, auditCtx, diagnosticLogger);
+            }
+
+            var reason = store.IsConfiguredRoom(roomNumber) ? "state-rejected" : "room-not-found";
+            await LogCanonicalValidationFailureAsync(
+                "room-available", roomNumber, previousRoom, reason, auditCtx, diagnosticLogger);
+            return store.IsConfiguredRoom(roomNumber)
+                ? Results.BadRequest("Room Available is only available during turnover.")
+                : Results.NotFound("Room is not configured.");
+        }
+
+        await diagnosticLogger.LogRoomAuditAsync(auditCtx.Build(
+            "room-available", roomNumber, previousRoom, result, true, null,
+            previousRoom?.AssignedDoctor, previousRoom?.ProcedureCode));
+        await hubContext.Clients.All.SendAsync("boardUpdated", store.GetSnapshot());
+        return Results.Ok(result);
+    }
+
+    private static async Task<IResult> CompleteIntegrityFaultAsync(
+        string action,
+        int roomNumber,
+        RoomStatus room,
+        AuditRequestContext auditCtx,
+        DiagnosticLogger diagnosticLogger)
+    {
+        await LogCanonicalValidationFailureAsync(
+            action,
+            roomNumber,
+            room,
+            PrestagingLifecycleErrorCodes.IntegrityFault,
+            auditCtx,
+            diagnosticLogger);
+        return CanonicalError(
+            new PrestagingLifecycleErrorResponse(
+                PrestagingLifecycleErrorCodes.IntegrityFault,
+                "The room has an integrity fault.",
+                [],
+                room.IntegrityFaults ?? []),
+            StatusCodes.Status409Conflict);
     }
 
     private static async Task<IResult> CompleteCanonicalMutationAsync(
