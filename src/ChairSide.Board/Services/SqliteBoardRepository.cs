@@ -717,6 +717,74 @@ public sealed class SqliteBoardRepository
             persistedRoom);
     }
 
+    internal GuardedWithdrawReadyPersistenceResult WithdrawReadyHandoffGuarded(
+        RoomState room,
+        string handoffId,
+        DateTimeOffset withdrawnAt,
+        ActiveRoomWriteExpectation expectation)
+    {
+        ArgumentNullException.ThrowIfNull(room);
+        ArgumentNullException.ThrowIfNull(expectation);
+        ValidateRequiredId(handoffId, nameof(handoffId));
+        if (room.RoomId != expectation.RoomId)
+        {
+            throw new ArgumentException("The Ready withdrawal candidate must match the persistence expectation.", nameof(room));
+        }
+
+        var persistedRoom = CopyRoomForPersistence(room);
+        using var connection = OpenConnection();
+        using var transaction = connection.BeginTransaction();
+        var rows = UpdateCanonicalRoom(connection, transaction, persistedRoom, expectation);
+        if (rows == 0)
+        {
+            transaction.Rollback();
+            return new GuardedWithdrawReadyPersistenceResult(GuardedWithdrawReadyPersistenceOutcome.StaleWrite);
+        }
+        if (rows != 1)
+        {
+            throw new InvalidOperationException("Guarded Ready withdrawal must update exactly one room.");
+        }
+
+        var history = LoadReadyHandoffsByEpisode(connection, transaction, expectation.EpisodeId!);
+        var referenced = history.SingleOrDefault(existing => existing.HandoffId == handoffId);
+        var roomAssignment = new PersistedRoomAssignment(
+            expectation.AssignedDoctorId,
+            expectation.AssignedDoctorDisplayName,
+            expectation.ProcedureCode,
+            expectation.ProcedureCategory,
+            expectation.SedationState,
+            expectation.ExpectedAllocationState,
+            expectation.ExpectedAllocationSuggestedUnits,
+            expectation.ExpectedAllocationConfirmedUnits);
+        var hasIntegrityFault =
+            string.IsNullOrWhiteSpace(expectation.EpisodeId)
+            || expectation.ActiveReadyHandoffId != handoffId
+            || expectation.AcceptedReadyHandoffId is not null
+            || referenced is null
+            || referenced.RoomId != expectation.RoomId
+            || referenced.EpisodeId != expectation.EpisodeId
+            || referenced.ContractStatus != ReadyHandoffStatus.Active
+            || !roomAssignment.MatchesHandoffSnapshot(referenced.Assignment)
+            || history.Any(existing =>
+                existing.RoomId != expectation.RoomId
+                || !string.Equals(existing.EpisodeId, expectation.EpisodeId, StringComparison.Ordinal)
+                || (existing.HandoffId != handoffId
+                    && existing.ContractStatus != ReadyHandoffStatus.Withdrawn));
+        if (hasIntegrityFault)
+        {
+            transaction.Rollback();
+            return new GuardedWithdrawReadyPersistenceResult(GuardedWithdrawReadyPersistenceOutcome.IntegrityFault);
+        }
+
+        UpdateReadyHandoffOutcomeGuarded(connection, transaction, referenced!, "withdrawn_at", withdrawnAt);
+        transaction.Commit();
+        return new GuardedWithdrawReadyPersistenceResult(
+            GuardedWithdrawReadyPersistenceOutcome.Success,
+            new CommittedReadyHandoffResult(
+                CopyReadyHandoff(referenced!, withdrawnAt: withdrawnAt),
+                persistedRoom));
+    }
+
     public CommittedReadyHandoffResult AcceptReadyHandoffAndSaveCycle(
         RoomState room,
         CompletedRoomCycle cycle,
@@ -1182,6 +1250,41 @@ public sealed class SqliteBoardRepository
         if (rows != 1)
         {
             throw new InvalidOperationException("Ready handoff outcome update requires exactly one active handoff.");
+        }
+    }
+
+    private static void UpdateReadyHandoffOutcomeGuarded(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        PersistedReadyHandoff handoff,
+        string outcomeColumn,
+        DateTimeOffset outcomeAt)
+    {
+        if (outcomeColumn is not ("withdrawn_at" or "accepted_at"))
+        {
+            throw new ArgumentException("Unsupported Ready handoff outcome column.", nameof(outcomeColumn));
+        }
+
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = $"""
+            UPDATE ready_handoffs
+            SET {outcomeColumn} = $outcomeAt
+            WHERE handoff_id = $handoffId
+                AND episode_id = $episodeId
+                AND room_id = $roomId
+                AND withdrawn_at IS NULL
+                AND accepted_at IS NULL
+                AND terminated_at IS NULL
+                AND ready_at <= $outcomeAt;
+            """;
+        command.Parameters.AddWithValue("$handoffId", handoff.HandoffId);
+        command.Parameters.AddWithValue("$episodeId", handoff.EpisodeId);
+        command.Parameters.AddWithValue("$roomId", handoff.RoomId);
+        command.Parameters.AddWithValue("$outcomeAt", FormatDateTimeOffset(outcomeAt));
+        if (command.ExecuteNonQuery() != 1)
+        {
+            throw new InvalidOperationException("Guarded Ready handoff outcome update requires exactly one active handoff.");
         }
     }
 

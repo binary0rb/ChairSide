@@ -668,29 +668,71 @@ public sealed class DemoBoardStore
         }
     }
 
+    public PrestagingLifecycleMutationResult WithdrawReadyCanonical(int roomNumber)
+    {
+        try
+        {
+            lock (_syncRoot)
+            {
+                var room = _rooms.FirstOrDefault(item => item.RoomId == roomNumber);
+                if (room is null) return CanonicalFailure(PrestagingLifecycleMutationOutcome.RoomNotFound);
+                if (room.State is not (RoomStates.ReadyForDoctor or RoomStates.Aging or RoomStates.Stale))
+                {
+                    return CanonicalFailure(PrestagingLifecycleMutationOutcome.LifecycleConflict);
+                }
+
+                var faults = DeriveIntegrityFaults(room);
+                if (faults.Count > 0) return CanonicalFailure(PrestagingLifecycleMutationOutcome.IntegrityFault, faults);
+                if (string.IsNullOrWhiteSpace(room.ActiveReadyHandoffId))
+                {
+                    var fault = new RoomIntegrityFault(
+                        RoomIntegrityFaultCode.ReadyHandoffMissing,
+                        GetCanonicalAssignment(room).ToContract());
+                    return CanonicalFailure(PrestagingLifecycleMutationOutcome.IntegrityFault, [fault]);
+                }
+
+                var expectation = ActiveRoomWriteExpectation.FromRoom(room);
+                var now = Now;
+                var candidate = CopyRoomState(room);
+                candidate.State = RoomStates.Seated;
+                candidate.ReadyForDoctorAt = null;
+                candidate.AgingStartedAt = null;
+                candidate.StaleStartedAt = null;
+                candidate.ActiveReadyHandoffId = null;
+                var persistence = _repository.WithdrawReadyHandoffGuarded(
+                    candidate,
+                    room.ActiveReadyHandoffId,
+                    now,
+                    expectation);
+                if (persistence.Outcome == GuardedWithdrawReadyPersistenceOutcome.StaleWrite)
+                {
+                    return CanonicalFailure(PrestagingLifecycleMutationOutcome.StaleWrite);
+                }
+                if (persistence.Outcome == GuardedWithdrawReadyPersistenceOutcome.IntegrityFault)
+                {
+                    var fault = new RoomIntegrityFault(
+                        RoomIntegrityFaultCode.ContradictoryHandoffReferences,
+                        GetCanonicalAssignment(room).ToContract());
+                    return CanonicalFailure(PrestagingLifecycleMutationOutcome.IntegrityFault, [fault]);
+                }
+
+                var committed = persistence.Committed
+                    ?? throw new InvalidOperationException("Successful guarded Ready withdrawal must return committed state.");
+                ApplyCommittedRoom(room, committed.Room);
+                AddEvent(new RoomEvent(room.RoomId, "ReadyWithdrawn", now, room.AssignedDoctor, room.ProcedureCode));
+                return CanonicalSuccess(room, GetCanonicalAssignment(room).ToContract(), now, committed.Handoff.ToContract());
+            }
+        }
+        catch (SqliteException exception)
+        {
+            return CanonicalFailure(PrestagingLifecycleMutationOutcome.PersistenceFailure, exception: exception);
+        }
+    }
+
     public RoomStatus? WithdrawReady(int roomNumber)
     {
-        lock (_syncRoot)
-        {
-            var room = _rooms.FirstOrDefault(item => item.RoomId == roomNumber);
-            if (room is null
-                || room.State is not (RoomStates.ReadyForDoctor or RoomStates.Aging or RoomStates.Stale)
-                || string.IsNullOrWhiteSpace(room.ActiveReadyHandoffId))
-            {
-                return null;
-            }
-            if (DeriveIntegrityFaults(room).Count > 0)
-            {
-                return null;
-            }
-
-            var candidate = CopyRoomState(room);
-            candidate.State = RoomStates.Seated;
-            var committed = _repository.WithdrawReadyHandoff(candidate, room.ActiveReadyHandoffId, Now, _doctors, _procedures);
-            ApplyCommittedRoom(room, committed.Room);
-            AddEvent(new RoomEvent(room.RoomId, "ReadyWithdrawn", Now, room.AssignedDoctor, room.ProcedureCode));
-            return ToRoomStatus(room, Now);
-        }
+        var result = WithdrawReadyCanonical(roomNumber);
+        return result.Outcome == PrestagingLifecycleMutationOutcome.Success ? result.Room : null;
     }
 
     public RoomStatus? MarkDoctorArrived(int roomNumber)
@@ -2810,6 +2852,10 @@ public sealed class DemoBoardStore
         if (!TryGetCompleteHandoffAssignment(handoff, out _))
         {
             faults.Add(new RoomIntegrityFault(RoomIntegrityFaultCode.ReadyHandoffAssignmentIncomplete, assignment));
+        }
+        else if (!GetCanonicalAssignment(room).MatchesHandoffSnapshot(handoff.Assignment))
+        {
+            faults.Add(new RoomIntegrityFault(RoomIntegrityFaultCode.ReadyHandoffAssignmentMismatch, assignment));
         }
     }
 

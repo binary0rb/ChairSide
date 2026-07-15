@@ -410,6 +410,46 @@ public sealed class ReadyHandoffPersistenceTests
     }
 
     [Fact]
+    public void Guarded_withdrawal_rejects_room_handoff_assignment_divergence_inside_transaction()
+    {
+        using var workspace = TestWorkspace.Create();
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production);
+        var readyAt = new DateTimeOffset(2026, 7, 14, 14, 0, 0, TimeSpan.Zero);
+        var handoff = context.Repository.CreateReadyHandoff(
+            ReadyRoom(readyAt),
+            CompleteAssignment(),
+            readyAt,
+            context.Doctors,
+            context.Procedures);
+        using (var connection = OpenConnection(context.DatabasePath))
+        {
+            ExecuteSql(connection, "UPDATE active_rooms SET assigned_doctor_id = 'pledger' WHERE room_id = 1;");
+        }
+
+        var corrupted = LoadRoom(context);
+        var durableBefore = RoomSnapshot.From(corrupted);
+        var handoffBefore = HandoffSnapshot.From(context.Repository.LoadReadyHandoff(handoff.HandoffId)!);
+        var candidate = CopyRoom(corrupted);
+        candidate.State = RoomStates.Seated;
+        candidate.ReadyForDoctorAt = null;
+        candidate.AgingStartedAt = null;
+        candidate.StaleStartedAt = null;
+        candidate.ActiveReadyHandoffId = null;
+
+        var result = context.Repository.WithdrawReadyHandoffGuarded(
+            candidate,
+            handoff.HandoffId,
+            readyAt.AddMinutes(2),
+            ActiveRoomWriteExpectation.FromRoom(corrupted));
+
+        Assert.Equal(GuardedWithdrawReadyPersistenceOutcome.IntegrityFault, result.Outcome);
+        Assert.Null(result.Committed);
+        Assert.Equal(durableBefore, RoomSnapshot.From(LoadRoom(context)));
+        Assert.Equal(handoffBefore, HandoffSnapshot.From(context.Repository.LoadReadyHandoff(handoff.HandoffId)!));
+        Assert.Equal(ReadyHandoffStatus.Active, context.Repository.LoadReadyHandoff(handoff.HandoffId)!.ContractStatus);
+    }
+
+    [Fact]
     public void Ready_handoff_rejects_incomplete_assignment_without_persisting_side_effects()
     {
         using var workspace = TestWorkspace.Create();

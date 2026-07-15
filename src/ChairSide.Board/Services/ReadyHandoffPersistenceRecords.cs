@@ -75,6 +75,17 @@ internal sealed record GuardedReadyHandoffPersistenceResult(
     GuardedReadyHandoffPersistenceOutcome Outcome,
     CommittedReadyHandoffResult? Committed = null);
 
+internal enum GuardedWithdrawReadyPersistenceOutcome
+{
+    Success,
+    StaleWrite,
+    IntegrityFault
+}
+
+internal sealed record GuardedWithdrawReadyPersistenceResult(
+    GuardedWithdrawReadyPersistenceOutcome Outcome,
+    CommittedReadyHandoffResult? Committed = null);
+
 public static class ReadyHandoffTerminationKinds
 {
     public const string Canceled = "Canceled";
@@ -94,6 +105,18 @@ public sealed record PersistedRoomAssignment(
     int? ExpectedAllocationSuggestedUnits,
     int? ExpectedAllocationConfirmedUnits)
 {
+    internal bool MatchesHandoffSnapshot(PersistedRoomAssignment other)
+    {
+        ArgumentNullException.ThrowIfNull(other);
+
+        return string.Equals(DoctorId, other.DoctorId, StringComparison.Ordinal)
+            && string.Equals(ProcedureCode, other.ProcedureCode, StringComparison.Ordinal)
+            && SedationState == other.SedationState
+            && ExpectedAllocationState == other.ExpectedAllocationState
+            && ExpectedAllocationSuggestedUnits == other.ExpectedAllocationSuggestedUnits
+            && ExpectedAllocationConfirmedUnits == other.ExpectedAllocationConfirmedUnits;
+    }
+
     public static PersistedRoomAssignment FromCanonicalContract(
         RoomAssignmentContract assignment,
         string? doctorDisplayName = null,

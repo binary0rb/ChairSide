@@ -57,6 +57,7 @@ public enum RoomIntegrityFaultCode
     ReadyHandoffOwnershipMismatch,
     ReadyHandoffNotActive,
     ReadyHandoffAssignmentIncomplete,
+    ReadyHandoffAssignmentMismatch,
     AcceptedHandoffMissing,
     AcceptedHandoffOwnershipMismatch,
     AcceptedHandoffNotAccepted,

@@ -378,6 +378,7 @@ app.MapPost("/api/rooms/{roomNumber:int}/cancel-prestage", RoomLifecycleEndpoint
 app.MapPost("/api/rooms/{roomNumber:int}/cancel-seating", RoomLifecycleEndpointHandler.CancelSeatingAsync);
 
 app.MapPost("/api/rooms/{roomNumber:int}/ready-for-doctor", RoomLifecycleEndpointHandler.ReadyForDoctorAsync);
+app.MapPost("/api/rooms/{roomNumber:int}/withdraw-ready", RoomLifecycleEndpointHandler.WithdrawReadyAsync);
 
 app.MapPost("/api/rooms/{roomNumber:int}/doctor-arrived", async Task<IResult> (
     int roomNumber,
@@ -1140,6 +1141,43 @@ public static class RoomLifecycleEndpointHandler
             "ready-for-doctor", roomNumber, previousRoom, auditCtx,
             store.MarkReadyForDoctorCanonical(roomNumber, assignment), store, diagnosticLogger, hubContext,
             returnLegacyRoomResponse: wasBodyEmpty);
+    }
+
+    public static async Task<IResult> WithdrawReadyAsync(
+        int roomNumber, HttpContext httpContext, RoomDeviceTokenValidator roomDeviceTokenValidator,
+        DemoBoardStore store, DiagnosticLogger diagnosticLogger, IHubContext<BoardHub> hubContext)
+    {
+        var auditCtx = AuditRequestContext.From(httpContext);
+        var previousRoom = store.GetRoom(roomNumber);
+        var bindingFailure = RoomDeviceBindingGuard.ValidateMutationRequest(roomNumber, httpContext.Request, roomDeviceTokenValidator);
+        if (bindingFailure is not null)
+        {
+            await LogCanonicalValidationFailureAsync(
+                "withdraw-ready", roomNumber, previousRoom, "binding-rejected", auditCtx, diagnosticLogger);
+            return bindingFailure;
+        }
+
+        var (root, bodyError, _) = await StrictJsonRequestReader.ReadObjectWithPresenceAsync(
+            httpContext.Request,
+            treatWhitespaceAsEmpty: false);
+        if (bodyError is not null)
+        {
+            await LogCanonicalValidationFailureAsync(
+                "withdraw-ready", roomNumber, previousRoom, PrestagingLifecycleErrorCodes.MalformedRequest, auditCtx, diagnosticLogger);
+            return CanonicalError(PrestagingLifecycleErrorCodes.MalformedRequest, "The request body is malformed.");
+        }
+
+        var parsed = PrestagingLifecycleRequestParser.ParseEmptyAction(root.GetRawText());
+        if (parsed.Error is not null)
+        {
+            await LogCanonicalValidationFailureAsync(
+                "withdraw-ready", roomNumber, previousRoom, parsed.Error.Code, auditCtx, diagnosticLogger);
+            return CanonicalError(parsed.Error, StatusCodes.Status400BadRequest);
+        }
+
+        return await CompleteCanonicalMutationAsync(
+            "withdraw-ready", roomNumber, previousRoom, auditCtx,
+            store.WithdrawReadyCanonical(roomNumber), store, diagnosticLogger, hubContext);
     }
 
     private static async Task<IResult> CompleteCanonicalMutationAsync(
