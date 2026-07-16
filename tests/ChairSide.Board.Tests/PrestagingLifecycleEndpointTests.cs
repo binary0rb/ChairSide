@@ -1846,6 +1846,225 @@ public sealed class PrestagingLifecycleEndpointTests
     }
 
     [Fact]
+    public async Task Canonical_cross_layer_lifecycle_survives_restarts_and_preserves_accepted_truth()
+    {
+        using var workspace = TestWorkspace.Create();
+        var start = new DateTimeOffset(2026, 7, 16, 14, 0, 0, TimeSpan.Zero);
+        var clock = new ManualTimeProvider(start);
+        var initial = StoreContext.Create(
+            workspace,
+            Environments.Production,
+            agingMinutes: 7,
+            staleMinutes: 12,
+            timeProvider: clock);
+        var databasePath = initial.DatabasePath;
+        string episodeId;
+
+        using (var h = new Harness(workspace, initial))
+        {
+            var began = Action(await h.Begin(1, null));
+            episodeId = Assert.IsType<string>(began.Room.EpisodeId);
+            Assert.Equal(RoomStates.Prestaging, began.Room.State);
+            Assert.Equal(start, began.Room.PrestageStartedAt);
+            Assert.Equal(AssignmentCompleteness.Absent, began.Lifecycle.Assignment.Completeness);
+            Assert.False(began.Lifecycle.AssignmentLocked);
+
+            var partial = Action(await h.Save(1, """{"doctorId":"otte"}"""));
+            Assert.Equal(RoomStates.Prestaging, partial.Room.State);
+            Assert.Equal(AssignmentCompleteness.Partial, partial.Lifecycle.Assignment.Completeness);
+            Assert.Equal("otte", partial.Lifecycle.Assignment.DoctorId);
+            Assert.Null(partial.Lifecycle.Assignment.ProcedureCode);
+        }
+
+        var prestaging = StoreContext.Create(
+            workspace,
+            Environments.Production,
+            databasePath,
+            agingMinutes: 7,
+            staleMinutes: 12,
+            timeProvider: clock);
+        var prestagingRead = prestaging.Store.GetSnapshot().Rooms.Single(room => room.RoomId == 1);
+        Assert.Equal(RoomStates.Prestaging, prestagingRead.State);
+        Assert.Equal(episodeId, prestagingRead.EpisodeId);
+        Assert.Equal(start, prestagingRead.PrestageStartedAt);
+        Assert.Equal("otte", prestagingRead.Assignment?.DoctorId);
+        Assert.Equal(AssignmentCompleteness.Partial, prestagingRead.Assignment?.Completeness);
+
+        string firstHandoffId;
+        clock.SetUtcNow(start.AddMinutes(2));
+        using (var h = new Harness(workspace, prestaging))
+        {
+            var seated = Action(await h.Seat(1, "{}"));
+            Assert.Equal(RoomStates.Seated, seated.Room.State);
+            Assert.Equal(episodeId, seated.Room.EpisodeId);
+            Assert.Equal(start.AddMinutes(2), seated.Room.SeatedAt);
+            Assert.Equal(AssignmentCompleteness.Partial, seated.Lifecycle.Assignment.Completeness);
+
+            var beforeFailedReady = ReadyRoomSnapshot.From(
+                prestaging.Repository.LoadRooms(3).Single(room => room.RoomId == 1));
+            var handoffsBeforeFailedReady = prestaging.Repository.LoadReadyHandoffsByEpisode(episodeId).Count;
+            AssertError(
+                await h.Ready(1, "{}"),
+                409,
+                PrestagingLifecycleErrorCodes.AssignmentIncomplete);
+            Assert.Equal(
+                beforeFailedReady,
+                ReadyRoomSnapshot.From(prestaging.Repository.LoadRooms(3).Single(room => room.RoomId == 1)));
+            Assert.Equal(
+                handoffsBeforeFailedReady,
+                prestaging.Repository.LoadReadyHandoffsByEpisode(episodeId).Count);
+
+            var complete = Action(await h.Save(
+                1,
+                """{"doctorId":"otte","procedureCode":"EXT","confirmedExpectedAllocationUnits":3}"""));
+            Assert.Equal(AssignmentCompleteness.Complete, complete.Lifecycle.Assignment.Completeness);
+            Assert.Equal(SedationState.EligibleNo, complete.Lifecycle.Assignment.Sedation.State);
+            Assert.Equal(
+                ExpectedAllocationState.ConfirmedSuggestedValue,
+                complete.Lifecycle.Assignment.ExpectedAllocation.State);
+
+            clock.SetUtcNow(start.AddMinutes(4));
+            var firstReady = Action(await h.Ready(1, "{}"));
+            firstHandoffId = Assert.IsType<string>(firstReady.Room.ActiveReadyHandoffId);
+            Assert.Equal(firstHandoffId, firstReady.Handoff?.HandoffId);
+            Assert.True(firstReady.Lifecycle.AssignmentLocked);
+            Assert.Equal(RoomStates.ReadyForDoctor, firstReady.Room.State);
+        }
+
+        clock.SetUtcNow(start.AddMinutes(12));
+        Assert.Equal(ReadyUrgency.Aging, prestaging.Store.GetRoom(1)?.ReadyUrgency);
+        clock.SetUtcNow(start.AddMinutes(17));
+        var ready = StoreContext.Create(
+            workspace,
+            Environments.Production,
+            databasePath,
+            agingMinutes: 7,
+            staleMinutes: 12,
+            timeProvider: clock);
+        var readyRead = ready.Store.GetRoom(1)!;
+        Assert.Equal(RoomStates.ReadyForDoctor, readyRead.State);
+        Assert.Equal(ReadyUrgency.Stale, readyRead.ReadyUrgency);
+        Assert.True(readyRead.AssignmentLocked);
+        Assert.Equal(firstHandoffId, readyRead.ActiveReadyHandoffId);
+        Assert.Null(readyRead.AcceptedReadyHandoffId);
+        Assert.Equal("EXT", readyRead.Assignment?.ProcedureCode);
+        Assert.Equal(SedationState.EligibleNo, readyRead.Assignment?.Sedation.State);
+
+        string secondHandoffId;
+        using (var h = new Harness(workspace, ready))
+        {
+            var withdrawn = Action(await h.Withdraw(1, "{}"));
+            Assert.Equal(RoomStates.Seated, withdrawn.Room.State);
+            Assert.Equal(episodeId, withdrawn.Room.EpisodeId);
+            Assert.Equal(start, withdrawn.Room.PrestageStartedAt);
+            Assert.Equal(start.AddMinutes(2), withdrawn.Room.SeatedAt);
+            Assert.Equal(ReadyUrgency.None, withdrawn.Lifecycle.ReadyUrgency);
+            Assert.False(withdrawn.Lifecycle.AssignmentLocked);
+            Assert.Null(withdrawn.Room.ActiveReadyHandoffId);
+
+            var beforeInvalidProcedureChange = ReadyRoomSnapshot.From(
+                ready.Repository.LoadRooms(3).Single(room => room.RoomId == 1));
+            AssertError(
+                await h.Save(
+                    1,
+                    """{"doctorId":"pledger","procedureCode":"CON","sedationChoice":"yes","confirmedExpectedAllocationUnits":3}"""),
+                400,
+                PrestagingLifecycleErrorCodes.InvalidAssignment);
+            Assert.Equal(
+                beforeInvalidProcedureChange,
+                ReadyRoomSnapshot.From(ready.Repository.LoadRooms(3).Single(room => room.RoomId == 1)));
+
+            var corrected = Action(await h.Save(
+                1,
+                """{"doctorId":"pledger","procedureCode":"CON","confirmedExpectedAllocationUnits":1}"""));
+            Assert.Equal("pledger", corrected.Lifecycle.Assignment.DoctorId);
+            Assert.Equal("CON", corrected.Lifecycle.Assignment.ProcedureCode);
+            Assert.Equal(
+                SedationState.UnavailableProcedureIneligible,
+                corrected.Lifecycle.Assignment.Sedation.State);
+            Assert.Equal(1, corrected.Lifecycle.Assignment.ExpectedAllocation.ConfirmedValue);
+
+            clock.SetUtcNow(start.AddMinutes(20));
+            var secondReady = Action(await h.Ready(1, "{}"));
+            secondHandoffId = Assert.IsType<string>(secondReady.Room.ActiveReadyHandoffId);
+            Assert.NotEqual(firstHandoffId, secondHandoffId);
+            Assert.Equal(secondHandoffId, secondReady.Handoff?.HandoffId);
+        }
+
+        clock.SetUtcNow(start.AddMinutes(25));
+        var reissued = StoreContext.Create(
+            workspace,
+            Environments.Production,
+            databasePath,
+            agingMinutes: 7,
+            staleMinutes: 12,
+            timeProvider: clock);
+        var reissuedRead = reissued.Store.GetSnapshot().Rooms.Single(room => room.RoomId == 1);
+        Assert.Equal(RoomStates.ReadyForDoctor, reissuedRead.State);
+        Assert.Equal(ReadyUrgency.None, reissuedRead.ReadyUrgency);
+        Assert.Equal(secondHandoffId, reissuedRead.ActiveReadyHandoffId);
+        Assert.Equal("pledger", reissuedRead.Assignment?.DoctorId);
+        Assert.Equal("CON", reissuedRead.Assignment?.ProcedureCode);
+
+        using (var h = new Harness(workspace, reissued))
+        {
+            var arrived = Action(await h.DoctorArrived(1, "{}"));
+            Assert.Equal(RoomStates.DoctorInRoom, arrived.Room.State);
+            Assert.Equal(ReadyUrgency.None, arrived.Lifecycle.ReadyUrgency);
+            Assert.True(arrived.Lifecycle.AssignmentLocked);
+            Assert.Null(arrived.Room.ActiveReadyHandoffId);
+            Assert.Equal(secondHandoffId, arrived.Room.AcceptedReadyHandoffId);
+            Assert.Equal("pledger", arrived.Lifecycle.Assignment.DoctorId);
+            Assert.Equal("CON", arrived.Lifecycle.Assignment.ProcedureCode);
+
+            clock.SetUtcNow(start.AddMinutes(47));
+            Assert.Equal(200, (await h.DoctorComplete(1)).StatusCode);
+            clock.SetUtcNow(start.AddMinutes(52));
+            Assert.Equal(200, (await h.RoomAvailable(1)).StatusCode);
+        }
+
+        var final = StoreContext.Create(
+            workspace,
+            Environments.Production,
+            databasePath,
+            agingMinutes: 7,
+            staleMinutes: 12,
+            timeProvider: clock);
+        var finalRoom = final.Store.GetRoom(1)!;
+        Assert.Equal(RoomStates.Available, finalRoom.State);
+        Assert.Null(finalRoom.EpisodeId);
+        Assert.Null(finalRoom.Assignment);
+
+        var handoffs = final.Repository.LoadReadyHandoffsByEpisode(episodeId);
+        var withdrawnHandoff = Assert.Single(
+            handoffs,
+            handoff => handoff.ContractStatus == ReadyHandoffStatus.Withdrawn);
+        var acceptedHandoff = Assert.Single(
+            handoffs,
+            handoff => handoff.ContractStatus == ReadyHandoffStatus.Accepted);
+        Assert.Equal(firstHandoffId, withdrawnHandoff.HandoffId);
+        Assert.Equal(secondHandoffId, acceptedHandoff.HandoffId);
+
+        var durableCycle = Assert.Single(final.Repository.LoadCompletedCycles());
+        Assert.Equal(secondHandoffId, durableCycle.AcceptedReadyHandoffId);
+        Assert.Equal("pledger", durableCycle.AssignedDoctor);
+        Assert.Equal("CON", durableCycle.ProcedureCode);
+        Assert.Equal(start.AddMinutes(20), durableCycle.ReadyForDoctorAt);
+        Assert.Equal(start.AddMinutes(25), durableCycle.DoctorArrivedAt);
+        Assert.Equal(5 * 60, durableCycle.ReadyToDoctorSeconds);
+        Assert.Equal(23 * 60, durableCycle.SeatedToDoctorSeconds);
+
+        var reports = final.Store.GetReports();
+        var reportedCycle = Assert.Single(reports.RecentCompletedCycles);
+        Assert.Equal(secondHandoffId, reportedCycle.AcceptedReadyHandoffId);
+        Assert.Equal("pledger", reportedCycle.AssignedDoctor);
+        Assert.Equal("CON", reportedCycle.ProcedureCode);
+        Assert.Equal(1, reportedCycle.ExpectedAllocationUnits);
+        Assert.Equal(5 * 60, reports.AverageReadyToDoctorSeconds);
+        Assert.Equal(23 * 60, reports.AverageSeatedToDoctorSeconds);
+    }
+
+    [Fact]
     public async Task Canonical_doctor_arrived_keeps_assignment_details_locked_without_mutation()
     {
         using var workspace = TestWorkspace.Create();
