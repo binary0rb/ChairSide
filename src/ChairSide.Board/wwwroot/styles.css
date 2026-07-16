@@ -440,6 +440,11 @@ body[data-view="doctor"] .primary-nav [data-nav="doctor"] .nav-pill-toggle {
   background: #94a3b8;
 }
 
+.state-dot.prestaging {
+  background: #cffafe;
+  border: 3px solid #0891b2;
+}
+
 .state-dot.seated {
   background: #dbeafe;
   border: 3px solid #2563eb;
@@ -527,12 +532,12 @@ body[data-view="doctor"] .primary-nav [data-nav="doctor"] .nav-pill-toggle {
   ), color-mix(in srgb, var(--doctor-color) 12%, #ffffff);
 }
 
-.room-tile.aging {
+.room-tile.ready-for-doctor.urgency-aging {
   border-width: 6px;
   animation: agingBorderPulse 3.8s ease-in-out infinite;
 }
 
-.room-tile.stale {
+.room-tile.ready-for-doctor.urgency-stale {
   border-width: 6px;
   animation: staleBorderPulse 2.25s ease-in-out infinite;
 }
@@ -551,47 +556,42 @@ body[data-view="doctor"] .primary-nav [data-nav="doctor"] .nav-pill-toggle {
 }
 
 /* State badge tones. Explicit text plus a dedicated state color per badge. */
-.room-tile.empty .room-topline span {
+.room-tile.empty .room-topline > .room-state-badge {
   background: #e2e8f0;
   color: #334155;
 }
 
-.room-tile.seated .room-topline span {
+.room-tile.prestaging .room-topline > .room-state-badge {
+  background: #cffafe;
+  color: #155e75;
+}
+
+.room-tile.seated .room-topline > .room-state-badge {
   background: #dbeafe;
   color: #1e3a8a;
 }
 
-.room-tile.ready-for-doctor .room-topline span {
+.room-tile.ready-for-doctor .room-topline > .room-state-badge {
   background: #facc15;
   color: #422006;
 }
 
-.room-tile.aging .room-topline span {
-  background: #ea580c;
-  color: #ffffff;
-}
-
-.room-tile.stale .room-topline span {
-  background: #dc2626;
-  color: #ffffff;
-}
-
-.room-tile.doctor-in-room .room-topline span {
+.room-tile.doctor-in-room .room-topline > .room-state-badge {
   background: #15803d;
   color: #ffffff;
 }
 
-.room-tile.turnover .room-topline span {
+.room-tile.turnover .room-topline > .room-state-badge {
   background: #6d28d9;
   color: #ffffff;
 }
 
 /* Urgency lands on the timer as well as the border. */
-.room-tile.aging .room-timer {
+.room-tile.ready-for-doctor.urgency-aging .room-timer {
   color: #9a3412;
 }
 
-.room-tile.stale .room-timer {
+.room-tile.ready-for-doctor.urgency-stale .room-timer {
   color: #b91c1c;
 }
 
@@ -646,7 +646,7 @@ body[data-view="doctor"] .primary-nav [data-nav="doctor"] .nav-pill-toggle {
   font-weight: 900;
 }
 
-.room-topline span {
+.room-topline > .room-state-badge {
   padding: 5px 9px;
   border-radius: 6px;
   background: rgba(23, 32, 51, 0.1);
@@ -676,6 +676,22 @@ body[data-view="doctor"] .primary-nav [data-nav="doctor"] .nav-pill-toggle {
 .procedure-lockup span {
   font-size: clamp(24px, 3.2vw, 48px);
   font-weight: 900;
+}
+
+.procedure-lockup--pending span {
+  font-size: clamp(14px, 1.7vw, 22px);
+  color: var(--muted);
+  letter-spacing: 0.02em;
+}
+
+.room-assignment-summary {
+  display: block;
+  min-height: 18px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.35;
+  text-align: center;
 }
 
 .room-footer {
@@ -2706,9 +2722,10 @@ button:disabled {
   justify-self: start;
 }
 
-body[data-view="room"] .room-tile.large .room-topline > .ready-status-stack {
+.room-topline > .ready-status-stack {
   display: inline-flex;
-  align-items: center;
+  flex-direction: column;
+  align-items: flex-end;
   gap: 6px;
   padding: 0;
   border: 0;
@@ -2727,17 +2744,17 @@ body[data-view="room"] .room-tile.large .room-topline > .ready-status-stack {
   letter-spacing: 0.04em;
 }
 
-.ready-primary-badge {
+.room-topline > .ready-status-stack .ready-primary-badge {
   background: #facc15;
   color: #422006;
 }
 
-.ready-urgency-badge.aging {
+.room-topline > .ready-status-stack .ready-urgency-badge.aging {
   background: #ea580c;
   color: #ffffff;
 }
 
-.ready-urgency-badge.stale {
+.room-topline > .ready-status-stack .ready-urgency-badge.stale {
   background: #dc2626;
   color: #ffffff;
 }
@@ -3037,7 +3054,7 @@ body[data-view="master"] .room-grid {
 }
 
 body[data-view="master"] .room-tile {
-  min-height: 132px;
+  min-height: 156px;
   padding: 10px 12px 10px 20px;
   border-width: 2px;
   border-color: rgba(23, 32, 51, 0.16);
@@ -3053,17 +3070,17 @@ body[data-view="master"] .room-tile.empty {
   border-color: rgba(23, 32, 51, 0.1);
 }
 
-body[data-view="master"] .room-tile.aging,
-body[data-view="master"] .room-tile.stale {
+body[data-view="master"] .room-tile.ready-for-doctor.urgency-aging,
+body[data-view="master"] .room-tile.ready-for-doctor.urgency-stale {
   border-width: 5px;
   box-shadow: none;
 }
 
-body[data-view="master"] .room-tile.aging {
+body[data-view="master"] .room-tile.ready-for-doctor.urgency-aging {
   animation: masterAgingBorderPulse 4.5s ease-in-out infinite;
 }
 
-body[data-view="master"] .room-tile.stale {
+body[data-view="master"] .room-tile.ready-for-doctor.urgency-stale {
   animation: masterStaleBorderPulse 3s ease-in-out infinite;
 }
 
@@ -3076,7 +3093,8 @@ body[data-view="master"] .room-topline strong {
   line-height: 1;
 }
 
-body[data-view="master"] .room-topline span {
+body[data-view="master"] .room-topline > .room-state-badge,
+body[data-view="master"] .room-topline > .ready-status-stack span {
   min-height: 26px;
   padding: 4px 8px;
   border: 1px solid transparent;
@@ -3085,31 +3103,32 @@ body[data-view="master"] .room-topline span {
   letter-spacing: 0.06em;
 }
 
-body[data-view="master"] .room-tile.empty .room-topline span {
+body[data-view="master"] .room-tile.empty .room-topline > .room-state-badge {
   border-color: rgba(51, 65, 85, 0.18);
 }
 
-body[data-view="master"] .room-tile.seated .room-topline span {
+body[data-view="master"] .room-tile.prestaging .room-topline > .room-state-badge {
+  border-color: rgba(8, 145, 178, 0.24);
+}
+
+body[data-view="master"] .room-tile.seated .room-topline > .room-state-badge {
   border-color: rgba(30, 58, 138, 0.22);
 }
 
-body[data-view="master"] .room-tile.ready-for-doctor .room-topline span {
+body[data-view="master"] .room-tile.ready-for-doctor .room-topline > .room-state-badge,
+body[data-view="master"] .room-tile.ready-for-doctor .ready-primary-badge {
   border-color: rgba(66, 32, 6, 0.24);
 }
 
-body[data-view="master"] .room-tile.aging .room-topline span {
+body[data-view="master"] .room-tile.ready-for-doctor .ready-urgency-badge {
   border-color: rgba(255, 255, 255, 0.35);
 }
 
-body[data-view="master"] .room-tile.stale .room-topline span {
-  border-color: rgba(255, 255, 255, 0.35);
-}
-
-body[data-view="master"] .room-tile.doctor-in-room .room-topline span {
+body[data-view="master"] .room-tile.doctor-in-room .room-topline > .room-state-badge {
   border-color: rgba(255, 255, 255, 0.3);
 }
 
-body[data-view="master"] .room-tile.turnover .room-topline span {
+body[data-view="master"] .room-tile.turnover .room-topline > .room-state-badge {
   border-color: rgba(255, 255, 255, 0.3);
 }
 
@@ -3228,7 +3247,7 @@ body[data-view="doctor"] .doctor-list {
 }
 
 body[data-view="doctor"] .doctor-list .room-tile {
-  min-height: 132px;
+  min-height: 156px;
   padding: 10px 12px 10px 20px;
   border-width: 2px;
   border-color: rgba(23, 32, 51, 0.16);
@@ -3244,17 +3263,17 @@ body[data-view="doctor"] .doctor-list .room-tile.empty {
   border-color: rgba(23, 32, 51, 0.1);
 }
 
-body[data-view="doctor"] .doctor-list .room-tile.aging,
-body[data-view="doctor"] .doctor-list .room-tile.stale {
+body[data-view="doctor"] .doctor-list .room-tile.ready-for-doctor.urgency-aging,
+body[data-view="doctor"] .doctor-list .room-tile.ready-for-doctor.urgency-stale {
   border-width: 5px;
   box-shadow: none;
 }
 
-body[data-view="doctor"] .doctor-list .room-tile.aging {
+body[data-view="doctor"] .doctor-list .room-tile.ready-for-doctor.urgency-aging {
   animation: doctorAgingBorderPulse 4.5s ease-in-out infinite;
 }
 
-body[data-view="doctor"] .doctor-list .room-tile.stale {
+body[data-view="doctor"] .doctor-list .room-tile.ready-for-doctor.urgency-stale {
   animation: doctorStaleBorderPulse 3s ease-in-out infinite;
 }
 
@@ -3267,7 +3286,8 @@ body[data-view="doctor"] .doctor-list .room-topline strong {
   line-height: 1;
 }
 
-body[data-view="doctor"] .doctor-list .room-topline span {
+body[data-view="doctor"] .doctor-list .room-topline > .room-state-badge,
+body[data-view="doctor"] .doctor-list .room-topline > .ready-status-stack span {
   min-height: 26px;
   padding: 4px 8px;
   border: 1px solid transparent;
@@ -3276,31 +3296,32 @@ body[data-view="doctor"] .doctor-list .room-topline span {
   letter-spacing: 0.06em;
 }
 
-body[data-view="doctor"] .doctor-list .room-tile.empty .room-topline span {
+body[data-view="doctor"] .doctor-list .room-tile.empty .room-topline > .room-state-badge {
   border-color: rgba(51, 65, 85, 0.18);
 }
 
-body[data-view="doctor"] .doctor-list .room-tile.seated .room-topline span {
+body[data-view="doctor"] .doctor-list .room-tile.prestaging .room-topline > .room-state-badge {
+  border-color: rgba(8, 145, 178, 0.24);
+}
+
+body[data-view="doctor"] .doctor-list .room-tile.seated .room-topline > .room-state-badge {
   border-color: rgba(30, 58, 138, 0.22);
 }
 
-body[data-view="doctor"] .doctor-list .room-tile.ready-for-doctor .room-topline span {
+body[data-view="doctor"] .doctor-list .room-tile.ready-for-doctor .room-topline > .room-state-badge,
+body[data-view="doctor"] .doctor-list .room-tile.ready-for-doctor .ready-primary-badge {
   border-color: rgba(66, 32, 6, 0.24);
 }
 
-body[data-view="doctor"] .doctor-list .room-tile.aging .room-topline span {
+body[data-view="doctor"] .doctor-list .room-tile.ready-for-doctor .ready-urgency-badge {
   border-color: rgba(255, 255, 255, 0.35);
 }
 
-body[data-view="doctor"] .doctor-list .room-tile.stale .room-topline span {
-  border-color: rgba(255, 255, 255, 0.35);
-}
-
-body[data-view="doctor"] .doctor-list .room-tile.doctor-in-room .room-topline span {
+body[data-view="doctor"] .doctor-list .room-tile.doctor-in-room .room-topline > .room-state-badge {
   border-color: rgba(255, 255, 255, 0.3);
 }
 
-body[data-view="doctor"] .doctor-list .room-tile.turnover .room-topline span {
+body[data-view="doctor"] .doctor-list .room-tile.turnover .room-topline > .room-state-badge {
   border-color: rgba(255, 255, 255, 0.3);
 }
 
@@ -3541,17 +3562,17 @@ body[data-view="room"] .panel-status .room-tile.large::before {
   width: 6px;
 }
 
-body[data-view="room"] .panel-status .room-tile.large.aging,
-body[data-view="room"] .panel-status .room-tile.large.stale {
+body[data-view="room"] .panel-status .room-tile.large.ready-for-doctor.urgency-aging,
+body[data-view="room"] .panel-status .room-tile.large.ready-for-doctor.urgency-stale {
   border-width: 6px;
   box-shadow: none;
 }
 
-body[data-view="room"] .panel-status .room-tile.large.aging {
+body[data-view="room"] .panel-status .room-tile.large.ready-for-doctor.urgency-aging {
   animation: roomAgingBorderPulse 4s ease-in-out infinite;
 }
 
-body[data-view="room"] .panel-status .room-tile.large.stale {
+body[data-view="room"] .panel-status .room-tile.large.ready-for-doctor.urgency-stale {
   animation: roomStaleBorderPulse 2.75s ease-in-out infinite;
 }
 
@@ -3563,7 +3584,8 @@ body[data-view="room"] .panel-status .room-tile.large .room-topline strong {
   line-height: 1;
 }
 
-body[data-view="room"] .panel-status .room-tile.large .room-topline span {
+body[data-view="room"] .panel-status .room-tile.large .room-topline > .room-state-badge,
+body[data-view="room"] .panel-status .room-tile.large .room-topline > .ready-status-stack span {
   min-height: 26px;
   padding: 4px 8px;
   border: 1px solid transparent;
@@ -3571,31 +3593,32 @@ body[data-view="room"] .panel-status .room-tile.large .room-topline span {
   letter-spacing: 0.06em;
 }
 
-body[data-view="room"] .panel-status .room-tile.large.empty .room-topline span {
+body[data-view="room"] .panel-status .room-tile.large.empty .room-topline > .room-state-badge {
   border-color: rgba(51, 65, 85, 0.18);
 }
 
-body[data-view="room"] .panel-status .room-tile.large.seated .room-topline span {
+body[data-view="room"] .panel-status .room-tile.large.prestaging .room-topline > .room-state-badge {
+  border-color: rgba(8, 145, 178, 0.24);
+}
+
+body[data-view="room"] .panel-status .room-tile.large.seated .room-topline > .room-state-badge {
   border-color: rgba(30, 58, 138, 0.22);
 }
 
-body[data-view="room"] .panel-status .room-tile.large.ready-for-doctor .room-topline span {
+body[data-view="room"] .panel-status .room-tile.large.ready-for-doctor .room-topline > .room-state-badge,
+body[data-view="room"] .panel-status .room-tile.large.ready-for-doctor .ready-primary-badge {
   border-color: rgba(66, 32, 6, 0.24);
 }
 
-body[data-view="room"] .panel-status .room-tile.large.aging .room-topline span {
+body[data-view="room"] .panel-status .room-tile.large.ready-for-doctor .ready-urgency-badge {
   border-color: rgba(255, 255, 255, 0.35);
 }
 
-body[data-view="room"] .panel-status .room-tile.large.stale .room-topline span {
-  border-color: rgba(255, 255, 255, 0.35);
-}
-
-body[data-view="room"] .panel-status .room-tile.large.doctor-in-room .room-topline span {
+body[data-view="room"] .panel-status .room-tile.large.doctor-in-room .room-topline > .room-state-badge {
   border-color: rgba(255, 255, 255, 0.3);
 }
 
-body[data-view="room"] .panel-status .room-tile.large.turnover .room-topline span {
+body[data-view="room"] .panel-status .room-tile.large.turnover .room-topline > .room-state-badge {
   border-color: rgba(255, 255, 255, 0.3);
 }
 
