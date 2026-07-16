@@ -531,6 +531,12 @@
                       "path":  "tests/ChairSide.Board.Tests/ReportTrendSnapshotTests.cs"
                   },
                   {
+                      "id":  "file:tests/ChairSide.Board.Tests/RoomPanelPrestagingWorkflowTests.cs",
+                      "label":  "tests/ChairSide.Board.Tests/RoomPanelPrestagingWorkflowTests.cs",
+                      "type":  "File",
+                      "path":  "tests/ChairSide.Board.Tests/RoomPanelPrestagingWorkflowTests.cs"
+                  },
+                  {
                       "id":  "file:tests/ChairSide.Board.Tests/ScheduleFitCalculatorTests.cs",
                       "label":  "tests/ChairSide.Board.Tests/ScheduleFitCalculatorTests.cs",
                       "type":  "File",
@@ -1657,6 +1663,12 @@
                       "label":  "RoomMutationRequestValidator",
                       "type":  "CodeType",
                       "path":  "src/ChairSide.Board/Services/RoomMutationRequestValidator.cs"
+                  },
+                  {
+                      "id":  "symbol:type:RoomPanelPrestagingWorkflowTests",
+                      "label":  "RoomPanelPrestagingWorkflowTests",
+                      "type":  "CodeType",
+                      "path":  "tests/ChairSide.Board.Tests/RoomPanelPrestagingWorkflowTests.cs"
                   },
                   {
                       "id":  "symbol:type:RoomSnapshot",
@@ -2943,6 +2955,11 @@
                       "label":  "declares"
                   },
                   {
+                      "from":  "file:tests/ChairSide.Board.Tests/RoomPanelPrestagingWorkflowTests.cs",
+                      "to":  "symbol:type:RoomPanelPrestagingWorkflowTests",
+                      "label":  "declares"
+                  },
+                  {
                       "from":  "file:tests/ChairSide.Board.Tests/ScheduleFitCalculatorTests.cs",
                       "to":  "symbol:type:ScheduleFitCalculatorTests",
                       "label":  "declares"
@@ -3390,6 +3407,11 @@
                   {
                       "from":  "repo:chairside",
                       "to":  "file:tests/ChairSide.Board.Tests/ReportTrendSnapshotTests.cs",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:tests/ChairSide.Board.Tests/RoomPanelPrestagingWorkflowTests.cs",
                       "label":  "contains"
                   },
                   {

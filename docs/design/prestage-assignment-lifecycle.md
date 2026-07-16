@@ -25,6 +25,8 @@ Prestaging and Seated may persist an absent, partial, or complete assignment. A 
 - sedation semantics consistent with procedure eligibility; and
 - a confirmed expected allocation consistent with the procedure.
 
+Sedation is an optional modifier, not a separate required Yes/No question. With no procedure it is not applicable, and with an ineligible procedure it is unavailable. For an eligible procedure the room control is enabled; unchecked means no sedation and checked means sedation. When an eligible unchecked draft is committed by Save Details, Seat, or Ready, canonical transport normalizes it to durable `EligibleNo`. `EligibleUnresolved` remains readable for partial or legacy state, but the canonical room workflow does not require an extra No click.
+
 When procedure is absent, sedation is unavailable and expected allocation must be Unknown. Procedure-derived Suggested, ConfirmedSuggestedValue, or ConfirmedAdjustedValue allocation cannot remain attached to an absent procedure.
 
 `SaveAssignmentDetails` is the explicit draft commit. Assignment-bearing Seat or Ready may persist its supplied canonical assignment in the same transaction as the lifecycle action. Save Details, Seat, and Ready reject invalid data without changing durable or live room state.
@@ -39,11 +41,13 @@ Ready requires a complete, currently valid assignment. The assignment may alread
 - links it through `ActiveReadyHandoffId`; and
 - locks assignment editing.
 
-An omitted or explicit empty Ready request uses the durably saved assignment. An assignment-bearing canonical request persists the supplied complete draft and creates the Active handoff in one transaction. The current room panel still sends an omitted body and receives the legacy top-level room response; explicit canonical requests receive the lifecycle action envelope until issue #121 migrates the UI.
+An omitted or explicit empty Ready request uses the durably saved assignment. An assignment-bearing canonical request persists the supplied complete draft and creates the Active handoff in one transaction. The canonical room panel sends its current draft and consumes the lifecycle action envelope; omitted-body compatibility remains available to older clients.
 
 ## Canonical HTTP contract
 
-Issue #120 exposes canonical Begin Prestage, Save Details, Seat, Ready, Withdraw Ready, and Doctor Arrived operations. Canonical assignment input uses `doctorId`, undecorated `procedureCode`, `sedationChoice`, and `confirmedExpectedAllocationUnits`; the internal `+SED` decoration is never accepted or returned by canonical transport.
+Issue #120 exposes canonical Begin Prestage, Save Details, Seat, Ready, Withdraw Ready, and Doctor Arrived operations. Canonical assignment input uses `doctorId`, undecorated `procedureCode`, `sedationChoice`, and `confirmedExpectedAllocationUnits`; the internal `+SED` decoration is never accepted or returned by canonical transport. For an eligible procedure, `sedationChoice: "yes"` persists `EligibleYes`, while omitted or null `sedationChoice` represents the unchecked modifier and persists `EligibleNo`. Explicit `"no"` remains compatible.
+
+Room reads expose the durable canonical assignment alongside the existing room projection so initial load, polling, SignalR refresh, and restart recovery can restore doctor, procedure, sedation, allocation confirmation, completeness, lock state, and handoff references without inferring them from display fields.
 
 Canonical mutation outcomes distinguish room-not-found, invalid or incomplete assignment, lifecycle conflict, assignment lock, integrity fault, stale write, and persistence failure. Malformed or invalid assignment input maps to HTTP 400, room-not-found to 404, lifecycle/integrity/concurrency conflicts to 409, and persistence failure to 500. Validation and persistence failures do not partially mutate the room, handoff, cycle, live state, or event stream.
 

@@ -38,12 +38,10 @@ const app = {
   // re-seeds from the new default, but a sedation change only re-seeds when not manually adjusted.
   expectedUnits: null,
   expectedUnitsManual: false,
+  expectedUnitsConfirmed: false,
   expectedUnitsProcedureCode: null,
   expectedUnitsSedation: false,
-  // Doctor / procedure / sedation are only editable during initial seating or when the
-  // staff explicitly enters the Update Assignment / Edit flow. Otherwise they are locked
-  // read-only case metadata. This stays Off by default after seating.
-  assignmentEditMode: false,
+  persistedAssignmentSignature: "",
   selectionContext: null,
   // True while a pointer is pressed on a doctor/procedure tile. The 1s room poll
   // defers re-syncing and re-rendering the selection tiles while this is set so a
@@ -60,10 +58,11 @@ const app = {
 };
 
 const stateNames = ["empty", "seated", "aging", "stale", "ready-for-doctor", "doctor-in-room", "turnover"];
+const editableAssignmentStates = new Set(["prestaging", "seated"]);
 // States where "Ready for Doctor" button is enabled (only the neutral In Prep state).
 const activeSeatedStates = new Set(["seated"]);
-// States where cancellation is available. Assignment editing is separately locked at Ready.
-const cancelableStates = new Set(["seated", "ready-for-doctor", "aging", "stale"]);
+// States where cancellation is available. Assignment editing remains locked at Ready.
+const cancelableStates = new Set(["prestaging", "seated", "ready-for-doctor", "aging", "stale"]);
 // States where "Doctor Arrived" is enabled - all ready-for-doctor phase states.
 const doctorArrivedStates = new Set(["ready-for-doctor", "aging", "stale"]);
 const staffLoungeRoomNumber = 99;
@@ -777,6 +776,7 @@ function renderRoomPanel() {
     syncRoomSelection(room);
     renderSelectionTiles(room);
   }
+  renderAssignmentGuidance(room);
   renderRoomTokenPrompt();
   applyDemoTimerVisibility();
   populateDemoTimerSelect();
@@ -3012,7 +3012,9 @@ function renderRoomTile(room, large = false) {
   const roomId = getRoomId(room);
   const doctorColor = room.doctor ? room.doctor.color : "#8b949e";
   const procedure = room.procedure || procedureFromCode(room.procedureCode);
-  const badge = stateBadge(state);
+  const badge = large && (state === "aging" || state === "stale")
+    ? `<span class="ready-primary-badge">READY</span><span class="ready-urgency-badge ${state}">${state.toUpperCase()}</span>`
+    : stateBadge(state);
   const timer = roomTimerLabel(room);
   const fullDoctorName = room.doctor ? room.doctor.name : "Unassigned";
   const doctorDisplayName = large ? fullDoctorName : (room.doctor?.shortName || cardDoctorName(fullDoctorName));
@@ -3026,7 +3028,7 @@ function renderRoomTile(room, large = false) {
     <article class="room-tile ${state} ${large ? "large" : ""}" style="${tileStyle}">
       <div class="room-topline">
         <strong>Room ${roomId}</strong>
-        <span>${badge}</span>
+        <span class="${large && (state === "aging" || state === "stale") ? "ready-status-stack" : ""}">${badge}</span>
       </div>
       <div class="procedure-lockup${procedure ? " procedure-lockup--chip" : ""}">
         ${procedure ? renderProcedureIcon(procedure) : renderEmptyIcon()}
@@ -3111,6 +3113,10 @@ function stateBadge(state) {
     return "IN PREP";
   }
 
+  if (state === "prestaging") {
+    return "PRESTAGING";
+  }
+
   if (state === "ready-for-doctor") {
     return "READY";
   }
@@ -3127,14 +3133,18 @@ function stateBadge(state) {
 }
 
 function roomTimerLabel(room) {
-  if (!room.seatedAt) {
-    return { label: "Available", value: "--:--" };
+  if (room.seatedAt) {
+    return {
+      label: "Room time",
+      value: formatElapsed(room.seatedAt)
+    };
   }
 
-  return {
-    label: "Room time",
-    value: formatElapsed(room.seatedAt)
-  };
+  if (room.prestageStartedAt) {
+    return { label: "Prep time", value: formatElapsed(room.prestageStartedAt) };
+  }
+
+  return { label: "Available", value: "--:--" };
 }
 
 function getRoomId(room) {
@@ -3158,41 +3168,38 @@ function renderInvalidRoomMessage() {
 function setRoomControlsEnabled(room) {
   const isEnabled = Boolean(room);
   const state = room ? normalizeState(room) : "empty";
-  const canCorrect = cancelableStates.has(state);
-  const isPrep = activeSeatedStates.has(state); // only "seated" - not aging/stale anymore
-
-  // The Edit flow only exists in correctable seated states; drop it everywhere else so a
-  // lifecycle transition (Ready / Doctor Arrived / Available) always re-locks the controls.
-  if (!canCorrect) {
-    app.assignmentEditMode = false;
-  }
-  const isEditing = app.assignmentEditMode && canCorrect;
+  const canEdit = canEditAssignment(room);
+  const isDirty = canEdit && isAssignmentDraftDirty(room);
+  const isReady = doctorArrivedStates.has(state);
 
   setDisabled("demoElapsedSelect", !isEnabled || state !== "empty" || !isDemoTimerEnabled());
-  setDisabled("seatButton", !isEnabled || state !== "empty");
-  setDisabled("readyForDoctorButton", !isEnabled || !isPrep);
-  setDisabled("updateAssignmentButton", !isEnabled || !canCorrect);
-  setDisabled("cancelSeatingButton", !isEnabled || !canCorrect);
-  setDisabled("doctorArrivedButton", !isEnabled || !doctorArrivedStates.has(state));
+  setDisabled("beginPrestageButton", !isEnabled || state !== "empty");
+  setDisabled("seatButton", !isEnabled || state !== "prestaging");
+  setDisabled("readyForDoctorButton", !isEnabled || !activeSeatedStates.has(state) || !room?.episodeId);
+  setDisabled("saveDetailsButton", !isDirty);
+  setDisabled("discardChangesButton", !isDirty);
+  setDisabled("withdrawReadyButton", !isReady);
+  setDisabled("cancelSeatingButton", !isEnabled || !cancelableStates.has(state));
+  setDisabled("doctorArrivedButton", !isEnabled || !isReady);
   setDisabled("doctorCompleteButton", !isEnabled || state !== "doctor-in-room");
   setDisabled("roomAvailableButton", !isEnabled || state !== "turnover");
-
-  // Contextual labels: the correction buttons enter the Edit flow, then save/cancel it.
-  setButtonLabel("updateAssignmentButton", isEditing ? "Save Assignment" : "Update Assignment");
-  setButtonLabel("cancelSeatingButton", isEditing ? "Cancel Edit" : "Cancel Seating");
-}
-
-function setButtonLabel(id, label) {
-  const control = document.getElementById(id);
-  if (control && control.textContent !== label) {
-    control.textContent = label;
-  }
+  setHidden("saveDetailsButton", !isDirty);
+  setHidden("discardChangesButton", !isDirty);
+  setHidden("withdrawReadyButton", !isReady);
+  setHidden("cancelSeatingButton", !isEnabled || !cancelableStates.has(state));
 }
 
 function setDisabled(id, isDisabled) {
   const control = document.getElementById(id);
   if (control) {
     control.disabled = isDisabled;
+  }
+}
+
+function setHidden(id, isHidden) {
+  const control = document.getElementById(id);
+  if (control) {
+    control.hidden = isHidden;
   }
 }
 
@@ -3335,25 +3342,181 @@ function renderHelpIcon(helpText, placement) {
 }
 
 function syncRoomSelection(room) {
+  const assignment = canonicalAssignmentFromRoom(room);
+  const signature = canonicalAssignmentSignature(assignment);
   const context = room
-    ? `${getRoomId(room)}:${room.seatedAt || "available"}:${room.assignedDoctor || ""}:${room.procedureCode || ""}`
+    ? `${getRoomId(room)}:${room.episodeId || room.prestageStartedAt || "available"}:${signature}`
     : `invalid:${app.roomNumber}`;
-  if (app.selectionContext === context && app.selectedDoctorId && app.selectedProcedureId) {
+  if (app.selectionContext === context) {
     return;
   }
 
   app.selectionContext = context;
-  app.selectedDoctorId = room?.assignedDoctor || room?.doctor?.id || app.snapshot.doctors[0]?.id || null;
-  // A room's stored procedure code may carry a sedation modifier ("EXT+SED"). Select the
-  // base procedure tile and reflect the sedation toggle from the stored modifier.
-  const rawCode = room?.procedureCode || "";
-  const sedationFromRoom = hasSedationModifier(rawCode);
-  const baseCode = stripSedationModifier(rawCode);
-  const procedure = procedureFromCode(baseCode)
-    || app.snapshot.procedures.find(item => !isSedationCode(item.code))
-    || null;
-  app.selectedProcedureId = procedure?.code || null;
-  app.sedationOn = sedationFromRoom && Boolean(procedure && procedure.sedationEligible);
+  app.persistedAssignmentSignature = signature;
+  app.selectedDoctorId = assignment?.doctorId || null;
+  app.selectedProcedureId = assignment?.procedureCode || null;
+  app.sedationOn = assignment?.sedation?.state === "EligibleYes";
+  const allocation = assignment?.expectedAllocation;
+  app.expectedUnits = allocation?.confirmedValue ?? allocation?.suggestedValue ?? null;
+  app.expectedUnitsConfirmed = allocation?.state === "ConfirmedSuggestedValue"
+    || allocation?.state === "ConfirmedAdjustedValue";
+  app.expectedUnitsManual = allocation?.state === "ConfirmedAdjustedValue";
+  app.expectedUnitsProcedureCode = app.selectedProcedureId;
+  app.expectedUnitsSedation = app.sedationOn;
+}
+
+function canonicalAssignmentFromRoom(room) {
+  if (room?.assignment) {
+    return room.assignment;
+  }
+  if (!room?.assignedDoctor && !room?.procedureCode) {
+    return null;
+  }
+
+  // Pre-canonical active rows can carry truthful display fields without the durable state needed
+  // for a canonical handoff. Restore only those known values for read-only presentation; never
+  // invent allocation confirmation or treat the row as editable/Ready-capable.
+  const procedureCode = stripSedationModifier(room?.procedureCode) || null;
+  const procedure = procedureFromCode(procedureCode);
+  const sedationState = !procedure
+    ? "UnavailableNoProcedure"
+    : procedure.sedationEligible
+      ? (hasSedationModifier(room?.procedureCode) ? "EligibleYes" : "EligibleUnresolved")
+      : "UnavailableProcedureIneligible";
+  return {
+    doctorId: room?.assignedDoctor || null,
+    procedureCode,
+    sedation: { state: sedationState },
+    expectedAllocation: { state: "Unknown", suggestedValue: null, confirmedValue: null },
+    completeness: "Partial"
+  };
+}
+
+function canonicalAssignmentSignature(assignment) {
+  if (!assignment) {
+    return "unavailable";
+  }
+
+  return JSON.stringify({
+    doctorId: assignment.doctorId || null,
+    procedureCode: assignment.procedureCode || null,
+    sedationState: assignment.sedation?.state || null,
+    allocationState: assignment.expectedAllocation?.state || null,
+    suggestedValue: assignment.expectedAllocation?.suggestedValue ?? null,
+    confirmedValue: assignment.expectedAllocation?.confirmedValue ?? null
+  });
+}
+
+function draftAssignmentShape() {
+  const procedure = procedureFromCode(app.selectedProcedureId);
+  const procedureCode = procedure?.code || null;
+  const suggestedValue = procedureCode ? selectedProcedureDefaultUnits() : null;
+  const confirmedValue = procedureCode && app.expectedUnitsConfirmed
+    ? clampExpectedUnits(app.expectedUnits ?? suggestedValue)
+    : null;
+  let sedationState = "UnavailableNoProcedure";
+  if (procedure) {
+    sedationState = procedure.sedationEligible
+      ? (app.sedationOn ? "EligibleYes" : "EligibleNo")
+      : "UnavailableProcedureIneligible";
+  }
+  let allocationState = "Unknown";
+  if (procedureCode) {
+    allocationState = confirmedValue === null
+      ? "Suggested"
+      : confirmedValue === suggestedValue
+        ? "ConfirmedSuggestedValue"
+        : "ConfirmedAdjustedValue";
+  }
+
+  return {
+    doctorId: app.selectedDoctorId || null,
+    procedureCode,
+    sedationState,
+    allocationState,
+    suggestedValue,
+    confirmedValue
+  };
+}
+
+function draftAssignmentSignature() {
+  return JSON.stringify(draftAssignmentShape());
+}
+
+function isAssignmentDraftDirty(room = getCurrentRoom()) {
+  return canEditAssignment(room) && draftAssignmentSignature() !== app.persistedAssignmentSignature;
+}
+
+function discardAssignmentDraft() {
+  app.selectionContext = null;
+  syncRoomSelection(getCurrentRoom());
+  renderSelectionTiles(getCurrentRoom());
+  renderAssignmentGuidance(getCurrentRoom());
+  setRoomControlsEnabled(getCurrentRoom());
+}
+
+function canonicalAssignmentRequest() {
+  const procedure = procedureFromCode(app.selectedProcedureId);
+  return {
+    doctorId: app.selectedDoctorId || null,
+    procedureCode: procedure?.code || null,
+    sedationChoice: procedure?.sedationEligible && app.sedationOn ? "yes" : null,
+    confirmedExpectedAllocationUnits: procedure && app.expectedUnitsConfirmed
+      ? clampExpectedUnits(app.expectedUnits ?? selectedProcedureDefaultUnits())
+      : null
+  };
+}
+
+function renderAssignmentGuidance(room) {
+  const target = document.getElementById("assignmentGuidance");
+  if (!target || !room) {
+    return;
+  }
+  const faults = room.integrityFaults || [];
+  if (faults.length) {
+    target.textContent = "Assignment integrity requires review before this room can progress.";
+    target.dataset.tone = "error";
+    return;
+  }
+  const state = normalizeState(room);
+  if (isLegacyActiveRoom(room)) {
+    target.textContent = "This pre-canonical room remains visible but cannot issue a canonical handoff. Cancel seating, then begin a new Prestaging episode.";
+    target.dataset.tone = "error";
+    return;
+  }
+  if (state === "empty") {
+    target.textContent = "Begin Prestage to start room preparation. Assignment details can follow.";
+    target.dataset.tone = "neutral";
+    return;
+  }
+  if (room.assignmentLocked || doctorArrivedStates.has(state) || state === "doctor-in-room" || state === "turnover") {
+    target.textContent = doctorArrivedStates.has(state)
+      ? "Assignment locked for the active Ready handoff. Withdraw Ready to make a correction."
+      : "Assignment locked.";
+    target.dataset.tone = "neutral";
+    return;
+  }
+  const draft = draftAssignmentShape();
+  if (!draft.doctorId && !draft.procedureCode) {
+    target.textContent = state === "seated"
+      ? "Assignment pending. Complete details before Ready for Doctor."
+      : "Assignment pending. Details may be added now or after seating.";
+    target.dataset.tone = "neutral";
+    return;
+  }
+  const unresolved = [];
+  if (!draft.doctorId) unresolved.push("doctor");
+  if (!draft.procedureCode) unresolved.push("procedure");
+  if (draft.procedureCode && draft.confirmedValue === null) unresolved.push("allocation confirmation");
+  if (unresolved.length) {
+    target.textContent = `Details pending: ${unresolved.join(", ")}.`;
+    target.dataset.tone = "neutral";
+    return;
+  }
+  target.textContent = isAssignmentDraftDirty(room)
+    ? "Details ready. Save them now or continue with the next lifecycle action."
+    : "Assignment details complete.";
+  target.dataset.tone = "success";
 }
 
 function hasSedationModifier(code) {
@@ -3477,6 +3640,9 @@ function syncExpectedUnits() {
   if (app.expectedUnits === null || procedureChanged) {
     app.expectedUnits = selectedProcedureDefaultUnits();
     app.expectedUnitsManual = false;
+    if (procedureChanged) {
+      app.expectedUnitsConfirmed = false;
+    }
   } else if (sedationChanged && !app.expectedUnitsManual) {
     app.expectedUnits = selectedProcedureDefaultUnits();
   }
@@ -3485,8 +3651,8 @@ function syncExpectedUnits() {
   app.expectedUnitsSedation = app.sedationOn;
 }
 
-// Renders the expected allocation stepper. Interactive only while seating an empty room; for an
-// already-seated room it shows the persisted snapshot read-only (and hides when none exists).
+// Renders the expected allocation suggestion/confirmation. It stays editable throughout
+// Prestaging and Seated / In Prep, then becomes read-only at the Ready handoff boundary.
 function renderAllocationSelector(room) {
   const section = document.getElementById("allocationSection");
   if (!section) {
@@ -3495,12 +3661,18 @@ function renderAllocationSelector(room) {
 
   syncExpectedUnits();
 
-  const seating = room ? normalizeState(room) === "empty" : false;
+  const editing = canEditAssignment(room);
+  if (editing && !app.selectedProcedureId) {
+    section.hidden = true;
+    section.classList.remove("allocation-variable");
+    return;
+  }
   let units;
-  if (seating) {
+  if (editing) {
     units = app.expectedUnits ?? selectedProcedureDefaultUnits();
   } else {
-    const persisted = Number(room?.expectedAllocationUnits);
+    const persisted = Number(room?.assignment?.expectedAllocation?.confirmedValue
+      ?? room?.assignment?.expectedAllocation?.suggestedValue);
     units = Number.isFinite(persisted) && persisted > 0 ? persisted : null;
   }
 
@@ -3528,29 +3700,37 @@ function renderAllocationSelector(room) {
   }
 
   const variable = isVariableProcedure(procedureFromCode(app.selectedProcedureId));
-  section.classList.toggle("allocation-variable", seating && variable);
+  section.classList.toggle("allocation-variable", editing && variable);
 
   if (hintEl) {
-    hintEl.textContent = !seating
-      ? "Confirmed at seating."
+    hintEl.textContent = !editing
+      ? "Confirmed for the locked assignment."
+      : app.expectedUnitsConfirmed
+        ? "Allocation confirmed. Adjusting the units keeps the new value confirmed."
       : variable
-        ? "This procedure may vary. Confirm units against the scheduled block."
-        : "Standard expected allocation. Adjust only if needed.";
+        ? `Suggested: ${units} ${units === 1 ? "unit" : "units"}. Confirm or adjust.`
+        : `Suggested: ${units} ${units === 1 ? "unit" : "units"}. Confirm to continue.`;
   }
 
   if (minusBtn) {
-    minusBtn.disabled = !seating || units <= EXPECTED_UNITS_MIN;
+    minusBtn.disabled = !editing || units <= EXPECTED_UNITS_MIN;
   }
 
   if (plusBtn) {
-    plusBtn.disabled = !seating || units >= EXPECTED_UNITS_MAX;
+    plusBtn.disabled = !editing || units >= EXPECTED_UNITS_MAX;
+  }
+
+  const confirm = document.getElementById("allocationConfirm");
+  if (confirm) {
+    confirm.hidden = !editing || app.expectedUnitsConfirmed;
+    confirm.disabled = !editing || app.expectedUnitsConfirmed;
   }
 }
 
-// Adjusts expected units by delta during seating, marking the value as manually set so a later
+// Adjusts expected units by delta while the assignment is editable, marking the value as manually set so a later
 // live re-render does not snap it back to the procedure default.
 function adjustExpectedUnits(delta) {
-  if (currentRoomState() !== "empty") {
+  if (!canEditAssignment(getCurrentRoom())) {
     return;
   }
 
@@ -3562,7 +3742,10 @@ function adjustExpectedUnits(delta) {
 
   app.expectedUnits = next;
   app.expectedUnitsManual = true;
-  renderAllocationSelector(getCurrentRoom());
+  app.expectedUnitsConfirmed = true;
+  renderSelectionTiles(getCurrentRoom());
+  renderAssignmentGuidance(getCurrentRoom());
+  setRoomControlsEnabled(getCurrentRoom());
 }
 
 function renderDoctorTiles(room) {
@@ -3634,8 +3817,8 @@ function selectedProcedureIsSedationEligible() {
   return Boolean(procedure && procedure.sedationEligible);
 }
 
-// Renders the sedation modifier toggle. It is only interactable during initial seating or
-// the explicit Edit flow, and only for a sedation-eligible primary procedure; it defaults
+// Renders the sedation modifier toggle. It is interactable throughout Prestaging and Seated,
+// and only for a sedation-eligible primary procedure; it defaults
 // Off and only turns on when staff explicitly tap it. When the assignment is locked it
 // shows the room's actual sedation status as read-only case metadata.
 function renderSedationToggle(room) {
@@ -3646,6 +3829,11 @@ function renderSedationToggle(room) {
 
   const canEdit = canEditAssignment(room);
   const eligible = selectedProcedureIsSedationEligible();
+  const stateName = room ? normalizeState(room) : "empty";
+  const assignmentLocked = room?.assignmentLocked === true
+    || doctorArrivedStates.has(stateName)
+    || stateName === "doctor-in-room"
+    || stateName === "turnover";
   let interactable;
   let isOn;
 
@@ -3658,9 +3846,11 @@ function renderSedationToggle(room) {
     }
     isOn = eligible && app.sedationOn;
   } else {
-    // Locked: read-only mirror of the persisted case so EXT + SED still reads as On.
+    // Locked: prefer the canonical read contract. The mutation envelope intentionally returns
+    // the base procedure code, so the legacy +SED display decoration is only a fallback.
     interactable = false;
-    isOn = hasSedationModifier(room?.procedureCode);
+    isOn = room?.assignment?.sedation?.state === "EligibleYes"
+      || hasSedationModifier(room?.procedureCode);
   }
 
   toggle.disabled = !interactable;
@@ -3674,28 +3864,34 @@ function renderSedationToggle(room) {
 
   const hint = toggle.querySelector(".sedation-hint");
   if (hint) {
-    hint.textContent = !canEdit
-      ? "Use Update Assignment to change"
+    hint.textContent = assignmentLocked
+      ? "Locked with the Ready handoff"
+      : isLegacyActiveRoom(room)
+        ? "Legacy assignment is read-only until the room is restarted."
+      : !canEdit
+        ? "Available after Begin Prestage and an eligible procedure."
       : eligible
-        ? "Tap to mark this as a sedation case"
+        ? "Optional modifier. Leave off when sedation is not used."
         : "Not available for this procedure";
   }
 }
 
-// True when the doctor / procedure / sedation selection controls are live. They are live
-// during initial seating (room empty) and during the explicit Update Assignment / Edit
-// flow. In every other seated state they are locked read-only case metadata.
+// True when the doctor / procedure / sedation selection controls are live. They remain
+// directly editable in Prestaging and Seated / In Prep and lock at Ready.
 function canEditAssignment(room) {
   if (!room) {
     return false;
   }
 
-  const state = normalizeState(room);
-  if (state === "empty") {
-    return true;
-  }
+  return editableAssignmentStates.has(normalizeState(room))
+    && !isLegacyActiveRoom(room)
+    && room.assignmentLocked !== true;
+}
 
-  return cancelableStates.has(state) && app.assignmentEditMode;
+function isLegacyActiveRoom(room) {
+  return Boolean(room)
+    && editableAssignmentStates.has(normalizeState(room))
+    && !room.episodeId;
 }
 
 // Only writes innerHTML when the logical content actually changed. The room panel
@@ -3778,19 +3974,25 @@ function wireRoomPanel() {
     return;
   }
 
+  const beginPrestageButton = document.getElementById("beginPrestageButton");
   const seatButton = document.getElementById("seatButton");
   const readyForDoctorButton = document.getElementById("readyForDoctorButton");
-  const updateAssignmentButton = document.getElementById("updateAssignmentButton");
+  const saveDetailsButton = document.getElementById("saveDetailsButton");
+  const discardChangesButton = document.getElementById("discardChangesButton");
+  const withdrawReadyButton = document.getElementById("withdrawReadyButton");
   const cancelSeatingButton = document.getElementById("cancelSeatingButton");
   const doctorArrivedButton = document.getElementById("doctorArrivedButton");
   const doctorCompleteButton = document.getElementById("doctorCompleteButton");
   const roomAvailableButton = document.getElementById("roomAvailableButton");
 
-  if (!seatButton || !readyForDoctorButton || !updateAssignmentButton || !cancelSeatingButton || !doctorArrivedButton || !doctorCompleteButton || !roomAvailableButton) {
+  if (!beginPrestageButton || !seatButton || !readyForDoctorButton || !saveDetailsButton || !discardChangesButton || !withdrawReadyButton || !cancelSeatingButton || !doctorArrivedButton || !doctorCompleteButton || !roomAvailableButton) {
     console.error("[ChairSide] Room panel buttons were not found.", {
+      beginPrestageButton,
       seatButton,
       readyForDoctorButton,
-      updateAssignmentButton,
+      saveDetailsButton,
+      discardChangesButton,
+      withdrawReadyButton,
       cancelSeatingButton,
       doctorArrivedButton,
       doctorCompleteButton,
@@ -3802,48 +4004,57 @@ function wireRoomPanel() {
   console.log("[ChairSide] Room panel click handlers bound.", { roomNumber: app.roomNumber });
   wireSelectionTiles();
 
+  beginPrestageButton.addEventListener("click", async () => {
+    if (!isConfiguredRoom(app.roomNumber) || !isRoomInState("empty")) {
+      setRoomActionStatus("Begin Prestage is only available when the room is available.", "error");
+      return;
+    }
+    setRoomActionStatus("Starting room preparation...", "pending");
+    try {
+      const result = await sendCanonicalRoomAction("prestage", {});
+      applyRoomMutationResult(result);
+      setRoomActionStatus("Prestaging started. Assignment details can be added now or after seating.", "success");
+    } catch (error) {
+      setRoomActionStatus(error.message || "Failed to begin Prestaging.", "error");
+    }
+  });
+
+  saveDetailsButton.addEventListener("click", async () => {
+    if (!canEditAssignment(getCurrentRoom()) || !isAssignmentDraftDirty()) {
+      return;
+    }
+    setRoomActionStatus("Saving details...", "pending");
+    try {
+      const result = await sendSaveDetails(canonicalAssignmentRequest());
+      applyRoomMutationResult(result);
+      setRoomActionStatus("Details saved.", "success");
+    } catch (error) {
+      setRoomActionStatus(error.message || "Failed to save details.", "error");
+    }
+  });
+
+  discardChangesButton.addEventListener("click", () => {
+    discardAssignmentDraft();
+    setRoomActionStatus("Changes discarded.", "pending");
+  });
+
   seatButton.addEventListener("click", async () => {
     if (!isConfiguredRoom(app.roomNumber)) {
       setRoomActionStatus("This room is not configured.", "error");
       return;
     }
 
-    if (!isRoomInState("empty")) {
-      setRoomActionStatus("Seat Room is only available when the room is available.", "error");
+    if (!isRoomInState("prestaging")) {
+      setRoomActionStatus("Seat Room is only available after Prestaging begins.", "error");
       return;
     }
-
-    const doctorId = app.selectedDoctorId;
-    const procedureCode = app.selectedProcedureId;
-    const demoElapsedMinutes = isDemoTimerEnabled()
-      ? Number(document.getElementById("demoElapsedSelect")?.value || "0")
-      : 0;
-    if (!hasAssignmentSelection()) {
-      setRoomActionStatus("Choose a doctor and procedure first.", "error");
-      return;
-    }
-
-    const sedation = app.sedationOn && selectedProcedureIsSedationEligible();
-    const expectedAllocationUnits = clampExpectedUnits(app.expectedUnits ?? selectedProcedureDefaultUnits());
-    const payload = {
-      roomNumber: app.roomNumber,
-      doctorId,
-      procedureCode,
-      procedureId: procedureCode,
-      demoElapsedMinutes,
-      sedation,
-      expectedAllocationUnits
-    };
-
-    console.log("[ChairSide] Seat Room clicked.", payload);
     setRoomActionStatus("Seating room...", "pending");
 
     try {
-      await sendSeatRoom(payload);
-      console.log("[ChairSide] Seat Room succeeded.", payload);
+      const result = await sendSeatRoom(canonicalAssignmentRequest());
+      applyRoomMutationResult(result);
       setRoomActionStatus("Room seated.", "success");
     } catch (error) {
-      console.error("[ChairSide] Seat Room failed.", { payload, error });
       setRoomActionStatus(error.message || "Failed to seat room.", "error");
     }
   });
@@ -3863,8 +4074,8 @@ function wireRoomPanel() {
     setRoomActionStatus("Marking ready for doctor...", "pending");
 
     try {
-      await sendRoomAction(app.roomNumber, "ready-for-doctor", "Ready for Doctor");
-      console.log("[ChairSide] Ready for Doctor succeeded.", { roomNumber: app.roomNumber });
+      const result = await sendReadyForDoctor(canonicalAssignmentRequest());
+      applyRoomMutationResult(result);
       setRoomActionStatus("Ready for doctor.", "success");
     } catch (error) {
       console.error("[ChairSide] Ready for Doctor failed.", { roomNumber: app.roomNumber, error });
@@ -3872,52 +4083,18 @@ function wireRoomPanel() {
     }
   });
 
-  updateAssignmentButton.addEventListener("click", async () => {
-    if (!isConfiguredRoom(app.roomNumber)) {
-      setRoomActionStatus("This room is not configured.", "error");
+  withdrawReadyButton.addEventListener("click", async () => {
+    if (!doctorArrivedStates.has(currentRoomState())) {
+      setRoomActionStatus("Withdraw Ready is only available before Doctor Arrived.", "error");
       return;
     }
-
-    if (!cancelableStates.has(currentRoomState())) {
-      setRoomActionStatus("Update Assignment is only available while the room is in prep or seated.", "error");
-      return;
-    }
-
-    // First press enters the explicit Edit flow and unlocks procedure / sedation.
-    if (!app.assignmentEditMode) {
-      app.assignmentEditMode = true;
-      console.log("[ChairSide] Entered assignment edit mode.", { roomNumber: app.roomNumber });
-      setRoomActionStatus("Editing assignment - adjust procedure or sedation, then Save.", "pending");
-      renderRoomPanel();
-      return;
-    }
-
-    // Second press saves the edited assignment and re-locks the controls.
-    if (!hasAssignmentSelection()) {
-      setRoomActionStatus("Choose a doctor and procedure first.", "error");
-      return;
-    }
-
-    const payload = {
-      roomNumber: app.roomNumber,
-      doctorId: app.selectedDoctorId,
-      procedureCode: app.selectedProcedureId,
-      procedureId: app.selectedProcedureId,
-      sedation: app.sedationOn && selectedProcedureIsSedationEligible()
-    };
-
-    console.log("[ChairSide] Save Assignment clicked.", payload);
-    setRoomActionStatus("Updating assignment...", "pending");
-
+    setRoomActionStatus("Withdrawing the active handoff...", "pending");
     try {
-      await sendAssignmentUpdate(payload);
-      app.assignmentEditMode = false;
-      console.log("[ChairSide] Update Assignment succeeded.", payload);
-      setRoomActionStatus("Assignment updated.", "success");
-      renderRoomPanel();
+      const result = await sendCanonicalRoomAction("withdraw-ready", {});
+      applyRoomMutationResult(result);
+      setRoomActionStatus("Ready withdrawn. Details are editable again.", "success");
     } catch (error) {
-      console.error("[ChairSide] Update Assignment failed.", { payload, error });
-      setRoomActionStatus(error.message || "Failed to update assignment.", "error");
+      setRoomActionStatus(error.message || "Failed to withdraw Ready.", "error");
     }
   });
 
@@ -3932,17 +4109,6 @@ function wireRoomPanel() {
       return;
     }
 
-    // In the Edit flow this button discards in-progress edits and re-locks, rather than
-    // canceling the seating outright.
-    if (app.assignmentEditMode) {
-      app.assignmentEditMode = false;
-      app.selectionContext = null; // force re-sync from the persisted room (discard edits)
-      console.log("[ChairSide] Canceled assignment edit.", { roomNumber: app.roomNumber });
-      setRoomActionStatus("Edit canceled.", "pending");
-      renderRoomPanel();
-      return;
-    }
-
     const isConfirmed = window.confirm(`Cancel seating for Room ${app.roomNumber}? This will return the room to available without creating a report entry.`);
     if (!isConfirmed) {
       setRoomActionStatus("Cancel seating aborted.", "pending");
@@ -3953,7 +4119,8 @@ function wireRoomPanel() {
     setRoomActionStatus("Canceling seating...", "pending");
 
     try {
-      await sendRoomAction(app.roomNumber, "cancel-seating", "Cancel Seating");
+      const result = await sendRoomAction(app.roomNumber, "cancel-seating", "Cancel Seating");
+      applyRoomMutationResult(result);
       console.log("[ChairSide] Cancel Seating succeeded.", { roomNumber: app.roomNumber });
       setRoomActionStatus("Seating canceled. Room available.", "success");
     } catch (error) {
@@ -3983,6 +4150,7 @@ function wireRoomPanel() {
       });
 
       if (response.ok) {
+        applyRoomMutationResult(await response.json());
         console.log("[ChairSide] Doctor Arrived succeeded.", { roomNumber: app.roomNumber });
         setRoomActionStatus("Doctor arrived.", "success");
         return;
@@ -4020,7 +4188,8 @@ function wireRoomPanel() {
     setRoomActionStatus("Marking doctor complete...", "pending");
 
     try {
-      await sendRoomAction(app.roomNumber, "doctor-complete", "Doctor Complete");
+      const result = await sendRoomAction(app.roomNumber, "doctor-complete", "Doctor Complete");
+      applyRoomMutationResult(result);
       console.log("[ChairSide] Doctor Complete succeeded.", { roomNumber: app.roomNumber });
       setRoomActionStatus("Doctor complete. Turnover started.", "success");
     } catch (error) {
@@ -4044,7 +4213,8 @@ function wireRoomPanel() {
     setRoomActionStatus("Marking room available...", "pending");
 
     try {
-      await sendRoomAction(app.roomNumber, "available", "Room Available");
+      const result = await sendRoomAction(app.roomNumber, "available", "Room Available");
+      applyRoomMutationResult(result);
       console.log("[ChairSide] Room Available succeeded.", { roomNumber: app.roomNumber });
       setRoomActionStatus("Room available.", "success");
     } catch (error) {
@@ -4134,14 +4304,20 @@ function wireSelectionTiles() {
   wireTileGroup(doctorTiles, "[data-doctor-id]", "doctorId", button => {
     app.selectedDoctorId = button.dataset.doctorId;
     renderSelectionTiles(getCurrentRoom());
+    renderAssignmentGuidance(getCurrentRoom());
+    setRoomControlsEnabled(getCurrentRoom());
   });
 
   wireTileGroup(procedureTiles, "[data-procedure-id]", "procedureId", button => {
+    const procedureChanged = app.selectedProcedureId !== button.dataset.procedureId;
     app.selectedProcedureId = button.dataset.procedureId;
-    if (!selectedProcedureIsSedationEligible()) {
+    if (procedureChanged) {
       app.sedationOn = false;
+      app.expectedUnitsConfirmed = false;
     }
     renderSelectionTiles(getCurrentRoom());
+    renderAssignmentGuidance(getCurrentRoom());
+    setRoomControlsEnabled(getCurrentRoom());
   });
 
   // Resolve / clean up the press at the document level so a release outside the
@@ -4154,6 +4330,10 @@ function wireSelectionTiles() {
   document.addEventListener("keydown", event => {
     if (event.key === "Escape") {
       clearTilePress();
+      if (isAssignmentDraftDirty()) {
+        discardAssignmentDraft();
+        setRoomActionStatus("Changes discarded.", "pending");
+      }
     }
   });
 
@@ -4165,14 +4345,22 @@ function wireSelectionTiles() {
 
     app.sedationOn = !app.sedationOn;
     renderSelectionTiles(getCurrentRoom());
+    renderAssignmentGuidance(getCurrentRoom());
+    setRoomControlsEnabled(getCurrentRoom());
   });
 
   document.getElementById("allocationMinus")?.addEventListener("click", () => adjustExpectedUnits(-1));
   document.getElementById("allocationPlus")?.addEventListener("click", () => adjustExpectedUnits(1));
-}
-
-function hasAssignmentSelection() {
-  return Boolean(app.selectedDoctorId && app.selectedProcedureId);
+  document.getElementById("allocationConfirm")?.addEventListener("click", () => {
+    if (!canEditAssignment(getCurrentRoom()) || !app.selectedProcedureId) {
+      return;
+    }
+    app.expectedUnits = app.expectedUnits ?? selectedProcedureDefaultUnits();
+    app.expectedUnitsConfirmed = true;
+    renderSelectionTiles(getCurrentRoom());
+    renderAssignmentGuidance(getCurrentRoom());
+    setRoomControlsEnabled(getCurrentRoom());
+  });
 }
 
 function isConfiguredRoom(roomNumber) {
@@ -4192,54 +4380,63 @@ function isRoomInState(state) {
   return currentRoomState() === state;
 }
 
-async function sendSeatRoom(payload) {
-  console.log("[ChairSide] Sending Seat Room payload.", payload);
-  const response = await fetch(`/api/rooms/${payload.roomNumber}/seat`, {
-    method: "POST",
-    headers: mutationHeaders({ "Content-Type": "application/json" }),
-    body: JSON.stringify({
-      doctorId: payload.doctorId,
-      procedureCode: payload.procedureCode,
-      procedureId: payload.procedureId,
-      demoElapsedMinutes: payload.demoElapsedMinutes,
-      sedation: payload.sedation,
-      expectedAllocationUnits: payload.expectedAllocationUnits
-    })
-  });
+async function sendCanonicalRoomAction(action, body) {
+  return sendCanonicalMutation(`/api/rooms/${app.roomNumber}/${action}`, "POST", body, action);
+}
 
+async function sendSaveDetails(assignment) {
+  return sendCanonicalMutation(
+    `/api/rooms/${app.roomNumber}/assignment-details`,
+    "PUT",
+    assignment,
+    "save details");
+}
+
+async function sendSeatRoom(assignment) {
+  return sendCanonicalMutation(
+    `/api/rooms/${app.roomNumber}/seat`,
+    "POST",
+    { assignment },
+    "seat room");
+}
+
+async function sendReadyForDoctor(assignment) {
+  return sendCanonicalMutation(
+    `/api/rooms/${app.roomNumber}/ready-for-doctor`,
+    "POST",
+    { assignment },
+    "ready for doctor");
+}
+
+async function sendCanonicalMutation(url, method, body, label) {
+  const response = await fetch(url, {
+    method,
+    headers: mutationHeaders({ "Content-Type": "application/json" }),
+    body: JSON.stringify(body)
+  });
   if (!response.ok) {
     if (response.status === 401 || response.status === 403) {
       showRoomTokenPrompt(response.status);
     }
-
-    throw new Error(await readErrorMessage(response, `Seat Room failed with HTTP ${response.status}.`));
+    throw new Error(await readErrorMessage(response, `${label} failed with HTTP ${response.status}.`));
   }
-
   return response.json();
 }
 
-async function sendAssignmentUpdate(payload) {
-  console.log("[ChairSide] Sending Update Assignment payload.", payload);
-  const response = await fetch(`/api/rooms/${payload.roomNumber}/assignment`, {
-    method: "POST",
-    headers: mutationHeaders({ "Content-Type": "application/json" }),
-    body: JSON.stringify({
-      doctorId: payload.doctorId,
-      procedureCode: payload.procedureCode,
-      procedureId: payload.procedureId,
-      sedation: payload.sedation
-    })
-  });
-
-  if (!response.ok) {
-    if (response.status === 401 || response.status === 403) {
-      showRoomTokenPrompt(response.status);
-    }
-
-    throw new Error(await readErrorMessage(response, `Update Assignment failed with HTTP ${response.status}.`));
+function applyRoomMutationResult(result) {
+  const room = result?.room || result;
+  if (!room || !app.snapshot?.rooms) {
+    return;
   }
-
-  return response.json();
+  const roomId = getRoomId(room);
+  const index = app.snapshot.rooms.findIndex(item => getRoomId(item) === roomId);
+  if (index < 0) {
+    return;
+  }
+  app.snapshot.rooms[index] = room;
+  app.selectionContext = null;
+  app.lastSnapshotAt = Date.now();
+  renderRoomPanel();
 }
 
 // Handles a 409 from the doctor-arrived endpoint: confirms with the user, then asks the server
@@ -4321,8 +4518,25 @@ function mutationHeaders(baseHeaders = {}) {
 }
 
 async function readErrorMessage(response, fallback) {
-  const message = await response.text();
-  return message || fallback;
+  const text = await response.text();
+  if (!text) {
+    return fallback;
+  }
+  try {
+    const error = JSON.parse(text);
+    const labels = {
+      doctorId: "doctor",
+      procedureCode: "procedure",
+      sedationChoice: "sedation",
+      confirmedExpectedAllocationUnits: "allocation confirmation"
+    };
+    const unresolved = (error.unresolvedFields || []).map(field => labels[field] || field);
+    return unresolved.length
+      ? `${error.message || fallback} Still needed: ${unresolved.join(", ")}.`
+      : error.message || fallback;
+  } catch {
+    return text;
+  }
 }
 
 function setRoomActionStatus(message, tone) {

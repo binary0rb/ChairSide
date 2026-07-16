@@ -58,6 +58,10 @@ flowchart LR
     DoctorRoster["ConfigOption: Doctor roster"] --> CanonicalAssignment
     ProcedureRoster["ConfigOption: Procedure roster"] --> CanonicalAssignment
     SedationModifier["DomainConcept: Sedation modifier"] --> CanonicalAssignment
+    SedationModifier --> OptionalSedation["DesignDecision: Eligible unchecked means no sedation"]
+    OptionalSedation --> SaveDetails
+    CanonicalAssignment --> RoomReadModel["Contract: Durable room assignment read model"]
+    RoomReadModel --> BoardUi
     DeviceBinding["DomainConcept: Room device binding"] --> Mutations["LifecycleEvent: Room-local writes"]
     Realtime["StoreOrService: SignalR + polling fallback"] --> BoardUi
 
@@ -70,6 +74,7 @@ flowchart LR
 
 - ChairSide tracks rooms, never patients, and remains non-PHI.
 - Begin Prestage creates an episode without requiring assignment. Prestaging and Seated allow absent, partial, or complete canonical assignment.
+- For an eligible procedure, sedation is an optional modifier: unchecked canonical room drafts normalize to durable `EligibleNo` when saved, seated, or made Ready, while `EligibleUnresolved` remains readable for partial or legacy state.
 - Ready requires a complete, valid assignment, persisted either before or atomically with Ready, and is the immutable handoff/assignment-lock boundary.
 - `ReadyForDoctor` is the primary state. Aging and Stale are urgency projections from the owned Active handoff's `ReadyAt`.
 - Withdrawal returns to Seated and starts no new urgency until a different handoff is issued. Doctor Arrived accepts the current handoff.
@@ -97,7 +102,7 @@ flowchart LR
 
 ## Deferred and separate work
 
-- Room-panel workflow changes are deferred to #121, and master/doctor-view changes are deferred to #122.
+- Room-panel workflow changes belong to #121, and master/doctor-view changes are deferred to #122.
 - Reporting-population work remains #123; issue #120 preserves the existing accepted-handoff attribution contract.
 - After-hours sweep retry and batch atomicity remain issue #129.
 - Knowledge-graph comment/string false-positive extraction remains issue #126.

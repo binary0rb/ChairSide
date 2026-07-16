@@ -36,11 +36,13 @@
     <div class="panel-left-column">
       <section class="panel-status" id="roomPanelStatus"></section>
       <section class="corrections-panel" aria-labelledby="correctionsLabel">
-        <span class="control-label secondary-actions-label" id="correctionsLabel">Corrections</span>
+        <span class="control-label secondary-actions-label" id="correctionsLabel">Details and corrections</span>
         <div class="action-status" id="roomActionStatus" role="status" aria-live="polite"></div>
         <div class="room-token-panel" id="roomTokenPrompt" hidden></div>
         <div class="secondary-action-grid">
-          <button class="secondary-button utility-button" id="updateAssignmentButton" type="button">Update Assignment</button>
+          <button class="secondary-button utility-button" id="saveDetailsButton" type="button" hidden>Save Details</button>
+          <button class="secondary-button utility-button" id="discardChangesButton" type="button" hidden>Discard Changes</button>
+          <button class="secondary-button utility-button" id="withdrawReadyButton" type="button" hidden>Withdraw Ready</button>
           <button class="danger-button utility-button" id="cancelSeatingButton" type="button">Cancel Seating</button>
         </div>
       </section>
@@ -75,7 +77,9 @@
           <button class="allocation-step" id="allocationPlus" type="button" aria-label="Increase expected allocation">+</button>
         </div>
         <small class="allocation-hint" id="allocationHint"></small>
+        <button class="secondary-button utility-button allocation-confirm" id="allocationConfirm" type="button">Confirm Allocation</button>
       </div>
+      <div class="assignment-guidance" id="assignmentGuidance" role="status" aria-live="polite"></div>
       <div class="demo-timer-control" hidden>
         <label for="demoElapsedSelect">Demo Timer</label>
         <select id="demoElapsedSelect"></select>
@@ -83,6 +87,7 @@
       <div class="primary-workflow-panel" aria-labelledby="primaryWorkflowLabel">
         <span class="control-label primary-workflow-label" id="primaryWorkflowLabel">Primary workflow</span>
         <div class="primary-action-grid">
+          <button class="primary-button" id="beginPrestageButton" type="button">Begin Prestage</button>
           <button class="primary-button" id="seatButton" type="button">Seat Room</button>
           <button class="secondary-button" id="readyForDoctorButton" type="button">Ready for Doctor</button>
           <button class="secondary-button" id="doctorArrivedButton" type="button">Doctor Arrived</button>
