@@ -619,7 +619,7 @@ function renderLegend() {
   if (agingLabel) {
     const agingMinutes = getAgingMinutes();
     if (agingMinutes !== null) {
-      agingLabel.innerHTML = `<i class="state-dot aging"></i> Aging: doctor requested &gt; ${Math.round(agingMinutes)} min`;
+      agingLabel.innerHTML = `<i class="state-dot aging"></i> Aging: Ready wait &gt; ${Math.round(agingMinutes)} min`;
     }
   }
 
@@ -627,7 +627,7 @@ function renderLegend() {
   if (staleLabel) {
     const staleMinutes = getStaleMinutes();
     if (staleMinutes !== null) {
-      staleLabel.innerHTML = `<i class="state-dot stale"></i> Stale: doctor requested &gt; ${Math.round(staleMinutes)} min`;
+      staleLabel.innerHTML = `<i class="state-dot stale"></i> Stale: Ready wait &gt; ${Math.round(staleMinutes)} min`;
     }
   }
 }
@@ -868,7 +868,7 @@ function renderDoctorView() {
     return;
   }
 
-  const rooms = app.snapshot.rooms.filter(room => room.assignedDoctor === doctor.id || (room.doctor && room.doctor.id === doctor.id));
+  const rooms = app.snapshot.rooms.filter(room => roomAssignedDoctorId(room) === doctor.id);
 
   title.textContent = doctor.name;
   document.documentElement.style.setProperty("--active-doctor", doctor.color);
@@ -3008,32 +3008,42 @@ function doctorName(doctorId) {
 }
 
 function renderRoomTile(room, large = false) {
-  const state = normalizeState(room);
+  const presentation = roomPresentationState(room);
+  const state = presentation.primaryState;
   const roomId = getRoomId(room);
-  const doctorColor = room.doctor ? room.doctor.color : "#8b949e";
-  const procedure = room.procedure || procedureFromCode(room.procedureCode);
-  const badge = large && (state === "aging" || state === "stale")
-    ? `<span class="ready-primary-badge">READY</span><span class="ready-urgency-badge ${state}">${state.toUpperCase()}</span>`
-    : stateBadge(state);
+  const display = roomDisplayAssignment(room);
+  const doctorColor = display.doctor ? display.doctor.color : "#8b949e";
+  const procedure = display.procedure;
+  const badge = renderRoomStatusBadge(presentation);
   const timer = roomTimerLabel(room);
-  const fullDoctorName = room.doctor ? room.doctor.name : "Unassigned";
-  const doctorDisplayName = large ? fullDoctorName : (room.doctor?.shortName || cardDoctorName(fullDoctorName));
-  const coinInitials = room.doctor ? doctorInitials(room.doctor.id, fullDoctorName) : "";
+  const fullDoctorName = display.doctor?.name || (state === "empty" ? "No assignment" : "Doctor pending");
+  const doctorDisplayName = large
+    ? fullDoctorName
+    : (display.doctor?.shortName || cardDoctorName(fullDoctorName));
+  const coinInitials = display.doctor ? doctorInitials(display.doctor.id, fullDoctorName) : "";
+  const procedureDisplayCode = display.procedureCode
+    ? `${display.procedureCode}${display.sedationState === "EligibleYes" ? "+SED" : ""}`
+    : null;
+  const procedureLabel = procedureDisplayCode
+    ? formatProcedureCode(procedureDisplayCode)
+    : state === "empty" ? "OPEN" : "PROCEDURE PENDING";
+  const assignmentSummary = roomAssignmentSummary(room, display, state);
 
-  const accent = procedure ? resolveProcedureAccent(room.procedureCode) : "";
+  const accent = display.procedureCode ? resolveProcedureAccent(display.procedureCode) : "";
   const tileStyle = `--doctor-color: ${escapeAttribute(doctorColor)}`
     + (accent ? `; --procedure-accent: ${accent}` : "");
 
   return `
-    <article class="room-tile ${state} ${large ? "large" : ""}" style="${tileStyle}">
+    <article class="room-tile ${state} ${presentation.readyUrgency ? `urgency-${presentation.readyUrgency}` : ""} ${room.assignmentLocked ? "assignment-locked" : ""} ${large ? "large" : ""}" style="${tileStyle}">
       <div class="room-topline">
         <strong>Room ${roomId}</strong>
-        <span class="${large && (state === "aging" || state === "stale") ? "ready-status-stack" : ""}">${badge}</span>
+        ${badge}
       </div>
-      <div class="procedure-lockup${procedure ? " procedure-lockup--chip" : ""}">
+      <div class="procedure-lockup${procedure ? " procedure-lockup--chip" : state === "empty" ? "" : " procedure-lockup--pending"}">
         ${procedure ? renderProcedureIcon(procedure) : renderEmptyIcon()}
-        <span>${procedure ? escapeHtml(formatProcedureCode(procedure.code)) : "OPEN"}</span>
+        <span>${escapeHtml(procedureLabel)}</span>
       </div>
+      ${assignmentSummary ? `<small class="room-assignment-summary">${escapeHtml(assignmentSummary)}</small>` : ""}
       <div class="room-footer">
         <span class="room-doctor">
           ${coinInitials ? `<span class="room-doctor-coin" aria-hidden="true">${escapeHtml(coinInitials)}</span>` : ""}
@@ -3046,6 +3056,117 @@ function renderRoomTile(room, large = false) {
       </div>
     </article>
   `;
+}
+
+function roomPresentationState(room) {
+  const normalizedState = normalizeState(room);
+  const isReady = normalizedState === "ready-for-doctor"
+    || normalizedState === "aging"
+    || normalizedState === "stale";
+  if (!isReady) {
+    return { primaryState: normalizedState, readyUrgency: null };
+  }
+
+  const projectedUrgency = String(room?.readyUrgency || "").toLowerCase();
+  const readyUrgency = projectedUrgency === "aging" || projectedUrgency === "stale"
+    ? projectedUrgency
+    : normalizedState === "aging" || normalizedState === "stale"
+      ? normalizedState
+      : null;
+  return { primaryState: "ready-for-doctor", readyUrgency };
+}
+
+function renderRoomStatusBadge(presentation) {
+  if (!presentation.readyUrgency) {
+    return `<span class="room-state-badge">${stateBadge(presentation.primaryState)}</span>`;
+  }
+
+  const urgency = presentation.readyUrgency;
+  return `<span class="ready-status-stack" aria-label="Ready for Doctor, ${urgency} urgency">
+    <span class="ready-primary-badge">READY</span>
+    <span class="ready-urgency-badge ${urgency}">${urgency.toUpperCase()}</span>
+  </span>`;
+}
+
+function roomAssignedDoctorId(room) {
+  return roomDisplayAssignment(room).doctorId;
+}
+
+function roomDisplayAssignment(room) {
+  const assignment = room?.assignment || null;
+  if (assignment) {
+    const doctorId = assignment.doctorId || null;
+    const procedureCode = assignment.procedureCode || null;
+    return {
+      assignment,
+      doctorId,
+      doctor: app.snapshot?.doctors.find(doctor => doctor.id === doctorId) || null,
+      procedureCode,
+      procedure: procedureFromCode(procedureCode),
+      sedationState: assignment.sedation?.state || null,
+      expectedAllocation: assignment.expectedAllocation || null
+    };
+  }
+
+  // Legacy active rows may lack the additive canonical read model. Preserve their truthful saved
+  // display fields without treating decorated procedure codes as canonical assignment truth.
+  const doctorId = room?.doctor?.id || room?.assignedDoctor || null;
+  const procedureCode = stripSedationModifier(room?.procedureCode) || null;
+  return {
+    assignment: null,
+    doctorId,
+    doctor: app.snapshot?.doctors.find(doctor => doctor.id === doctorId) || room?.doctor || null,
+    procedureCode,
+    procedure: procedureFromCode(procedureCode) || room?.procedure || null,
+    sedationState: hasSedationModifier(room?.procedureCode) ? "EligibleYes" : null,
+    expectedAllocation: null
+  };
+}
+
+function roomAssignmentSummary(room, display, state) {
+  if (state === "empty") {
+    return "";
+  }
+  if (!display.assignment && !display.doctorId && !display.procedureCode) {
+    return "Assignment pending";
+  }
+
+  const details = [];
+  if (room.assignmentLocked) {
+    details.push(state === "ready-for-doctor" ? "Handoff locked" : "Accepted assignment");
+  }
+  if (!display.doctorId) {
+    details.push("Doctor pending");
+  }
+  if (!display.procedureCode) {
+    details.push("Procedure pending");
+  } else if (display.assignment) {
+    if (display.sedationState === "EligibleYes") {
+      details.push("Sedation on");
+    } else if (display.sedationState === "EligibleNo") {
+      details.push("No sedation");
+    } else if (display.sedationState === "EligibleUnresolved") {
+      details.push("Sedation pending");
+    } else {
+      details.push("Sedation unavailable");
+    }
+
+    const allocation = display.expectedAllocation;
+    const allocationState = allocation?.state || "Unknown";
+    const confirmedValue = allocation?.confirmedValue;
+    const suggestedValue = allocation?.suggestedValue;
+    if (allocationState === "ConfirmedSuggestedValue" || allocationState === "ConfirmedAdjustedValue") {
+      details.push(`${confirmedValue} ${confirmedValue === 1 ? "unit" : "units"} confirmed`);
+    } else if (allocationState === "Suggested" && suggestedValue !== null && suggestedValue !== undefined) {
+      details.push(`Suggested ${suggestedValue} ${suggestedValue === 1 ? "unit" : "units"} - confirm`);
+    } else {
+      details.push("Allocation pending");
+    }
+  } else {
+    details.push("Legacy assignment");
+  }
+
+  return details.join(" | ");
 }
 
 function cardDoctorName(displayName) {

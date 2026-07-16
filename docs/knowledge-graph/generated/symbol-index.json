@@ -1,7 +1,7 @@
 ﻿{
     "generatedStamp":  "deterministic",
     "root":  ".",
-    "fileCount":  92,
+    "fileCount":  93,
     "files":  [
                   {
                       "path":  ".github/pull_request_template.md",
@@ -132,7 +132,7 @@
                   {
                       "path":  "docs/design/prestage-assignment-lifecycle.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  10236,
+                      "sizeBytes":  10245,
                       "typeSymbols":  [
 
                                       ],
@@ -356,7 +356,7 @@
                   {
                       "path":  "docs/knowledge/reports/sedation-as-modifier.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  3453,
+                      "sizeBytes":  3458,
                       "typeSymbols":  [
 
                                       ],
@@ -418,7 +418,7 @@
                   {
                       "path":  "docs/knowledge/ui/doctor-view-operational-header.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  5676,
+                      "sizeBytes":  6739,
                       "typeSymbols":  [
 
                                       ],
@@ -443,6 +443,7 @@
                                        "Layout rule",
                                        "Current-room frame posture",
                                        "Room counting: assignment-based, not state-filtered",
+                                       "Canonical room-card presentation",
                                        "Scope",
                                        "Source anchors",
                                        "Verification notes"
@@ -513,7 +514,7 @@
                   {
                       "path":  "docs/knowledge-graph/chairside.graph.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  7213,
+                      "sizeBytes":  7771,
                       "typeSymbols":  [
 
                                       ],
@@ -544,7 +545,7 @@
                   {
                       "path":  "docs/knowledge-graph/decisions.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  6964,
+                      "sizeBytes":  6968,
                       "typeSymbols":  [
 
                                       ],
@@ -1452,7 +1453,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/DemoBoardStore.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  245750,
+                      "sizeBytes":  245777,
                       "typeSymbols":  [
                                           "ExceptionReasons",
                                           "ReportingExceptionReasons",
@@ -1617,7 +1618,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/PrestagingLifecycleApiContracts.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  23399,
+                      "sizeBytes":  23404,
                       "typeSymbols":  [
                                           "CanonicalAssignmentRequest",
                                           "EmptyLifecycleActionRequest",
@@ -2138,7 +2139,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/board.js",
                       "kind":  "JavaScript",
-                      "sizeBytes":  179463,
+                      "sizeBytes":  184578,
                       "typeSymbols":  [
 
                                       ],
@@ -2243,7 +2244,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/doctor.html",
                       "kind":  "Html",
-                      "sizeBytes":  2819,
+                      "sizeBytes":  2815,
                       "typeSymbols":  [
 
                                       ],
@@ -2269,7 +2270,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/index.html",
                       "kind":  "Html",
-                      "sizeBytes":  2726,
+                      "sizeBytes":  2822,
                       "typeSymbols":  [
 
                                       ],
@@ -2295,7 +2296,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/master.html",
                       "kind":  "Html",
-                      "sizeBytes":  2726,
+                      "sizeBytes":  2822,
                       "typeSymbols":  [
 
                                       ],
@@ -2347,7 +2348,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/room.html",
                       "kind":  "Html",
-                      "sizeBytes":  6077,
+                      "sizeBytes":  6096,
                       "typeSymbols":  [
 
                                       ],
@@ -2373,7 +2374,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/room-1.html",
                       "kind":  "Html",
-                      "sizeBytes":  6087,
+                      "sizeBytes":  6117,
                       "typeSymbols":  [
 
                                       ],
@@ -2425,7 +2426,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/styles.css",
                       "kind":  "Css",
-                      "sizeBytes":  90445,
+                      "sizeBytes":  92053,
                       "typeSymbols":  [
 
                                       ],
@@ -2491,6 +2492,38 @@
                                       ],
                       "methodSymbols":  [
 
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
+                      "path":  "tests/ChairSide.Board.Tests/BoardReadyPresentationTests.cs",
+                      "kind":  "CSharp",
+                      "sizeBytes":  10332,
+                      "typeSymbols":  [
+                                          "BoardReadyPresentationTests"
+                                      ],
+                      "methodSymbols":  [
+                                            "Canonical_room_reads_keep_prestaging_and_seated_distinct_without_fabricating_assignment",
+                                            "Ready_remains_primary_while_withdrawal_and_arrival_clear_urgency_and_keep_assignment",
+                                            "Master_and_doctor_cards_share_canonical_assignment_and_ready_presentation",
+                                            "Doctor_operational_header_and_room_panel_contracts_remain_in_place",
+                                            "StateKey",
+                                            "ElementIds",
+                                            "FindRepositoryRoot"
                                         ],
                       "routes":  [
 
@@ -2916,7 +2949,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/PrestagingLifecycleApiContractTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  17464,
+                      "sizeBytes":  17467,
                       "typeSymbols":  [
                                           "PrestagingLifecycleApiContractTests"
                                       ],
@@ -2962,7 +2995,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/PrestagingLifecycleEndpointTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  135167,
+                      "sizeBytes":  135168,
                       "typeSymbols":  [
                                           "PrestagingLifecycleEndpointTests",
                                           "Harness",
@@ -3209,7 +3242,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/RoomPanelPrestagingWorkflowTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  8210,
+                      "sizeBytes":  8365,
                       "typeSymbols":  [
                                           "RoomPanelPrestagingWorkflowTests"
                                       ],

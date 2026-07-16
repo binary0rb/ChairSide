@@ -447,6 +447,12 @@
                       "path":  "src/ChairSide.Board/wwwroot/workshop.html"
                   },
                   {
+                      "id":  "file:tests/ChairSide.Board.Tests/BoardReadyPresentationTests.cs",
+                      "label":  "tests/ChairSide.Board.Tests/BoardReadyPresentationTests.cs",
+                      "type":  "File",
+                      "path":  "tests/ChairSide.Board.Tests/BoardReadyPresentationTests.cs"
+                  },
+                  {
                       "id":  "file:tests/ChairSide.Board.Tests/BoardStoreTests.cs",
                       "label":  "tests/ChairSide.Board.Tests/BoardStoreTests.cs",
                       "type":  "File",
@@ -811,6 +817,12 @@
                       "label":  "BoardPersistenceOptions",
                       "type":  "CodeType",
                       "path":  "src/ChairSide.Board/Options/BoardPersistenceOptions.cs"
+                  },
+                  {
+                      "id":  "symbol:type:BoardReadyPresentationTests",
+                      "label":  "BoardReadyPresentationTests",
+                      "type":  "CodeType",
+                      "path":  "tests/ChairSide.Board.Tests/BoardReadyPresentationTests.cs"
                   },
                   {
                       "id":  "symbol:type:BoardSnapshot",
@@ -2745,6 +2757,11 @@
                       "label":  "declares"
                   },
                   {
+                      "from":  "file:tests/ChairSide.Board.Tests/BoardReadyPresentationTests.cs",
+                      "to":  "symbol:type:BoardReadyPresentationTests",
+                      "label":  "declares"
+                  },
+                  {
                       "from":  "file:tests/ChairSide.Board.Tests/BoardStoreTests.cs",
                       "to":  "symbol:type:a",
                       "label":  "declares"
@@ -3337,6 +3354,11 @@
                   {
                       "from":  "repo:chairside",
                       "to":  "file:src/ChairSide.Board/wwwroot/workshop.html",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:tests/ChairSide.Board.Tests/BoardReadyPresentationTests.cs",
                       "label":  "contains"
                   },
                   {

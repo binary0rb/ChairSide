@@ -1,7 +1,7 @@
 ---
 title: Doctor View operational header
 tags: [ui-cohesion, doctors, room, design-decision, active, last-verified]
-last_verified_commit: pending-issue-119
+last_verified_commit: pending-issue-122
 ---
 
 # Doctor View operational header
@@ -39,7 +39,16 @@ The current-room frame's per-doctor room count is assignment-based, not state-fi
 
 This means a doctor who still has an assigned `IN ROOM` or `TURNOVER` room, in addition to newly-seated rooms, shows a higher current-room count than the pre-arrival room count alone would suggest. Deterministic Doctor View fixtures that need an exact posture count (1, 3, 4, or 5+ rooms) keep every counted room in `Seated` or canonical `ReadyForDoctor`; threshold-relative Ready times exercise Aging/Stale urgency without persisting those labels as primary states. See `docs/knowledge/tests/deterministic-stress-fixtures.md`.
 
-Source: `src/ChairSide.Board/wwwroot/board.js`, `renderDoctorView`'s room filter - `room.assignedDoctor === doctor.id || (room.doctor && room.doctor.id === doctor.id)`, with no state predicate.
+Doctor View membership uses the shared canonical-first room assignment projection. When `room.assignment` is present, its `doctorId` is authoritative; stale decorated procedure codes or legacy display fields cannot override it. Pre-canonical rows without the additive assignment read model retain a read-only legacy fallback. The filter has no state predicate.
+
+## Canonical room-card presentation
+
+- Prestaging and Seated / In Prep remain distinct primary states.
+- Ready for Doctor stays the primary status while Aging or Stale appears beneath it as a secondary urgency badge.
+- Withdrawal returns the card to Seated / In Prep and removes Ready urgency. Doctor Arrived advances to In Room and also removes Ready urgency.
+- Doctor, procedure, sedation, and expected allocation come from the canonical room assignment read model when available.
+- Missing or partial assignment values use neutral pending language. Cards do not fabricate doctor, procedure, sedation, or allocation defaults.
+- Ready cards identify the locked handoff; later states retain the accepted assignment presentation.
 
 ## Scope
 
@@ -48,13 +57,13 @@ This is a UI and operational-awareness rule only. It does not change report sema
 ## Source anchors
 
 - `src/ChairSide.Board/wwwroot/doctor.html` - the operational header markup: `.doctor-operational-header` containing `.doctor-current-rooms-frame` (upper-left) and the reporting snapshot (`#doctorCockpit` / `.doctor-report-snapshot`, upper-right), with `.doctor-report-details` (the `#selectedDoctorPanel` tabs) below.
-- `src/ChairSide.Board/wwwroot/board.js` - `renderDoctorView` and `setDoctorRoomCount` (sets the `room-count-{0..4}` class that drives the adaptive posture; count capped at 4).
+- `src/ChairSide.Board/wwwroot/board.js` - `renderDoctorView`, `roomAssignedDoctorId`, `roomDisplayAssignment`, `roomPresentationState`, `renderRoomTile`, and `setDoctorRoomCount` (sets the `room-count-{0..4}` class that drives the adaptive posture; count capped at 4).
 - `src/ChairSide.Board/wwwroot/styles.css` - the `body[data-view="doctor"] .doctor-operational-header` / `.doctor-current-rooms-frame` / adaptive `.doctor-list.room-count-*` rules, and the `[hidden]` overrides that keep the snapshot and detail panel reliably hidden when there is no report access.
 - Related UI intent: `docs/ui-cohesion-audit.md` (reuse-first, protected operational clarity).
 
 ## Verification notes
 
-Verified during PR implementation against the working-tree layout: the current-room frame renders above the reporting detail; the reporting snapshot is right-aligned and compact; a tall expanded detail panel sits below without pushing the room frame down; and the 1, 2, 3 (2x2 with empty fourth quadrant), and 4 room postures render as described. Doctor coins and room-card readability are preserved.
+Verified during issue #122 implementation against the working-tree layout: the current-room frame remains above the reporting detail; the reporting snapshot remains right-aligned and compact; canonical assignment controls Doctor View membership and card details; Ready urgency is subordinate; and the adaptive room-count posture remains structurally unchanged. Focused browser smoke covers the rendered master and Doctor View states; full browser acceptance remains issue #125.
 
 Known limits: this note documents the layout rule and intent, not every responsive breakpoint or the exact flex-basis values, which live in the CSS. The greater-than-four-rooms case is deliberately conservative and not heavily designed.
 
