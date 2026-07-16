@@ -21,6 +21,8 @@ Sedation is a modifier of a primary procedure, never a standalone procedure and 
 
 - Do not calculate a separate "sedation time" or split a case into procedure time plus sedation time.
 - Do not model sedation as its own procedure family in new work; it is a modifier only.
+- In the canonical room workflow, an eligible unchecked modifier means no sedation and an eligible checked modifier means sedation. Saving, seating, or issuing Ready normalizes the unchecked eligible state to durable `EligibleNo`; staff do not need a separate No action.
+- Keep `EligibleUnresolved` readable for partial or legacy state without making it the normal room-panel interaction.
 - Keep sedation variants distinct from their base in variant-level reporting (`EXT` and `EXT+SED` are separate rows), while base-procedure roll-ups fold them together with `IsSedationCase = false` on the roll-up row.
 
 ## Source anchors

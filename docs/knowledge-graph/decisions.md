@@ -20,13 +20,15 @@ This file records decisions that should survive across tasks, PRs, and debugging
 
 **Rationale:** Lifecycle truth and assignment completeness are independent before Ready. The system must not invent clinical defaults or require staff to lie about timing.
 
+**Sedation interaction:** Sedation remains a modifier. For an eligible procedure, unchecked means no sedation and checked means sedation; the room workflow does not require a separate No action. Committing an eligible unchecked draft normalizes it to durable `EligibleNo`, while `EligibleUnresolved` remains compatible with partial or legacy state.
+
 ## Ready handoff boundary
 
 **Decision:** Ready requires a complete, currently valid assignment and creates an immutable owned Active handoff. The assignment may already be durable or may be persisted atomically by an assignment-bearing canonical Ready request. Ready is the assignment-lock boundary; Doctor Arrived accepts the handoff rather than reconstructing assignment.
 
 **Rationale:** A doctor may act on the handoff as soon as Ready is issued, so silent assignment changes after that point are unsafe.
 
-**Compatibility:** Omitted Ready and Doctor Arrived bodies retain the current room-panel `RoomStatus` response. Explicit canonical bodies return the lifecycle action envelope until issue #121 migrates the UI.
+**Compatibility:** Omitted Ready and Doctor Arrived bodies retain the legacy top-level `RoomStatus` response. Explicit canonical bodies return the lifecycle action envelope used by the canonical room panel.
 
 ## Ready urgency
 

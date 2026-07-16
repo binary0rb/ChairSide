@@ -83,7 +83,7 @@ public sealed class PrestagingLifecycleApiContractTests
     }
 
     [Fact]
-    public void Assignment_conversion_derives_absent_unresolved_suggested_and_confirmed_states()
+    public void Assignment_conversion_normalizes_eligible_unchecked_to_no_and_preserves_confirmed_states()
     {
         var absent = CanonicalAssignmentRequestConverter.Convert(
             new CanonicalAssignmentRequest(null, null, null, null),
@@ -104,7 +104,7 @@ public sealed class PrestagingLifecycleApiContractTests
         Assert.Equal(ExpectedAllocationState.Unknown, absent.Value?.ExpectedAllocation.State);
 
         Assert.Equal(AssignmentCompleteness.Partial, partial.Value?.Completeness);
-        Assert.Equal(SedationState.EligibleUnresolved, partial.Value?.Sedation.State);
+        Assert.Equal(SedationState.EligibleNo, partial.Value?.Sedation.State);
         Assert.Equal(ExpectedAllocationState.Suggested, partial.Value?.ExpectedAllocation.State);
         Assert.Equal(3, partial.Value?.ExpectedAllocation.SuggestedValue);
 
@@ -245,7 +245,7 @@ public sealed class PrestagingLifecycleApiContractTests
 
         var unresolved = CanonicalAssignmentRequirements.GetUnresolvedFields(partial);
 
-        Assert.Equal(["doctorId", "sedationChoice", "confirmedExpectedAllocationUnits"], unresolved);
+        Assert.Equal(["doctorId", "confirmedExpectedAllocationUnits"], unresolved);
     }
 
     [Fact]

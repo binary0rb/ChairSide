@@ -461,7 +461,7 @@ public static class CanonicalAssignmentRequestConverter
             {
                 "yes" => SedationContract.EligibleYes(),
                 "no" => SedationContract.EligibleNo(),
-                null => SedationContract.EligibleUnresolved(),
+                null => SedationContract.EligibleNo(),
                 _ => throw new InvalidOperationException("Sedation choice was validated before canonical conversion.")
             };
         }
@@ -568,7 +568,7 @@ public static class PrestagingLifecycleResponseProjector
         };
     }
 
-    private static RoomAssignmentContract ProjectAssignment(RoomAssignmentContract assignment)
+    internal static RoomAssignmentContract ProjectAssignment(RoomAssignmentContract assignment)
     {
         var baseCode = CanonicalProcedureCodeTransport.ToBaseCode(assignment.ProcedureCode);
         return string.Equals(baseCode, assignment.ProcedureCode, StringComparison.Ordinal)

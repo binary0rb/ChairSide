@@ -398,7 +398,7 @@ public sealed class PrestagingLifecycleEndpointTests
             suppliedDraft ? """{"assignment":{"doctorId":"otte","procedureCode":"EXT"}}""" : "{}");
 
         var error = AssertError(response, 409, PrestagingLifecycleErrorCodes.AssignmentIncomplete);
-        Assert.Equal(["sedationChoice", "confirmedExpectedAllocationUnits"], error.UnresolvedFields);
+        Assert.Equal(["confirmedExpectedAllocationUnits"], error.UnresolvedFields);
         Assert.Equal(["code", "message", "unresolvedFields", "integrityFaults"], Names(response.Json));
         Assert.Equal(before, ReadyRoomSnapshot.From(h.Context.Repository.LoadRooms(3).Single(room => room.RoomId == 1)));
         Assert.Equal(eventsBefore, h.Context.Store.GetSnapshot().RecentEvents.Count);

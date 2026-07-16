@@ -2849,6 +2849,12 @@ public sealed class DemoBoardStore
         var procedure = ResolveProcedure(room.ProcedureCode);
         var urgency = ProjectReadyUrgency(room, now);
         var faults = DeriveIntegrityFaults(room);
+        var persistedAssignment = GetCanonicalAssignment(room);
+        var assignment = persistedAssignment.TryToContract(out var canonicalAssignment)
+            ? PrestagingLifecycleResponseProjector.ProjectAssignment(canonicalAssignment)
+            : null;
+        var assignmentLocked = room.State is
+            RoomStates.ReadyForDoctor or RoomStates.Aging or RoomStates.Stale or RoomStates.DoctorInRoom or RoomStates.Turnover;
 
         return new RoomStatus(
             room.RoomId,
@@ -2871,7 +2877,13 @@ public sealed class DemoBoardStore
             room.ExpectedAllocationMinutes,
             room.AllocationAdjustedFromDefault,
             urgency,
-            faults);
+            faults,
+            room.EpisodeId,
+            room.PrestageStartedAt,
+            assignment,
+            assignmentLocked,
+            room.ActiveReadyHandoffId,
+            room.AcceptedReadyHandoffId);
     }
 
     private ReadyUrgency ProjectReadyUrgency(RoomState room, DateTimeOffset now)
@@ -4238,7 +4250,13 @@ public sealed record RoomStatus(
     int ExpectedAllocationMinutes = 0,
     bool AllocationAdjustedFromDefault = false,
     ReadyUrgency ReadyUrgency = ReadyUrgency.None,
-    IReadOnlyList<RoomIntegrityFault>? IntegrityFaults = null);
+    IReadOnlyList<RoomIntegrityFault>? IntegrityFaults = null,
+    string? EpisodeId = null,
+    DateTimeOffset? PrestageStartedAt = null,
+    RoomAssignmentContract? Assignment = null,
+    bool AssignmentLocked = false,
+    string? ActiveReadyHandoffId = null,
+    string? AcceptedReadyHandoffId = null);
 
 public sealed record RoomEvent(
     int RoomNumber,
