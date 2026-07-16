@@ -418,7 +418,7 @@
                   {
                       "path":  "docs/knowledge/ui/doctor-view-operational-header.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  6739,
+                      "sizeBytes":  6752,
                       "typeSymbols":  [
 
                                       ],
@@ -514,7 +514,7 @@
                   {
                       "path":  "docs/knowledge-graph/chairside.graph.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  7771,
+                      "sizeBytes":  7782,
                       "typeSymbols":  [
 
                                       ],
@@ -2139,7 +2139,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/board.js",
                       "kind":  "JavaScript",
-                      "sizeBytes":  184578,
+                      "sizeBytes":  184732,
                       "typeSymbols":  [
 
                                       ],
@@ -2244,7 +2244,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/doctor.html",
                       "kind":  "Html",
-                      "sizeBytes":  2815,
+                      "sizeBytes":  2817,
                       "typeSymbols":  [
 
                                       ],
@@ -2270,7 +2270,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/index.html",
                       "kind":  "Html",
-                      "sizeBytes":  2822,
+                      "sizeBytes":  2830,
                       "typeSymbols":  [
 
                                       ],
@@ -2296,7 +2296,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/master.html",
                       "kind":  "Html",
-                      "sizeBytes":  2822,
+                      "sizeBytes":  2830,
                       "typeSymbols":  [
 
                                       ],
@@ -2348,7 +2348,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/room.html",
                       "kind":  "Html",
-                      "sizeBytes":  6096,
+                      "sizeBytes":  6098,
                       "typeSymbols":  [
 
                                       ],
@@ -2374,7 +2374,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/room-1.html",
                       "kind":  "Html",
-                      "sizeBytes":  6117,
+                      "sizeBytes":  6119,
                       "typeSymbols":  [
 
                                       ],
@@ -2426,7 +2426,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/styles.css",
                       "kind":  "Css",
-                      "sizeBytes":  92053,
+                      "sizeBytes":  92302,
                       "typeSymbols":  [
 
                                       ],
@@ -2512,7 +2512,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/BoardReadyPresentationTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  10332,
+                      "sizeBytes":  10512,
                       "typeSymbols":  [
                                           "BoardReadyPresentationTests"
                                       ],
@@ -2995,7 +2995,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/PrestagingLifecycleEndpointTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  135168,
+                      "sizeBytes":  146204,
                       "typeSymbols":  [
                                           "PrestagingLifecycleEndpointTests",
                                           "Harness",
