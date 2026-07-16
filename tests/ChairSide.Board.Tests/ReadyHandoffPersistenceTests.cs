@@ -26,12 +26,20 @@ public sealed class ReadyHandoffPersistenceTests
     }
 
     [Fact]
-    public void Legacy_schema_migrates_without_fabricating_ready_handoffs_or_accepted_snapshots()
+    public void Legacy_schema_migration_preserves_final_reporting_without_fabricating_ready_data()
     {
         using var workspace = TestWorkspace.Create();
         var legacyDbPath = Path.Combine(workspace.DataRoot, "legacy.db");
         var readyAt = new DateTimeOffset(2026, 7, 12, 15, 0, 0, TimeSpan.Zero);
         var seatedAt = readyAt.AddMinutes(-8);
+        var doctorArrivedAt = readyAt.AddMinutes(4);
+        var doctorCompleteAt = readyAt.AddMinutes(22);
+        var roomAvailableAt = readyAt.AddMinutes(27);
+        var comparatorCompleteAt = new DateTimeOffset(2026, 7, 13, 15, 20, 0, TimeSpan.Zero);
+        var comparatorSeatedAt = comparatorCompleteAt.AddMinutes(-30);
+        var comparatorReadyAt = comparatorCompleteAt.AddMinutes(-25);
+        var comparatorArrivedAt = comparatorCompleteAt.AddMinutes(-20);
+        var comparatorAvailableAt = comparatorCompleteAt.AddMinutes(5);
 
         using (var seed = OpenConnection(legacyDbPath))
         {
@@ -132,11 +140,32 @@ public sealed class ReadyHandoffPersistenceTests
                 INSERT INTO completed_room_cycles (
                     room_id, assigned_doctor_id, assigned_doctor_display_name, procedure_code,
                     procedure_category, seated_at, ready_for_doctor_at, doctor_arrived_at,
-                    seated_to_doctor_seconds, final_wait_state, episode_id, created_at, updated_at)
+                    doctor_complete_at, room_available_at, seated_to_doctor_seconds,
+                    ready_to_doctor_seconds, doctor_in_room_seconds, turnover_seconds,
+                    total_room_cycle_seconds, original_default_expected_units,
+                    expected_allocation_units, expected_allocation_minutes, final_wait_state,
+                    episode_id, created_at, updated_at)
                 VALUES (1, 'otte', 'Dr. Otte', 'CON', 'Consult',
-                    '{FormatDateTimeOffset(seatedAt)}', NULL, '{FormatDateTimeOffset(readyAt.AddMinutes(4))}',
-                    720, 'readyForDoctor', 'legacy-complete', '{FormatDateTimeOffset(readyAt)}',
-                    '{FormatDateTimeOffset(readyAt)}');
+                    '{FormatDateTimeOffset(seatedAt)}', NULL, '{FormatDateTimeOffset(doctorArrivedAt)}',
+                    '{FormatDateTimeOffset(doctorCompleteAt)}', '{FormatDateTimeOffset(roomAvailableAt)}',
+                    720, NULL, 1080, 300, 2100, 3, 3, 30, 'readyForDoctor',
+                    'legacy-complete', '{FormatDateTimeOffset(readyAt)}',
+                    '{FormatDateTimeOffset(roomAvailableAt)}');
+
+                INSERT INTO completed_room_cycles (
+                    room_id, assigned_doctor_id, assigned_doctor_display_name, procedure_code,
+                    procedure_category, seated_at, ready_for_doctor_at, doctor_arrived_at,
+                    doctor_complete_at, room_available_at, seated_to_doctor_seconds,
+                    ready_to_doctor_seconds, doctor_in_room_seconds, turnover_seconds,
+                    total_room_cycle_seconds, original_default_expected_units,
+                    expected_allocation_units, expected_allocation_minutes, final_wait_state,
+                    episode_id, created_at, updated_at)
+                VALUES (2, 'pledger', 'Dr. Pledger', 'EXT', 'Extraction',
+                    '{FormatDateTimeOffset(comparatorSeatedAt)}', '{FormatDateTimeOffset(comparatorReadyAt)}',
+                    '{FormatDateTimeOffset(comparatorArrivedAt)}', '{FormatDateTimeOffset(comparatorCompleteAt)}',
+                    '{FormatDateTimeOffset(comparatorAvailableAt)}', 600, 300, 1200, 300, 2100,
+                    4, 4, 40, 'readyForDoctor', 'legacy-ready-complete',
+                    '{FormatDateTimeOffset(comparatorReadyAt)}', '{FormatDateTimeOffset(comparatorAvailableAt)}');
 
                 INSERT INTO aborted_room_assignments (
                     episode_id, room_id, assigned_doctor_id, assigned_doctor_display_name,
@@ -164,8 +193,46 @@ public sealed class ReadyHandoffPersistenceTests
         Assert.Null(active.ActiveReadyHandoffId);
         Assert.Null(active.AcceptedReadyHandoffId);
 
-        var completed = Assert.Single(context.Repository.LoadCompletedCycles());
+        var completed = context.Repository.LoadCompletedCycles()
+            .Single(cycle => cycle.EpisodeId == "legacy-complete");
+        Assert.Equal("otte", completed.AssignedDoctor);
+        Assert.Equal("CON", completed.ProcedureCode);
         Assert.Null(completed.AcceptedReadyHandoffId);
+        Assert.Null(completed.ReadyForDoctorAt);
+        Assert.Null(completed.ReadyToDoctorSeconds);
+
+        var reports = context.Store.GetReports();
+        var reportedLegacy = reports.RecentCompletedCycles
+            .Single(cycle => cycle.EpisodeId == "legacy-complete");
+        Assert.Equal(2, reports.CompletedRoomCyclesCount);
+        Assert.Equal(2, reports.IncludedCompletedCycleCount);
+        Assert.Equal(0, reports.ExcludedCompletedCycleCount);
+        Assert.Equal(0, reports.ExceptionCount);
+        Assert.Equal("otte", reportedLegacy.AssignedDoctor);
+        Assert.Equal("CON", reportedLegacy.ProcedureCode);
+        Assert.Null(reportedLegacy.AcceptedReadyHandoffId);
+        Assert.Null(reportedLegacy.ReadyForDoctorAt);
+        Assert.Null(reportedLegacy.ReadyToDoctorSeconds);
+        Assert.Contains(
+            reports.DoctorSummaries,
+            summary => summary.AssignedDoctor == "otte" && summary.CompletedRoomCyclesCount == 1);
+        Assert.Contains(
+            reports.ProcedureSummaries,
+            summary => summary.ProcedureCode == "CON" && summary.CompletedCycleCount == 1);
+        Assert.Equal(300, reports.AverageReadyToDoctorSeconds);
+        Assert.Equal(300, reports.MedianReadyToDoctorSeconds);
+        Assert.Equal(
+            new[] { "2026-07-06", "2026-07-13" },
+            reports.Trends!.Buckets.Select(bucket => bucket.StartDate).ToArray());
+
+        var targetDay = context.Store.GetReports(
+            ReportDateRange.FromDateStrings("2026-07-12", "2026-07-12"));
+        var targetDayCycle = Assert.Single(targetDay.RecentCompletedCycles);
+        Assert.Equal("legacy-complete", targetDayCycle.EpisodeId);
+        Assert.Equal(1, targetDay.CompletedRoomCyclesCount);
+        Assert.Equal(1, targetDay.IncludedCompletedCycleCount);
+        Assert.Equal("2026-07-12", targetDay.RangeStartDate);
+        Assert.Equal("2026-07-12", targetDay.RangeEndDate);
 
         var aborted = Assert.Single(context.Repository.LoadAbortedAssignments());
         Assert.Equal("legacy-abort", aborted.EpisodeId);

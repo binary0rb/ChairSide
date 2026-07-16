@@ -33,7 +33,7 @@
                   {
                       "path":  "AGENTS.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  15678,
+                      "sizeBytes":  15697,
                       "typeSymbols":  [
 
                                       ],
@@ -132,7 +132,7 @@
                   {
                       "path":  "docs/design/prestage-assignment-lifecycle.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  9192,
+                      "sizeBytes":  9208,
                       "typeSymbols":  [
 
                                       ],
@@ -451,7 +451,7 @@
                   {
                       "path":  "docs/knowledge/workflow/room-lifecycle.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  5923,
+                      "sizeBytes":  5940,
                       "typeSymbols":  [
 
                                       ],
@@ -513,7 +513,7 @@
                   {
                       "path":  "docs/knowledge-graph/chairside.graph.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  6726,
+                      "sizeBytes":  6732,
                       "typeSymbols":  [
 
                                       ],
@@ -544,7 +544,7 @@
                   {
                       "path":  "docs/knowledge-graph/decisions.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  6608,
+                      "sizeBytes":  6618,
                       "typeSymbols":  [
 
                                       ],
@@ -1295,7 +1295,7 @@
                   {
                       "path":  "src/ChairSide.Board/Program.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  90067,
+                      "sizeBytes":  90589,
                       "typeSymbols":  [
                                           "BeginPrestageRequest",
                                           "SeatRoomRequest",
@@ -1452,7 +1452,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/DemoBoardStore.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  244389,
+                      "sizeBytes":  244883,
                       "typeSymbols":  [
                                           "ExceptionReasons",
                                           "ReportingExceptionReasons",
@@ -1617,7 +1617,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/PrestagingLifecycleApiContracts.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  22813,
+                      "sizeBytes":  23411,
                       "typeSymbols":  [
                                           "CanonicalAssignmentRequest",
                                           "EmptyLifecycleActionRequest",
@@ -1746,7 +1746,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/ReadyHandoffPersistenceRecords.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  9807,
+                      "sizeBytes":  9911,
                       "typeSymbols":  [
                                           "ActiveRoomWriteExpectation",
                                           "GuardedReadyHandoffPersistenceOutcome",
@@ -1823,7 +1823,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/RoomAssignmentContracts.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  14643,
+                      "sizeBytes":  14656,
                       "typeSymbols":  [
                                           "AssignmentCompleteness",
                                           "SedationState",
@@ -2039,7 +2039,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/SqliteBoardRepository.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  146037,
+                      "sizeBytes":  146576,
                       "typeSymbols":  [
                                           "SqliteBoardRepository",
                                           "the",
@@ -2668,7 +2668,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/DurableFailureInjectionTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  27970,
+                      "sizeBytes":  28117,
                       "typeSymbols":  [
                                           "DurableFailureInjectionTests",
                                           "HandoffSnapshot",
@@ -2916,7 +2916,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/PrestagingLifecycleApiContractTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  17116,
+                      "sizeBytes":  17483,
                       "typeSymbols":  [
                                           "PrestagingLifecycleApiContractTests"
                                       ],
@@ -2962,7 +2962,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/PrestagingLifecycleEndpointTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  126298,
+                      "sizeBytes":  135071,
                       "typeSymbols":  [
                                           "PrestagingLifecycleEndpointTests",
                                           "Harness",
@@ -3101,7 +3101,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/ReadyHandoffPersistenceTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  64843,
+                      "sizeBytes":  69268,
                       "typeSymbols":  [
                                           "ReadyHandoffPersistenceTests",
                                           "RoomSnapshot",
@@ -3109,7 +3109,7 @@
                                       ],
                       "methodSymbols":  [
                                             "Fresh_database_contains_ready_handoff_schema_and_canonical_columns",
-                                            "Legacy_schema_migrates_without_fabricating_ready_handoffs_or_accepted_snapshots",
+                                            "Legacy_schema_migration_preserves_final_reporting_without_fabricating_ready_data",
                                             "Canonical_active_room_assignment_round_trips",
                                             "Canonical_assignment_compare_and_swap_rejects_wrong_expected_identity",
                                             "Canonical_assignment_compare_and_swap_rejects_expected_null_active_handoff",

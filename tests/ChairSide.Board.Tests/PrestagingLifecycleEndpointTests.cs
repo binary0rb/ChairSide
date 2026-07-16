@@ -1738,6 +1738,114 @@ public sealed class PrestagingLifecycleEndpointTests
     }
 
     [Fact]
+    public async Task Reissued_ready_uses_only_the_accepted_handoff_through_final_reporting_and_reload()
+    {
+        using var workspace = TestWorkspace.Create();
+        var start = new DateTimeOffset(2026, 7, 15, 14, 0, 0, TimeSpan.Zero);
+        var clock = new ManualTimeProvider(start);
+        var context = StoreContext.Create(workspace, Environments.Production, timeProvider: clock);
+        using var h = new Harness(workspace, context);
+
+        await h.Begin(1, null);
+        clock.SetUtcNow(start.AddMinutes(2));
+        await h.Seat(1, """{"assignment":{"doctorId":"otte","procedureCode":"CON","confirmedExpectedAllocationUnits":1}}""");
+        clock.SetUtcNow(start.AddMinutes(5));
+        var firstReady = Action(await h.Ready(1, "{}"));
+        clock.SetUtcNow(start.AddMinutes(12));
+        Action(await h.Withdraw(1, "{}"));
+        Action(await h.Save(1, """{"doctorId":"pledger","procedureCode":"EXT","sedationChoice":"yes","confirmedExpectedAllocationUnits":4}"""));
+        clock.SetUtcNow(start.AddMinutes(15));
+        var secondReady = Action(await h.Ready(1, "{}"));
+        clock.SetUtcNow(start.AddMinutes(20));
+        Action(await h.DoctorArrived(1, "{}"));
+        var episodeId = context.Repository.LoadRooms(3).Single(room => room.RoomId == 1).EpisodeId!;
+        clock.SetUtcNow(start.AddMinutes(47));
+        Assert.Equal(200, (await h.DoctorComplete(1)).StatusCode);
+        clock.SetUtcNow(start.AddMinutes(52));
+        Assert.Equal(200, (await h.RoomAvailable(1)).StatusCode);
+
+        var history = context.Repository.LoadReadyHandoffsByEpisode(episodeId)
+            .OrderBy(handoff => handoff.ReadyAt)
+            .ToArray();
+        var withdrawn = Assert.Single(history, handoff => handoff.ContractStatus == ReadyHandoffStatus.Withdrawn);
+        var accepted = Assert.Single(history, handoff => handoff.ContractStatus == ReadyHandoffStatus.Accepted);
+        var durableCycle = Assert.Single(context.Repository.LoadCompletedCycles());
+        var reports = context.Store.GetReports();
+        var reportedCycle = Assert.Single(reports.RecentCompletedCycles);
+
+        Assert.Equal(2, history.Length);
+        Assert.Equal(firstReady.Handoff!.HandoffId, withdrawn.HandoffId);
+        Assert.Equal(secondReady.Handoff!.HandoffId, accepted.HandoffId);
+        Assert.NotEqual(withdrawn.HandoffId, accepted.HandoffId);
+        Assert.NotNull(withdrawn.WithdrawnAt);
+        Assert.Null(withdrawn.AcceptedAt);
+        Assert.Null(accepted.WithdrawnAt);
+        Assert.Equal("pledger", accepted.Assignment.DoctorId);
+        Assert.Equal("EXT+SED", accepted.Assignment.ProcedureCode);
+        Assert.Equal(SedationState.EligibleYes, accepted.Assignment.SedationState);
+        Assert.Equal(4, accepted.Assignment.ExpectedAllocationConfirmedUnits);
+
+        Assert.Equal(accepted.HandoffId, durableCycle.AcceptedReadyHandoffId);
+        Assert.Equal(accepted.ReadyAt, durableCycle.ReadyForDoctorAt);
+        Assert.Equal(accepted.Assignment.DoctorId, durableCycle.AssignedDoctor);
+        Assert.Equal(accepted.Assignment.ProcedureCode, durableCycle.ProcedureCode);
+        Assert.Equal(accepted.Assignment.ExpectedAllocationConfirmedUnits, durableCycle.ExpectedAllocationUnits);
+        Assert.Equal(start.AddMinutes(2), durableCycle.SeatedAt);
+        Assert.Equal(start.AddMinutes(20), durableCycle.DoctorArrivedAt);
+        Assert.Equal(5 * 60, durableCycle.ReadyToDoctorSeconds);
+        Assert.NotEqual((int)(accepted.AcceptedAt!.Value - withdrawn.ReadyAt).TotalSeconds, durableCycle.ReadyToDoctorSeconds);
+        Assert.Equal(18 * 60, durableCycle.SeatedToDoctorSeconds);
+
+        Assert.Equal(durableCycle.AcceptedReadyHandoffId, reportedCycle.AcceptedReadyHandoffId);
+        Assert.Equal("pledger", reportedCycle.AssignedDoctor);
+        Assert.Equal("EXT+SED", reportedCycle.ProcedureCode);
+        Assert.Equal(4, reportedCycle.ExpectedAllocationUnits);
+        Assert.Equal(40, reportedCycle.ExpectedAllocationMinutes);
+        Assert.Equal(45, reportedCycle.MeasuredCaseFlowMinutes);
+        Assert.Equal(5, reportedCycle.AllocationVarianceMinutes);
+        Assert.True(reportedCycle.IsOverExpectedAllocation);
+        Assert.Equal(5 * 60, reports.AverageReadyToDoctorSeconds);
+        Assert.Equal(18 * 60, reports.AverageSeatedToDoctorSeconds);
+        Assert.Equal(1, reports.SedationCaseCount);
+        Assert.Equal(1, reports.AllocationVariance!.AllocationVarianceCycleCount);
+        Assert.Equal(40, reports.AllocationVariance.TotalExpectedAllocationMinutes);
+        Assert.Equal(45, reports.AllocationVariance.TotalMeasuredCaseFlowMinutes);
+        Assert.Equal(5, reports.AllocationVariance.NetAllocationVarianceMinutes);
+        Assert.Equal(1, reports.ScheduleFit!.IncludedCycleCount);
+        Assert.Equal(1, reports.ScheduleFit.ScheduleFitCycleCount);
+        Assert.Equal(40, reports.ScheduleFit.Overall.TotalExpectedMinutes);
+        Assert.Equal(45, reports.ScheduleFit.Overall.TotalMeasuredMinutes);
+        Assert.Equal(5, reports.ScheduleFit.Overall.TotalVarianceMinutes);
+
+        var reloaded = StoreContext.Create(
+            workspace,
+            Environments.Production,
+            context.DatabasePath,
+            timeProvider: clock);
+        var reloadedHistory = reloaded.Repository.LoadReadyHandoffsByEpisode(episodeId);
+        var reloadedAccepted = Assert.Single(
+            reloadedHistory,
+            handoff => handoff.ContractStatus == ReadyHandoffStatus.Accepted);
+        Assert.Single(reloadedHistory, handoff => handoff.ContractStatus == ReadyHandoffStatus.Withdrawn);
+        var reloadedReports = reloaded.Store.GetReports();
+        var reloadedCycle = Assert.Single(reloadedReports.RecentCompletedCycles);
+
+        Assert.Equal(2, reloadedHistory.Count);
+        Assert.Equal(accepted.HandoffId, reloadedAccepted.HandoffId);
+        Assert.Equal(accepted.HandoffId, reloadedCycle.AcceptedReadyHandoffId);
+        Assert.Equal("pledger", reloadedCycle.AssignedDoctor);
+        Assert.Equal("EXT+SED", reloadedCycle.ProcedureCode);
+        Assert.Equal(4, reloadedCycle.ExpectedAllocationUnits);
+        Assert.Equal(start.AddMinutes(2), reloadedCycle.SeatedAt);
+        Assert.Equal(start.AddMinutes(20), reloadedCycle.DoctorArrivedAt);
+        Assert.Equal(5 * 60, reloadedCycle.ReadyToDoctorSeconds);
+        Assert.Equal(18 * 60, reloadedCycle.SeatedToDoctorSeconds);
+        Assert.Equal(5, reloadedCycle.AllocationVarianceMinutes);
+        Assert.Equal(40, reloadedReports.ScheduleFit!.Overall.TotalExpectedMinutes);
+        Assert.Equal(45, reloadedReports.ScheduleFit.Overall.TotalMeasuredMinutes);
+    }
+
+    [Fact]
     public async Task Canonical_doctor_arrived_keeps_assignment_details_locked_without_mutation()
     {
         using var workspace = TestWorkspace.Create();
