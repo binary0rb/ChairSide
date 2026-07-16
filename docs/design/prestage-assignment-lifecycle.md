@@ -2,7 +2,7 @@
 
 ## Status and traceability
 
-Issue #119 implements the store and persistence lifecycle described here. The current boundary requires a complete canonical assignment to be durably saved before `MarkReadyForDoctor`. An assignment-bearing Ready overload and the corresponding Program/UI workflow are deliberately deferred to issues #120 and #121.
+Issue #119 implements the store and persistence lifecycle described here. Issue #120 exposes that lifecycle through canonical HTTP contracts, including optional assignment-bearing Seat and Ready actions. The room-panel workflow remains issue #121.
 
 ## Primary lifecycle
 
@@ -27,11 +27,11 @@ Prestaging and Seated may persist an absent, partial, or complete assignment. A 
 
 When procedure is absent, sedation is unavailable and expected allocation must be Unknown. Procedure-derived Suggested, ConfirmedSuggestedValue, or ConfirmedAdjustedValue allocation cannot remain attached to an absent procedure.
 
-`SaveAssignmentDetails` is the explicit draft commit. An assignment-bearing Begin Prestage or Seat may persist its supplied canonical assignment in the same transaction as the lifecycle action. Save Details and assignment-bearing Seat reject invalid data without changing durable or live room state.
+`SaveAssignmentDetails` is the explicit draft commit. Assignment-bearing Seat or Ready may persist its supplied canonical assignment in the same transaction as the lifecycle action. Save Details, Seat, and Ready reject invalid data without changing durable or live room state.
 
 ## Ready boundary
 
-Ready requires a complete, currently valid, durably saved assignment. A successful Ready transition:
+Ready requires a complete, currently valid assignment. The assignment may already be durable or may be supplied by the canonical Ready request and persisted atomically with the transition. A successful Ready transition:
 
 - persists primary state `ReadyForDoctor`;
 - records `ReadyForDoctorAt`;
@@ -39,7 +39,13 @@ Ready requires a complete, currently valid, durably saved assignment. A successf
 - links it through `ActiveReadyHandoffId`; and
 - locks assignment editing.
 
-The current Ready action does not accept or persist a draft. Staff must Save Details first. This is the intentional issue #119 store boundary, not the future #120/#121 API/UI design.
+An omitted or explicit empty Ready request uses the durably saved assignment. An assignment-bearing canonical request persists the supplied complete draft and creates the Active handoff in one transaction. The current room panel still sends an omitted body and receives the legacy top-level room response; explicit canonical requests receive the lifecycle action envelope until issue #121 migrates the UI.
+
+## Canonical HTTP contract
+
+Issue #120 exposes canonical Begin Prestage, Save Details, Seat, Ready, Withdraw Ready, and Doctor Arrived operations. Canonical assignment input uses `doctorId`, undecorated `procedureCode`, `sedationChoice`, and `confirmedExpectedAllocationUnits`; the internal `+SED` decoration is never accepted or returned by canonical transport.
+
+Canonical mutation outcomes distinguish room-not-found, invalid or incomplete assignment, lifecycle conflict, assignment lock, integrity fault, stale write, and persistence failure. Malformed or invalid assignment input maps to HTTP 400, room-not-found to 404, lifecycle/integrity/concurrency conflicts to 409, and persistence failure to 500. Validation and persistence failures do not partially mutate the room, handoff, cycle, live state, or event stream.
 
 ## Ready urgency, withdrawal, and acceptance
 
@@ -61,14 +67,9 @@ Post-arrival expiration persists a review-required exception cycle and releases 
 
 Every representative multi-write lifecycle operation uses a SQLite transaction. Store code constructs detached candidates, calls the repository, and applies the committed result to live memory only after persistence succeeds.
 
-Canonical assignment writes capture an internal expectation from the original live room before constructing the candidate:
+Canonical lifecycle writes capture an internal expectation from the original live room before constructing the candidate. The guarded `UPDATE active_rooms` compares room/episode/state identity, the complete assignment and allocation snapshot, both handoff references, and lifecycle timestamps with null-safe predicates. Exactly one affected row may commit. Zero rows returns the typed stale-write outcome without fallback INSERT/UPSERT, event, reload, retry, durable mutation, or live mutation. More than one row is an invariant violation.
 
-- `RoomId`;
-- nullable `EpisodeId`;
-- lifecycle `State`; and
-- nullable `ActiveReadyHandoffId`.
-
-The canonical-assignment path uses a guarded `UPDATE active_rooms` that matches all four fields. SQLite `IS` provides null-safe comparison for `episode_id` and `active_ready_handoff_id`. Exactly one affected row commits. Zero rows means stale durable identity and returns `null` without fallback INSERT/UPSERT, event, reload, retry, durable mutation, or live mutation. More than one row is an invariant violation. SQLite/database failures throw and roll back all writes in the transaction.
+Ready validates episode handoff history and writes the assignment, room, and new immutable Active handoff atomically. Withdraw Ready validates ownership and assignment equality before changing the Active handoff to Withdrawn and returning the room to Seated. Doctor Arrived uses an immediate SQLite transaction so cross-room doctor ownership is revalidated against Accepted handoff truth before the target room, handoff, and reporting cycle commit together. Database failures roll back all transaction-local writes; live memory and events change only after commit.
 
 The general `SaveRoom`/`SaveRooms` UPSERT path remains available for unrelated initialization and lifecycle persistence.
 
@@ -87,7 +88,9 @@ The stress-fixture reset transaction deletes completed cycles, all Active handof
 ## Explicit non-goals and separate issues
 
 - No patient identity or PHI.
-- No assignment-bearing `MarkReadyForDoctor` API/UI in issue #119; see #120/#121.
+- No room-panel implementation in issue #120; see #121.
+- No master/doctor-view implementation in issue #120; see #122.
+- No reporting-population or metric changes in issue #120; see #123.
 - No automatic replay of stale assignment intent.
 - No migration that rewrites legacy Aging/Stale rows or historical cycles.
 - No after-hours sweep retry/batch-atomicity fix. `_lastSweepDate` can advance before persistence succeeds, same-day retry can be suppressed, and earlier rooms can commit before a later failure.

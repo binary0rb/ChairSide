@@ -311,7 +311,8 @@ app.MapPost("/api/client-errors", async (
     return Results.NoContent();
 });
 
-app.MapPost("/api/rooms/{roomNumber:int}/prestage", RoomLifecycleEndpointHandler.BeginPrestageAsync);
+app.MapPost("/api/rooms/{roomNumber:int}/prestage", RoomLifecycleEndpointHandler.BeginPrestageRouteAsync);
+app.MapPut("/api/rooms/{roomNumber:int}/assignment-details", RoomLifecycleEndpointHandler.SaveAssignmentDetailsAsync);
 app.MapPost("/api/rooms/{roomNumber:int}/seat", RoomLifecycleEndpointHandler.SeatAsync);
 
 // Canonical draft assignment correction: distinct from the legacy /assignment route below because
@@ -376,111 +377,10 @@ app.MapPost("/api/rooms/{roomNumber:int}/assignment", async Task<IResult> (
 app.MapPost("/api/rooms/{roomNumber:int}/cancel-prestage", RoomLifecycleEndpointHandler.CancelPrestageAsync);
 app.MapPost("/api/rooms/{roomNumber:int}/cancel-seating", RoomLifecycleEndpointHandler.CancelSeatingAsync);
 
-app.MapPost("/api/rooms/{roomNumber:int}/ready-for-doctor", async Task<IResult> (
-    int roomNumber,
-    HttpContext httpContext,
-    RoomDeviceTokenValidator roomDeviceTokenValidator,
-    DemoBoardStore store,
-    DiagnosticLogger diagnosticLogger,
-    Microsoft.AspNetCore.SignalR.IHubContext<BoardHub> hubContext) =>
-{
-    var auditCtx = AuditRequestContext.From(httpContext);
-    var previousRoom = store.GetRoom(roomNumber);
+app.MapPost("/api/rooms/{roomNumber:int}/ready-for-doctor", RoomLifecycleEndpointHandler.ReadyForDoctorAsync);
+app.MapPost("/api/rooms/{roomNumber:int}/withdraw-ready", RoomLifecycleEndpointHandler.WithdrawReadyAsync);
 
-    var bindingFailure = RoomDeviceBindingGuard.ValidateMutationRequest(
-        roomNumber,
-        httpContext.Request,
-        roomDeviceTokenValidator);
-    if (bindingFailure is not null)
-    {
-        await diagnosticLogger.LogRoomAuditAsync(auditCtx.Build(
-            "ready-for-doctor", roomNumber, previousRoom, null, false, "binding-rejected",
-            previousRoom?.AssignedDoctor, previousRoom?.ProcedureCode));
-        return bindingFailure;
-    }
-
-    var result = store.MarkReadyForDoctor(roomNumber);
-    if (result is null)
-    {
-        var reason = store.IsConfiguredRoom(roomNumber) ? "state-rejected" : "room-not-found";
-        await diagnosticLogger.LogRoomAuditAsync(auditCtx.Build(
-            "ready-for-doctor", roomNumber, previousRoom, null, false, reason,
-            previousRoom?.AssignedDoctor, previousRoom?.ProcedureCode));
-        return store.IsConfiguredRoom(roomNumber)
-            ? Results.BadRequest("Ready for Doctor requires a seated room with a complete, currently valid, durably saved assignment.")
-            : Results.NotFound("Room is not configured.");
-    }
-
-    await diagnosticLogger.LogRoomAuditAsync(auditCtx.Build(
-        "ready-for-doctor", roomNumber, previousRoom, result, true, null,
-        result.AssignedDoctor, result.ProcedureCode));
-    await hubContext.Clients.All.SendAsync("boardUpdated", store.GetSnapshot());
-    return Results.Ok(result);
-});
-
-app.MapPost("/api/rooms/{roomNumber:int}/doctor-arrived", async Task<IResult> (
-    int roomNumber,
-    HttpContext httpContext,
-    RoomDeviceTokenValidator roomDeviceTokenValidator,
-    DemoBoardStore store,
-    DiagnosticLogger diagnosticLogger,
-    Microsoft.AspNetCore.SignalR.IHubContext<BoardHub> hubContext) =>
-{
-    var auditCtx = AuditRequestContext.From(httpContext);
-    var previousRoom = store.GetRoom(roomNumber);
-
-    var bindingFailure = RoomDeviceBindingGuard.ValidateMutationRequest(
-        roomNumber,
-        httpContext.Request,
-        roomDeviceTokenValidator);
-    if (bindingFailure is not null)
-    {
-        await diagnosticLogger.LogRoomAuditAsync(auditCtx.Build(
-            "doctor-arrived", roomNumber, previousRoom, null, false, "binding-rejected",
-            previousRoom?.AssignedDoctor, previousRoom?.ProcedureCode));
-        return bindingFailure;
-    }
-
-    var outcome = store.TryMarkDoctorArrived(roomNumber);
-
-    if (outcome.Outcome == DoctorArrivalOutcome.NotConfigured)
-    {
-        await diagnosticLogger.LogRoomAuditAsync(auditCtx.Build(
-            "doctor-arrived", roomNumber, previousRoom, null, false, "room-not-found",
-            previousRoom?.AssignedDoctor, previousRoom?.ProcedureCode));
-        return Results.NotFound("Room is not configured.");
-    }
-
-    if (outcome.Outcome == DoctorArrivalOutcome.Rejected)
-    {
-        await diagnosticLogger.LogRoomAuditAsync(auditCtx.Build(
-            "doctor-arrived", roomNumber, previousRoom, null, false, "state-rejected",
-            previousRoom?.AssignedDoctor, previousRoom?.ProcedureCode));
-        return Results.BadRequest("Doctor Arrived is only available when the room is marked ready for doctor.");
-    }
-
-    if (outcome.Outcome == DoctorArrivalOutcome.Conflict)
-    {
-        var conflict = outcome.Conflict!;
-        await diagnosticLogger.LogRoomAuditAsync(auditCtx.Build(
-            "doctor-arrived", roomNumber, previousRoom, null, false, "doctor-conflict",
-            previousRoom?.AssignedDoctor, previousRoom?.ProcedureCode));
-        return Results.Json(
-            new DoctorArrivedConflictResponse(
-                "Doctor is already marked in another room.",
-                conflict.ConflictingRoomId,
-                conflict.DoctorId,
-                conflict.DoctorDisplayName),
-            statusCode: StatusCodes.Status409Conflict);
-    }
-
-    var result = outcome.Status!;
-    await diagnosticLogger.LogRoomAuditAsync(auditCtx.Build(
-        "doctor-arrived", roomNumber, previousRoom, result, true, null,
-        result.AssignedDoctor, result.ProcedureCode));
-    await hubContext.Clients.All.SendAsync("boardUpdated", store.GetSnapshot());
-    return Results.Ok(result);
-});
+app.MapPost("/api/rooms/{roomNumber:int}/doctor-arrived", RoomLifecycleEndpointHandler.DoctorArrivedAsync);
 
 // Resolve a doctor-arrival conflict: complete the conflicting old room (it moves to TURNOVER, not
 // Available) and then mark the current room Doctor Arrived. The store revalidates the conflict
@@ -489,89 +389,9 @@ app.MapPost(
     "/api/rooms/{roomNumber:int}/doctor-arrived/resolve-conflict",
     DoctorArrivalConflictEndpointHandler.ResolveAsync);
 
-app.MapPost("/api/rooms/{roomNumber:int}/doctor-complete", async Task<IResult> (
-    int roomNumber,
-    HttpContext httpContext,
-    RoomDeviceTokenValidator roomDeviceTokenValidator,
-    DemoBoardStore store,
-    DiagnosticLogger diagnosticLogger,
-    Microsoft.AspNetCore.SignalR.IHubContext<BoardHub> hubContext) =>
-{
-    var auditCtx = AuditRequestContext.From(httpContext);
-    var previousRoom = store.GetRoom(roomNumber);
+app.MapPost("/api/rooms/{roomNumber:int}/doctor-complete", RoomLifecycleEndpointHandler.DoctorCompleteAsync);
 
-    var bindingFailure = RoomDeviceBindingGuard.ValidateMutationRequest(
-        roomNumber,
-        httpContext.Request,
-        roomDeviceTokenValidator);
-    if (bindingFailure is not null)
-    {
-        await diagnosticLogger.LogRoomAuditAsync(auditCtx.Build(
-            "doctor-complete", roomNumber, previousRoom, null, false, "binding-rejected",
-            previousRoom?.AssignedDoctor, previousRoom?.ProcedureCode));
-        return bindingFailure;
-    }
-
-    var result = store.MarkDoctorComplete(roomNumber);
-    if (result is null)
-    {
-        var reason = store.IsConfiguredRoom(roomNumber) ? "state-rejected" : "room-not-found";
-        await diagnosticLogger.LogRoomAuditAsync(auditCtx.Build(
-            "doctor-complete", roomNumber, previousRoom, null, false, reason,
-            previousRoom?.AssignedDoctor, previousRoom?.ProcedureCode));
-        return store.IsConfiguredRoom(roomNumber)
-            ? Results.BadRequest("Doctor Complete is only available when the doctor is in the room.")
-            : Results.NotFound("Room is not configured.");
-    }
-
-    await diagnosticLogger.LogRoomAuditAsync(auditCtx.Build(
-        "doctor-complete", roomNumber, previousRoom, result, true, null,
-        result.AssignedDoctor, result.ProcedureCode));
-    await hubContext.Clients.All.SendAsync("boardUpdated", store.GetSnapshot());
-    return Results.Ok(result);
-});
-
-app.MapPost("/api/rooms/{roomNumber:int}/available", async Task<IResult> (
-    int roomNumber,
-    HttpContext httpContext,
-    RoomDeviceTokenValidator roomDeviceTokenValidator,
-    DemoBoardStore store,
-    DiagnosticLogger diagnosticLogger,
-    Microsoft.AspNetCore.SignalR.IHubContext<BoardHub> hubContext) =>
-{
-    var auditCtx = AuditRequestContext.From(httpContext);
-    var previousRoom = store.GetRoom(roomNumber);
-
-    var bindingFailure = RoomDeviceBindingGuard.ValidateMutationRequest(
-        roomNumber,
-        httpContext.Request,
-        roomDeviceTokenValidator);
-    if (bindingFailure is not null)
-    {
-        await diagnosticLogger.LogRoomAuditAsync(auditCtx.Build(
-            "room-available", roomNumber, previousRoom, null, false, "binding-rejected",
-            previousRoom?.AssignedDoctor, previousRoom?.ProcedureCode));
-        return bindingFailure;
-    }
-
-    var result = store.MarkRoomAvailable(roomNumber);
-    if (result is null)
-    {
-        var reason = store.IsConfiguredRoom(roomNumber) ? "state-rejected" : "room-not-found";
-        await diagnosticLogger.LogRoomAuditAsync(auditCtx.Build(
-            "room-available", roomNumber, previousRoom, null, false, reason,
-            previousRoom?.AssignedDoctor, previousRoom?.ProcedureCode));
-        return store.IsConfiguredRoom(roomNumber)
-            ? Results.BadRequest("Room Available is only available during turnover.")
-            : Results.NotFound("Room is not configured.");
-    }
-
-    await diagnosticLogger.LogRoomAuditAsync(auditCtx.Build(
-        "room-available", roomNumber, previousRoom, result, true, null,
-        previousRoom?.AssignedDoctor, previousRoom?.ProcedureCode));
-    await hubContext.Clients.All.SendAsync("boardUpdated", store.GetSnapshot());
-    return Results.Ok(result);
-});
+app.MapPost("/api/rooms/{roomNumber:int}/available", RoomLifecycleEndpointHandler.RoomAvailableAsync);
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -774,21 +594,29 @@ internal static class StrictJsonRequestReader
     // content type and parse to a JSON object; anything else is the project's normal 400 behavior.
     public static async Task<(JsonElement Root, IResult? Error)> ReadObjectAsync(HttpRequest request)
     {
+        var (root, error, _) = await ReadObjectWithPresenceAsync(request, treatWhitespaceAsEmpty: true);
+        return (root, error);
+    }
+
+    public static async Task<(JsonElement Root, IResult? Error, bool WasBodyEmpty)> ReadObjectWithPresenceAsync(
+        HttpRequest request,
+        bool treatWhitespaceAsEmpty)
+    {
         string raw;
         using (var reader = new StreamReader(request.Body, leaveOpen: true))
         {
             raw = await reader.ReadToEndAsync();
         }
 
-        if (string.IsNullOrWhiteSpace(raw))
+        if (raw.Length == 0 || (treatWhitespaceAsEmpty && string.IsNullOrWhiteSpace(raw)))
         {
             using var empty = JsonDocument.Parse("{}");
-            return (empty.RootElement.Clone(), null);
+            return (empty.RootElement.Clone(), null, true);
         }
 
         if (!request.HasJsonContentType())
         {
-            return (default, Results.BadRequest("Unsupported content type. Expected application/json."));
+            return (default, Results.BadRequest("Unsupported content type. Expected application/json."), false);
         }
 
         JsonDocument document;
@@ -798,17 +626,17 @@ internal static class StrictJsonRequestReader
         }
         catch (JsonException)
         {
-            return (default, Results.BadRequest("Malformed JSON request body."));
+            return (default, Results.BadRequest("Malformed JSON request body."), false);
         }
 
         using (document)
         {
             if (document.RootElement.ValueKind != JsonValueKind.Object)
             {
-                return (default, Results.BadRequest("Request body must be a JSON object."));
+                return (default, Results.BadRequest("Request body must be a JSON object."), false);
             }
 
-            return (document.RootElement.Clone(), null);
+            return (document.RootElement.Clone(), null, false);
         }
     }
 
@@ -1033,6 +861,435 @@ internal static class CancelRequestParser
 
 public static class RoomLifecycleEndpointHandler
 {
+    private static readonly IReadOnlyCollection<string> LegacyBeginProperties = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+    {
+        "doctorId", "procedureCode", "procedureId", "sedation", "expectedAllocationUnits"
+    };
+
+    public static async Task<IResult> BeginPrestageRouteAsync(
+        int roomNumber, HttpContext httpContext, RoomDeviceTokenValidator roomDeviceTokenValidator,
+        DemoBoardStore store, DiagnosticLogger diagnosticLogger, IHubContext<BoardHub> hubContext)
+    {
+        var auditCtx = AuditRequestContext.From(httpContext);
+        var previousRoom = store.GetRoom(roomNumber);
+        var bindingFailure = RoomDeviceBindingGuard.ValidateMutationRequest(roomNumber, httpContext.Request, roomDeviceTokenValidator);
+        if (bindingFailure is not null)
+        {
+            await LogCanonicalValidationFailureAsync(
+                "begin-prestage", roomNumber, previousRoom, "binding-rejected", auditCtx, diagnosticLogger);
+            return bindingFailure;
+        }
+        var (root, bodyError, _) = await StrictJsonRequestReader.ReadObjectWithPresenceAsync(
+            httpContext.Request,
+            treatWhitespaceAsEmpty: false);
+        if (bodyError is not null)
+        {
+            await LogCanonicalValidationFailureAsync(
+                "begin-prestage", roomNumber, previousRoom, PrestagingLifecycleErrorCodes.MalformedRequest, auditCtx, diagnosticLogger);
+            return CanonicalError(PrestagingLifecycleErrorCodes.MalformedRequest, "The request body is malformed.");
+        }
+        if (!root.EnumerateObject().Any())
+        {
+            return await CompleteCanonicalMutationAsync(
+                "begin-prestage", roomNumber, previousRoom, auditCtx,
+                store.BeginPrestageCanonical(roomNumber), store, diagnosticLogger, hubContext);
+        }
+        var propertyError = StrictJsonRequestReader.ValidatePropertySet(root, LegacyBeginProperties);
+        if (propertyError is not null)
+        {
+            await LogCanonicalValidationFailureAsync(
+                "begin-prestage", roomNumber, previousRoom, PrestagingLifecycleErrorCodes.MalformedRequest, auditCtx, diagnosticLogger);
+            return CanonicalError(PrestagingLifecycleErrorCodes.MalformedRequest, "The request contains unknown or duplicate properties.");
+        }
+        BeginPrestageRequest? request;
+        try { request = JsonSerializer.Deserialize<BeginPrestageRequest>(root.GetRawText(), new JsonSerializerOptions(JsonSerializerDefaults.Web)); }
+        catch (JsonException)
+        {
+            await LogCanonicalValidationFailureAsync(
+                "begin-prestage", roomNumber, previousRoom, PrestagingLifecycleErrorCodes.MalformedRequest, auditCtx, diagnosticLogger);
+            return CanonicalError(PrestagingLifecycleErrorCodes.MalformedRequest, "The compatibility request is malformed.");
+        }
+        return await BeginPrestageAsync(roomNumber, request ?? new(), httpContext, roomDeviceTokenValidator, store, diagnosticLogger, hubContext);
+    }
+
+    public static async Task<IResult> SaveAssignmentDetailsAsync(
+        int roomNumber, HttpContext httpContext, RoomDeviceTokenValidator roomDeviceTokenValidator,
+        DemoBoardStore store, DiagnosticLogger diagnosticLogger, IHubContext<BoardHub> hubContext)
+    {
+        var auditCtx = AuditRequestContext.From(httpContext);
+        var previousRoom = store.GetRoom(roomNumber);
+        var bindingFailure = RoomDeviceBindingGuard.ValidateMutationRequest(roomNumber, httpContext.Request, roomDeviceTokenValidator);
+        if (bindingFailure is not null)
+        {
+            await LogCanonicalValidationFailureAsync(
+                "save-assignment-details", roomNumber, previousRoom, "binding-rejected", auditCtx, diagnosticLogger);
+            return bindingFailure;
+        }
+        if (!httpContext.Request.HasJsonContentType())
+        {
+            await LogCanonicalValidationFailureAsync(
+                "save-assignment-details", roomNumber, previousRoom, PrestagingLifecycleErrorCodes.MalformedRequest, auditCtx, diagnosticLogger);
+            return CanonicalError(PrestagingLifecycleErrorCodes.MalformedRequest, "The request body must use an application/json-compatible content type.");
+        }
+        using var reader = new StreamReader(httpContext.Request.Body, leaveOpen: true);
+        var body = await reader.ReadToEndAsync();
+        var parsed = PrestagingLifecycleRequestParser.ParseAssignment(string.IsNullOrWhiteSpace(body) ? null : body);
+        if (parsed.Error is not null)
+        {
+            await LogCanonicalValidationFailureAsync(
+                "save-assignment-details", roomNumber, previousRoom, parsed.Error.Code, auditCtx, diagnosticLogger);
+            return CanonicalError(parsed.Error, StatusCodes.Status400BadRequest);
+        }
+        var converted = store.ConvertCanonicalAssignment(parsed.Value!);
+        if (converted.Error is not null)
+        {
+            await LogCanonicalValidationFailureAsync(
+                "save-assignment-details", roomNumber, previousRoom, converted.Error.Code, auditCtx, diagnosticLogger);
+            return CanonicalError(converted.Error, StatusCodes.Status400BadRequest);
+        }
+        return await CompleteCanonicalMutationAsync(
+            "save-assignment-details", roomNumber, previousRoom, auditCtx,
+            store.SaveAssignmentDetailsCanonical(roomNumber, converted.Value!), store, diagnosticLogger, hubContext);
+    }
+
+    public static async Task<IResult> ReadyForDoctorAsync(
+        int roomNumber, HttpContext httpContext, RoomDeviceTokenValidator roomDeviceTokenValidator,
+        DemoBoardStore store, DiagnosticLogger diagnosticLogger, IHubContext<BoardHub> hubContext)
+    {
+        var auditCtx = AuditRequestContext.From(httpContext);
+        var previousRoom = store.GetRoom(roomNumber);
+        var bindingFailure = RoomDeviceBindingGuard.ValidateMutationRequest(roomNumber, httpContext.Request, roomDeviceTokenValidator);
+        if (bindingFailure is not null)
+        {
+            await LogCanonicalValidationFailureAsync(
+                "ready-for-doctor", roomNumber, previousRoom, "binding-rejected", auditCtx, diagnosticLogger);
+            return bindingFailure;
+        }
+
+        var (root, bodyError, wasBodyEmpty) = await StrictJsonRequestReader.ReadObjectWithPresenceAsync(
+            httpContext.Request,
+            treatWhitespaceAsEmpty: false);
+        if (bodyError is not null)
+        {
+            await LogCanonicalValidationFailureAsync(
+                "ready-for-doctor", roomNumber, previousRoom, PrestagingLifecycleErrorCodes.MalformedRequest, auditCtx, diagnosticLogger);
+            return CanonicalError(PrestagingLifecycleErrorCodes.MalformedRequest, "The request body is malformed.");
+        }
+
+        var parsed = PrestagingLifecycleRequestParser.ParseReadyForDoctorAction(root.GetRawText());
+        if (parsed.Error is not null)
+        {
+            await LogCanonicalValidationFailureAsync(
+                "ready-for-doctor", roomNumber, previousRoom, parsed.Error.Code, auditCtx, diagnosticLogger);
+            return CanonicalError(parsed.Error, StatusCodes.Status400BadRequest);
+        }
+
+        RoomAssignmentContract? assignment = null;
+        if (parsed.Value!.Assignment is not null)
+        {
+            var converted = store.ConvertCanonicalAssignment(parsed.Value.Assignment);
+            if (converted.Error is not null)
+            {
+                await LogCanonicalValidationFailureAsync(
+                    "ready-for-doctor", roomNumber, previousRoom, converted.Error.Code, auditCtx, diagnosticLogger);
+                return CanonicalError(converted.Error, StatusCodes.Status400BadRequest);
+            }
+            assignment = converted.Value;
+        }
+
+        return await CompleteCanonicalMutationAsync(
+            "ready-for-doctor", roomNumber, previousRoom, auditCtx,
+            store.MarkReadyForDoctorCanonical(roomNumber, assignment), store, diagnosticLogger, hubContext,
+            returnLegacyRoomResponse: wasBodyEmpty);
+    }
+
+    public static async Task<IResult> WithdrawReadyAsync(
+        int roomNumber, HttpContext httpContext, RoomDeviceTokenValidator roomDeviceTokenValidator,
+        DemoBoardStore store, DiagnosticLogger diagnosticLogger, IHubContext<BoardHub> hubContext)
+    {
+        var auditCtx = AuditRequestContext.From(httpContext);
+        var previousRoom = store.GetRoom(roomNumber);
+        var bindingFailure = RoomDeviceBindingGuard.ValidateMutationRequest(roomNumber, httpContext.Request, roomDeviceTokenValidator);
+        if (bindingFailure is not null)
+        {
+            await LogCanonicalValidationFailureAsync(
+                "withdraw-ready", roomNumber, previousRoom, "binding-rejected", auditCtx, diagnosticLogger);
+            return bindingFailure;
+        }
+
+        var (root, bodyError, _) = await StrictJsonRequestReader.ReadObjectWithPresenceAsync(
+            httpContext.Request,
+            treatWhitespaceAsEmpty: false);
+        if (bodyError is not null)
+        {
+            await LogCanonicalValidationFailureAsync(
+                "withdraw-ready", roomNumber, previousRoom, PrestagingLifecycleErrorCodes.MalformedRequest, auditCtx, diagnosticLogger);
+            return CanonicalError(PrestagingLifecycleErrorCodes.MalformedRequest, "The request body is malformed.");
+        }
+
+        var parsed = PrestagingLifecycleRequestParser.ParseEmptyAction(root.GetRawText());
+        if (parsed.Error is not null)
+        {
+            await LogCanonicalValidationFailureAsync(
+                "withdraw-ready", roomNumber, previousRoom, parsed.Error.Code, auditCtx, diagnosticLogger);
+            return CanonicalError(parsed.Error, StatusCodes.Status400BadRequest);
+        }
+
+        return await CompleteCanonicalMutationAsync(
+            "withdraw-ready", roomNumber, previousRoom, auditCtx,
+            store.WithdrawReadyCanonical(roomNumber), store, diagnosticLogger, hubContext);
+    }
+
+    public static async Task<IResult> DoctorArrivedAsync(
+        int roomNumber, HttpContext httpContext, RoomDeviceTokenValidator roomDeviceTokenValidator,
+        DemoBoardStore store, DiagnosticLogger diagnosticLogger, IHubContext<BoardHub> hubContext)
+    {
+        var auditCtx = AuditRequestContext.From(httpContext);
+        var previousRoom = store.GetRoom(roomNumber);
+        var bindingFailure = RoomDeviceBindingGuard.ValidateMutationRequest(
+            roomNumber,
+            httpContext.Request,
+            roomDeviceTokenValidator);
+        if (bindingFailure is not null)
+        {
+            await LogCanonicalValidationFailureAsync(
+                "doctor-arrived", roomNumber, previousRoom, "binding-rejected", auditCtx, diagnosticLogger);
+            return bindingFailure;
+        }
+
+        var (root, bodyError, wasBodyEmpty) = await StrictJsonRequestReader.ReadObjectWithPresenceAsync(
+            httpContext.Request,
+            treatWhitespaceAsEmpty: false);
+        if (bodyError is not null)
+        {
+            await LogCanonicalValidationFailureAsync(
+                "doctor-arrived", roomNumber, previousRoom, PrestagingLifecycleErrorCodes.MalformedRequest, auditCtx, diagnosticLogger);
+            return CanonicalError(PrestagingLifecycleErrorCodes.MalformedRequest, "The request body is malformed.");
+        }
+
+        var parsed = PrestagingLifecycleRequestParser.ParseEmptyAction(root.GetRawText());
+        if (parsed.Error is not null)
+        {
+            await LogCanonicalValidationFailureAsync(
+                "doctor-arrived", roomNumber, previousRoom, parsed.Error.Code, auditCtx, diagnosticLogger);
+            return CanonicalError(parsed.Error, StatusCodes.Status400BadRequest);
+        }
+
+        var mutation = store.MarkDoctorArrivedCanonical(roomNumber);
+        if (wasBodyEmpty
+            && mutation.Outcome == PrestagingLifecycleMutationOutcome.LifecycleConflict
+            && mutation.DoctorArrivalConflict is { } conflict)
+        {
+            await LogCanonicalValidationFailureAsync(
+                "doctor-arrived", roomNumber, previousRoom, PrestagingLifecycleErrorCodes.LifecycleConflict, auditCtx, diagnosticLogger);
+            return Results.Json(
+                new DoctorArrivedConflictResponse(
+                    "Doctor is already marked in another room.",
+                    conflict.ConflictingRoomId,
+                    conflict.DoctorId,
+                    conflict.DoctorDisplayName),
+                statusCode: StatusCodes.Status409Conflict);
+        }
+
+        return await CompleteCanonicalMutationAsync(
+            "doctor-arrived", roomNumber, previousRoom, auditCtx,
+            mutation, store, diagnosticLogger, hubContext,
+            returnLegacyRoomResponse: wasBodyEmpty);
+    }
+
+    public static async Task<IResult> DoctorCompleteAsync(
+        int roomNumber, HttpContext httpContext, RoomDeviceTokenValidator roomDeviceTokenValidator,
+        DemoBoardStore store, DiagnosticLogger diagnosticLogger, IHubContext<BoardHub> hubContext)
+    {
+        var auditCtx = AuditRequestContext.From(httpContext);
+        var previousRoom = store.GetRoom(roomNumber);
+        var bindingFailure = RoomDeviceBindingGuard.ValidateMutationRequest(
+            roomNumber,
+            httpContext.Request,
+            roomDeviceTokenValidator);
+        if (bindingFailure is not null)
+        {
+            await LogCanonicalValidationFailureAsync(
+                "doctor-complete", roomNumber, previousRoom, "binding-rejected", auditCtx, diagnosticLogger);
+            return bindingFailure;
+        }
+
+        if (previousRoom?.IntegrityFaults is { Count: > 0 })
+        {
+            return await CompleteIntegrityFaultAsync(
+                "doctor-complete", roomNumber, previousRoom, auditCtx, diagnosticLogger);
+        }
+
+        var result = store.MarkDoctorComplete(roomNumber);
+        if (result is null)
+        {
+            var currentRoom = store.GetRoom(roomNumber);
+            if (currentRoom?.IntegrityFaults is { Count: > 0 })
+            {
+                return await CompleteIntegrityFaultAsync(
+                    "doctor-complete", roomNumber, currentRoom, auditCtx, diagnosticLogger);
+            }
+
+            var reason = store.IsConfiguredRoom(roomNumber) ? "state-rejected" : "room-not-found";
+            await LogCanonicalValidationFailureAsync(
+                "doctor-complete", roomNumber, previousRoom, reason, auditCtx, diagnosticLogger);
+            return store.IsConfiguredRoom(roomNumber)
+                ? Results.BadRequest("Doctor Complete is only available when the doctor is in the room.")
+                : Results.NotFound("Room is not configured.");
+        }
+
+        await diagnosticLogger.LogRoomAuditAsync(auditCtx.Build(
+            "doctor-complete", roomNumber, previousRoom, result, true, null,
+            result.AssignedDoctor, result.ProcedureCode));
+        await hubContext.Clients.All.SendAsync("boardUpdated", store.GetSnapshot());
+        return Results.Ok(result);
+    }
+
+    public static async Task<IResult> RoomAvailableAsync(
+        int roomNumber, HttpContext httpContext, RoomDeviceTokenValidator roomDeviceTokenValidator,
+        DemoBoardStore store, DiagnosticLogger diagnosticLogger, IHubContext<BoardHub> hubContext)
+    {
+        var auditCtx = AuditRequestContext.From(httpContext);
+        var previousRoom = store.GetRoom(roomNumber);
+        var bindingFailure = RoomDeviceBindingGuard.ValidateMutationRequest(
+            roomNumber,
+            httpContext.Request,
+            roomDeviceTokenValidator);
+        if (bindingFailure is not null)
+        {
+            await LogCanonicalValidationFailureAsync(
+                "room-available", roomNumber, previousRoom, "binding-rejected", auditCtx, diagnosticLogger);
+            return bindingFailure;
+        }
+
+        if (previousRoom?.IntegrityFaults is { Count: > 0 })
+        {
+            return await CompleteIntegrityFaultAsync(
+                "room-available", roomNumber, previousRoom, auditCtx, diagnosticLogger);
+        }
+
+        var result = store.MarkRoomAvailable(roomNumber);
+        if (result is null)
+        {
+            var currentRoom = store.GetRoom(roomNumber);
+            if (currentRoom?.IntegrityFaults is { Count: > 0 })
+            {
+                return await CompleteIntegrityFaultAsync(
+                    "room-available", roomNumber, currentRoom, auditCtx, diagnosticLogger);
+            }
+
+            var reason = store.IsConfiguredRoom(roomNumber) ? "state-rejected" : "room-not-found";
+            await LogCanonicalValidationFailureAsync(
+                "room-available", roomNumber, previousRoom, reason, auditCtx, diagnosticLogger);
+            return store.IsConfiguredRoom(roomNumber)
+                ? Results.BadRequest("Room Available is only available during turnover.")
+                : Results.NotFound("Room is not configured.");
+        }
+
+        await diagnosticLogger.LogRoomAuditAsync(auditCtx.Build(
+            "room-available", roomNumber, previousRoom, result, true, null,
+            previousRoom?.AssignedDoctor, previousRoom?.ProcedureCode));
+        await hubContext.Clients.All.SendAsync("boardUpdated", store.GetSnapshot());
+        return Results.Ok(result);
+    }
+
+    private static async Task<IResult> CompleteIntegrityFaultAsync(
+        string action,
+        int roomNumber,
+        RoomStatus room,
+        AuditRequestContext auditCtx,
+        DiagnosticLogger diagnosticLogger)
+    {
+        await LogCanonicalValidationFailureAsync(
+            action,
+            roomNumber,
+            room,
+            PrestagingLifecycleErrorCodes.IntegrityFault,
+            auditCtx,
+            diagnosticLogger);
+        return CanonicalError(
+            new PrestagingLifecycleErrorResponse(
+                PrestagingLifecycleErrorCodes.IntegrityFault,
+                "The room has an integrity fault.",
+                [],
+                room.IntegrityFaults ?? []),
+            StatusCodes.Status409Conflict);
+    }
+
+    private static async Task<IResult> CompleteCanonicalMutationAsync(
+        string action, int roomNumber, RoomStatus? previousRoom, AuditRequestContext auditCtx,
+        PrestagingLifecycleMutationResult mutation,
+        DemoBoardStore store, DiagnosticLogger diagnosticLogger, IHubContext<BoardHub> hubContext,
+        bool returnLegacyRoomResponse = false)
+    {
+        if (mutation.Outcome != PrestagingLifecycleMutationOutcome.Success)
+        {
+            var mapped = MapCanonicalFailure(mutation);
+            await diagnosticLogger.LogRoomAuditAsync(auditCtx.Build(
+                action, roomNumber, previousRoom, null, false, mapped.Error.Code,
+                previousRoom?.AssignedDoctor, previousRoom?.ProcedureCode));
+            return CanonicalError(mapped.Error, mapped.StatusCode);
+        }
+        var room = mutation.Room!;
+        var state = room.State switch
+        {
+            RoomStates.Prestaging => CanonicalRoomLifecycleState.Prestaging,
+            RoomStates.Seated => CanonicalRoomLifecycleState.SeatedInPrep,
+            RoomStates.ReadyForDoctor or RoomStates.Aging or RoomStates.Stale => CanonicalRoomLifecycleState.ReadyForDoctor,
+            RoomStates.DoctorInRoom => CanonicalRoomLifecycleState.DoctorWorking,
+            _ => throw new InvalidOperationException($"Canonical mutation returned unsupported room state '{room.State}'.")
+        };
+        await diagnosticLogger.LogRoomAuditAsync(auditCtx.Build(
+            action, roomNumber, previousRoom, room, true, null, room.AssignedDoctor, room.ProcedureCode));
+        await hubContext.Clients.All.SendAsync("boardUpdated", store.GetSnapshot());
+        if (returnLegacyRoomResponse)
+        {
+            return Results.Ok(room);
+        }
+        return Results.Ok(PrestagingLifecycleResponseProjector.Create(room, state, mutation.Assignment!, mutation.Handoff));
+    }
+
+    private static Task LogCanonicalValidationFailureAsync(
+        string action,
+        int roomNumber,
+        RoomStatus? previousRoom,
+        string reason,
+        AuditRequestContext auditCtx,
+        DiagnosticLogger diagnosticLogger) =>
+        diagnosticLogger.LogRoomAuditAsync(auditCtx.Build(
+            action,
+            roomNumber,
+            previousRoom,
+            null,
+            false,
+            reason,
+            previousRoom?.AssignedDoctor,
+            previousRoom?.ProcedureCode));
+
+    internal static (PrestagingLifecycleErrorResponse Error, int StatusCode) MapCanonicalFailure(
+        PrestagingLifecycleMutationResult mutation)
+    {
+        var (code, status, message) = mutation.Outcome switch
+        {
+            PrestagingLifecycleMutationOutcome.RoomNotFound => (PrestagingLifecycleErrorCodes.RoomNotFound, 404, "Room is not configured."),
+            PrestagingLifecycleMutationOutcome.InvalidAssignment => (PrestagingLifecycleErrorCodes.InvalidAssignment, 400, "The assignment is invalid."),
+            PrestagingLifecycleMutationOutcome.AssignmentIncomplete => (PrestagingLifecycleErrorCodes.AssignmentIncomplete, 409, "Ready for Doctor requires a complete assignment."),
+            PrestagingLifecycleMutationOutcome.AssignmentLocked => (PrestagingLifecycleErrorCodes.AssignmentLocked, 409, "The Ready assignment is locked."),
+            PrestagingLifecycleMutationOutcome.IntegrityFault => (PrestagingLifecycleErrorCodes.IntegrityFault, 409, "The room has an integrity fault."),
+            PrestagingLifecycleMutationOutcome.StaleWrite => (PrestagingLifecycleErrorCodes.StaleWrite, 409, "The room changed; reload before retrying."),
+            PrestagingLifecycleMutationOutcome.PersistenceFailure => (PrestagingLifecycleErrorCodes.PersistenceFailure, 500, "The room could not be persisted."),
+            _ => (PrestagingLifecycleErrorCodes.LifecycleConflict, 409, "The room is not in a valid lifecycle state for this action.")
+        };
+
+        var unresolvedFields = mutation.Outcome == PrestagingLifecycleMutationOutcome.AssignmentIncomplete
+            && mutation.Assignment is not null
+                ? CanonicalAssignmentRequirements.GetUnresolvedFields(mutation.Assignment)
+                : [];
+        return (new(code, message, unresolvedFields, mutation.IntegrityFaults ?? []), status);
+    }
+
+    private static IResult CanonicalError(string code, string message) => CanonicalError(new(code, message, [], []), 400);
+    private static IResult CanonicalError(PrestagingLifecycleErrorResponse error, int status) => Results.Json(error, statusCode: status);
     public static async Task<IResult> BeginPrestageAsync(
         int roomNumber,
         BeginPrestageRequest request,
@@ -1192,13 +1449,59 @@ public static class RoomLifecycleEndpointHandler
             return bindingFailure;
         }
 
-        var (root, bodyError) = await StrictJsonRequestReader.ReadObjectAsync(httpContext.Request);
+        var (root, bodyError, _) = await StrictJsonRequestReader.ReadObjectWithPresenceAsync(
+            httpContext.Request,
+            treatWhitespaceAsEmpty: false);
         if (bodyError is not null)
         {
             await diagnosticLogger.LogRoomAuditAsync(auditCtx.Build(
-                "seat", roomNumber, previousRoom, null, false, "validation-failed",
+                "seat", roomNumber, previousRoom, null, false, PrestagingLifecycleErrorCodes.MalformedRequest,
                 previousRoom?.AssignedDoctor, previousRoom?.ProcedureCode));
-            return bodyError;
+            return CanonicalError(PrestagingLifecycleErrorCodes.MalformedRequest, "The request body is malformed.");
+        }
+
+        var properties = root.EnumerateObject().Select(property => property.Name).ToArray();
+        var hasCanonicalAssignment = properties.Any(name => string.Equals(name, "assignment", StringComparison.Ordinal));
+        var hasLegacyFields = properties.Any(name => SeatRequestParser.AllowedProperties.Contains(name, StringComparer.OrdinalIgnoreCase));
+        var hasUnknownFields = properties.Any(name =>
+            !string.Equals(name, "assignment", StringComparison.Ordinal)
+            && !SeatRequestParser.AllowedProperties.Contains(name, StringComparer.OrdinalIgnoreCase));
+        if (hasUnknownFields)
+        {
+            await LogCanonicalValidationFailureAsync(
+                "seat", roomNumber, previousRoom, PrestagingLifecycleErrorCodes.MalformedRequest, auditCtx, diagnosticLogger);
+            return CanonicalError(PrestagingLifecycleErrorCodes.MalformedRequest, "The Seat request contains an unknown property.");
+        }
+        if (hasCanonicalAssignment && hasLegacyFields)
+        {
+            await LogCanonicalValidationFailureAsync(
+                "seat", roomNumber, previousRoom, PrestagingLifecycleErrorCodes.MalformedRequest, auditCtx, diagnosticLogger);
+            return CanonicalError(PrestagingLifecycleErrorCodes.MalformedRequest, "Canonical and compatibility Seat properties cannot be mixed.");
+        }
+        if (properties.Length == 0 || hasCanonicalAssignment)
+        {
+            var parsedCanonical = PrestagingLifecycleRequestParser.ParseSeatAction(root.GetRawText());
+            if (parsedCanonical.Error is not null)
+            {
+                await LogCanonicalValidationFailureAsync(
+                    "seat", roomNumber, previousRoom, parsedCanonical.Error.Code, auditCtx, diagnosticLogger);
+                return CanonicalError(parsedCanonical.Error, 400);
+            }
+            RoomAssignmentContract? assignment = null;
+            if (parsedCanonical.Value!.Assignment is { } requestAssignment)
+            {
+                var converted = store.ConvertCanonicalAssignment(requestAssignment);
+                if (converted.Error is not null)
+                {
+                    await LogCanonicalValidationFailureAsync(
+                        "seat", roomNumber, previousRoom, converted.Error.Code, auditCtx, diagnosticLogger);
+                    return CanonicalError(converted.Error, 400);
+                }
+                assignment = converted.Value;
+            }
+            return await CompleteCanonicalMutationAsync(
+                "seat", roomNumber, previousRoom, auditCtx,
+                store.SeatRoomCanonical(roomNumber, assignment), store, diagnosticLogger, hubContext);
         }
 
         var propertyError = StrictJsonRequestReader.ValidatePropertySet(root, SeatRequestParser.AllowedProperties);

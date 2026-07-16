@@ -221,9 +221,9 @@ Rooms should be configurable, with the default early prototype using:
 
 Ready is the assignment-lock boundary. Cancellation and expiration before Doctor Arrived produce aborted history outside throughput. Post-arrival expiration produces a review-required exception without fabricating `DoctorCompleteAt`. Legacy persisted Aging/Stale rows remain readable recovery states.
 
-Canonical assignment persistence is compare-and-swap guarded by the originally loaded room, episode, lifecycle state, and Active handoff identity. Stale writes return no result and do not mutate live state, reload, or retry. SQLite failures throw, roll back transaction-local writes, and leave live memory unchanged.
+Canonical lifecycle persistence is compare-and-swap guarded by the complete originally loaded room expectation: episode and lifecycle identity, assignment and allocation values, both handoff references, and lifecycle timestamps. Stale writes return a typed failure and do not mutate live state, reload, or retry. Ready, Withdraw Ready, and Doctor Arrived validate handoff history transactionally; Doctor Arrived also serializes durable cross-room doctor ownership. SQLite failures roll back transaction-local writes and leave live memory unchanged.
 
-Draft-bearing Ready is deferred to API/UI issues #120 and #121; do not add a `MarkReadyForDoctor` assignment overload without that follow-up scope.
+Issue #120 exposes optional draft-bearing Ready atomically through the canonical API. Omitted Ready and Doctor Arrived bodies retain the current room-panel `RoomStatus` response, while explicit canonical bodies return the lifecycle action envelope. The room-panel migration remains issue #121.
 
 Doctors should be able to view room status from a phone or workstation, but they should not be able to acknowledge or clear the room remotely.
 
@@ -269,6 +269,21 @@ The accepted Ready handoff is the finalized reporting assignment. Withdrawn hand
 Reports should be operational, non-punitive, and team-process oriented. Avoid doctor or staff rankings, best/worst framing, scoreboards, awards, shame language, or productivity theater. Use summary cards, median/average timing context, plain-English explanations, progressive disclosure, and operational questions.
 
 Workshop and projection language should frame outputs as scenario exploration, not prediction. Do not imply ChairSide can perfectly predict capacity or that observed slack is automatically recoverable time.
+
+## Data Analytics skills for reporting work
+
+The Data Analytics plugin is available as a bundled set of skills. Invoke the narrowest relevant skill explicitly; do not ask the bundle to choose or run every analytics workflow by default.
+
+Use this sequence for ChairSide reporting and metrics work:
+
+1. Use `$create-data-context` only when the task explicitly asks to create or maintain a durable ChairSide reporting semantic layer. Ordinary analysis does not require saved context.
+2. Use `$analyze-data-quality` before relying on new extracts, joins, populations, or dashboards. Check freshness, grain, nulls, duplicates, timestamp ordering, handoff consistency, outliers, and source-definition conflicts.
+3. Use `$metric-diagnostics` when explaining why an approved metric changed across time, doctors, rooms, procedures, sedation, allocation, or other reviewed dimensions.
+4. Use `$validate-data` before sharing analytical conclusions. Verify source selection, population rules, calculations, comparisons, visuals, caveats, and whether the evidence supports the conclusion.
+5. Use `$visualize-data` only after the metric definition and data quality are settled. Keep charts operational, non-punitive, and aligned with the approved reporting populations.
+6. Use `$build-report` when a durable stakeholder-facing analysis is requested. Use `$jupyter-notebooks` when reproducible SQL, Python, statistics, or an auditable calculation materially improves the work.
+
+Defer `$design-kpis`, `$build-dashboard`, and `$kpi-reporting` until canonical metric definitions, sources, and data quality have been reviewed and the user explicitly requests that artifact or framework. Do not create rankings, individual performance scores, quotas, best/worst framing, or causal claims from descriptive operational data. Separate durable source facts, derived metrics, presentation-only values, and proposed future measures. Never include or infer PHI.
 
 ## MVP features
 

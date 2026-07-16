@@ -1,7 +1,7 @@
 ---
 title: Room lifecycle
 tags: [room, board, room-lifecycle, data-persistence, permissions, device-binding, domain-rule, active, last-verified]
-last_verified_commit: pending-issue-119
+last_verified_commit: 2834afc
 ---
 
 # Room lifecycle
@@ -13,12 +13,12 @@ ChairSide tracks room episodes, not patients. The canonical lifecycle is:
 1. Begin Prestage creates `EpisodeId`, records `PrestageStartedAt`, and enters `Prestaging` without requiring an assignment.
 2. Save Details explicitly persists an absent, partial, or complete assignment while `Prestaging` or `Seated`.
 3. Seat Room records truthful `SeatedAt`. An assignment-bearing Seat may persist the supplied canonical draft in the same transaction.
-4. Ready for Doctor requires a complete, currently valid, durably saved assignment. It enters primary state `ReadyForDoctor`, creates an owned Active handoff, and locks the assignment.
+4. Ready for Doctor requires a complete, currently valid assignment. It may use the durable draft or atomically persist a supplied canonical draft, then enters primary state `ReadyForDoctor`, creates an owned Active handoff, and locks the assignment.
 5. Doctor Arrived accepts that handoff, clears Ready urgency, records `DoctorArrivedAt`, and enters `DoctorInRoom`.
 6. Doctor Complete records `DoctorCompleteAt` and enters `Turnover`.
 7. Room Available records completion and releases the room to `Available`.
 
-Draft-bearing Ready is not part of the current store/API/UI boundary. It is deferred to issues #120 and #121.
+Issue #120 exposes canonical Begin Prestage, Save Details, Seat, Ready, Withdraw Ready, and Doctor Arrived endpoints. Omitted Ready and Doctor Arrived bodies preserve the current room-panel `RoomStatus` response; explicit canonical bodies return the lifecycle action envelope. UI migration is deferred to issue #121.
 
 ## Ready handoff and urgency
 
@@ -34,9 +34,13 @@ Pre-arrival cancellation and expiration create aborted-assignment history, not t
 
 Restart recovery restores durable truth and projects urgency and integrity without mutating the database. Live room state changes only after the repository transaction succeeds.
 
+Canonical `DoctorInRoom` and `Turnover` progression revalidates the room assignment and in-progress reporting-cycle attribution against the immutable Accepted handoff. Contradictory recovered state projects or returns `integrity-fault` and blocks Doctor Complete or Room Available without mutating room, handoff, cycle, timestamps, reports, events, or live state. Legitimate legacy arrived rooms without handoff metadata retain their compatibility completion path.
+
 ## Concurrency and durability
 
-Canonical assignment writes capture the originally loaded `RoomId`, nullable `EpisodeId`, state, and nullable `ActiveReadyHandoffId`. The guarded SQLite update compares all four values, using null-safe `IS` for nullable identities. A stale context receives `null`; it does not mutate live memory, retry, reload, append an event, regress Ready, overwrite the locked assignment, or orphan a handoff. SQLite failures throw and roll back transaction-local writes.
+Canonical lifecycle writes capture the complete originally loaded durable room expectation: room/episode/state identity, assignment and allocation values, both handoff references, and lifecycle timestamps. The guarded SQLite update uses null-safe comparisons. A stale context receives `stale-write`; it does not mutate live memory, retry, reload, append an event, regress Ready, overwrite the locked assignment, or orphan a handoff.
+
+Ready and Withdraw Ready validate episode handoff history in the same transaction as the room mutation. Doctor Arrived uses an immediate SQLite transaction to serialize cross-room doctor ownership, validates canonical working rooms against their Accepted handoffs, and commits the room, Active-to-Accepted handoff transition, and reporting cycle atomically. SQLite failures roll back transaction-local writes; live memory and events change only after commit.
 
 ## Authorization and conflict handling
 
@@ -45,9 +49,13 @@ Room lifecycle mutation remains room-local and device-token guarded. Doctors are
 ## Source and test anchors
 
 - `src/ChairSide.Board/Services/DemoBoardStore.cs`
+- `src/ChairSide.Board/Program.cs`
+- `src/ChairSide.Board/Services/PrestagingLifecycleApiContracts.cs`
 - `src/ChairSide.Board/Services/SqliteBoardRepository.cs`
 - `src/ChairSide.Board/Services/RoomAssignmentContracts.cs`
 - `tests/ChairSide.Board.Tests/PrestagingLifecycleTransitionTests.cs`
+- `tests/ChairSide.Board.Tests/PrestagingLifecycleApiContractTests.cs`
+- `tests/ChairSide.Board.Tests/PrestagingLifecycleEndpointTests.cs`
 - `tests/ChairSide.Board.Tests/ReadyHandoffPersistenceTests.cs`
 - `tests/ChairSide.Board.Tests/CanonicalAssignmentDomainValidationTests.cs`
 - `tests/ChairSide.Board.Tests/FaultedReadyCancellationTests.cs`
@@ -56,4 +64,4 @@ Room lifecycle mutation remains room-local and device-token guarded. Doctors are
 
 ## Separate known issue
 
-The after-hours sweep currently advances `_lastSweepDate` before persistence succeeds. A failure can suppress same-day retry, and earlier rooms can commit before a later room fails. That retry and batch-atomicity defect is separate from issue #119.
+The after-hours sweep currently advances `_lastSweepDate` before persistence succeeds. A failure can suppress same-day retry, and earlier rooms can commit before a later room fails. That retry and batch-atomicity defect is issue #129. Knowledge-graph comment/string false-positive extraction remains issue #126.

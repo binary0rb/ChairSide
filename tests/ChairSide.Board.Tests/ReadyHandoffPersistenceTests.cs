@@ -370,6 +370,132 @@ public sealed class ReadyHandoffPersistenceTests
     }
 
     [Fact]
+    public void Guarded_ready_handoff_compare_and_swap_rolls_back_stale_candidate_handoff()
+    {
+        using var workspace = TestWorkspace.Create();
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production);
+        Assert.Equal(PrestagingLifecycleMutationOutcome.Success, context.Store.BeginPrestageCanonical(1).Outcome);
+        Assert.Equal(PrestagingLifecycleMutationOutcome.Success, context.Store.SeatRoomCanonical(1, CompleteAssignment()).Outcome);
+        var seated = LoadRoom(context);
+        var expectation = ActiveRoomWriteExpectation.FromRoom(seated);
+        var staleCandidate = CopyRoom(seated);
+        staleCandidate.State = RoomStates.ReadyForDoctor;
+        var staleCandidateBefore = RoomSnapshot.From(staleCandidate);
+        var readyAt = new DateTimeOffset(2026, 7, 14, 14, 0, 0, TimeSpan.Zero);
+        var currentCandidate = CopyRoom(seated);
+        currentCandidate.State = RoomStates.ReadyForDoctor;
+        var current = context.Repository.CreateReadyHandoff(
+            currentCandidate,
+            CompleteAssignment(),
+            readyAt,
+            context.Doctors,
+            context.Procedures);
+
+        var staleResult = context.Repository.CreateReadyHandoffGuarded(
+            staleCandidate,
+            CompleteAssignment(),
+            readyAt.AddMinutes(1),
+            expectation,
+            context.Doctors,
+            context.Procedures);
+
+        Assert.Equal(GuardedReadyHandoffPersistenceOutcome.StaleWrite, staleResult.Outcome);
+        Assert.Null(staleResult.Committed);
+        Assert.Equal(staleCandidateBefore, RoomSnapshot.From(staleCandidate));
+        var durable = LoadRoom(context);
+        Assert.Equal(current.HandoffId, durable.ActiveReadyHandoffId);
+        var handoff = Assert.Single(context.Repository.LoadReadyHandoffsByEpisode(durable.EpisodeId!));
+        Assert.Equal(current.HandoffId, handoff.HandoffId);
+        Assert.Equal(ReadyHandoffStatus.Active, handoff.ContractStatus);
+    }
+
+    [Fact]
+    public void Guarded_withdrawal_rejects_room_handoff_assignment_divergence_inside_transaction()
+    {
+        using var workspace = TestWorkspace.Create();
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production);
+        var readyAt = new DateTimeOffset(2026, 7, 14, 14, 0, 0, TimeSpan.Zero);
+        var handoff = context.Repository.CreateReadyHandoff(
+            ReadyRoom(readyAt),
+            CompleteAssignment(),
+            readyAt,
+            context.Doctors,
+            context.Procedures);
+        using (var connection = OpenConnection(context.DatabasePath))
+        {
+            ExecuteSql(connection, "UPDATE active_rooms SET assigned_doctor_id = 'pledger' WHERE room_id = 1;");
+        }
+
+        var corrupted = LoadRoom(context);
+        var durableBefore = RoomSnapshot.From(corrupted);
+        var handoffBefore = HandoffSnapshot.From(context.Repository.LoadReadyHandoff(handoff.HandoffId)!);
+        var candidate = CopyRoom(corrupted);
+        candidate.State = RoomStates.Seated;
+        candidate.ReadyForDoctorAt = null;
+        candidate.AgingStartedAt = null;
+        candidate.StaleStartedAt = null;
+        candidate.ActiveReadyHandoffId = null;
+
+        var result = context.Repository.WithdrawReadyHandoffGuarded(
+            candidate,
+            handoff.HandoffId,
+            readyAt.AddMinutes(2),
+            ActiveRoomWriteExpectation.FromRoom(corrupted));
+
+        Assert.Equal(GuardedWithdrawReadyPersistenceOutcome.IntegrityFault, result.Outcome);
+        Assert.Null(result.Committed);
+        Assert.Equal(durableBefore, RoomSnapshot.From(LoadRoom(context)));
+        Assert.Equal(handoffBefore, HandoffSnapshot.From(context.Repository.LoadReadyHandoff(handoff.HandoffId)!));
+        Assert.Equal(ReadyHandoffStatus.Active, context.Repository.LoadReadyHandoff(handoff.HandoffId)!.ContractStatus);
+    }
+
+    [Fact]
+    public void Guarded_doctor_arrived_accepts_the_handoff_and_cycle_from_one_immutable_snapshot()
+    {
+        using var workspace = TestWorkspace.Create();
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production);
+        var readyAt = new DateTimeOffset(2026, 7, 15, 14, 0, 0, TimeSpan.Zero);
+        var acceptedAt = readyAt.AddMinutes(6);
+        var handoff = context.Repository.CreateReadyHandoff(
+            ReadyRoom(readyAt),
+            CompleteAssignment(),
+            readyAt,
+            context.Doctors,
+            context.Procedures);
+        var ready = LoadRoom(context);
+        var expectation = ActiveRoomWriteExpectation.FromRoom(ready);
+        var candidate = CopyRoom(ready);
+        candidate.State = RoomStates.DoctorInRoom;
+        candidate.DoctorArrivedAt = acceptedAt;
+        candidate.AgingStartedAt = null;
+        candidate.StaleStartedAt = null;
+        candidate.ActiveReadyHandoffId = null;
+        candidate.AcceptedReadyHandoffId = handoff.HandoffId;
+
+        var result = context.Repository.AcceptReadyHandoffAndSaveCycleGuarded(
+            candidate,
+            CompletedCycle(candidate, acceptedAt),
+            handoff.HandoffId,
+            acceptedAt,
+            expectation,
+            context.Doctors,
+            context.Procedures);
+
+        Assert.Equal(GuardedDoctorArrivedPersistenceOutcome.Success, result.Outcome);
+        var committed = Assert.IsType<CommittedReadyHandoffResult>(result.Committed);
+        Assert.Equal(ReadyHandoffStatus.Accepted, committed.Handoff.ContractStatus);
+        Assert.Equal(RoomStates.DoctorInRoom, committed.Room.State);
+        Assert.Null(committed.Room.ActiveReadyHandoffId);
+        Assert.Equal(handoff.HandoffId, committed.Room.AcceptedReadyHandoffId);
+        Assert.Equal(handoff.HandoffId, committed.CompletedCycle!.AcceptedReadyHandoffId);
+        Assert.Equal(committed.Handoff.Assignment.DoctorId, committed.CompletedCycle.AssignedDoctor);
+        Assert.Equal(committed.Handoff.Assignment.ProcedureCode, committed.CompletedCycle.ProcedureCode);
+        Assert.Equal(committed.Handoff.Assignment.ExpectedAllocationConfirmedUnits, committed.CompletedCycle.ExpectedAllocationUnits);
+        Assert.Equal(RoomSnapshot.From(committed.Room), RoomSnapshot.From(LoadRoom(context)));
+        Assert.Equal(HandoffSnapshot.From(committed.Handoff), HandoffSnapshot.From(context.Repository.LoadReadyHandoff(handoff.HandoffId)!));
+    }
+
+    [Fact]
     public void Ready_handoff_rejects_incomplete_assignment_without_persisting_side_effects()
     {
         using var workspace = TestWorkspace.Create();

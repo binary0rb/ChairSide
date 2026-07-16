@@ -22,11 +22,11 @@ This file records decisions that should survive across tasks, PRs, and debugging
 
 ## Ready handoff boundary
 
-**Decision:** Ready requires a complete, currently valid, durably saved assignment and creates an immutable owned Active handoff. Ready is the assignment-lock boundary; Doctor Arrived accepts the handoff rather than reconstructing assignment.
+**Decision:** Ready requires a complete, currently valid assignment and creates an immutable owned Active handoff. The assignment may already be durable or may be persisted atomically by an assignment-bearing canonical Ready request. Ready is the assignment-lock boundary; Doctor Arrived accepts the handoff rather than reconstructing assignment.
 
 **Rationale:** A doctor may act on the handoff as soon as Ready is issued, so silent assignment changes after that point are unsafe.
 
-**Deferred:** Draft-bearing Ready and matching Program/UI changes belong to issues #120/#121, not #119.
+**Compatibility:** Omitted Ready and Doctor Arrived bodies retain the current room-panel `RoomStatus` response. Explicit canonical bodies return the lifecycle action envelope until issue #121 migrates the UI.
 
 ## Ready urgency
 
@@ -44,11 +44,17 @@ This file records decisions that should survive across tasks, PRs, and debugging
 
 ## Concurrency and durable ordering
 
-**Decision:** Canonical assignment persistence compares the originally loaded room id, nullable episode id, lifecycle state, and nullable Active handoff id. Zero affected rows returns `null` with no INSERT/UPSERT fallback, reload, retry, event, durable mutation, or live mutation. Database failures throw. Live state is applied only after a successful repository transaction.
+**Decision:** Canonical lifecycle persistence compares the complete originally loaded room expectation: room/episode/state identity, assignment and allocation values, both handoff references, and lifecycle timestamps. Zero affected rows returns `stale-write` with no INSERT/UPSERT fallback, reload, retry, event, durable mutation, or live mutation. Ready and Withdraw Ready validate handoff history transactionally. Doctor Arrived uses an immediate SQLite transaction to serialize durable cross-room doctor ownership and commits room, handoff acceptance, and reporting-cycle creation together. Live state and events change only after a successful repository commit.
 
 **Rationale:** A stale context must not regress Ready, replace its locked assignment, clear its handoff link, or orphan the durable handoff. Failure injection proves multi-write transaction rollback and unchanged live memory.
 
 **Compatibility:** General `SaveRoom` and `SaveRooms` UPSERT behavior remains for initialization and unrelated lifecycle paths.
+
+## Canonical lifecycle transport
+
+**Decision:** Canonical Begin Prestage, Save Details, Seat, Ready, Withdraw Ready, and Doctor Arrived use strict JSON contracts, typed mutation outcomes, and stable HTTP error codes. Canonical procedure codes are undecorated; internal `+SED` persistence representation never crosses the canonical transport boundary.
+
+**Rationale:** Explicit wire shapes and typed failures let current and future clients recover without partial mutation or inference from free-form messages. Compatibility response branches remain narrow and test-guarded until the UI issues migrate them.
 
 ## Development seed
 

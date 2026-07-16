@@ -11,6 +11,8 @@ public sealed class DurableFailureInjectionTests
 {
     private const string ResetTriggerName = "fail_room_1_reset";
     private const string CanonicalTriggerName = "fail_room_1_canonical_assignment";
+    private const string CanonicalSeatTriggerName = "fail_room_1_canonical_seat";
+    private const string CanonicalReadyTriggerName = "fail_room_1_canonical_ready";
 
     [Fact]
     public void Cancel_seating_database_abort_rolls_back_aborted_history_and_preserves_live_room()
@@ -282,6 +284,119 @@ public sealed class DurableFailureInjectionTests
         Assert.Empty(reloaded.Repository.LoadCompletedCycles());
     }
 
+    [Fact]
+    public void Canonical_assignment_bearing_seat_database_abort_returns_persistence_failure_and_preserves_state()
+    {
+        using var workspace = TestWorkspace.Create();
+        var databasePath = workspace.ProductionDatabasePath();
+        var context = StoreContext.Create(
+            workspace,
+            environmentName: Environments.Production,
+            databasePath: databasePath);
+
+        Assert.Equal(PrestagingLifecycleMutationOutcome.Success, context.Store.BeginPrestageCanonical(1).Outcome);
+        var partial = RoomAssignmentContract.Create(
+            "otte",
+            "EXT",
+            SedationContract.EligibleUnresolved(),
+            ExpectedAllocationContract.Suggested(3));
+        Assert.Equal(
+            PrestagingLifecycleMutationOutcome.Success,
+            context.Store.SaveAssignmentDetailsCanonical(1, partial).Outcome);
+
+        var liveBefore = RoomSnapshot.From(GetLiveRoom(context.Store));
+        var durableBefore = RoomSnapshot.From(LoadRoom(context));
+        var eventCountBefore = context.Store.GetSnapshot().RecentEvents.Count;
+        var complete = RoomAssignmentContract.Create(
+            "pledger",
+            "EXT",
+            SedationContract.EligibleNo(),
+            ExpectedAllocationContract.ConfirmedSuggestedValue(3));
+
+        InstallCanonicalSeatFailureTrigger(databasePath);
+        PrestagingLifecycleMutationResult result;
+        try
+        {
+            result = context.Store.SeatRoomCanonical(1, complete);
+        }
+        finally
+        {
+            DropTrigger(databasePath, CanonicalSeatTriggerName);
+        }
+
+        Assert.Equal(PrestagingLifecycleMutationOutcome.PersistenceFailure, result.Outcome);
+        AssertInjectedAbort(
+            Assert.IsType<SqliteException>(result.PersistenceException),
+            "injected canonical seat failure");
+        Assert.Equal(liveBefore, RoomSnapshot.From(GetLiveRoom(context.Store)));
+        Assert.Equal(durableBefore, RoomSnapshot.From(LoadRoom(context)));
+        Assert.Equal(eventCountBefore, context.Store.GetSnapshot().RecentEvents.Count);
+
+        var reloaded = StoreContext.Create(
+            workspace,
+            environmentName: Environments.Production,
+            databasePath: databasePath);
+        Assert.Equal(durableBefore, RoomSnapshot.From(LoadRoom(reloaded)));
+    }
+
+    [Fact]
+    public void Canonical_assignment_bearing_ready_database_abort_rolls_back_assignment_and_handoff()
+    {
+        using var workspace = TestWorkspace.Create();
+        var databasePath = workspace.ProductionDatabasePath();
+        var context = StoreContext.Create(
+            workspace,
+            environmentName: Environments.Production,
+            databasePath: databasePath);
+        Assert.Equal(PrestagingLifecycleMutationOutcome.Success, context.Store.BeginPrestageCanonical(1).Outcome);
+        var partial = RoomAssignmentContract.Create(
+            "otte",
+            "EXT",
+            SedationContract.EligibleUnresolved(),
+            ExpectedAllocationContract.Suggested(3));
+        Assert.Equal(PrestagingLifecycleMutationOutcome.Success, context.Store.SeatRoomCanonical(1, partial).Outcome);
+        var liveBefore = RoomSnapshot.From(GetLiveRoom(context.Store));
+        var durableBefore = RoomSnapshot.From(LoadRoom(context));
+        var eventCountBefore = context.Store.GetSnapshot().RecentEvents.Count;
+        var handoffsBefore = context.Repository.LoadReadyHandoffsByEpisode(durableBefore.EpisodeId!).Select(HandoffSnapshot.From).ToArray();
+        var complete = RoomAssignmentContract.Create(
+            "pledger",
+            "EXT+SED",
+            SedationContract.EligibleYes(),
+            ExpectedAllocationContract.ConfirmedAdjustedValue(3, 4));
+
+        InstallCanonicalReadyFailureTrigger(databasePath);
+        PrestagingLifecycleMutationResult result;
+        try
+        {
+            result = context.Store.MarkReadyForDoctorCanonical(1, complete);
+        }
+        finally
+        {
+            DropTrigger(databasePath, CanonicalReadyTriggerName);
+        }
+
+        Assert.Equal(PrestagingLifecycleMutationOutcome.PersistenceFailure, result.Outcome);
+        AssertInjectedAbort(
+            Assert.IsType<SqliteException>(result.PersistenceException),
+            "injected canonical ready failure");
+        Assert.Equal(liveBefore, RoomSnapshot.From(GetLiveRoom(context.Store)));
+        Assert.Equal(durableBefore, RoomSnapshot.From(LoadRoom(context)));
+        Assert.Equal(eventCountBefore, context.Store.GetSnapshot().RecentEvents.Count);
+        Assert.Equal(handoffsBefore, context.Repository.LoadReadyHandoffsByEpisode(durableBefore.EpisodeId!).Select(HandoffSnapshot.From).ToArray());
+        Assert.Empty(context.Repository.LoadAbortedAssignments());
+        Assert.Empty(context.Repository.LoadCompletedCycles());
+
+        var reloaded = StoreContext.Create(
+            workspace,
+            environmentName: Environments.Production,
+            databasePath: databasePath);
+        Assert.Equal(durableBefore, RoomSnapshot.From(LoadRoom(reloaded)));
+        Assert.Equal(handoffsBefore, reloaded.Repository.LoadReadyHandoffsByEpisode(durableBefore.EpisodeId!).Select(HandoffSnapshot.From).ToArray());
+        Assert.Empty(reloaded.Repository.LoadAbortedAssignments());
+        Assert.Empty(reloaded.Repository.LoadCompletedCycles());
+    }
+
     private static RoomExpirationOptions EnabledExpiration() =>
         new()
         {
@@ -337,6 +452,31 @@ public sealed class DurableFailureInjectionTests
                 AND NEW.procedure_code = 'EXT'
             BEGIN
                 SELECT RAISE(ABORT, 'injected canonical assignment failure');
+            END;
+            """);
+
+    private static void InstallCanonicalSeatFailureTrigger(string databasePath) =>
+        ExecuteSql(databasePath, """
+            CREATE TRIGGER fail_room_1_canonical_seat
+            BEFORE UPDATE ON active_rooms
+            FOR EACH ROW
+            WHEN OLD.room_id = 1
+                AND OLD.state = 'prestaging'
+                AND NEW.state = 'seated'
+                AND OLD.episode_id IS NEW.episode_id
+            BEGIN
+                SELECT RAISE(ABORT, 'injected canonical seat failure');
+            END;
+            """);
+
+    private static void InstallCanonicalReadyFailureTrigger(string databasePath) =>
+        ExecuteSql(databasePath, """
+            CREATE TRIGGER fail_room_1_canonical_ready
+            BEFORE INSERT ON ready_handoffs
+            FOR EACH ROW
+            WHEN NEW.room_id = 1
+            BEGIN
+                SELECT RAISE(ABORT, 'injected canonical ready failure');
             END;
             """);
 

@@ -57,10 +57,14 @@ public enum RoomIntegrityFaultCode
     ReadyHandoffOwnershipMismatch,
     ReadyHandoffNotActive,
     ReadyHandoffAssignmentIncomplete,
+    ReadyHandoffAssignmentMismatch,
     AcceptedHandoffMissing,
     AcceptedHandoffOwnershipMismatch,
     AcceptedHandoffNotAccepted,
     AcceptedHandoffAssignmentIncomplete,
+    AcceptedHandoffAssignmentMismatch,
+    AcceptedHandoffHistoryMismatch,
+    AcceptedHandoffCycleMismatch,
     ContradictoryHandoffReferences
 }
 

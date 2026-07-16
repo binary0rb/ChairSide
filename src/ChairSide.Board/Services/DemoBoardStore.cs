@@ -1,6 +1,7 @@
 using System.Globalization;
 
 using ChairSide.Board.Options;
+using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Options;
 
 namespace ChairSide.Board.Services;
@@ -149,6 +150,111 @@ public sealed class DemoBoardStore
         }
     }
 
+    public CanonicalAssignmentConversionResult ConvertCanonicalAssignment(CanonicalAssignmentRequest request)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        var procedure = request.ProcedureCode is null ? null : FindActiveProcedure(request.ProcedureCode);
+        var converted = CanonicalAssignmentRequestConverter.Convert(request, procedure);
+        if (converted.Value is not { } assignment || assignment.Sedation.State != SedationState.EligibleYes) return converted;
+        return new(RoomAssignmentContract.Create(assignment.DoctorId, ComposeProcedureCode(assignment.ProcedureCode!, true), assignment.Sedation, assignment.ExpectedAllocation), null);
+    }
+
+    public PrestagingLifecycleMutationResult BeginPrestageCanonical(int roomNumber)
+    {
+        var assignment = RoomAssignmentContract.Create(null, null, SedationContract.UnavailableNoProcedure(), ExpectedAllocationContract.Unknown());
+        try
+        {
+            lock (_syncRoot)
+            {
+                var room = _rooms.FirstOrDefault(item => item.RoomId == roomNumber);
+                if (room is null) return CanonicalFailure(PrestagingLifecycleMutationOutcome.RoomNotFound);
+                if (!CanBeginPrestage(room)) return CanonicalFailure(PrestagingLifecycleMutationOutcome.LifecycleConflict);
+                var expectation = ActiveRoomWriteExpectation.FromRoom(room);
+                var now = Now;
+                var candidate = new RoomState(room.RoomId) { EpisodeId = NewEpisodeId(), State = RoomStates.Prestaging, PrestageStartedAt = now };
+                var persisted = PersistedRoomAssignment.FromCanonicalContract(assignment, null, null);
+                ApplyPersistedAssignment(candidate, persisted);
+                var committed = _repository.SaveCanonicalAssignment(candidate, persisted, expectation, _doctors, _procedures);
+                if (committed is null) return CanonicalFailure(PrestagingLifecycleMutationOutcome.StaleWrite);
+                ApplyCommittedRoom(room, committed.Room);
+                AddEvent(new RoomEvent(room.RoomId, "PrestageStarted", now, null, null));
+                return CanonicalSuccess(room, assignment, now);
+            }
+        }
+        catch (SqliteException exception) { return CanonicalFailure(PrestagingLifecycleMutationOutcome.PersistenceFailure, exception: exception); }
+    }
+
+    public PrestagingLifecycleMutationResult SaveAssignmentDetailsCanonical(int roomNumber, RoomAssignmentContract assignment)
+    {
+        ArgumentNullException.ThrowIfNull(assignment);
+        try
+        {
+            lock (_syncRoot)
+            {
+                var room = _rooms.FirstOrDefault(item => item.RoomId == roomNumber);
+                if (room is null) return CanonicalFailure(PrestagingLifecycleMutationOutcome.RoomNotFound);
+                var faults = DeriveIntegrityFaults(room);
+                if (faults.Count > 0) return CanonicalFailure(PrestagingLifecycleMutationOutcome.IntegrityFault, faults);
+                if (room.State is RoomStates.ReadyForDoctor or RoomStates.Aging or RoomStates.Stale || room.DoctorArrivedAt is not null) return CanonicalFailure(PrestagingLifecycleMutationOutcome.AssignmentLocked);
+                if (room.State is not (RoomStates.Prestaging or RoomStates.Seated)) return CanonicalFailure(PrestagingLifecycleMutationOutcome.LifecycleConflict);
+                if (!IsAssignmentValidForRoster(assignment)) return CanonicalFailure(PrestagingLifecycleMutationOutcome.InvalidAssignment);
+                var expectation = ActiveRoomWriteExpectation.FromRoom(room);
+                var persisted = PersistedRoomAssignment.FromCanonicalContract(assignment, ResolveDoctorDisplayName(assignment.DoctorId), ResolveProcedure(assignment.ProcedureCode)?.Label);
+                var candidate = CopyRoomState(room);
+                ApplyPersistedAssignment(candidate, persisted);
+                var committed = _repository.SaveCanonicalAssignment(candidate, persisted, expectation, _doctors, _procedures);
+                if (committed is null) return CanonicalFailure(PrestagingLifecycleMutationOutcome.StaleWrite);
+                ApplyCommittedRoom(room, committed.Room);
+                var now = Now;
+                AddEvent(new RoomEvent(room.RoomId, "AssignmentSaved", now, room.AssignedDoctor, room.ProcedureCode));
+                return CanonicalSuccess(room, assignment, now);
+            }
+        }
+        catch (SqliteException exception) { return CanonicalFailure(PrestagingLifecycleMutationOutcome.PersistenceFailure, exception: exception); }
+    }
+
+    public PrestagingLifecycleMutationResult SeatRoomCanonical(int roomNumber, RoomAssignmentContract? assignment)
+    {
+        try
+        {
+            lock (_syncRoot)
+            {
+                var room = _rooms.FirstOrDefault(item => item.RoomId == roomNumber);
+                if (room is null) return CanonicalFailure(PrestagingLifecycleMutationOutcome.RoomNotFound);
+                var faults = DeriveIntegrityFaults(room);
+                if (faults.Count > 0) return CanonicalFailure(PrestagingLifecycleMutationOutcome.IntegrityFault, faults);
+                if (!CanSeat(room) || room.PrestageStartedAt is null) return CanonicalFailure(PrestagingLifecycleMutationOutcome.LifecycleConflict);
+                if (assignment is not null && !IsAssignmentValidForRoster(assignment)) return CanonicalFailure(PrestagingLifecycleMutationOutcome.InvalidAssignment);
+                var expectation = ActiveRoomWriteExpectation.FromRoom(room);
+                var now = Now;
+                var candidate = CopyRoomState(room);
+                var persisted = assignment is null ? GetCanonicalAssignment(candidate) : PersistedRoomAssignment.FromCanonicalContract(assignment, ResolveDoctorDisplayName(assignment.DoctorId), ResolveProcedure(assignment.ProcedureCode)?.Label);
+                ApplyPersistedAssignment(candidate, persisted);
+                candidate.SeatedAt = now;
+                candidate.State = RoomStates.Seated;
+                var committed = _repository.SaveCanonicalAssignment(candidate, persisted, expectation, _doctors, _procedures);
+                if (committed is null) return CanonicalFailure(PrestagingLifecycleMutationOutcome.StaleWrite);
+                ApplyCommittedRoom(room, committed.Room);
+                AddEvent(new RoomEvent(room.RoomId, "Seated", now, room.AssignedDoctor, room.ProcedureCode));
+                return CanonicalSuccess(room, persisted.ToContract(), now);
+            }
+        }
+        catch (SqliteException exception) { return CanonicalFailure(PrestagingLifecycleMutationOutcome.PersistenceFailure, exception: exception); }
+    }
+
+    private PrestagingLifecycleMutationResult CanonicalSuccess(
+        RoomState room,
+        RoomAssignmentContract assignment,
+        DateTimeOffset now,
+        ReadyHandoffContract? handoff = null) =>
+        new(PrestagingLifecycleMutationOutcome.Success, ToRoomStatus(room, now), assignment, [], Handoff: handoff);
+
+    private static PrestagingLifecycleMutationResult CanonicalFailure(
+        PrestagingLifecycleMutationOutcome outcome,
+        IReadOnlyList<RoomIntegrityFault>? faults = null,
+        Exception? exception = null,
+        DoctorArrivalConflict? conflict = null) =>
+        new(outcome, IntegrityFaults: faults ?? [], PersistenceException: exception, DoctorArrivalConflict: conflict);
     public RoomStatus? BeginPrestage(int roomNumber)
     {
         return BeginPrestage(
@@ -475,29 +581,162 @@ public sealed class DemoBoardStore
         }
     }
 
+    public PrestagingLifecycleMutationResult MarkReadyForDoctorCanonical(
+        int roomNumber,
+        RoomAssignmentContract? suppliedAssignment)
+    {
+        try
+        {
+            lock (_syncRoot)
+            {
+                var room = _rooms.FirstOrDefault(item => item.RoomId == roomNumber);
+                if (room is null) return CanonicalFailure(PrestagingLifecycleMutationOutcome.RoomNotFound);
+                var faults = DeriveIntegrityFaults(room);
+                if (faults.Count > 0) return CanonicalFailure(PrestagingLifecycleMutationOutcome.IntegrityFault, faults);
+                if (room.State is RoomStates.ReadyForDoctor or RoomStates.Aging or RoomStates.Stale || room.DoctorArrivedAt is not null)
+                {
+                    return CanonicalFailure(
+                        suppliedAssignment is null
+                            ? PrestagingLifecycleMutationOutcome.LifecycleConflict
+                            : PrestagingLifecycleMutationOutcome.AssignmentLocked);
+                }
+                if (room.State != RoomStates.Seated || room.SeatedAt is null)
+                {
+                    return CanonicalFailure(PrestagingLifecycleMutationOutcome.LifecycleConflict);
+                }
+
+                RoomAssignmentContract assignment;
+                if (suppliedAssignment is not null)
+                {
+                    assignment = suppliedAssignment;
+                }
+                else if (!GetCanonicalAssignment(room).TryToContract(out var persistedAssignment))
+                {
+                    return CanonicalFailure(PrestagingLifecycleMutationOutcome.InvalidAssignment);
+                }
+                else
+                {
+                    assignment = persistedAssignment;
+                }
+
+                if (!IsAssignmentValidForRoster(assignment))
+                {
+                    return CanonicalFailure(PrestagingLifecycleMutationOutcome.InvalidAssignment);
+                }
+                if (assignment.Completeness != AssignmentCompleteness.Complete)
+                {
+                    return new PrestagingLifecycleMutationResult(
+                        PrestagingLifecycleMutationOutcome.AssignmentIncomplete,
+                        Assignment: assignment,
+                        IntegrityFaults: []);
+                }
+                if (room.ActiveReadyHandoffId is not null || room.AcceptedReadyHandoffId is not null)
+                {
+                    var fault = new RoomIntegrityFault(RoomIntegrityFaultCode.ContradictoryHandoffReferences, assignment);
+                    return CanonicalFailure(PrestagingLifecycleMutationOutcome.IntegrityFault, [fault]);
+                }
+
+                var expectation = ActiveRoomWriteExpectation.FromRoom(room);
+                var now = Now;
+                var candidate = CopyRoomState(room);
+                candidate.State = RoomStates.ReadyForDoctor;
+                var persistence = _repository.CreateReadyHandoffGuarded(
+                    candidate,
+                    assignment,
+                    now,
+                    expectation,
+                    _doctors,
+                    _procedures);
+                if (persistence.Outcome == GuardedReadyHandoffPersistenceOutcome.StaleWrite)
+                {
+                    return CanonicalFailure(PrestagingLifecycleMutationOutcome.StaleWrite);
+                }
+                if (persistence.Outcome == GuardedReadyHandoffPersistenceOutcome.IntegrityFault)
+                {
+                    var fault = new RoomIntegrityFault(
+                        RoomIntegrityFaultCode.ContradictoryHandoffReferences,
+                        assignment);
+                    return CanonicalFailure(PrestagingLifecycleMutationOutcome.IntegrityFault, [fault]);
+                }
+
+                var committed = persistence.Committed
+                    ?? throw new InvalidOperationException("Successful guarded Ready persistence must return committed state.");
+                ApplyCommittedRoom(room, committed.Room);
+                AddEvent(new RoomEvent(room.RoomId, "ReadyForDoctor", now, room.AssignedDoctor, room.ProcedureCode));
+                return CanonicalSuccess(room, assignment, now, committed.Handoff.ToContract());
+            }
+        }
+        catch (SqliteException exception)
+        {
+            return CanonicalFailure(PrestagingLifecycleMutationOutcome.PersistenceFailure, exception: exception);
+        }
+    }
+
+    public PrestagingLifecycleMutationResult WithdrawReadyCanonical(int roomNumber)
+    {
+        try
+        {
+            lock (_syncRoot)
+            {
+                var room = _rooms.FirstOrDefault(item => item.RoomId == roomNumber);
+                if (room is null) return CanonicalFailure(PrestagingLifecycleMutationOutcome.RoomNotFound);
+                if (room.State is not (RoomStates.ReadyForDoctor or RoomStates.Aging or RoomStates.Stale))
+                {
+                    return CanonicalFailure(PrestagingLifecycleMutationOutcome.LifecycleConflict);
+                }
+
+                var faults = DeriveIntegrityFaults(room);
+                if (faults.Count > 0) return CanonicalFailure(PrestagingLifecycleMutationOutcome.IntegrityFault, faults);
+                if (string.IsNullOrWhiteSpace(room.ActiveReadyHandoffId))
+                {
+                    var fault = new RoomIntegrityFault(
+                        RoomIntegrityFaultCode.ReadyHandoffMissing,
+                        GetCanonicalAssignment(room).ToContract());
+                    return CanonicalFailure(PrestagingLifecycleMutationOutcome.IntegrityFault, [fault]);
+                }
+
+                var expectation = ActiveRoomWriteExpectation.FromRoom(room);
+                var now = Now;
+                var candidate = CopyRoomState(room);
+                candidate.State = RoomStates.Seated;
+                candidate.ReadyForDoctorAt = null;
+                candidate.AgingStartedAt = null;
+                candidate.StaleStartedAt = null;
+                candidate.ActiveReadyHandoffId = null;
+                var persistence = _repository.WithdrawReadyHandoffGuarded(
+                    candidate,
+                    room.ActiveReadyHandoffId,
+                    now,
+                    expectation);
+                if (persistence.Outcome == GuardedWithdrawReadyPersistenceOutcome.StaleWrite)
+                {
+                    return CanonicalFailure(PrestagingLifecycleMutationOutcome.StaleWrite);
+                }
+                if (persistence.Outcome == GuardedWithdrawReadyPersistenceOutcome.IntegrityFault)
+                {
+                    var fault = new RoomIntegrityFault(
+                        RoomIntegrityFaultCode.ContradictoryHandoffReferences,
+                        GetCanonicalAssignment(room).ToContract());
+                    return CanonicalFailure(PrestagingLifecycleMutationOutcome.IntegrityFault, [fault]);
+                }
+
+                var committed = persistence.Committed
+                    ?? throw new InvalidOperationException("Successful guarded Ready withdrawal must return committed state.");
+                ApplyCommittedRoom(room, committed.Room);
+                AddEvent(new RoomEvent(room.RoomId, "ReadyWithdrawn", now, room.AssignedDoctor, room.ProcedureCode));
+                return CanonicalSuccess(room, GetCanonicalAssignment(room).ToContract(), now, committed.Handoff.ToContract());
+            }
+        }
+        catch (SqliteException exception)
+        {
+            return CanonicalFailure(PrestagingLifecycleMutationOutcome.PersistenceFailure, exception: exception);
+        }
+    }
+
     public RoomStatus? WithdrawReady(int roomNumber)
     {
-        lock (_syncRoot)
-        {
-            var room = _rooms.FirstOrDefault(item => item.RoomId == roomNumber);
-            if (room is null
-                || room.State is not (RoomStates.ReadyForDoctor or RoomStates.Aging or RoomStates.Stale)
-                || string.IsNullOrWhiteSpace(room.ActiveReadyHandoffId))
-            {
-                return null;
-            }
-            if (DeriveIntegrityFaults(room).Count > 0)
-            {
-                return null;
-            }
-
-            var candidate = CopyRoomState(room);
-            candidate.State = RoomStates.Seated;
-            var committed = _repository.WithdrawReadyHandoff(candidate, room.ActiveReadyHandoffId, Now, _doctors, _procedures);
-            ApplyCommittedRoom(room, committed.Room);
-            AddEvent(new RoomEvent(room.RoomId, "ReadyWithdrawn", Now, room.AssignedDoctor, room.ProcedureCode));
-            return ToRoomStatus(room, Now);
-        }
+        var result = WithdrawReadyCanonical(roomNumber);
+        return result.Outcome == PrestagingLifecycleMutationOutcome.Success ? result.Room : null;
     }
 
     public RoomStatus? MarkDoctorArrived(int roomNumber)
@@ -506,6 +745,130 @@ public sealed class DemoBoardStore
         {
             var room = PrepareDoctorArrived(roomNumber, out var now);
             return room is null ? null : ApplyDoctorArrived(room, now);
+        }
+    }
+
+    public PrestagingLifecycleMutationResult MarkDoctorArrivedCanonical(int roomNumber)
+    {
+        try
+        {
+            lock (_syncRoot)
+            {
+                var room = _rooms.FirstOrDefault(item => item.RoomId == roomNumber);
+                if (room is null) return CanonicalFailure(PrestagingLifecycleMutationOutcome.RoomNotFound);
+                if (!CanMarkDoctorArrived(room) || room.SeatedAt is null)
+                {
+                    return CanonicalFailure(PrestagingLifecycleMutationOutcome.LifecycleConflict);
+                }
+
+                var faults = DeriveIntegrityFaults(room);
+                if (faults.Count > 0) return CanonicalFailure(PrestagingLifecycleMutationOutcome.IntegrityFault, faults);
+                if (string.IsNullOrWhiteSpace(room.ActiveReadyHandoffId))
+                {
+                    return CanonicalFailure(
+                        PrestagingLifecycleMutationOutcome.IntegrityFault,
+                        [new RoomIntegrityFault(RoomIntegrityFaultCode.ReadyHandoffMissing, GetCanonicalAssignment(room).ToContract())]);
+                }
+
+                var conflictRoom = FindActiveDoctorRoom(room.AssignedDoctor!, room.RoomId);
+                if (conflictRoom is not null)
+                {
+                    var conflict = new DoctorArrivalConflict(
+                        conflictRoom.RoomId,
+                        room.AssignedDoctor,
+                        ResolveDoctorDisplayName(room.AssignedDoctor));
+                    return CanonicalFailure(PrestagingLifecycleMutationOutcome.LifecycleConflict, conflict: conflict);
+                }
+
+                var expectation = ActiveRoomWriteExpectation.FromRoom(room);
+                var now = Now;
+                var candidate = CopyRoomState(room);
+                var urgency = ProjectReadyUrgency(candidate, now);
+                var seatedToDoctorSeconds = SecondsBetween(candidate.SeatedAt!.Value, now);
+                var prepSeconds = candidate.ReadyForDoctorAt.HasValue
+                    ? SecondsBetween(candidate.SeatedAt.Value, candidate.ReadyForDoctorAt.Value)
+                    : (int?)null;
+                var readyToDoctorSeconds = candidate.ReadyForDoctorAt.HasValue
+                    ? SecondsBetween(candidate.ReadyForDoctorAt.Value, now)
+                    : (int?)null;
+                candidate.DoctorArrivedAt = now;
+                candidate.State = RoomStates.DoctorInRoom;
+                candidate.AgingStartedAt = null;
+                candidate.StaleStartedAt = null;
+                candidate.ActiveReadyHandoffId = null;
+                candidate.AcceptedReadyHandoffId = room.ActiveReadyHandoffId;
+                var cycle = new CompletedRoomCycle
+                {
+                    RoomId = candidate.RoomId,
+                    AssignedDoctor = candidate.AssignedDoctor ?? string.Empty,
+                    ProcedureCode = candidate.ProcedureCode ?? string.Empty,
+                    SeatedAt = candidate.SeatedAt.Value,
+                    ReadyForDoctorAt = candidate.ReadyForDoctorAt,
+                    DoctorArrivedAt = now,
+                    EpisodeId = candidate.EpisodeId,
+                    PrestageStartedAt = candidate.PrestageStartedAt,
+                    SeatedToDoctorSeconds = seatedToDoctorSeconds,
+                    PrepSeconds = prepSeconds,
+                    ReadyToDoctorSeconds = readyToDoctorSeconds,
+                    FinalWaitState = RoomStates.ReadyForDoctor,
+                    AgingThresholdReached = urgency is ReadyUrgency.Aging or ReadyUrgency.Stale,
+                    StaleThresholdReached = urgency == ReadyUrgency.Stale,
+                    OriginalDefaultExpectedUnits = candidate.OriginalDefaultExpectedUnits,
+                    ExpectedAllocationUnits = candidate.ExpectedAllocationUnits,
+                    ExpectedAllocationMinutes = candidate.ExpectedAllocationMinutes,
+                    AllocationAdjustedFromDefault = candidate.AllocationAdjustedFromDefault
+                };
+                var persistence = _repository.AcceptReadyHandoffAndSaveCycleGuarded(
+                    candidate,
+                    cycle,
+                    room.ActiveReadyHandoffId,
+                    now,
+                    expectation,
+                    _doctors,
+                    _procedures);
+                if (persistence.Outcome == GuardedDoctorArrivedPersistenceOutcome.StaleWrite)
+                {
+                    return CanonicalFailure(PrestagingLifecycleMutationOutcome.StaleWrite);
+                }
+                if (persistence.Outcome == GuardedDoctorArrivedPersistenceOutcome.DoctorConflict)
+                {
+                    var conflict = new DoctorArrivalConflict(
+                        persistence.ConflictingRoomId
+                            ?? throw new InvalidOperationException("A guarded doctor conflict must identify the conflicting room."),
+                        room.AssignedDoctor,
+                        ResolveDoctorDisplayName(room.AssignedDoctor));
+                    return CanonicalFailure(
+                        PrestagingLifecycleMutationOutcome.LifecycleConflict,
+                        conflict: conflict);
+                }
+                if (persistence.Outcome == GuardedDoctorArrivedPersistenceOutcome.IntegrityFault)
+                {
+                    return CanonicalFailure(
+                        PrestagingLifecycleMutationOutcome.IntegrityFault,
+                        [new RoomIntegrityFault(RoomIntegrityFaultCode.ContradictoryHandoffReferences, GetCanonicalAssignment(room).ToContract())]);
+                }
+
+                var committed = persistence.Committed
+                    ?? throw new InvalidOperationException("Successful guarded Doctor Arrived persistence must return committed state.");
+                ApplyCommittedRoom(room, committed.Room);
+                if (committed.CompletedCycle is not null) _completedCycles.Add(committed.CompletedCycle);
+                AddEvent(new RoomEvent(
+                    room.RoomId,
+                    "DoctorArrived",
+                    now,
+                    room.AssignedDoctor,
+                    room.ProcedureCode,
+                    TimeSpan.FromSeconds(seatedToDoctorSeconds)));
+                return CanonicalSuccess(
+                    room,
+                    committed.Handoff.Assignment.ToContract(),
+                    now,
+                    committed.Handoff.ToContract());
+            }
+        }
+        catch (SqliteException exception)
+        {
+            return CanonicalFailure(PrestagingLifecycleMutationOutcome.PersistenceFailure, exception: exception);
         }
     }
 
@@ -2618,6 +2981,10 @@ public sealed class DemoBoardStore
         {
             faults.Add(new RoomIntegrityFault(RoomIntegrityFaultCode.ReadyHandoffAssignmentIncomplete, assignment));
         }
+        else if (!GetCanonicalAssignment(room).MatchesHandoffSnapshot(handoff.Assignment))
+        {
+            faults.Add(new RoomIntegrityFault(RoomIntegrityFaultCode.ReadyHandoffAssignmentMismatch, assignment));
+        }
     }
 
     private void AddAcceptedHandoffFaults(
@@ -2653,7 +3020,88 @@ public sealed class DemoBoardStore
         if (!TryGetCompleteHandoffAssignment(handoff, out _))
         {
             faults.Add(new RoomIntegrityFault(RoomIntegrityFaultCode.AcceptedHandoffAssignmentIncomplete, assignment));
+            return;
         }
+
+        if (!GetCanonicalAssignment(room).MatchesHandoffSnapshot(handoff.Assignment)
+            || !MatchesAcceptedAllocationSnapshot(room, handoff.Assignment))
+        {
+            faults.Add(new RoomIntegrityFault(RoomIntegrityFaultCode.AcceptedHandoffAssignmentMismatch, assignment));
+        }
+
+        var history = string.IsNullOrWhiteSpace(room.EpisodeId)
+            ? []
+            : _repository.LoadReadyHandoffsByEpisode(room.EpisodeId);
+        if (room.ReadyForDoctorAt != handoff.ReadyAt
+            || room.DoctorArrivedAt != handoff.AcceptedAt
+            || history.Any(existing =>
+                existing.RoomId != room.RoomId
+                || !string.Equals(existing.EpisodeId, room.EpisodeId, StringComparison.Ordinal)
+                || (existing.HandoffId != handoff.HandoffId
+                    && existing.ContractStatus != ReadyHandoffStatus.Withdrawn)))
+        {
+            faults.Add(new RoomIntegrityFault(RoomIntegrityFaultCode.AcceptedHandoffHistoryMismatch, assignment));
+        }
+
+        var cycle = room.SeatedAt.HasValue
+            ? _completedCycles.SingleOrDefault(existing =>
+                existing.RoomId == room.RoomId
+                && existing.SeatedAt == room.SeatedAt.Value)
+            : null;
+        if (cycle is null || !CompletedCycleMatchesAcceptedTruth(cycle, room, handoff))
+        {
+            faults.Add(new RoomIntegrityFault(RoomIntegrityFaultCode.AcceptedHandoffCycleMismatch, assignment));
+        }
+    }
+
+    private static bool MatchesAcceptedAllocationSnapshot(
+        RoomState room,
+        PersistedRoomAssignment assignment)
+    {
+        if (assignment.ExpectedAllocationConfirmedUnits is not { } confirmedUnits)
+        {
+            return false;
+        }
+
+        var suggestedUnits = assignment.ExpectedAllocationSuggestedUnits;
+        return room.OriginalDefaultExpectedUnits == (suggestedUnits ?? confirmedUnits)
+            && room.ExpectedAllocationUnits == confirmedUnits
+            && room.ExpectedAllocationMinutes == confirmedUnits * 10
+            && room.AllocationAdjustedFromDefault ==
+                (suggestedUnits.HasValue && suggestedUnits.Value != confirmedUnits);
+    }
+
+    private static bool CompletedCycleMatchesAcceptedTruth(
+        CompletedRoomCycle cycle,
+        RoomState room,
+        PersistedReadyHandoff handoff)
+    {
+        if (handoff.AcceptedAt is not { } acceptedAt
+            || handoff.Assignment.ExpectedAllocationConfirmedUnits is not { } confirmedUnits
+            || room.SeatedAt is not { } seatedAt)
+        {
+            return false;
+        }
+
+        var suggestedUnits = handoff.Assignment.ExpectedAllocationSuggestedUnits;
+        return cycle.RoomId == room.RoomId
+            && string.Equals(cycle.EpisodeId, room.EpisodeId, StringComparison.Ordinal)
+            && cycle.SeatedAt == seatedAt
+            && string.Equals(cycle.AcceptedReadyHandoffId, handoff.HandoffId, StringComparison.Ordinal)
+            && string.Equals(cycle.AssignedDoctor, handoff.Assignment.DoctorId, StringComparison.Ordinal)
+            && string.Equals(cycle.ProcedureCode, handoff.Assignment.ProcedureCode, StringComparison.Ordinal)
+            && cycle.PrestageStartedAt == room.PrestageStartedAt
+            && cycle.ReadyForDoctorAt == handoff.ReadyAt
+            && cycle.DoctorArrivedAt == acceptedAt
+            && cycle.DoctorCompleteAt == room.DoctorCompleteAt
+            && cycle.RoomAvailableAt == room.RoomAvailableAt
+            && cycle.SeatedToDoctorSeconds == SecondsBetween(seatedAt, acceptedAt)
+            && cycle.ReadyToDoctorSeconds == SecondsBetween(handoff.ReadyAt, acceptedAt)
+            && cycle.OriginalDefaultExpectedUnits == (suggestedUnits ?? confirmedUnits)
+            && cycle.ExpectedAllocationUnits == confirmedUnits
+            && cycle.ExpectedAllocationMinutes == confirmedUnits * 10
+            && cycle.AllocationAdjustedFromDefault ==
+                (suggestedUnits.HasValue && suggestedUnits.Value != confirmedUnits);
     }
 
     private static bool TryGetCompleteHandoffAssignment(PersistedReadyHandoff handoff, out RoomAssignmentContract? assignment)
