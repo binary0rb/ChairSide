@@ -40,9 +40,11 @@ This file records decisions that should survive across tasks, PRs, and debugging
 
 ## Cancellation, expiration, and recovery
 
-**Decision:** Pre-arrival cancellation/expiration creates aborted assignment history outside throughput. Post-arrival expiration creates a review-required exception without fabricating `DoctorCompleteAt`. Faulted pre-arrival Ready remains visible and safely cancellable without rewriting invalid or unrelated handoffs.
+**Decision:** Pre-arrival cancellation and max-duration expiration create aborted assignment history outside throughput. Pre-arrival after-hours termination remains truthful aborted history but carries review metadata and appears in the unified exception queue. Post-arrival expiration creates a review-required exception without fabricating `DoctorCompleteAt`. Faulted pre-arrival Ready remains visible and safely cancellable without rewriting invalid or unrelated handoffs.
 
 **Rationale:** Recovery must preserve observed facts and reporting populations rather than manufacturing a plausible happy path.
+
+**After-hours retry:** The nightly sweep uses independently retryable per-room transactions. It does not advance the in-memory clinic-day marker until the full pass succeeds. Earlier successful rooms remain durable and Available when a later room fails; failed and later active rooms retry in the same store or after restart.
 
 ## Concurrency and durable ordering
 
@@ -82,5 +84,4 @@ This file records decisions that should survive across tasks, PRs, and debugging
 
 ## Explicitly separate issues
 
-- The after-hours sweep advances `_lastSweepDate` before persistence succeeds; a failed sweep can suppress same-day retry, and earlier rooms can commit before a later failure. Do not silently fold that retry/batch fix into #119.
 - Knowledge-graph comment/string false-positive extraction is tracked in issue #126.

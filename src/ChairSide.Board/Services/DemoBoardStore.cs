@@ -1209,6 +1209,7 @@ public sealed class DemoBoardStore
                 .Where(cycle => cycle.IsException && cycle.RequiresReview)
                 .OrderByDescending(cycle => cycle.SeatedAt)
                 .ToList();
+            var exceptionReviewRecords = BuildExceptionReviewRecords(exceptionCycles);
 
             // Annotate the raw display set with doctor-occupied / available wait, but use only the
             // standard population as the blocker pool so an extreme/overnight outlier never distorts
@@ -1252,7 +1253,8 @@ public sealed class DemoBoardStore
                 ScheduleFitReportBuilder.Build(standardCompletedCycles),
                 ReportTrendSnapshotBuilder.BuildWeekly(standardCompletedCycles),
                 BuildObservedDoctorDays(standardCompletedCycles),
-                BuildDoctorProcedureMix(standardCompletedCycles));
+                BuildDoctorProcedureMix(standardCompletedCycles),
+                exceptionReviewRecords);
         }
     }
 
@@ -2563,6 +2565,32 @@ public sealed class DemoBoardStore
         }
     }
 
+    public ReviewExceptionResult ReviewAbortedAssignmentById(long abortedAssignmentId)
+    {
+        lock (_syncRoot)
+        {
+            if (abortedAssignmentId <= 0)
+            {
+                return new ReviewExceptionResult(ReviewExceptionOutcome.NotFound, 0);
+            }
+
+            var record = _repository.LoadAbortedAssignments()
+                .FirstOrDefault(item => item.AbortedAssignmentId == abortedAssignmentId);
+            if (record == null)
+            {
+                return new ReviewExceptionResult(ReviewExceptionOutcome.NotFound, 0);
+            }
+
+            if (!record.IsException)
+            {
+                return new ReviewExceptionResult(ReviewExceptionOutcome.NotAnException, record.RoomId);
+            }
+
+            _repository.ReviewAbortedAssignment(abortedAssignmentId, Now, ExceptionReviewers.LocalAdmin);
+            return new ReviewExceptionResult(ReviewExceptionOutcome.Reviewed, record.RoomId);
+        }
+    }
+
     /// <summary>
     /// Checks all active room assignments for exceeding MaxActiveDurationHours and expires any
     /// that do. Pre-arrival assignments are archived as aborted assignments; post-arrival rooms
@@ -2611,8 +2639,9 @@ public sealed class DemoBoardStore
 
     /// <summary>
     /// Checks whether the after-hours sweep should fire for the current clinic day and,
-    /// if so, expires all still-active room assignments. Prestaging assignments are archived as
-    /// aborted assignments before arrival; post-arrival rooms become AfterHoursSweep exceptions.
+    /// if so, expires all still-active room assignments. Pre-arrival rooms remain truthful aborted
+    /// history and post-arrival rooms remain completed-cycle history; both become reviewable
+    /// AfterHoursSweep exceptions through the unified review projection.
     /// Runs at most once per clinic day; skips Available rooms.
     /// Returns the room IDs that were expired.
     /// </summary>
@@ -2656,8 +2685,6 @@ public sealed class DemoBoardStore
                 return [];
             }
 
-            _lastSweepDate = today;
-
             var expired = new List<int>();
             foreach (var room in _rooms)
             {
@@ -2675,15 +2702,21 @@ public sealed class DemoBoardStore
                 }
             }
 
+            // Mark the clinic day complete only after every eligible room commits. If any room
+            // throws, earlier per-room commits remain durable while this store retries the still-
+            // active rooms on its next pass.
+            _lastSweepDate = today;
+
             return expired;
         }
     }
 
     /// <summary>
     /// Expires an active room. Before Doctor Arrived the room is archived as aborted history (no
-    /// throughput). Once Doctor Arrived has occurred the room is recovered as a review-required
-    /// exception cycle instead. Either way the room is released to Available. Never manufactures
-    /// SeatedAt or DoctorCompleteAt. Must be called inside _syncRoot.
+    /// throughput), with after-hours records additionally marked for review. Once Doctor Arrived
+    /// has occurred the room is recovered as a review-required exception cycle instead. Either way
+    /// the room is released to Available. Never manufactures SeatedAt or DoctorCompleteAt. Must be
+    /// called inside _syncRoot.
     /// </summary>
     private bool ExpireRoom(RoomState room, DateTimeOffset now, string reason)
     {
@@ -2718,7 +2751,12 @@ public sealed class DemoBoardStore
             ReadyForDoctorAt = snapshot.ReadyForDoctorAt,
             TerminatedAt = now,
             TerminatedFromState = snapshot.State,
-            TerminationKind = reason == ExceptionReasons.AfterHoursSweep ? TerminationKinds.AfterHoursExpired : TerminationKinds.MaxDurationExpired
+            TerminationKind = reason == ExceptionReasons.AfterHoursSweep ? TerminationKinds.AfterHoursExpired : TerminationKinds.MaxDurationExpired,
+            IsException = reason == ExceptionReasons.AfterHoursSweep,
+            RequiresReview = reason == ExceptionReasons.AfterHoursSweep,
+            ExceptionReason = reason == ExceptionReasons.AfterHoursSweep ? ExceptionReasons.AfterHoursSweep : null,
+            ReviewStatus = ReviewStatuses.PendingReview,
+            SuggestedAction = reason == ExceptionReasons.AfterHoursSweep ? "Review after-hours closeout" : null
         };
         if (!string.IsNullOrWhiteSpace(snapshot.ActiveReadyHandoffId))
         {
@@ -2776,6 +2814,10 @@ public sealed class DemoBoardStore
                 AllocationAdjustedFromDefault = snapshot.AllocationAdjustedFromDefault
             };
 
+        // The in-progress cycle may still carry the state captured when Doctor Arrived created it.
+        // Record the actual terminal active state seen by this expiration without inventing any
+        // lifecycle event or timestamp.
+        cycle.FinalWaitState = snapshot.State;
         cycle.IsException = true;
         cycle.RequiresReview = true;
         cycle.ExceptionReason = reason;
@@ -3471,6 +3513,66 @@ public sealed class DemoBoardStore
             ComposeProcedureCode(procedure.Code, sedation),
             sedationContract,
             allocation);
+    }
+
+    private IReadOnlyList<ExceptionReviewRecord> BuildExceptionReviewRecords(
+        IReadOnlyList<CompletedRoomCycle> completedExceptions)
+    {
+        var completed = completedExceptions.Select(cycle => new ExceptionReviewRecord(
+            ExceptionReviewSources.CompletedCycle,
+            cycle.CompletedCycleId,
+            cycle.CompletedCycleId,
+            0,
+            cycle.EpisodeId,
+            cycle.RoomId,
+            cycle.AssignedDoctor,
+            cycle.ProcedureCode,
+            cycle.PrestageStartedAt,
+            cycle.SeatedAt,
+            cycle.ReadyForDoctorAt,
+            cycle.DoctorArrivedAt,
+            cycle.DoctorCompleteAt,
+            cycle.RoomAvailableAt,
+            cycle.FinalWaitState,
+            cycle.IsException,
+            cycle.RequiresReview,
+            cycle.ExceptionReason,
+            cycle.ReviewStatus,
+            cycle.SuggestedAction,
+            cycle.ReviewedAt,
+            cycle.ReviewedBy));
+
+        var aborted = _repository.LoadAbortedAssignments()
+            .Where(record => record.IsException && record.RequiresReview)
+            .Select(record => new ExceptionReviewRecord(
+                ExceptionReviewSources.AbortedAssignment,
+                record.AbortedAssignmentId,
+                0,
+                record.AbortedAssignmentId,
+                record.EpisodeId,
+                record.RoomId,
+                record.AssignedDoctor,
+                record.ProcedureCode,
+                record.PrestageStartedAt,
+                record.SeatedAt,
+                record.ReadyForDoctorAt,
+                null,
+                null,
+                null,
+                record.TerminatedFromState,
+                record.IsException,
+                record.RequiresReview,
+                record.ExceptionReason,
+                record.ReviewStatus,
+                record.SuggestedAction,
+                record.ReviewedAt,
+                record.ReviewedBy));
+
+        return completed
+            .Concat(aborted)
+            .OrderByDescending(record => record.SeatedAt ?? record.PrestageStartedAt)
+            .ThenBy(record => record.RoomId)
+            .ToList();
     }
 
     private static CompletedRoomCycle CopyCompletedCycle(CompletedRoomCycle cycle) =>
@@ -4335,7 +4437,11 @@ public sealed record ReportsSnapshot(
     IReadOnlyList<ObservedDoctorDay>? ObservedDoctorDays = null,
     // Per-doctor procedure-variant mix over the same standard completed-cycle population. Additive
     // read model for the selected-doctor Procedure Mix tab; no existing metric semantics change.
-    IReadOnlyList<DoctorProcedureMixRow>? DoctorProcedureMix = null);
+    IReadOnlyList<DoctorProcedureMixRow>? DoctorProcedureMix = null,
+    // Unified pending-review projection. Completed exceptions retain their completed-cycle identity;
+    // pre-arrival after-hours exceptions retain aborted-assignment identity and nullable lifecycle
+    // timestamps instead of being forced into the completed-cycle reporting model.
+    IReadOnlyList<ExceptionReviewRecord>? ExceptionReviewRecords = null);
 
 public sealed record DoctorProcedureMixRow(
     string DoctorId,
@@ -4870,6 +4976,17 @@ public sealed class AbortedRoomAssignment
     public string TerminatedFromState { get; set; } = "";
     public string TerminationKind { get; set; } = "";
     public string? CancellationReason { get; set; }
+
+    // Automatic after-hours terminations remain outside throughput but participate in the same
+    // administrative review queue as post-arrival exception cycles. Ordinary staff cancellations
+    // and max-duration expirations keep the default non-exception values.
+    public bool IsException { get; set; }
+    public bool RequiresReview { get; set; }
+    public string? ExceptionReason { get; set; }
+    public string ReviewStatus { get; set; } = ReviewStatuses.PendingReview;
+    public string? SuggestedAction { get; set; }
+    public DateTimeOffset? ReviewedAt { get; set; }
+    public string? ReviewedBy { get; set; }
 }
 
 public static class ReviewStatuses

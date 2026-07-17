@@ -269,6 +269,12 @@ app.MapPost("/api/reports/cycles/{completedCycleId:long}/confirm-exclusion", asy
     return Results.NoContent();
 });
 
+// Admin-protected counterpart for truthful pre-arrival after-hours history. These records remain
+// aborted assignments outside throughput; confirming review clears only the pending-review flag.
+app.MapPost(
+    "/api/reports/aborted-assignments/{abortedAssignmentId:long}/confirm-exclusion",
+    ExceptionReviewEndpointHandler.ConfirmAbortedAssignmentExclusionAsync);
+
 app.MapGet("/api/rooms/{roomNumber:int}", IResult (int roomNumber, DemoBoardStore store) =>
 {
     var room = store.GetRoom(roomNumber);
@@ -856,6 +862,40 @@ internal static class CancelRequestParser
         }
 
         return true;
+    }
+}
+
+public static class ExceptionReviewEndpointHandler
+{
+    public static async Task<IResult> ConfirmAbortedAssignmentExclusionAsync(
+        long abortedAssignmentId,
+        DemoBoardStore store,
+        DiagnosticLogger diagnosticLogger,
+        IHubContext<BoardHub> hubContext)
+    {
+        var result = store.ReviewAbortedAssignmentById(abortedAssignmentId);
+
+        if (result.Outcome == ReviewExceptionOutcome.NotFound)
+        {
+            return Results.NotFound("No matching aborted assignment found for the supplied abortedAssignmentId.");
+        }
+
+        if (result.Outcome == ReviewExceptionOutcome.NotAnException)
+        {
+            return Results.BadRequest("The aborted assignment exists but is not an exception.");
+        }
+
+        await diagnosticLogger.LogRoomAuditAsync(new RoomAuditEntry
+        {
+            Timestamp = DateTimeOffset.UtcNow.ToString("O"),
+            Action = "confirm-exclusion",
+            RoomNumber = result.RoomId,
+            Success = true,
+            Reason = ExceptionReasons.AfterHoursSweep
+        });
+
+        await hubContext.Clients.All.SendAsync("boardUpdated", store.GetSnapshot());
+        return Results.NoContent();
     }
 }
 

@@ -1,7 +1,7 @@
 ---
 title: Room lifecycle
 tags: [room, board, room-lifecycle, data-persistence, permissions, device-binding, domain-rule, active, last-verified]
-last_verified_commit: 2834afc
+last_verified_commit: pending-issue-129
 ---
 
 # Room lifecycle
@@ -30,7 +30,9 @@ A valid legacy `Aging` or `Stale` row with a matching owned Active handoff may w
 
 ## Cancellation, expiration, and recovery
 
-Pre-arrival cancellation and expiration create aborted-assignment history, not throughput. Faulted pre-arrival Ready rows remain visible and safely cancellable; unrelated or invalid handoff records are not rewritten. Post-arrival expiration creates a review-required exception cycle without inventing `DoctorCompleteAt` or other lifecycle timestamps.
+Pre-arrival cancellation and max-duration expiration create aborted-assignment history, not throughput. The nightly after-hours sweep also preserves pre-arrival truth in aborted-assignment history, but marks those records as `AfterHoursSweep` exceptions and projects them into the same administrative review queue as post-arrival exceptions. Faulted pre-arrival Ready rows remain visible and safely cancellable; unrelated or invalid handoff records are not rewritten. Post-arrival expiration creates a review-required exception cycle without inventing `DoctorCompleteAt` or other lifecycle timestamps.
+
+The after-hours sweep processes each active room in its existing per-room transaction. A committed room remains Available if a later room fails. The failed and later active rooms remain retryable because the clinic day is marked complete only after the entire pass succeeds; restart recovery likewise skips durably Available rooms and processes only active rooms.
 
 Restart recovery restores durable truth and projects urgency and integrity without mutating the database. Live room state changes only after the repository transaction succeeds.
 
@@ -64,4 +66,4 @@ Room lifecycle mutation remains room-local and device-token guarded. Doctors are
 
 ## Separate known issue
 
-The after-hours sweep currently advances `_lastSweepDate` before persistence succeeds. A failure can suppress same-day retry, and earlier rooms can commit before a later room fails. That retry and batch-atomicity defect is issue #129. Knowledge-graph comment/string false-positive extraction remains issue #126.
+Knowledge-graph comment/string false-positive extraction remains issue #126.

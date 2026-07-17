@@ -1,7 +1,7 @@
 ﻿{
     "generatedStamp":  "deterministic",
     "root":  ".",
-    "fileCount":  93,
+    "fileCount":  96,
     "files":  [
                   {
                       "path":  ".github/pull_request_template.md",
@@ -132,7 +132,7 @@
                   {
                       "path":  "docs/design/prestage-assignment-lifecycle.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  10245,
+                      "sizeBytes":  10213,
                       "typeSymbols":  [
 
                                       ],
@@ -326,7 +326,7 @@
                   {
                       "path":  "docs/knowledge/reports/reporting-population.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  2804,
+                      "sizeBytes":  3094,
                       "typeSymbols":  [
 
                                       ],
@@ -452,7 +452,7 @@
                   {
                       "path":  "docs/knowledge/workflow/room-lifecycle.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  5940,
+                      "sizeBytes":  6333,
                       "typeSymbols":  [
 
                                       ],
@@ -514,7 +514,7 @@
                   {
                       "path":  "docs/knowledge-graph/chairside.graph.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  7782,
+                      "sizeBytes":  8292,
                       "typeSymbols":  [
 
                                       ],
@@ -545,7 +545,7 @@
                   {
                       "path":  "docs/knowledge-graph/decisions.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  6968,
+                      "sizeBytes":  7224,
                       "typeSymbols":  [
 
                                       ],
@@ -1296,7 +1296,7 @@
                   {
                       "path":  "src/ChairSide.Board/Program.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  90589,
+                      "sizeBytes":  92196,
                       "typeSymbols":  [
                                           "BeginPrestageRequest",
                                           "SeatRoomRequest",
@@ -1308,6 +1308,7 @@
                                           "ParsedSeatRequest",
                                           "SeatRequestParser",
                                           "CancelRequestParser",
+                                          "ExceptionReviewEndpointHandler",
                                           "RoomLifecycleEndpointHandler",
                                           "MarkExceptionRequest",
                                           "DoctorArrivedConflictResponse",
@@ -1339,6 +1340,7 @@
                                      "/api/dev/seed-report-data",
                                      "/api/reports/cycles/mark-exception",
                                      "/api/reports/cycles/{completedCycleId:long}/confirm-exclusion",
+                                     "/api/reports/aborted-assignments/{abortedAssignmentId:long}/confirm-exclusion",
                                      "/api/rooms/{roomNumber:int}",
                                      "/api/client-errors",
                                      "/api/rooms/{roomNumber:int}/prestage",
@@ -1453,7 +1455,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/DemoBoardStore.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  245777,
+                      "sizeBytes":  251240,
                       "typeSymbols":  [
                                           "ExceptionReasons",
                                           "ReportingExceptionReasons",
@@ -1568,6 +1570,33 @@
                                             "TryRotate",
                                             "TryCreateDirectory",
                                             "ResolveLogDirectory"
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
+                      "path":  "src/ChairSide.Board/Services/ExceptionReviewRecords.cs",
+                      "kind":  "CSharp",
+                      "sizeBytes":  885,
+                      "typeSymbols":  [
+                                          "ExceptionReviewSources",
+                                          "ExceptionReviewRecord"
+                                      ],
+                      "methodSymbols":  [
+
                                         ],
                       "routes":  [
 
@@ -2040,7 +2069,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/SqliteBoardRepository.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  146576,
+                      "sizeBytes":  151572,
                       "typeSymbols":  [
                                           "SqliteBoardRepository",
                                           "the",
@@ -2074,6 +2103,7 @@
                                             "TerminateReadyHandoffAndIncompleteAssignment",
                                             "CancelReadyRoom",
                                             "LoadAbortedAssignments",
+                                            "ReviewAbortedAssignment",
                                             "LoadReadyHandoffsByEpisode",
                                             "LoadActiveReadyHandoff",
                                             "ReadReadyHandoffs",
@@ -2089,8 +2119,7 @@
                                             "TerminateReadyHandoff",
                                             "InsertAbortedAssignment",
                                             "Initialize",
-                                            "EnsureCompletedCycleIdColumn",
-                                            "MigrateNullableDoctorArrivedAt"
+                                            "EnsureCompletedCycleIdColumn"
                                         ],
                       "routes":  [
 
@@ -2139,7 +2168,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/board.js",
                       "kind":  "JavaScript",
-                      "sizeBytes":  185216,
+                      "sizeBytes":  185667,
                       "typeSymbols":  [
 
                                       ],
@@ -2510,6 +2539,74 @@
                                    ]
                   },
                   {
+                      "path":  "tests/ChairSide.Board.Tests/AfterHoursReviewEndpointTests.cs",
+                      "kind":  "CSharp",
+                      "sizeBytes":  8338,
+                      "typeSymbols":  [
+                                          "AfterHoursReviewEndpointTests"
+                                      ],
+                      "methodSymbols":  [
+                                            "Aborted_and_completed_confirm_exclusion_routes_share_admin_protection",
+                                            "Aborted_confirm_exclusion_is_durable_idempotent_and_source_disambiguated",
+                                            "Review_ui_routes_numeric_ids_by_explicit_source_type",
+                                            "SweepOptions",
+                                            "ActivateReady",
+                                            "CreateDiagnosticLogger",
+                                            "AdminRequest",
+                                            "StatusCode",
+                                            "FindRepositoryRoot"
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
+                      "path":  "tests/ChairSide.Board.Tests/AfterHoursSweepRetryTests.cs",
+                      "kind":  "CSharp",
+                      "sizeBytes":  14099,
+                      "typeSymbols":  [
+                                          "AfterHoursSweepRetryTests"
+                                      ],
+                      "methodSymbols":  [
+                                            "Failure_after_an_earlier_room_commits_retries_remaining_rooms_same_day_then_stops",
+                                            "Restart_after_partial_completion_processes_only_rooms_still_active",
+                                            "Every_after_hours_leftover_is_reviewable_without_fabricating_lifecycle_facts",
+                                            "SweepOptions",
+                                            "ActivateSeated",
+                                            "ActivateReady",
+                                            "InstallRoomTwoResetFailure",
+                                            "DropTrigger",
+                                            "ExecuteSql"
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
                       "path":  "tests/ChairSide.Board.Tests/BoardReadyPresentationTests.cs",
                       "kind":  "CSharp",
                       "sizeBytes":  10512,
@@ -2544,7 +2641,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/BoardStoreTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  481558,
+                      "sizeBytes":  481743,
                       "typeSymbols":  [
                                           "BoardStoreTests",
                                           "is",
@@ -3242,7 +3339,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/RoomPanelPrestagingWorkflowTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  8585,
+                      "sizeBytes":  8591,
                       "typeSymbols":  [
                                           "RoomPanelPrestagingWorkflowTests"
                                       ],

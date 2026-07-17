@@ -961,7 +961,7 @@ function renderReports() {
   renderFullMetrics(r, hasData);
 
   renderCompletedCycles(filterCyclesBySedation(r.recentCompletedCycles || []));
-  renderExceptionCycles(filterCyclesBySedation(r.exceptionCycles || []));
+  renderExceptionCycles(filterCyclesBySedation(r.exceptionReviewRecords || r.exceptionCycles || []));
   renderProcedureSummaries(filterSummariesBySedation(r.procedureSummaries || []));
 }
 
@@ -984,12 +984,12 @@ function renderReportHeadline(r, hasData) {
   }
 
   headline.classList.remove("is-empty");
-  const exceptions = (r.exceptionCycles || []).length;
+  const exceptions = (r.exceptionReviewRecords || r.exceptionCycles || []).length;
   headline.innerHTML = [
     renderHeadlineCard("Completed Cases", String(r.completedRoomCyclesCount ?? 0)),
     renderHeadlineCard("Avg Total to Doctor", formatDuration(r.averageSeatedToDoctorSeconds)),
     renderHeadlineCard("Avg Doctor Time", formatDuration(r.averageDoctorInRoomSeconds)),
-    renderHeadlineCard("Exceptions to Review", String(exceptions), "Completed cycles excluded or flagged because they do not fit normal reporting assumptions."),
+    renderHeadlineCard("Exceptions to Review", String(exceptions), "Encounter records excluded or flagged because they require administrative review."),
     renderHeadlineCard("Sedation Cases", `${r.sedationCaseCount ?? 0} / ${r.completedRoomCyclesCount ?? 0}`, "Separates cases where sedation was selected from non-sedation cases for reporting context.")
   ].join("");
 }
@@ -2306,6 +2306,8 @@ function renderExceptionCycles(exceptions) {
 
 function renderExceptionRow(cycle) {
   const doctor = doctorName(cycle.assignedDoctor);
+  const sourceType = cycle.sourceType || "CompletedCycle";
+  const reviewRecordId = Number(cycle.reviewRecordId || cycle.completedCycleId || cycle.abortedAssignmentId || 0);
   return `
     <tr>
       <td>${formatDateTime(cycle.seatedAt)}</td>
@@ -2322,8 +2324,9 @@ function renderExceptionRow(cycle) {
       <td>
         <button class="secondary-button utility-button"
                 data-action="confirm-exclusion"
-                data-completed-cycle-id="${escapeAttribute(String(cycle.completedCycleId || ""))}"
-                title="This keeps the cycle excluded from normal metrics.">
+                data-review-source="${escapeAttribute(sourceType)}"
+                data-review-record-id="${escapeAttribute(String(reviewRecordId || ""))}"
+                title="This keeps the record excluded from normal metrics.">
           Confirm Exclusion
         </button>
       </td>
@@ -2554,19 +2557,22 @@ async function handleReportsActionClick(event) {
 }
 
 async function handleConfirmExclusionClick(button) {
-  const completedCycleId = Number(button.dataset.completedCycleId);
-  if (!Number.isInteger(completedCycleId) || completedCycleId <= 0) {
+  const sourceType = button.dataset.reviewSource || "CompletedCycle";
+  const reviewRecordId = Number(button.dataset.reviewRecordId || button.dataset.completedCycleId);
+  if (!Number.isInteger(reviewRecordId) || reviewRecordId <= 0) {
     return;
   }
 
-  if (!confirm("Confirm exclusion of this exception?\n\nThis keeps the cycle excluded from normal metrics and clears it from the review queue.")) {
+  if (!confirm("Confirm exclusion of this exception?\n\nThis keeps the record excluded from normal metrics and clears it from the review queue.")) {
     return;
   }
 
   button.disabled = true;
   try {
-    // Targeted solely by the stable completedCycleId; no request body is required.
-    const response = await fetch(`/api/reports/cycles/${completedCycleId}/confirm-exclusion`, {
+    const recordPath = sourceType === "AbortedAssignment"
+      ? `aborted-assignments/${reviewRecordId}`
+      : `cycles/${reviewRecordId}`;
+    const response = await fetch(`/api/reports/${recordPath}/confirm-exclusion`, {
       method: "POST",
       cache: "no-store",
       headers: {
