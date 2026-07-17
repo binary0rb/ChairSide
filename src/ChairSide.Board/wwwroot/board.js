@@ -3588,6 +3588,19 @@ function canonicalAssignmentRequest() {
   };
 }
 
+function focusFirstUnresolvedAssignmentControl() {
+  const draft = draftAssignmentShape();
+  const target = !draft.doctorId
+    ? document.querySelector("#doctorTiles [data-doctor-id]:not(:disabled)")
+    : !draft.procedureCode
+      ? document.querySelector("#procedureTiles [data-procedure-id]:not(:disabled)")
+      : draft.confirmedValue === null
+        ? document.getElementById("allocationConfirm")
+        : null;
+
+  target?.focus();
+}
+
 function renderAssignmentGuidance(room) {
   const target = document.getElementById("assignmentGuidance");
   if (!target || !room) {
@@ -4201,6 +4214,7 @@ function wireRoomPanel() {
     } catch (error) {
       console.error("[ChairSide] Ready for Doctor failed.", { roomNumber: app.roomNumber, error });
       setRoomActionStatus(error.message || "Failed to mark ready for doctor.", "error");
+      focusFirstUnresolvedAssignmentControl();
     }
   });
 

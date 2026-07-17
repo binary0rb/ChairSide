@@ -109,6 +109,8 @@ public sealed class RoomPanelPrestagingWorkflowTests
         Assert.Contains("room?.assignment?.sedation?.state === \"EligibleYes\"", boardScript, StringComparison.Ordinal);
         Assert.Contains("function isLegacyActiveRoom(room)", boardScript, StringComparison.Ordinal);
         Assert.Contains("!activeSeatedStates.has(state) || !room?.episodeId", boardScript, StringComparison.Ordinal);
+        Assert.Contains("function focusFirstUnresolvedAssignmentControl()", boardScript, StringComparison.Ordinal);
+        Assert.Contains("focusFirstUnresolvedAssignmentControl();", boardScript, StringComparison.Ordinal);
     }
 
     private static PrestagingLifecycleMutationResult ReadyWithSuppliedAssignment(
