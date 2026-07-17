@@ -363,6 +363,18 @@ Use labels alongside icons until users learn the visual language.
 
 ## Testing expectations
 
+### Browser automation and UI verification
+
+- Use the Playwright MCP server (`mcp__playwright`) as the default tool for automated browser testing, end-to-end verification, and interactive UI inspection.
+- Playwright should launch and manage its own browser, pages, and tabs.
+- Do not ask the user to open, select, or navigate browser tabs as part of the normal testing workflow.
+- Do not use the built-in ChatGPT browser or Chrome integration unless the user explicitly requests it or Playwright is unavailable.
+- Prefer accessible roles, labels, and test IDs over brittle CSS selectors.
+- Verify rendered UI state after each important workflow transition.
+- On failure, collect the relevant visible state, console errors, network failures, and a screenshot when useful.
+- If `mcp__playwright` is unavailable, report that the current Codex task does not have Playwright loaded. Do not silently substitute another browser integration.
+- MCP servers added after a task was created may require restarting Codex and opening a new task before their tools are available.
+
 When code exists, include instructions for:
 
 - How to run locally
