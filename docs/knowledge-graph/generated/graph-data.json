@@ -297,6 +297,12 @@
                       "path":  "src/ChairSide.Board/Services/DiagnosticLogger.cs"
                   },
                   {
+                      "id":  "file:src/ChairSide.Board/Services/ExceptionReviewRecords.cs",
+                      "label":  "src/ChairSide.Board/Services/ExceptionReviewRecords.cs",
+                      "type":  "File",
+                      "path":  "src/ChairSide.Board/Services/ExceptionReviewRecords.cs"
+                  },
+                  {
                       "id":  "file:src/ChairSide.Board/Services/MaintenanceCommands.cs",
                       "label":  "src/ChairSide.Board/Services/MaintenanceCommands.cs",
                       "type":  "File",
@@ -447,6 +453,18 @@
                       "path":  "src/ChairSide.Board/wwwroot/workshop.html"
                   },
                   {
+                      "id":  "file:tests/ChairSide.Board.Tests/AfterHoursReviewEndpointTests.cs",
+                      "label":  "tests/ChairSide.Board.Tests/AfterHoursReviewEndpointTests.cs",
+                      "type":  "File",
+                      "path":  "tests/ChairSide.Board.Tests/AfterHoursReviewEndpointTests.cs"
+                  },
+                  {
+                      "id":  "file:tests/ChairSide.Board.Tests/AfterHoursSweepRetryTests.cs",
+                      "label":  "tests/ChairSide.Board.Tests/AfterHoursSweepRetryTests.cs",
+                      "type":  "File",
+                      "path":  "tests/ChairSide.Board.Tests/AfterHoursSweepRetryTests.cs"
+                  },
+                  {
                       "id":  "file:tests/ChairSide.Board.Tests/BoardReadyPresentationTests.cs",
                       "label":  "tests/ChairSide.Board.Tests/BoardReadyPresentationTests.cs",
                       "type":  "File",
@@ -593,6 +611,12 @@
                   {
                       "id":  "route:/api/reports",
                       "label":  "/api/reports",
+                      "type":  "Route",
+                      "path":  "src/ChairSide.Board/Program.cs"
+                  },
+                  {
+                      "id":  "route:/api/reports/aborted-assignments/{abortedAssignmentId:long}/confirm-exclusion",
+                      "label":  "/api/reports/aborted-assignments/{abortedAssignmentId:long}/confirm-exclusion",
                       "type":  "Route",
                       "path":  "src/ChairSide.Board/Program.cs"
                   },
@@ -751,6 +775,18 @@
                       "label":  "AdminAccessTokenValidator",
                       "type":  "CodeType",
                       "path":  "src/ChairSide.Board/Services/AdminAccessTokenValidator.cs"
+                  },
+                  {
+                      "id":  "symbol:type:AfterHoursReviewEndpointTests",
+                      "label":  "AfterHoursReviewEndpointTests",
+                      "type":  "CodeType",
+                      "path":  "tests/ChairSide.Board.Tests/AfterHoursReviewEndpointTests.cs"
+                  },
+                  {
+                      "id":  "symbol:type:AfterHoursSweepRetryTests",
+                      "label":  "AfterHoursSweepRetryTests",
+                      "type":  "CodeType",
+                      "path":  "tests/ChairSide.Board.Tests/AfterHoursSweepRetryTests.cs"
                   },
                   {
                       "id":  "symbol:type:AllocationBehaviors",
@@ -1101,10 +1137,28 @@
                       "path":  "src/ChairSide.Board/Services/DemoBoardStore.cs"
                   },
                   {
+                      "id":  "symbol:type:ExceptionReviewEndpointHandler",
+                      "label":  "ExceptionReviewEndpointHandler",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Program.cs"
+                  },
+                  {
                       "id":  "symbol:type:ExceptionReviewers",
                       "label":  "ExceptionReviewers",
                       "type":  "CodeType",
                       "path":  "src/ChairSide.Board/Services/DemoBoardStore.cs"
+                  },
+                  {
+                      "id":  "symbol:type:ExceptionReviewRecord",
+                      "label":  "ExceptionReviewRecord",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/ExceptionReviewRecords.cs"
+                  },
+                  {
+                      "id":  "symbol:type:ExceptionReviewSources",
+                      "label":  "ExceptionReviewSources",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/ExceptionReviewRecords.cs"
                   },
                   {
                       "id":  "symbol:type:exists",
@@ -1993,6 +2047,11 @@
                   },
                   {
                       "from":  "file:src/ChairSide.Board/Program.cs",
+                      "to":  "route:/api/reports/aborted-assignments/{abortedAssignmentId:long}/confirm-exclusion",
+                      "label":  "maps"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Program.cs",
                       "to":  "route:/api/reports/cycles/{completedCycleId:long}/confirm-exclusion",
                       "label":  "maps"
                   },
@@ -2109,6 +2168,11 @@
                   {
                       "from":  "file:src/ChairSide.Board/Program.cs",
                       "to":  "symbol:type:DoctorArrivedConflictResponse",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Program.cs",
+                      "to":  "symbol:type:ExceptionReviewEndpointHandler",
                       "label":  "declares"
                   },
                   {
@@ -2394,6 +2458,16 @@
                   {
                       "from":  "file:src/ChairSide.Board/Services/DiagnosticLogger.cs",
                       "to":  "symbol:type:RoomAuditEntry",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/ExceptionReviewRecords.cs",
+                      "to":  "symbol:type:ExceptionReviewRecord",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/ExceptionReviewRecords.cs",
+                      "to":  "symbol:type:ExceptionReviewSources",
                       "label":  "declares"
                   },
                   {
@@ -2754,6 +2828,16 @@
                   {
                       "from":  "file:src/ChairSide.Board/Services/SqliteBoardRepository.cs",
                       "to":  "symbol:type:the",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:tests/ChairSide.Board.Tests/AfterHoursReviewEndpointTests.cs",
+                      "to":  "symbol:type:AfterHoursReviewEndpointTests",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:tests/ChairSide.Board.Tests/AfterHoursSweepRetryTests.cs",
+                      "to":  "symbol:type:AfterHoursSweepRetryTests",
                       "label":  "declares"
                   },
                   {
@@ -3233,6 +3317,11 @@
                   },
                   {
                       "from":  "repo:chairside",
+                      "to":  "file:src/ChairSide.Board/Services/ExceptionReviewRecords.cs",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
                       "to":  "file:src/ChairSide.Board/Services/MaintenanceCommands.cs",
                       "label":  "contains"
                   },
@@ -3354,6 +3443,16 @@
                   {
                       "from":  "repo:chairside",
                       "to":  "file:src/ChairSide.Board/wwwroot/workshop.html",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:tests/ChairSide.Board.Tests/AfterHoursReviewEndpointTests.cs",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:tests/ChairSide.Board.Tests/AfterHoursSweepRetryTests.cs",
                       "label":  "contains"
                   },
                   {

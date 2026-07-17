@@ -9149,6 +9149,13 @@ public sealed class BoardStoreTests
         "terminated_from_state",
         "termination_kind",
         "cancellation_reason",
+        "is_exception",
+        "requires_review",
+        "exception_reason",
+        "review_status",
+        "suggested_action",
+        "reviewed_at",
+        "reviewed_by",
         "created_at",
         "updated_at"
     ];

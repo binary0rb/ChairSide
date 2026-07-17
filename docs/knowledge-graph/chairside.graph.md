@@ -45,8 +45,12 @@ flowchart LR
     CasGuard --> ActiveRooms
 
     PreArrivalTermination["DomainConcept: Pre-arrival cancellation / expiration"] --> Aborts
+    AfterHoursSweep["DomainConcept: Nightly after-hours safety sweep"] --> Aborts
+    AfterHoursSweep --> ReviewException
     PostArrivalExpiration["DomainConcept: Post-arrival expiration"] --> ReviewException["ReportMetric: Review-required exception"]
     ReviewException --> Cycles
+    Aborts --> UnifiedReview["UiSurface: Unified exception review queue"]
+    ReviewException --> UnifiedReview
 
     Reports["UiSurface: Reports"] --> SummaryCards["UiSurface: Summary cards"]
     ReportsBuilder["StoreOrService: Report snapshot builder"] --> Reports
@@ -83,7 +87,8 @@ flowchart LR
 - `ReadyForDoctor` is the primary state. Aging and Stale are urgency projections from the owned Active handoff's `ReadyAt`.
 - Master and Doctor room cards consume the canonical assignment read model when present; partial values use neutral pending language, and Doctor View membership begins only after a doctor assignment is durably saved.
 - Withdrawal returns to Seated and starts no new urgency until a different handoff is issued. Doctor Arrived accepts the current handoff.
-- Pre-arrival termination is aborted history outside throughput. Post-arrival expiration is review-required exception history without a fabricated completion timestamp.
+- Pre-arrival cancellation and max-duration expiration are aborted history outside throughput. Pre-arrival after-hours terminations remain aborted history but also enter the unified review queue. Post-arrival expiration is review-required exception history without a fabricated completion timestamp.
+- The after-hours sweep is independently retryable per room: successful rooms remain committed, failed and later active rooms retry, and the clinic day is marked complete only after a successful full pass.
 - Canonical lifecycle writes are compare-and-swap guarded against the complete originally loaded room, assignment, handoff, and timestamp expectation. Stale writes do not retry or mutate live state.
 - Doctor Arrived serializes durable cross-room doctor ownership and commits the room, Accepted handoff, and reporting cycle together.
 - Live state changes only after durable persistence succeeds; SQLite failures roll back transaction-local writes.
@@ -109,5 +114,4 @@ flowchart LR
 
 - Room-panel workflow changes are implemented by #121, and canonical master/doctor-view presentation is implemented by #122.
 - Reporting-population work remains #123; issue #120 preserves the existing accepted-handoff attribution contract.
-- After-hours sweep retry and batch atomicity remain issue #129.
 - Knowledge-graph comment/string false-positive extraction remains issue #126.

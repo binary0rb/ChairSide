@@ -1197,7 +1197,14 @@ public sealed class SqliteBoardRepository
                 expected_allocation_state,
                 expected_allocation_suggested_units,
                 expected_allocation_confirmed_units,
-                terminal_ready_handoff_id
+                terminal_ready_handoff_id,
+                is_exception,
+                requires_review,
+                exception_reason,
+                review_status,
+                suggested_action,
+                reviewed_at,
+                reviewed_by
             FROM aborted_room_assignments
             ORDER BY terminated_at DESC;
             """;
@@ -1230,11 +1237,42 @@ public sealed class SqliteBoardRepository
                 ExpectedAllocationState = ReadNullableEnum<ExpectedAllocationState>(reader, 19),
                 ExpectedAllocationSuggestedUnits = ReadNullableInt32(reader, 20),
                 ExpectedAllocationConfirmedUnits = ReadNullableInt32(reader, 21),
-                TerminalReadyHandoffId = ReadNullableString(reader, 22)
+                TerminalReadyHandoffId = ReadNullableString(reader, 22),
+                IsException = reader.GetInt32(23) == 1,
+                RequiresReview = reader.GetInt32(24) == 1,
+                ExceptionReason = ReadNullableString(reader, 25),
+                ReviewStatus = ReadNullableString(reader, 26) ?? ReviewStatuses.PendingReview,
+                SuggestedAction = ReadNullableString(reader, 27),
+                ReviewedAt = ReadNullableDateTimeOffset(reader, 28),
+                ReviewedBy = ReadNullableString(reader, 29)
             });
         }
 
         return records;
+    }
+
+    public void ReviewAbortedAssignment(long abortedAssignmentId, DateTimeOffset reviewedAt, string reviewedBy)
+    {
+        using var connection = OpenConnection();
+        using var command = connection.CreateCommand();
+        command.CommandText = """
+            UPDATE aborted_room_assignments
+            SET requires_review = 0,
+                review_status = $reviewStatus,
+                reviewed_at = $reviewedAt,
+                reviewed_by = $reviewedBy,
+                updated_at = $reviewedAt
+            WHERE id = $id
+              AND is_exception = 1;
+            """;
+        command.Parameters.AddWithValue("$id", abortedAssignmentId);
+        command.Parameters.AddWithValue("$reviewStatus", ReviewStatuses.Reviewed);
+        command.Parameters.AddWithValue("$reviewedAt", FormatDateTimeOffset(reviewedAt));
+        command.Parameters.AddWithValue("$reviewedBy", reviewedBy);
+        if (command.ExecuteNonQuery() != 1)
+        {
+            throw new InvalidOperationException("Reviewing an aborted assignment exception must update exactly one record.");
+        }
     }
 
     public IReadOnlyList<PersistedReadyHandoff> LoadReadyHandoffsByEpisode(string episodeId)
@@ -1655,6 +1693,13 @@ public sealed class SqliteBoardRepository
                 expected_allocation_suggested_units,
                 expected_allocation_confirmed_units,
                 terminal_ready_handoff_id,
+                is_exception,
+                requires_review,
+                exception_reason,
+                review_status,
+                suggested_action,
+                reviewed_at,
+                reviewed_by,
                 created_at,
                 updated_at
             )
@@ -1681,6 +1726,13 @@ public sealed class SqliteBoardRepository
                 $expectedAllocationSuggestedUnits,
                 $expectedAllocationConfirmedUnits,
                 $terminalReadyHandoffId,
+                $isException,
+                $requiresReview,
+                $exceptionReason,
+                $reviewStatus,
+                $suggestedAction,
+                $reviewedAt,
+                $reviewedBy,
                 $now,
                 $now
             )
@@ -1710,6 +1762,13 @@ public sealed class SqliteBoardRepository
         command.Parameters.AddWithValue("$expectedAllocationSuggestedUnits", ToDbValue(record.ExpectedAllocationSuggestedUnits));
         command.Parameters.AddWithValue("$expectedAllocationConfirmedUnits", ToDbValue(record.ExpectedAllocationConfirmedUnits));
         command.Parameters.AddWithValue("$terminalReadyHandoffId", ToDbValue(record.TerminalReadyHandoffId));
+        command.Parameters.AddWithValue("$isException", record.IsException ? 1 : 0);
+        command.Parameters.AddWithValue("$requiresReview", record.RequiresReview ? 1 : 0);
+        command.Parameters.AddWithValue("$exceptionReason", ToDbValue(record.ExceptionReason));
+        command.Parameters.AddWithValue("$reviewStatus", record.ReviewStatus);
+        command.Parameters.AddWithValue("$suggestedAction", ToDbValue(record.SuggestedAction));
+        command.Parameters.AddWithValue("$reviewedAt", ToDbValue(record.ReviewedAt));
+        command.Parameters.AddWithValue("$reviewedBy", ToDbValue(record.ReviewedBy));
         command.Parameters.AddWithValue("$now", now);
         command.ExecuteNonQuery();
 
@@ -1830,6 +1889,13 @@ public sealed class SqliteBoardRepository
                     terminated_from_state TEXT NOT NULL,
                     termination_kind TEXT NOT NULL,
                     cancellation_reason TEXT NULL,
+                    is_exception INTEGER NOT NULL DEFAULT 0,
+                    requires_review INTEGER NOT NULL DEFAULT 0,
+                    exception_reason TEXT NULL,
+                    review_status TEXT NOT NULL DEFAULT 'PendingReview',
+                    suggested_action TEXT NULL,
+                    reviewed_at TEXT NULL,
+                    reviewed_by TEXT NULL,
                     created_at TEXT NOT NULL,
                     updated_at TEXT NOT NULL,
                     UNIQUE(episode_id)
@@ -1920,6 +1986,13 @@ public sealed class SqliteBoardRepository
         TryAddColumn(connection, "ALTER TABLE aborted_room_assignments ADD COLUMN expected_allocation_suggested_units INTEGER NULL");
         TryAddColumn(connection, "ALTER TABLE aborted_room_assignments ADD COLUMN expected_allocation_confirmed_units INTEGER NULL");
         TryAddColumn(connection, "ALTER TABLE aborted_room_assignments ADD COLUMN terminal_ready_handoff_id TEXT NULL");
+        TryAddColumn(connection, "ALTER TABLE aborted_room_assignments ADD COLUMN is_exception INTEGER NOT NULL DEFAULT 0");
+        TryAddColumn(connection, "ALTER TABLE aborted_room_assignments ADD COLUMN requires_review INTEGER NOT NULL DEFAULT 0");
+        TryAddColumn(connection, "ALTER TABLE aborted_room_assignments ADD COLUMN exception_reason TEXT NULL");
+        TryAddColumn(connection, "ALTER TABLE aborted_room_assignments ADD COLUMN review_status TEXT NOT NULL DEFAULT 'PendingReview'");
+        TryAddColumn(connection, "ALTER TABLE aborted_room_assignments ADD COLUMN suggested_action TEXT NULL");
+        TryAddColumn(connection, "ALTER TABLE aborted_room_assignments ADD COLUMN reviewed_at TEXT NULL");
+        TryAddColumn(connection, "ALTER TABLE aborted_room_assignments ADD COLUMN reviewed_by TEXT NULL");
         ApplyLosslessCanonicalBackfills(connection);
 
         // Migration: ensure completed_room_cycles has an explicit id primary key column.
@@ -2048,6 +2121,13 @@ public sealed class SqliteBoardRepository
             terminated_from_state TEXT NOT NULL,
             termination_kind TEXT NOT NULL,
             cancellation_reason TEXT NULL,
+            is_exception INTEGER NOT NULL DEFAULT 0,
+            requires_review INTEGER NOT NULL DEFAULT 0,
+            exception_reason TEXT NULL,
+            review_status TEXT NOT NULL DEFAULT 'PendingReview',
+            suggested_action TEXT NULL,
+            reviewed_at TEXT NULL,
+            reviewed_by TEXT NULL,
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL,
             UNIQUE(episode_id)
@@ -2078,6 +2158,13 @@ public sealed class SqliteBoardRepository
         "terminated_from_state",
         "termination_kind",
         "cancellation_reason",
+        "is_exception",
+        "requires_review",
+        "exception_reason",
+        "review_status",
+        "suggested_action",
+        "reviewed_at",
+        "reviewed_by",
         "created_at",
         "updated_at"
     ];
@@ -2810,7 +2897,14 @@ public sealed class SqliteBoardRepository
             TerminatedAt = record.TerminatedAt,
             TerminatedFromState = record.TerminatedFromState,
             TerminationKind = record.TerminationKind,
-            CancellationReason = record.CancellationReason
+            CancellationReason = record.CancellationReason,
+            IsException = record.IsException,
+            RequiresReview = record.RequiresReview,
+            ExceptionReason = record.ExceptionReason,
+            ReviewStatus = record.ReviewStatus,
+            SuggestedAction = record.SuggestedAction,
+            ReviewedAt = record.ReviewedAt,
+            ReviewedBy = record.ReviewedBy
         };
 
     private static void ApplyAcceptedSnapshotToCompletedCycle(

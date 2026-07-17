@@ -97,7 +97,7 @@ The stress-fixture reset transaction deletes completed cycles, all Active handof
 - No reporting-population or metric changes in issue #120; see #123.
 - No automatic replay of stale assignment intent.
 - No migration that rewrites legacy Aging/Stale rows or historical cycles.
-- No after-hours sweep retry/batch-atomicity fix. `_lastSweepDate` can advance before persistence succeeds, same-day retry can be suppressed, and earlier rooms can commit before a later failure.
+- Issue #129 later made the after-hours sweep independently retryable per room and added a truthful unified review projection for pre-arrival after-hours history.
 - No knowledge-graph comment/string extraction fix; false-positive extraction is issue #126.
 
 ## Acceptance summary

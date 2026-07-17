@@ -1,7 +1,7 @@
 ---
 title: Reporting population
 tags: [reports, reporting-population, reporting-metrics, exception-handling, domain-rule, active, last-verified]
-last_verified_commit: pending-issue-119
+last_verified_commit: pending-issue-129
 ---
 
 # Reporting population
@@ -24,8 +24,9 @@ Legacy completed cycles continue to use their existing finalized assignment data
 
 ## Termination populations
 
-- Pre-arrival cancellation and expiration create aborted assignment history and stay outside throughput.
-- Post-arrival expiration creates only a review-required exception population. It does not fabricate `DoctorCompleteAt`.
+- Pre-arrival cancellation and max-duration expiration create aborted assignment history and stay outside throughput.
+- Pre-arrival after-hours terminations remain truthful aborted assignment history outside throughput, while a unified review projection surfaces them as pending `AfterHoursSweep` exceptions without manufacturing a completed clinical cycle.
+- Post-arrival expiration creates only a review-required exception population. It preserves the last active state and does not fabricate `DoctorCompleteAt`.
 - Excluded and exception records remain visible for audit/review; exclusion changes calculations, not durable visibility.
 - Aging and stale threshold flags are captured for completed cycles from the accepted handoff interval without persisting new `Aging` or `Stale` primary room states.
 
