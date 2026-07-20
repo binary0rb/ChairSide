@@ -1,5 +1,6 @@
-using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
+
+using ChairSide.Board.Services;
 
 namespace ChairSide.Board.Options;
 
@@ -12,7 +13,7 @@ public sealed class AdminAccessOptions
     public string SharedToken { get; set; } = "";
 }
 
-public sealed class AdminAccessOptionsValidator(IHostEnvironment environment)
+public sealed class AdminAccessOptionsValidator(DeploymentEnvironment deploymentEnvironment)
     : IValidateOptions<AdminAccessOptions>
 {
     public ValidateOptionsResult Validate(string? name, AdminAccessOptions options)
@@ -28,10 +29,11 @@ public sealed class AdminAccessOptionsValidator(IHostEnvironment environment)
             failures.Add("AdminAccessOptions:SharedToken is required when admin access protection is enabled.");
         }
 
-        if (environment.IsProduction()
+        if (deploymentEnvironment.IsDeployed
             && string.Equals(options.SharedToken, "dev-admin-token", StringComparison.Ordinal))
         {
-            failures.Add("AdminAccessOptions:SharedToken must not use the dev-admin-token sample value in Production.");
+            failures.Add(
+                $"AdminAccessOptions:SharedToken must not use the dev-admin-token sample value in {deploymentEnvironment.EnvironmentName}.");
         }
 
         return failures.Count == 0

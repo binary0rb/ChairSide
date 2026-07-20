@@ -1,28 +1,35 @@
 # ChairSide Training Data Reset Runbook
 
+> **Status: intentionally unavailable.** ChairSide now refuses every destructive maintenance command
+> in `Production` before application build or repository construction. The current
+> `Reset-ChairSideTrainingData.ps1` wrapper invokes the maintenance CLI as `Production`, so it cannot
+> perform either reset described below. Do not work around this guard by running Production as
+> Development. Restoring a safe Training-only wrapper and reset workflow belongs to the later issue
+> #143 Training reset slice; the commands below are retained only as deferred workflow reference.
+
 Operator-only maintenance for resetting ChairSide data. **Destructive, but backup-first.** There is
 **no** staff-facing reset button and **no** production web endpoint that wipes data. All resets run
 through an in-app maintenance CLI invoked by a PowerShell wrapper that the operator runs deliberately
 on the server.
 
-> Do **not** run the production VM as `Development`. The maintenance CLI runs under `Production` so it
-> targets the real database path; it does not start the web server.
+> Do **not** run the production VM as `Development`. Production maintenance is refused even with a
+> valid confirmation token.
 
 ## Data lifecycle
 
-1. **Alpha DB** — current click-through / demo / training-session data. Disposable, but **archive
+1. **Alpha DB** - current click-through / demo / training-session data. Disposable, but **archive
    before removal**.
-2. **Training fixture DB** — clean, deterministic synthetic data for staff/doctor training and
+2. **Training fixture DB** - clean, deterministic synthetic data for staff/doctor training and
    reporting walkthroughs. Produced by the `TrainingSeed` reset.
-3. **Official beta DB** — a fresh, empty database used when ChairSide becomes the real beta source of
+3. **Official beta DB** - a fresh, empty database used when ChairSide becomes the real beta source of
    truth. Produced by the `EmptyBeta` reset.
 
 ## What the two modes do
 
 | Mode | CLI command | Confirmation token | Clears completed cycles | Resets active rooms | Seeds synthetic data |
 |---|---|---|---|---|---|
-| `TrainingSeed` | `reset-training-data` | `RESET_TRAINING_DATA` | Yes | Yes (all rooms → Available) | **Yes** (clean, non-PHI, deterministic) |
-| `EmptyBeta` | `reset-empty` | `RESET_EMPTY_BETA` | Yes | Yes (all rooms → Available) | **No** (empty board) |
+| `TrainingSeed` | `reset-training-data` | `RESET_TRAINING_DATA` | Yes | Yes (all rooms -> Available) | **Yes** (clean, non-PHI, deterministic) |
+| `EmptyBeta` | `reset-empty` | `RESET_EMPTY_BETA` | Yes | Yes (all rooms -> Available) | **No** (empty board) |
 
 Both modes operate through the app's own repository logic (WAL-consistent SQLite), never raw SQL file
 edits.
@@ -118,9 +125,9 @@ non-zero. The maintenance CLI never starts the web server.
 
 1. Archive current alpha DB: `.\Backup-ChairSideSqlite.ps1` (or the pre-reset backup created by this
    script).
-2. `TrainingSeed` reset → start app → verify reports → run training.
+2. `TrainingSeed` reset -> start app -> verify reports -> run training.
 3. After training, run `EmptyBeta` reset (this also backs up the training DB first).
-4. Start app → confirm empty board → ChairSide is the beta source of truth.
+4. Start app -> confirm empty board -> ChairSide is the beta source of truth.
 
 ## Safety notes
 

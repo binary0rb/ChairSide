@@ -77,7 +77,7 @@ public sealed class DemoBoardStore
         IOptions<DoctorRosterOptions> doctorRosterOptions,
         IOptions<ProcedureRosterOptions> procedureRosterOptions,
         SqliteBoardRepository repository,
-        IWebHostEnvironment environment,
+        DeploymentEnvironment deploymentEnvironment,
         TimeProvider? timeProvider = null)
     {
         _thresholdOptions = thresholdOptions;
@@ -85,8 +85,10 @@ public sealed class DemoBoardStore
         _repository = repository;
         _timeProvider = timeProvider ?? TimeProvider.System;
         _roomCount = boardOptions.Value.RoomCount;
-        _demoTimerEnabled = boardUiOptions.Value.DemoTimerEnabled ?? !environment.IsProduction();
-        _demoOffsetsAllowed = environment.IsDevelopment();
+        _demoTimerEnabled = deploymentEnvironment.IsTraining
+            ? false
+            : boardUiOptions.Value.DemoTimerEnabled ?? deploymentEnvironment.IsDevelopment;
+        _demoOffsetsAllowed = deploymentEnvironment.IsDevelopment;
         _doctors = BuildDoctors(doctorRosterOptions.Value).ToList();
         _activeDoctors = BuildDoctors(doctorRosterOptions.Value, activeOnly: true).ToList();
         _procedures = BuildProcedures(procedureRosterOptions.Value).ToList();
@@ -98,7 +100,7 @@ public sealed class DemoBoardStore
         _rooms = _repository.LoadRooms(_roomCount).ToList();
         AddMissingRooms();
 
-        if (!hasOperationalData && !environment.IsProduction())
+        if (!hasOperationalData && deploymentEnvironment.IsDevelopment)
         {
             SeedDemoRooms(now);
             _repository.SaveRooms(_rooms, _doctors, _procedures);
@@ -1316,7 +1318,8 @@ public sealed class DemoBoardStore
     /// current reporting rules (mapped/active procedures, full timing, no overnight/extreme records,
     /// expected-allocation snapshot present) so none are flagged as reporting exceptions. Idempotent:
     /// re-running writes the same deterministic set (keyed by room + seated time) without duplicating.
-    /// Must never be exposed in Production - the calling endpoint is mapped only in Development.
+    /// Must never be exposed in Training or Production - the calling endpoint is mapped only in
+    /// Development.
     /// </summary>
     public SeedReportDataResult SeedSyntheticReportData()
     {
@@ -1373,7 +1376,7 @@ public sealed class DemoBoardStore
     /// cycle stays inside the standard reporting population (mapped/active procedures, full timing, no
     /// overnight/extreme records, expected-allocation snapshot present), so none are reporting
     /// exceptions. Deterministic: the same requested count always reproduces the same set. Destructive
-    /// execution is gated at the CLI layer (confirmation token plus a Production hard-refusal); this
+    /// execution is gated at the CLI layer (confirmation token plus an environment allowlist); this
     /// method itself is environment-independent for testability.
     /// </summary>
     public MaintenanceResetResult ResetAndSeedLargeSyntheticReportData(int completedCycleTarget)
@@ -1611,7 +1614,7 @@ public sealed class DemoBoardStore
     /// small set of explicit edge-case cycles; full-stress composes the live-room and scenario-rich
     /// builders with no additional bespoke logic. Deterministic: the same profile on a fixed clock
     /// always reproduces the same fixture. Destructive execution is gated at the CLI layer
-    /// (confirmation token plus a Production hard-refusal); this method itself is environment-
+    /// (confirmation token plus an environment allowlist); this method itself is environment-
     /// independent for testability.
     /// </summary>
     public StressFixtureResult ResetAndSeedStressFixture(string profile, int? completedCycles)

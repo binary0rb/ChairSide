@@ -45,6 +45,12 @@
                       "path":  "docs/knowledge/_meta/tag-dictionary.md"
                   },
                   {
+                      "id":  "file:docs/knowledge/product/environment-maintenance-preflight.md",
+                      "label":  "docs/knowledge/product/environment-maintenance-preflight.md",
+                      "type":  "File",
+                      "path":  "docs/knowledge/product/environment-maintenance-preflight.md"
+                  },
+                  {
                       "id":  "file:docs/knowledge/product/non-phi-boundary.md",
                       "label":  "docs/knowledge/product/non-phi-boundary.md",
                       "type":  "File",
@@ -291,6 +297,12 @@
                       "path":  "src/ChairSide.Board/Services/DemoBoardStore.cs"
                   },
                   {
+                      "id":  "file:src/ChairSide.Board/Services/DeploymentEnvironmentPolicy.cs",
+                      "label":  "src/ChairSide.Board/Services/DeploymentEnvironmentPolicy.cs",
+                      "type":  "File",
+                      "path":  "src/ChairSide.Board/Services/DeploymentEnvironmentPolicy.cs"
+                  },
+                  {
                       "id":  "file:src/ChairSide.Board/Services/DiagnosticLogger.cs",
                       "label":  "src/ChairSide.Board/Services/DiagnosticLogger.cs",
                       "type":  "File",
@@ -493,6 +505,12 @@
                       "label":  "tests/ChairSide.Board.Tests/DurableFailureInjectionTests.cs",
                       "type":  "File",
                       "path":  "tests/ChairSide.Board.Tests/DurableFailureInjectionTests.cs"
+                  },
+                  {
+                      "id":  "file:tests/ChairSide.Board.Tests/EnvironmentMaintenancePreflightTests.cs",
+                      "label":  "tests/ChairSide.Board.Tests/EnvironmentMaintenancePreflightTests.cs",
+                      "type":  "File",
+                      "path":  "tests/ChairSide.Board.Tests/EnvironmentMaintenancePreflightTests.cs"
                   },
                   {
                       "id":  "file:tests/ChairSide.Board.Tests/FaultedReadyCancellationTests.cs",
@@ -945,6 +963,12 @@
                       "path":  "src/ChairSide.Board/Services/RoomAssignmentContracts.cs"
                   },
                   {
+                      "id":  "symbol:type:ChairSideEnvironmentNames",
+                      "label":  "ChairSideEnvironmentNames",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/DeploymentEnvironmentPolicy.cs"
+                  },
+                  {
                       "id":  "symbol:type:ClientErrorEntry",
                       "label":  "ClientErrorEntry",
                       "type":  "CodeType",
@@ -997,6 +1021,30 @@
                       "label":  "DemoSeedPattern",
                       "type":  "CodeType",
                       "path":  "src/ChairSide.Board/Services/DemoBoardStore.cs"
+                  },
+                  {
+                      "id":  "symbol:type:DeploymentEnvironment",
+                      "label":  "DeploymentEnvironment",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/DeploymentEnvironmentPolicy.cs"
+                  },
+                  {
+                      "id":  "symbol:type:DeploymentEnvironmentException",
+                      "label":  "DeploymentEnvironmentException",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/DeploymentEnvironmentPolicy.cs"
+                  },
+                  {
+                      "id":  "symbol:type:DeploymentEnvironmentPolicy",
+                      "label":  "DeploymentEnvironmentPolicy",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/DeploymentEnvironmentPolicy.cs"
+                  },
+                  {
+                      "id":  "symbol:type:DeploymentRole",
+                      "label":  "DeploymentRole",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/DeploymentEnvironmentPolicy.cs"
                   },
                   {
                       "id":  "symbol:type:DiagnosticLogger",
@@ -1111,6 +1159,12 @@
                       "label":  "EmptyLifecycleActionRequest",
                       "type":  "CodeType",
                       "path":  "src/ChairSide.Board/Services/PrestagingLifecycleApiContracts.cs"
+                  },
+                  {
+                      "id":  "symbol:type:EnvironmentMaintenancePreflightTests",
+                      "label":  "EnvironmentMaintenancePreflightTests",
+                      "type":  "CodeType",
+                      "path":  "tests/ChairSide.Board.Tests/EnvironmentMaintenancePreflightTests.cs"
                   },
                   {
                       "id":  "symbol:type:ExceptionReasons",
@@ -1235,6 +1289,12 @@
                   {
                       "id":  "symbol:type:MaintenanceCommands",
                       "label":  "MaintenanceCommands",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/MaintenanceCommands.cs"
+                  },
+                  {
+                      "id":  "symbol:type:MaintenanceExecutionPolicy",
+                      "label":  "MaintenanceExecutionPolicy",
                       "type":  "CodeType",
                       "path":  "src/ChairSide.Board/Services/MaintenanceCommands.cs"
                   },
@@ -2359,6 +2419,31 @@
                       "label":  "declares"
                   },
                   {
+                      "from":  "file:src/ChairSide.Board/Services/DeploymentEnvironmentPolicy.cs",
+                      "to":  "symbol:type:ChairSideEnvironmentNames",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/DeploymentEnvironmentPolicy.cs",
+                      "to":  "symbol:type:DeploymentEnvironment",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/DeploymentEnvironmentPolicy.cs",
+                      "to":  "symbol:type:DeploymentEnvironmentException",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/DeploymentEnvironmentPolicy.cs",
+                      "to":  "symbol:type:DeploymentEnvironmentPolicy",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/DeploymentEnvironmentPolicy.cs",
+                      "to":  "symbol:type:DeploymentRole",
+                      "label":  "declares"
+                  },
+                  {
                       "from":  "file:src/ChairSide.Board/Services/DiagnosticLogger.cs",
                       "to":  "symbol:type:ClientErrorEntry",
                       "label":  "declares"
@@ -2386,6 +2471,11 @@
                   {
                       "from":  "file:src/ChairSide.Board/Services/MaintenanceCommands.cs",
                       "to":  "symbol:type:MaintenanceCommands",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/MaintenanceCommands.cs",
+                      "to":  "symbol:type:MaintenanceExecutionPolicy",
                       "label":  "declares"
                   },
                   {
@@ -2819,6 +2909,11 @@
                       "label":  "declares"
                   },
                   {
+                      "from":  "file:tests/ChairSide.Board.Tests/EnvironmentMaintenancePreflightTests.cs",
+                      "to":  "symbol:type:EnvironmentMaintenancePreflightTests",
+                      "label":  "declares"
+                  },
+                  {
                       "from":  "file:tests/ChairSide.Board.Tests/FaultedReadyCancellationTests.cs",
                       "to":  "symbol:type:FaultedReadyCancellationTests",
                       "label":  "declares"
@@ -2966,6 +3061,11 @@
                   {
                       "from":  "repo:chairside",
                       "to":  "file:docs/knowledge/_meta/tag-dictionary.md",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:docs/knowledge/product/environment-maintenance-preflight.md",
                       "label":  "contains"
                   },
                   {
@@ -3175,6 +3275,11 @@
                   },
                   {
                       "from":  "repo:chairside",
+                      "to":  "file:src/ChairSide.Board/Services/DeploymentEnvironmentPolicy.cs",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
                       "to":  "file:src/ChairSide.Board/Services/DiagnosticLogger.cs",
                       "label":  "contains"
                   },
@@ -3341,6 +3446,11 @@
                   {
                       "from":  "repo:chairside",
                       "to":  "file:tests/ChairSide.Board.Tests/DurableFailureInjectionTests.cs",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:tests/ChairSide.Board.Tests/EnvironmentMaintenancePreflightTests.cs",
                       "label":  "contains"
                   },
                   {

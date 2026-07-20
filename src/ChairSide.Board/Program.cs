@@ -8,6 +8,20 @@ using ChairSide.Board.Options;
 using ChairSide.Board.Services;
 
 var builder = WebApplication.CreateBuilder(args);
+DeploymentEnvironment deploymentEnvironment;
+try
+{
+    deploymentEnvironment = DeploymentEnvironmentPolicy.Resolve(builder.Environment.EnvironmentName);
+}
+catch (DeploymentEnvironmentException exception)
+{
+    Console.Error.WriteLine($"[ChairSide Startup] Refused: {exception.Message}");
+    return 2;
+}
+
+var maintenance = MaintenanceCommands.Resolve(args);
+
+builder.Services.AddSingleton(deploymentEnvironment);
 
 builder.Services
     .AddOptions<BoardThresholdOptions>()
@@ -87,16 +101,19 @@ builder.Services.AddSingleton<DiagnosticLogger>();
 builder.Services.AddSingleton<ClientErrorRateLimiter>();
 builder.Services.AddHostedService<RoomExpirationService>();
 
-var app = builder.Build();
-
 // Operator-run maintenance CLI (console-only; never serves HTTP). Resolve enforces an explicit
-// per-command confirmation token; a refusal mutates nothing. This is the only reset mechanism and
-// it is deliberately not a web endpoint or UI button.
-var maintenance = MaintenanceCommands.Resolve(args);
+// per-command confirmation token. Environment authorization wraps application build/service
+// resolution, so a refusal cannot construct logs, SQLite, schema, or rooms. This is the only reset
+// mechanism and it is deliberately not a web endpoint or UI button.
 if (maintenance.Outcome != MaintenanceOutcome.NotRequested)
 {
-    return RunMaintenance(app, maintenance);
+    return MaintenanceExecutionPolicy.Execute(
+        deploymentEnvironment,
+        maintenance,
+        () => RunMaintenance(builder.Build(), deploymentEnvironment, maintenance));
 }
+
+var app = builder.Build();
 
 _ = app.Services.GetRequiredService<DemoBoardStore>();
 
@@ -112,16 +129,16 @@ app.Logger.LogInformation(
     roomExpirationOptions.AfterHoursSweepEnabled,
     roomExpirationOptions.AfterHoursSweepTime,
     roomExpirationOptions.TimeZone);
-if (app.Environment.IsProduction())
+if (deploymentEnvironment.IsDeployed)
 {
     if (!roomDeviceBindingOptions.Enabled)
     {
-        app.Logger.LogWarning("Room device binding is disabled in Production.");
+        LogDeploymentWarning(app.Logger, "Room device binding", deploymentEnvironment);
     }
 
     if (!adminAccessOptions.Enabled)
     {
-        app.Logger.LogWarning("Admin/report access protection is disabled in Production.");
+        LogDeploymentWarning(app.Logger, "Admin/report access protection", deploymentEnvironment);
     }
 }
 
@@ -157,9 +174,9 @@ app.MapGet("/api/board", (DemoBoardStore store) => store.GetSnapshot());
 app.MapGet("/api/reports", (DemoBoardStore store, string? from, string? to) =>
     store.GetReports(ReportDateRange.FromDateStrings(from, to)));
 
-// Development-only: populate deterministic, non-PHI synthetic completed cycles for local/beta
-// reporting smoke tests. Mapped only in Development so it can never be reached in Production.
-if (app.Environment.IsDevelopment())
+// Development-only: populate deterministic, non-PHI synthetic completed cycles for local
+// reporting smoke tests. Training and Production never map this endpoint.
+if (deploymentEnvironment.IsDevelopment)
 {
     app.MapPost("/api/dev/seed-report-data", async Task<IResult> (
         DemoBoardStore store,
@@ -406,34 +423,40 @@ app.MapPost("/api/rooms/{roomNumber:int}/available", RoomLifecycleEndpointHandle
 static string? Truncate(string? value, int maxLength) =>
     value is null ? null : value.Length <= maxLength ? value : value[..maxLength];
 
+static void LogDeploymentWarning(
+    ILogger logger,
+    string controlName,
+    DeploymentEnvironment deploymentEnvironment)
+{
+    try
+    {
+        logger.LogWarning(
+            "{ControlName} is disabled in {Environment}.",
+            controlName,
+            deploymentEnvironment.EnvironmentName);
+    }
+    catch (Exception exception) when (exception is AggregateException or InvalidOperationException)
+    {
+        Console.Error.WriteLine(
+            $"[ChairSide Startup] Warning: {controlName} is disabled in {deploymentEnvironment.EnvironmentName}. "
+            + $"The configured logging provider could not record the warning: {exception.Message}");
+    }
+}
+
 // Executes a resolved maintenance command against app services and returns a process exit code.
 // Console-only: no HTTP is served. A refusal performs no mutation.
-static int RunMaintenance(WebApplication maintenanceApp, MaintenanceResolution resolution)
+static int RunMaintenance(
+    WebApplication maintenanceApp,
+    DeploymentEnvironment deploymentEnvironment,
+    MaintenanceResolution resolution)
 {
-    if (resolution.Outcome == MaintenanceOutcome.Refused)
-    {
-        Console.Error.WriteLine($"[ChairSide Maintenance] Refused: {resolution.RefusalReason}");
-        Console.Error.WriteLine("[ChairSide Maintenance] No data was changed.");
-        return 2;
-    }
-
     var store = maintenanceApp.Services.GetRequiredService<DemoBoardStore>();
     var repository = maintenanceApp.Services.GetRequiredService<SqliteBoardRepository>();
 
     Console.WriteLine("[ChairSide Maintenance] Starting.");
-    Console.WriteLine($"[ChairSide Maintenance] Environment: {maintenanceApp.Environment.EnvironmentName}");
+    Console.WriteLine($"[ChairSide Maintenance] Environment: {deploymentEnvironment.EnvironmentName}");
     Console.WriteLine($"[ChairSide Maintenance] Database:    {repository.DatabasePath}");
     Console.WriteLine($"[ChairSide Maintenance] Command:     {resolution.Command}");
-
-    // Hard refusal: the large synthetic dataset and the stress-fixture command must never run
-    // against a Production database, even with a correct confirmation token. Scoped to those two
-    // commands; reset-training-data and reset-empty are unchanged.
-    if (MaintenanceCommands.IsProductionForbidden(resolution.Command) && maintenanceApp.Environment.IsProduction())
-    {
-        Console.Error.WriteLine($"[ChairSide Maintenance] Refused: '{resolution.Command}' cannot run in Production.");
-        Console.Error.WriteLine("[ChairSide Maintenance] No data was changed.");
-        return 2;
-    }
 
     if (string.Equals(resolution.Command, MaintenanceCommands.StressFixtureCommand, StringComparison.Ordinal))
     {
@@ -1776,7 +1799,8 @@ public static class RoomLifecycleEndpointHandler
             return "demoElapsedMinutes must be between 0 and 240.";
         }
 
-        return demoElapsedMinutes > 0 && !environment.IsDevelopment()
+        return demoElapsedMinutes > 0
+            && !DeploymentEnvironmentPolicy.Resolve(environment.EnvironmentName).IsDevelopment
             ? "demoElapsedMinutes is only available in Development."
             : null;
     }

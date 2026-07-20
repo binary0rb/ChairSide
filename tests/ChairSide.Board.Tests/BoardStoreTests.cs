@@ -5002,11 +5002,20 @@ public sealed class BoardStoreTests
     }
 
     [Fact]
-    public void Board_ui_demo_timer_defaults_to_development_only_and_can_be_enabled()
+    public void Board_ui_demo_timer_defaults_to_development_only_and_training_cannot_enable_it()
     {
         using var workspace = TestWorkspace.Create();
 
         var development = StoreContext.Create(workspace, environmentName: Environments.Development);
+        var training = StoreContext.Create(
+            workspace,
+            environmentName: ChairSideEnvironmentNames.Training,
+            databasePath: Path.Combine(workspace.DataRoot, "chairside-training.db"));
+        var trainingConfigured = StoreContext.Create(
+            workspace,
+            environmentName: ChairSideEnvironmentNames.Training,
+            databasePath: Path.Combine(workspace.DataRoot, "chairside-training-configured.db"),
+            boardUiOptions: new BoardUiOptions { DemoTimerEnabled = true });
         var production = StoreContext.Create(workspace, environmentName: Environments.Production, databasePath: workspace.ProductionDatabasePath());
         var productionEnabled = StoreContext.Create(
             workspace,
@@ -5015,6 +5024,8 @@ public sealed class BoardStoreTests
             boardUiOptions: new BoardUiOptions { DemoTimerEnabled = true });
 
         Assert.True(development.Store.GetSnapshot().DemoTimerEnabled);
+        Assert.False(training.Store.GetSnapshot().DemoTimerEnabled);
+        Assert.False(trainingConfigured.Store.GetSnapshot().DemoTimerEnabled);
         Assert.False(production.Store.GetSnapshot().DemoTimerEnabled);
         Assert.True(productionEnabled.Store.GetSnapshot().DemoTimerEnabled);
     }
@@ -7394,12 +7405,14 @@ public sealed class BoardStoreTests
     }
 
     [Fact]
-    public void Maintenance_large_synthetic_command_is_production_forbidden_but_others_are_not()
+    public void Maintenance_policy_defaults_to_deny_for_unknown_commands()
     {
-        Assert.True(MaintenanceCommands.IsProductionForbidden(MaintenanceCommands.LargeSyntheticSeedCommand));
-        Assert.False(MaintenanceCommands.IsProductionForbidden(MaintenanceCommands.TrainingSeedCommand));
-        Assert.False(MaintenanceCommands.IsProductionForbidden(MaintenanceCommands.EmptyBetaCommand));
-        Assert.False(MaintenanceCommands.IsProductionForbidden(null));
+        var development = DeploymentEnvironmentPolicy.Resolve(ChairSideEnvironmentNames.Development);
+        var training = DeploymentEnvironmentPolicy.Resolve(ChairSideEnvironmentNames.Training);
+
+        Assert.False(MaintenanceExecutionPolicy.IsAllowed(development, "future-command"));
+        Assert.False(MaintenanceExecutionPolicy.IsAllowed(training, "future-command"));
+        Assert.False(MaintenanceExecutionPolicy.IsAllowed(development, null));
     }
 
     [Fact]
@@ -7595,12 +7608,6 @@ public sealed class BoardStoreTests
 
         Assert.Equal(MaintenanceOutcome.Refused, resolution.Outcome);
         Assert.NotNull(resolution.RefusalReason);
-    }
-
-    [Fact]
-    public void Maintenance_stress_fixture_command_is_production_forbidden()
-    {
-        Assert.True(MaintenanceCommands.IsProductionForbidden(MaintenanceCommands.StressFixtureCommand));
     }
 
     [Fact]
@@ -9301,7 +9308,7 @@ public sealed class BoardStoreTests
     private static ValidateOptionsResult ValidateAdminAccessOptions(
         AdminAccessOptions options,
         string environmentName = "Development") =>
-        new AdminAccessOptionsValidator(new TestWebHostEnvironment(Path.GetTempPath(), environmentName))
+        new AdminAccessOptionsValidator(DeploymentEnvironmentPolicy.Resolve(environmentName))
             .Validate(null, options);
 
     private static DiagnosticLogger CreateDiagnosticLogger(
@@ -9515,6 +9522,7 @@ internal sealed class StoreContext
             ? workspace.ProductionDatabasePath()
             : Path.Combine(workspace.ContentRoot, "data", "chairside-test.db"));
         var environment = new TestWebHostEnvironment(workspace.ContentRoot, environmentName);
+        var deploymentEnvironment = DeploymentEnvironmentPolicy.Resolve(environmentName);
         var repository = new SqliteBoardRepository(
             Microsoft.Extensions.Options.Options.Create(new BoardPersistenceOptions { DatabasePath = resolvedDatabasePath }),
             environment);
@@ -9536,7 +9544,7 @@ internal sealed class StoreContext
                 Procedures = ProcedureRosterOptions.DefaultProcedures()
             }),
             repository,
-            environment,
+            deploymentEnvironment,
             timeProvider);
 
         return new StoreContext(store, repository, resolvedDatabasePath);

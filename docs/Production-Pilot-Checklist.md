@@ -33,11 +33,13 @@ Use this checklist for a small internal pilot. Do not enter PHI.
 - [ ] Run `dotnet publish .\src\ChairSide.Board\ChairSide.Board.csproj -c Release -o .\publish`.
 - [ ] Copy publish output to `C:\ChairSide\App`.
 - [ ] Do not commit `.\publish`.
+- [ ] Confirm `ASPNETCORE_ENVIRONMENT` is exactly `Production` (case-insensitive, with no surrounding whitespace); all other names except `Development` and `Training` are refused.
 - [ ] Review `appsettings.Production.json`.
 - [ ] Confirm `BoardPersistenceOptions:DatabasePath` is `C:\ChairSide\Data\chairside.db`.
 - [ ] Review and accept `RoomExpirationOptions`: active rooms expire after the configured max duration, and the after-hours sweep expires still-active rooms once per clinic day at the configured local time.
 - [ ] Confirm production secrets/tokens are environment-specific or deployment-time values.
 - [ ] Confirm no real tokens are committed to source control.
+- [ ] Confirm every destructive maintenance command is refused in Production before application build and database access.
 
 ## Backup And Restore
 

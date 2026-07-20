@@ -39,7 +39,7 @@ Withdrawn, Accepted, and Terminated handoffs are preserved. Aborted assignments 
 
 Repeated runs converge in current room state and Active-handoff counts. Preserved resolved history accumulates only through normal fixture behavior, so neither total historical rows nor generated GUIDs are deterministic promises.
 
-The command is maintenance-only, non-HTTP, confirmation-token gated, and hard-refused in Production. It never runs during normal startup.
+The command is maintenance-only, non-HTTP, confirmation-token gated, allowlisted only in Development and Training, and hard-refused in Production before application build or repository construction. It never runs during normal startup.
 
 ## Source and test anchors
 
