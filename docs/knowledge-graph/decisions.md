@@ -78,7 +78,11 @@ This file records decisions that should survive across tasks, PRs, and debugging
 
 **Rationale:** Environment ambiguity and late maintenance authorization can point destructive behavior at the wrong database. One canonical preflight gives normal and maintenance startup the same fail-closed deployment semantics while preserving command-specific confirmation tokens.
 
-**Training posture:** Training does not receive Development demo seeding or the Development HTTP seed endpoint, initializes fresh rooms as Available, disables the Demo Timer, rejects simulated elapsed time, rejects the sample Development admin token when protection is enabled, and emits the same disabled-security warnings as Production. Environment-specific Training database paths and deployment-role markers remain separate work.
+**Training posture:** Training does not receive Development demo seeding or the Development HTTP seed endpoint, initializes fresh rooms as Available, disables the Demo Timer, rejects simulated elapsed time, rejects the sample Development admin token when protection is enabled, and emits the same disabled-security warnings as Production.
+
+**Database isolation:** Production requires exactly `C:\ChairSide\Data\chairside.db`; Training requires exactly `C:\ChairSide\Training\Data\chairside-training.db` and uses `C:\ChairSide\Training\Logs`. These layout boundaries are code-owned. Deployed paths are fully qualified, case-insensitive, boundary-safe, outside the actual content root and both application roots, separate from the opposite deployment, and free of every existing reparse-point component. A missing canonical parent is created only after pure validation and is then rescanned before SQLite access. Development keeps relative and temporary absolute paths outside protected Production and Training roots.
+
+**Deferred identity boundary:** Path isolation does not prove database identity. A persisted Production/Training deployment-role marker and existing Production database adoption remain issue #143 PR C work.
 
 ## Reporting population semantics
 

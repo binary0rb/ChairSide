@@ -1323,7 +1323,7 @@ public sealed class BoardStoreTests
         using var workspace = TestWorkspace.Create();
         var insideContentRoot = Path.Combine(workspace.ContentRoot, "data", "prod.db");
 
-        var exception = Assert.Throws<InvalidOperationException>(() =>
+        var exception = Assert.Throws<DatabaseIsolationException>(() =>
             StoreContext.Create(workspace, environmentName: Environments.Production, databasePath: insideContentRoot));
 
         Assert.Contains("outside the deployed app content root", exception.Message);
@@ -3712,13 +3712,13 @@ public sealed class BoardStoreTests
         using var workspace = TestWorkspace.Create();
         var now = new DateTimeOffset(2026, 7, 5, 9, 0, 0, TimeSpan.Zero);
         var clock = new ManualTimeProvider(now);
-        var databasePath = workspace.ProductionDatabasePath();
-        _ = StoreContext.Create(workspace, environmentName: Environments.Production, databasePath: databasePath);
+        var databasePath = Path.Combine(workspace.DataRoot, "development-seat-minimal.db");
         var context = StoreContext.Create(
             workspace,
             environmentName: Environments.Development,
             databasePath: databasePath,
             timeProvider: clock);
+        context.Store.ResetAllDataForEmptyBeta();
         var logger = CreateDiagnosticLogger(Path.Combine(workspace.DataRoot, "logs"), workspace.ContentRoot);
         var environment = new TestWebHostEnvironment(workspace.ContentRoot, Environments.Development);
 
@@ -3758,13 +3758,13 @@ public sealed class BoardStoreTests
         using var workspace = TestWorkspace.Create();
         var now = new DateTimeOffset(2026, 7, 5, 10, 0, 0, TimeSpan.Zero);
         var clock = new ManualTimeProvider(now);
-        var databasePath = workspace.ProductionDatabasePath();
-        _ = StoreContext.Create(workspace, environmentName: Environments.Production, databasePath: databasePath);
+        var databasePath = Path.Combine(workspace.DataRoot, "development-seat-simulation.db");
         var context = StoreContext.Create(
             workspace,
             environmentName: Environments.Development,
             databasePath: databasePath,
             timeProvider: clock);
+        context.Store.ResetAllDataForEmptyBeta();
         var logger = CreateDiagnosticLogger(Path.Combine(workspace.DataRoot, "logs"), workspace.ContentRoot);
         var development = new TestWebHostEnvironment(workspace.ContentRoot, Environments.Development);
 
@@ -3993,10 +3993,10 @@ public sealed class BoardStoreTests
         using var workspace = TestWorkspace.Create();
         var now = new DateTimeOffset(2026, 7, 6, 9, 0, 0, TimeSpan.Zero);
         var clock = new ManualTimeProvider(now);
-        var databasePath = workspace.ProductionDatabasePath();
-        _ = StoreContext.Create(workspace, environmentName: Environments.Production, databasePath: databasePath);
+        var databasePath = Path.Combine(workspace.DataRoot, "development-seat-contract.db");
         var context = StoreContext.Create(
             workspace, environmentName: Environments.Development, databasePath: databasePath, timeProvider: clock);
+        context.Store.ResetAllDataForEmptyBeta();
         var logger = CreateDiagnosticLogger(Path.Combine(workspace.DataRoot, "logs"), workspace.ContentRoot);
         var environment = new TestWebHostEnvironment(workspace.ContentRoot, Environments.Development);
         var validator = CreateBindingValidator(enabled: false);
@@ -9021,9 +9021,14 @@ public sealed class BoardStoreTests
 
         // Constructing the repository runs Initialize() including the id-backfill migration.
         var environment = new TestWebHostEnvironment(workspace.ContentRoot, Environments.Development);
+        var deploymentEnvironment = DeploymentEnvironmentPolicy.Resolve(Environments.Development);
         var repository = new SqliteBoardRepository(
             Microsoft.Extensions.Options.Options.Create(new BoardPersistenceOptions { DatabasePath = databasePath }),
-            environment);
+            environment,
+            deploymentEnvironment,
+            new DatabaseIsolationPolicy(
+                workspace.DatabaseIsolationLayout(),
+                new FileSystemReparsePointInspector()));
 
         var cycles = repository.LoadCompletedCycles();
 
@@ -9518,14 +9523,22 @@ internal sealed class StoreContext
         TimeProvider? timeProvider = null,
         RoomExpirationOptions? expirationOptions = null)
     {
-        var resolvedDatabasePath = databasePath ?? (environmentName == Environments.Production
-            ? workspace.ProductionDatabasePath()
-            : Path.Combine(workspace.ContentRoot, "data", "chairside-test.db"));
+        var resolvedDatabasePath = databasePath
+            ?? (string.Equals(environmentName, Environments.Production, StringComparison.Ordinal)
+                ? workspace.ProductionDatabasePath()
+                : string.Equals(environmentName, ChairSideEnvironmentNames.Training, StringComparison.Ordinal)
+                    ? workspace.TrainingDatabasePath()
+                    : Path.Combine(workspace.ContentRoot, "data", "chairside-test.db"));
         var environment = new TestWebHostEnvironment(workspace.ContentRoot, environmentName);
         var deploymentEnvironment = DeploymentEnvironmentPolicy.Resolve(environmentName);
+        var isolationLayout = workspace.DatabaseIsolationLayout(
+            productionDatabasePath: deploymentEnvironment.IsProduction ? resolvedDatabasePath : null,
+            trainingDatabasePath: deploymentEnvironment.IsTraining ? resolvedDatabasePath : null);
         var repository = new SqliteBoardRepository(
             Microsoft.Extensions.Options.Options.Create(new BoardPersistenceOptions { DatabasePath = resolvedDatabasePath }),
-            environment);
+            environment,
+            deploymentEnvironment,
+            new DatabaseIsolationPolicy(isolationLayout, new FileSystemReparsePointInspector()));
         var store = new DemoBoardStore(
             new TestOptionsMonitor<BoardThresholdOptions>(new BoardThresholdOptions
             {
@@ -9572,7 +9585,26 @@ internal sealed class TestWorkspace : IDisposable
         new(Path.Combine(Path.GetTempPath(), "ChairSide.Board.Tests", Guid.NewGuid().ToString("N")));
 
     public string ProductionDatabasePath() =>
-        Path.Combine(DataRoot, "chairside-test.db");
+        Path.Combine(Root, "production", "data", "chairside-test.db");
+
+    public string TrainingDatabasePath() =>
+        Path.Combine(Root, "training", "data", "chairside-training-test.db");
+
+    public DatabaseIsolationLayout DatabaseIsolationLayout(
+        string? productionDatabasePath = null,
+        string? trainingDatabasePath = null)
+    {
+        var resolvedProductionDatabasePath = productionDatabasePath ?? ProductionDatabasePath();
+        var resolvedTrainingDatabasePath = trainingDatabasePath ?? TrainingDatabasePath();
+
+        return new DatabaseIsolationLayout(
+            ProductionAppRoot: Path.Combine(Root, "production", "app"),
+            ProductionDataRoot: Path.GetDirectoryName(resolvedProductionDatabasePath)!,
+            ProductionDatabasePath: resolvedProductionDatabasePath,
+            TrainingAppRoot: Path.Combine(Root, "training", "app"),
+            TrainingDataRoot: Path.GetDirectoryName(resolvedTrainingDatabasePath)!,
+            TrainingDatabasePath: resolvedTrainingDatabasePath);
+    }
 
     public void Dispose()
     {

@@ -130,12 +130,13 @@ public sealed class LifecycleFixtureCorrectionTests
     public void Development_database_with_history_and_no_active_rooms_is_not_demo_seeded(string historyKind)
     {
         using var workspace = TestWorkspace.Create();
-        var databasePath = workspace.ProductionDatabasePath();
+        var databasePath = Path.Combine(workspace.DataRoot, "development-history.db");
         var seed = StoreContext.Create(
             workspace,
-            environmentName: Environments.Production,
+            environmentName: Environments.Development,
             databasePath: databasePath,
             roomCount: 12);
+        seed.Store.ResetAllDataForEmptyBeta();
 
         switch (historyKind)
         {

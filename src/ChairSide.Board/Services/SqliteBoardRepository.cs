@@ -11,16 +11,23 @@ public sealed class SqliteBoardRepository
 
     public SqliteBoardRepository(
         IOptions<BoardPersistenceOptions> options,
-        IWebHostEnvironment environment)
+        IWebHostEnvironment environment,
+        DeploymentEnvironment deploymentEnvironment,
+        DatabaseIsolationPolicy databaseIsolationPolicy)
     {
-        _databasePath = ResolveDatabasePath(options.Value.DatabasePath, environment.ContentRootPath);
+        _databasePath = databaseIsolationPolicy.ResolveAndValidate(
+            options.Value.DatabasePath,
+            environment.ContentRootPath,
+            deploymentEnvironment);
         var directory = Path.GetDirectoryName(_databasePath);
         if (string.IsNullOrWhiteSpace(directory))
         {
             throw new InvalidOperationException("SQLite database path must include a directory.");
         }
 
-        ValidateDatabasePath(environment, directory);
+        Directory.CreateDirectory(directory);
+        databaseIsolationPolicy.RescanDeployedPath(_databasePath, deploymentEnvironment);
+        VerifyDirectoryWritable(directory);
         _connectionString = new SqliteConnectionStringBuilder
         {
             DataSource = _databasePath,
@@ -3015,33 +3022,6 @@ public sealed class SqliteBoardRepository
         return connection;
     }
 
-    private static void ValidateDatabasePath(IWebHostEnvironment environment, string databaseDirectory)
-    {
-        if (environment.IsProduction() && IsPathInsideContentRoot(databaseDirectory, environment.ContentRootPath))
-        {
-            throw new InvalidOperationException(
-                "Production SQLite database path must be outside the deployed app content root. Use an operational data directory such as C:\\ChairSide\\Data\\chairside.db.");
-        }
-
-        Directory.CreateDirectory(databaseDirectory);
-        VerifyDirectoryWritable(databaseDirectory);
-    }
-
-    private static bool IsPathInsideContentRoot(string path, string contentRootPath)
-    {
-        var fullPath = NormalizeDirectoryPath(path);
-        var fullContentRoot = NormalizeDirectoryPath(contentRootPath);
-        return fullPath.StartsWith(fullContentRoot, StringComparison.OrdinalIgnoreCase);
-    }
-
-    private static string NormalizeDirectoryPath(string path)
-    {
-        var fullPath = Path.GetFullPath(path);
-        return fullPath.EndsWith(Path.DirectorySeparatorChar)
-            ? fullPath
-            : fullPath + Path.DirectorySeparatorChar;
-    }
-
     private static void VerifyDirectoryWritable(string directory)
     {
         var testPath = Path.Combine(directory, $".chairside-write-test-{Guid.NewGuid():N}.tmp");
@@ -3057,11 +3037,6 @@ public sealed class SqliteBoardRepository
             }
         }
     }
-
-    private static string ResolveDatabasePath(string databasePath, string contentRootPath) =>
-        Path.GetFullPath(Path.IsPathRooted(databasePath)
-            ? databasePath
-            : Path.Combine(contentRootPath, databasePath));
 
     private static string FormatDateTimeOffset(DateTimeOffset value) =>
         value.ToUniversalTime().ToString("O");

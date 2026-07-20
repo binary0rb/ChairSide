@@ -189,6 +189,12 @@
                       "path":  "src/ChairSide.Board/appsettings.Production.json"
                   },
                   {
+                      "id":  "file:src/ChairSide.Board/appsettings.Training.json",
+                      "label":  "src/ChairSide.Board/appsettings.Training.json",
+                      "type":  "File",
+                      "path":  "src/ChairSide.Board/appsettings.Training.json"
+                  },
+                  {
                       "id":  "file:src/ChairSide.Board/ChairSide.Board.csproj",
                       "label":  "src/ChairSide.Board/ChairSide.Board.csproj",
                       "type":  "File",
@@ -291,6 +297,18 @@
                       "path":  "src/ChairSide.Board/Services/ClientErrorRateLimiter.cs"
                   },
                   {
+                      "id":  "file:src/ChairSide.Board/Services/DatabaseIsolationLayout.cs",
+                      "label":  "src/ChairSide.Board/Services/DatabaseIsolationLayout.cs",
+                      "type":  "File",
+                      "path":  "src/ChairSide.Board/Services/DatabaseIsolationLayout.cs"
+                  },
+                  {
+                      "id":  "file:src/ChairSide.Board/Services/DatabaseIsolationPolicy.cs",
+                      "label":  "src/ChairSide.Board/Services/DatabaseIsolationPolicy.cs",
+                      "type":  "File",
+                      "path":  "src/ChairSide.Board/Services/DatabaseIsolationPolicy.cs"
+                  },
+                  {
                       "id":  "file:src/ChairSide.Board/Services/DemoBoardStore.cs",
                       "label":  "src/ChairSide.Board/Services/DemoBoardStore.cs",
                       "type":  "File",
@@ -313,6 +331,12 @@
                       "label":  "src/ChairSide.Board/Services/ExceptionReviewRecords.cs",
                       "type":  "File",
                       "path":  "src/ChairSide.Board/Services/ExceptionReviewRecords.cs"
+                  },
+                  {
+                      "id":  "file:src/ChairSide.Board/Services/IReparsePointInspector.cs",
+                      "label":  "src/ChairSide.Board/Services/IReparsePointInspector.cs",
+                      "type":  "File",
+                      "path":  "src/ChairSide.Board/Services/IReparsePointInspector.cs"
                   },
                   {
                       "id":  "file:src/ChairSide.Board/Services/MaintenanceCommands.cs",
@@ -499,6 +523,12 @@
                       "label":  "tests/ChairSide.Board.Tests/ChairSide.Board.Tests.csproj",
                       "type":  "File",
                       "path":  "tests/ChairSide.Board.Tests/ChairSide.Board.Tests.csproj"
+                  },
+                  {
+                      "id":  "file:tests/ChairSide.Board.Tests/DatabaseIsolationPolicyTests.cs",
+                      "label":  "tests/ChairSide.Board.Tests/DatabaseIsolationPolicyTests.cs",
+                      "type":  "File",
+                      "path":  "tests/ChairSide.Board.Tests/DatabaseIsolationPolicyTests.cs"
                   },
                   {
                       "id":  "file:tests/ChairSide.Board.Tests/DurableFailureInjectionTests.cs",
@@ -1011,6 +1041,36 @@
                       "path":  "tests/ChairSide.Board.Tests/DurableFailureInjectionTests.cs"
                   },
                   {
+                      "id":  "symbol:type:DatabaseIsolationException",
+                      "label":  "DatabaseIsolationException",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/DatabaseIsolationPolicy.cs"
+                  },
+                  {
+                      "id":  "symbol:type:DatabaseIsolationLayout",
+                      "label":  "DatabaseIsolationLayout",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/DatabaseIsolationLayout.cs"
+                  },
+                  {
+                      "id":  "symbol:type:DatabaseIsolationPolicy",
+                      "label":  "DatabaseIsolationPolicy",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/DatabaseIsolationPolicy.cs"
+                  },
+                  {
+                      "id":  "symbol:type:DatabaseIsolationPolicyTests",
+                      "label":  "DatabaseIsolationPolicyTests",
+                      "type":  "CodeType",
+                      "path":  "tests/ChairSide.Board.Tests/DatabaseIsolationPolicyTests.cs"
+                  },
+                  {
+                      "id":  "symbol:type:DelegateReparsePointInspector",
+                      "label":  "DelegateReparsePointInspector",
+                      "type":  "CodeType",
+                      "path":  "tests/ChairSide.Board.Tests/DatabaseIsolationPolicyTests.cs"
+                  },
+                  {
                       "id":  "symbol:type:DemoBoardStore",
                       "label":  "DemoBoardStore",
                       "type":  "CodeType",
@@ -1215,6 +1275,12 @@
                       "path":  "tests/ChairSide.Board.Tests/FaultedReadyCancellationTests.cs"
                   },
                   {
+                      "id":  "symbol:type:FileSystemReparsePointInspector",
+                      "label":  "FileSystemReparsePointInspector",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/IReparsePointInspector.cs"
+                  },
+                  {
                       "id":  "symbol:type:GuardedDoctorArrivedPersistenceOutcome",
                       "label":  "GuardedDoctorArrivedPersistenceOutcome",
                       "type":  "CodeType",
@@ -1267,6 +1333,12 @@
                       "label":  "Harness",
                       "type":  "CodeType",
                       "path":  "tests/ChairSide.Board.Tests/PrestagingLifecycleEndpointTests.cs"
+                  },
+                  {
+                      "id":  "symbol:type:IReparsePointInspector",
+                      "label":  "IReparsePointInspector",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/IReparsePointInspector.cs"
                   },
                   {
                       "id":  "symbol:type:LifecycleFixtureCorrectionTests",
@@ -1357,6 +1429,12 @@
                       "label":  "NoopHubClients",
                       "type":  "CodeType",
                       "path":  "tests/ChairSide.Board.Tests/BoardStoreTests.cs"
+                  },
+                  {
+                      "id":  "symbol:type:NormalizedDatabaseIsolationLayout",
+                      "label":  "NormalizedDatabaseIsolationLayout",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/DatabaseIsolationPolicy.cs"
                   },
                   {
                       "id":  "symbol:type:ObservedDoctorDay",
@@ -1573,6 +1651,12 @@
                       "label":  "ReadyUrgencyEvaluator",
                       "type":  "CodeType",
                       "path":  "src/ChairSide.Board/Services/RoomAssignmentContracts.cs"
+                  },
+                  {
+                      "id":  "symbol:type:RecordingReparsePointInspector",
+                      "label":  "RecordingReparsePointInspector",
+                      "type":  "CodeType",
+                      "path":  "tests/ChairSide.Board.Tests/DatabaseIsolationPolicyTests.cs"
                   },
                   {
                       "id":  "symbol:type:ReportingExceptionReasons",
@@ -2239,6 +2323,26 @@
                       "label":  "declares"
                   },
                   {
+                      "from":  "file:src/ChairSide.Board/Services/DatabaseIsolationLayout.cs",
+                      "to":  "symbol:type:DatabaseIsolationLayout",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/DatabaseIsolationPolicy.cs",
+                      "to":  "symbol:type:DatabaseIsolationException",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/DatabaseIsolationPolicy.cs",
+                      "to":  "symbol:type:DatabaseIsolationPolicy",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/DatabaseIsolationPolicy.cs",
+                      "to":  "symbol:type:NormalizedDatabaseIsolationLayout",
+                      "label":  "declares"
+                  },
+                  {
                       "from":  "file:src/ChairSide.Board/Services/DemoBoardStore.cs",
                       "to":  "symbol:type:AbortedRoomAssignment",
                       "label":  "declares"
@@ -2466,6 +2570,16 @@
                   {
                       "from":  "file:src/ChairSide.Board/Services/ExceptionReviewRecords.cs",
                       "to":  "symbol:type:ExceptionReviewSources",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/IReparsePointInspector.cs",
+                      "to":  "symbol:type:FileSystemReparsePointInspector",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/IReparsePointInspector.cs",
+                      "to":  "symbol:type:IReparsePointInspector",
                       "label":  "declares"
                   },
                   {
@@ -2889,6 +3003,21 @@
                       "label":  "declares"
                   },
                   {
+                      "from":  "file:tests/ChairSide.Board.Tests/DatabaseIsolationPolicyTests.cs",
+                      "to":  "symbol:type:DatabaseIsolationPolicyTests",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:tests/ChairSide.Board.Tests/DatabaseIsolationPolicyTests.cs",
+                      "to":  "symbol:type:DelegateReparsePointInspector",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:tests/ChairSide.Board.Tests/DatabaseIsolationPolicyTests.cs",
+                      "to":  "symbol:type:RecordingReparsePointInspector",
+                      "label":  "declares"
+                  },
+                  {
                       "from":  "file:tests/ChairSide.Board.Tests/DurableFailureInjectionTests.cs",
                       "to":  "symbol:type:CycleSnapshot",
                       "label":  "declares"
@@ -3185,6 +3314,11 @@
                   },
                   {
                       "from":  "repo:chairside",
+                      "to":  "file:src/ChairSide.Board/appsettings.Training.json",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
                       "to":  "file:src/ChairSide.Board/ChairSide.Board.csproj",
                       "label":  "contains"
                   },
@@ -3270,6 +3404,16 @@
                   },
                   {
                       "from":  "repo:chairside",
+                      "to":  "file:src/ChairSide.Board/Services/DatabaseIsolationLayout.cs",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:src/ChairSide.Board/Services/DatabaseIsolationPolicy.cs",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
                       "to":  "file:src/ChairSide.Board/Services/DemoBoardStore.cs",
                       "label":  "contains"
                   },
@@ -3286,6 +3430,11 @@
                   {
                       "from":  "repo:chairside",
                       "to":  "file:src/ChairSide.Board/Services/ExceptionReviewRecords.cs",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:src/ChairSide.Board/Services/IReparsePointInspector.cs",
                       "label":  "contains"
                   },
                   {
@@ -3441,6 +3590,11 @@
                   {
                       "from":  "repo:chairside",
                       "to":  "file:tests/ChairSide.Board.Tests/ChairSide.Board.Tests.csproj",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:tests/ChairSide.Board.Tests/DatabaseIsolationPolicyTests.cs",
                       "label":  "contains"
                   },
                   {

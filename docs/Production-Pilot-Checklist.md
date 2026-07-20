@@ -9,6 +9,7 @@ Use this checklist for a small internal pilot. Do not enter PHI.
 - [ ] Create `C:\ChairSide\Backups`.
 - [ ] Optionally create `C:\ChairSide\Logs`.
 - [ ] Confirm the production database path is `C:\ChairSide\Data\chairside.db`.
+- [ ] Confirm no existing component from `C:\` through `chairside.db` is a reparse point.
 
 ## IIS
 
@@ -36,6 +37,7 @@ Use this checklist for a small internal pilot. Do not enter PHI.
 - [ ] Confirm `ASPNETCORE_ENVIRONMENT` is exactly `Production` (case-insensitive, with no surrounding whitespace); all other names except `Development` and `Training` are refused.
 - [ ] Review `appsettings.Production.json`.
 - [ ] Confirm `BoardPersistenceOptions:DatabasePath` is `C:\ChairSide\Data\chairside.db`.
+- [ ] Confirm startup refuses any non-canonical, application-root, Training-root, or reparse-point database path before creating SQLite files.
 - [ ] Review and accept `RoomExpirationOptions`: active rooms expire after the configured max duration, and the after-hours sweep expires still-active rooms once per clinic day at the configured local time.
 - [ ] Confirm production secrets/tokens are environment-specific or deployment-time values.
 - [ ] Confirm no real tokens are committed to source control.

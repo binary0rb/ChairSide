@@ -28,6 +28,35 @@ mapping, and tests consume that policy rather than independently interpreting ar
 - Training credentials must be separate from Development and Production credentials. No deployed
   secret belongs in source control.
 
+## Database path isolation
+
+The deployed database layout is code-owned and is not bound from configuration:
+
+- Production application root: `C:\ChairSide\App`
+- Production data root: `C:\ChairSide\Data`
+- Production database: `C:\ChairSide\Data\chairside.db`
+- Training application root: `C:\ChairSide\Training\App`
+- Training data root: `C:\ChairSide\Training\Data`
+- Training database: `C:\ChairSide\Training\Data\chairside-training.db`
+- Training diagnostic logs: `C:\ChairSide\Training\Logs`
+
+Production and Training require their exact canonical, fully qualified database paths. Normalized
+Windows paths compare case-insensitively with directory boundaries, so `Data2` is not treated as
+`Data`. Deployed paths are refused inside the actual content root, either application root, or the
+opposite deployment's application/data roots. Wrong filenames, relative and drive-relative paths,
+and existing directories used as the database leaf are refused. Development keeps relative paths
+resolved against the content root and temporary absolute paths, except under the protected
+Production or Training application/data roots.
+
+For deployed startup, every existing component from the volume root through the database leaf is
+checked for `FileAttributes.ReparsePoint`. Only genuine not-found results count as missing; metadata
+access errors fail closed. The pure policy creates nothing. After it succeeds, the repository may
+create a missing canonical parent directory, must rescan all components, then performs its write
+test before configuring SQLite or running schema/room initialization.
+
+Persisted database deployment-role markers remain deferred to issue #143 PR C. This slice does not
+complete Training IIS deployment.
+
 ## Maintenance posture
 
 `reset-training-data`, `reset-empty`, `reset-large-synthetic-report-data`, and
@@ -37,13 +66,16 @@ repository construction. Unknown commands default to denied.
 
 The existing `Reset-ChairSideTrainingData.ps1` wrapper invokes the CLI as Production and is therefore
 intentionally unusable. Updating that wrapper and completing a safe Training reset workflow belongs
-to a later issue #143 slice. This preflight does not implement environment-specific database paths or
-database deployment-role markers.
+to a later issue #143 slice. Database deployment-role markers also remain separate PR C work.
 
 ## Source and test anchors
 
 - `src/ChairSide.Board/Services/DeploymentEnvironmentPolicy.cs`
+- `src/ChairSide.Board/Services/DatabaseIsolationLayout.cs`
+- `src/ChairSide.Board/Services/DatabaseIsolationPolicy.cs`
+- `src/ChairSide.Board/Services/IReparsePointInspector.cs`
 - `src/ChairSide.Board/Services/MaintenanceCommands.cs`
 - `src/ChairSide.Board/Program.cs`
 - `src/ChairSide.Board/Services/DemoBoardStore.cs`
 - `tests/ChairSide.Board.Tests/EnvironmentMaintenancePreflightTests.cs`
+- `tests/ChairSide.Board.Tests/DatabaseIsolationPolicyTests.cs`
