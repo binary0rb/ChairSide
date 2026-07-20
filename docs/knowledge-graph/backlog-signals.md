@@ -8,7 +8,7 @@ Use this file as the parking lot for ideas that matter but are not ready for imp
 - Link each UI state to its lifecycle event, threshold, color language, and expected staff interpretation.
 - Link each production deployment validation command to the environment where it should run.
 - Add a glossary for support staff terms versus code terms.
-- Add an “AI handoff map” section optimized for future coding sessions.
+- Add an "AI handoff map" section optimized for future coding sessions.
 - Add architecture diagrams after the beta workflow settles.
 
 ## Risks to preserve
@@ -18,6 +18,7 @@ Use this file as the parking lot for ideas that matter but are not ready for imp
 - Generated artifacts can become noisy if committed without review discipline.
 - A graph database would be premature until the simple Markdown/Mermaid approach proves useful.
 - Deployment facts can become stale; include dates when capturing production environment details.
+- Path isolation does not establish database identity; issue #143 PR C must add the persisted Production/Training deployment-role marker and safe existing-Production adoption.
 
 ## Candidate relationships to add later
 

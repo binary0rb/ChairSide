@@ -93,6 +93,9 @@ builder.Services
     .Bind(builder.Configuration.GetSection(RoomExpirationOptions.SectionName));
 
 builder.Services.AddSignalR();
+builder.Services.AddSingleton(DatabaseIsolationLayout.Approved);
+builder.Services.AddSingleton<IReparsePointInspector, FileSystemReparsePointInspector>();
+builder.Services.AddSingleton<DatabaseIsolationPolicy>();
 builder.Services.AddSingleton<SqliteBoardRepository>();
 builder.Services.AddSingleton<DemoBoardStore>();
 builder.Services.AddSingleton<RoomDeviceTokenValidator>();
@@ -110,12 +113,20 @@ if (maintenance.Outcome != MaintenanceOutcome.NotRequested)
     return MaintenanceExecutionPolicy.Execute(
         deploymentEnvironment,
         maintenance,
-        () => RunMaintenance(builder.Build(), deploymentEnvironment, maintenance));
+        () => RunWithDatabaseIsolationRefusal(
+            () => RunMaintenance(builder.Build(), deploymentEnvironment, maintenance)));
 }
 
-var app = builder.Build();
-
-_ = app.Services.GetRequiredService<DemoBoardStore>();
+WebApplication app;
+try
+{
+    app = builder.Build();
+    _ = app.Services.GetRequiredService<DemoBoardStore>();
+}
+catch (DatabaseIsolationException exception)
+{
+    return RefuseDatabaseIsolation(exception);
+}
 
 var roomDeviceBindingOptions = app.Services.GetRequiredService<IOptions<RoomDeviceBindingOptions>>().Value;
 var adminAccessOptions = app.Services.GetRequiredService<IOptions<AdminAccessOptions>>().Value;
@@ -422,6 +433,24 @@ app.MapPost("/api/rooms/{roomNumber:int}/available", RoomLifecycleEndpointHandle
 
 static string? Truncate(string? value, int maxLength) =>
     value is null ? null : value.Length <= maxLength ? value : value[..maxLength];
+
+static int RunWithDatabaseIsolationRefusal(Func<int> action)
+{
+    try
+    {
+        return action();
+    }
+    catch (DatabaseIsolationException exception)
+    {
+        return RefuseDatabaseIsolation(exception);
+    }
+}
+
+static int RefuseDatabaseIsolation(DatabaseIsolationException exception)
+{
+    Console.Error.WriteLine($"[ChairSide Startup] Refused: {exception.Message}");
+    return 2;
+}
 
 static void LogDeploymentWarning(
     ILogger logger,

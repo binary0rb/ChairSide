@@ -165,10 +165,14 @@ Change those values to adjust room timing without code edits. `StaleMinutes` mus
 
 ChairSide recognizes exactly three application environments: `Development`, `Training`, and `Production` (case-insensitive, without surrounding whitespace). Startup refuses null, blank, padded, or any other environment name before application build, service resolution, database access, log creation, or endpoint mapping.
 
-`BoardPersistenceOptions:DatabasePath` controls the SQLite database location. The default development path is local to the app project, `./data/chairside-dev.db`. For Training or Production, set this to the intended operational data location through environment-specific configuration or command-line configuration. Environment-specific database path isolation is not implemented by this change and remains a separate deployment requirement.
+`BoardPersistenceOptions:DatabasePath` controls the SQLite database location. The default Development path is local to the app project, `./data/chairside-dev.db`. Development may also use relative paths resolved against the actual content root or temporary fully qualified paths, but it may not use any path under the protected Production or Training application/data roots.
+
+Deployed database locations are code-owned safety boundaries, not configurable layout choices. Production requires exactly `C:\ChairSide\Data\chairside.db`. Training requires exactly `C:\ChairSide\Training\Data\chairside-training.db`, and `appsettings.Training.json` sets its diagnostic log directory to `C:\ChairSide\Training\Logs`. Path comparison is case-insensitive and directory-boundary-safe. Production and Training refuse relative or drive-relative paths, paths under either deployed application root or the actual content root, the opposite environment's application/data paths, wrong filenames, database filenames that are existing directories, and any existing reparse-point component from the volume root through the database leaf.
+
+Database path preflight is pure: it normalizes and validates without creating files or directories. After successful deployed preflight, a missing canonical parent directory may be created, then every deployed path component is rescanned for reparse points before the write test, SQLite connection setup, schema migration, or room initialization. Database deployment-role identity markers are not implemented in this slice and remain deferred to issue #143 PR C. The Training configuration establishes path isolation only; it does not complete IIS or Training deployment.
 
 ```powershell
-dotnet run --project .\src\ChairSide.Board\ChairSide.Board.csproj --BoardPersistenceOptions:DatabasePath="C:\ChairSide\Data\chairside.db"
+dotnet run --project .\src\ChairSide.Board\ChairSide.Board.csproj --BoardPersistenceOptions:DatabasePath=".\data\chairside-dev.db"
 ```
 
 The app creates the SQLite database and schema on startup if they do not exist. Persisted data remains non-PHI and is limited to room episodes, canonical assignments, immutable Ready handoffs, lifecycle state, operational timestamps, aborted assignments, and completed-cycle durations.
@@ -244,14 +248,14 @@ Configure or disable this behavior with `RoomExpirationOptions` if needed:
 
 `AfterHoursSweepTime` uses `HH:mm` 24-hour time. `TimeZone` accepts an IANA or Windows timezone identifier. If a non-UTC timezone cannot be resolved, the after-hours sweep is suppressed rather than run at the wrong local time.
 
-Production database guidance:
+Production database requirements:
 
-- Recommended path: `C:\ChairSide\Data\chairside.db`
+- Required path: `C:\ChairSide\Data\chairside.db`
 - Recommended backup directory: `C:\ChairSide\Backups`
-- Do not store the production database under the deployed app/content root.
+- Do not store the Production or Training database under either deployed application root or the actual content root.
 - The IIS app pool identity needs Modify permission on `C:\ChairSide\Data`.
 - SQLite WAL mode creates `chairside.db-wal` and `chairside.db-shm` beside the database, so the directory must be writable, not just the database file.
-- In Production, the app fails fast if the configured database path resolves inside the app content root or if the database directory cannot be created/written by the running process.
+- Production fails before SQLite access unless the normalized path is the exact canonical path and every existing component is free of reparse points. A missing canonical data directory is created only after validation and is rescanned before use.
 
 Backup and restore:
 
@@ -373,9 +377,9 @@ Production configuration is supplied by `src/ChairSide.Board/appsettings.Product
 }
 ```
 
-The app validates this path at startup in Production. It must resolve outside the deployed app/content root. The app creates the SQLite database and schema if missing, but the data directory must be writable by the IIS app pool identity.
+The app validates this path at startup in Production. It must equal the code-owned canonical path, remain outside both application roots and the actual content root, and contain no existing reparse-point component. The app creates the SQLite database and schema if missing, but only after successful path preflight and a post-directory-creation reparse scan. The data directory must be writable by the IIS app pool identity.
 
-`appsettings.Production.json` is environment-specific. If the production server does not use `C:\ChairSide\Data`, update `BoardPersistenceOptions:DatabasePath` before deployment.
+`appsettings.Production.json` is environment-specific. Production deployment must use `C:\ChairSide\Data\chairside.db`; changing configuration to another path intentionally fails closed.
 
 IIS app pool guidance:
 

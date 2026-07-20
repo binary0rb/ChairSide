@@ -1,7 +1,7 @@
 ﻿{
     "generatedStamp":  "deterministic",
     "root":  ".",
-    "fileCount":  100,
+    "fileCount":  105,
     "files":  [
                   {
                       "path":  ".github/pull_request_template.md",
@@ -235,7 +235,7 @@
                   {
                       "path":  "docs/knowledge/product/environment-maintenance-preflight.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  2521,
+                      "sizeBytes":  4484,
                       "typeSymbols":  [
 
                                       ],
@@ -258,6 +258,7 @@
                                        "Environment and maintenance preflight",
                                        "Recognized environments",
                                        "Runtime posture",
+                                       "Database path isolation",
                                        "Maintenance posture",
                                        "Source and test anchors"
                                    ]
@@ -418,7 +419,7 @@
                   {
                       "path":  "docs/knowledge/tests/deterministic-stress-fixtures.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  3530,
+                      "sizeBytes":  3531,
                       "typeSymbols":  [
 
                                       ],
@@ -516,7 +517,7 @@
                   {
                       "path":  "docs/knowledge-graph/backlog-signals.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  1502,
+                      "sizeBytes":  1672,
                       "typeSymbols":  [
 
                                       ],
@@ -545,7 +546,7 @@
                   {
                       "path":  "docs/knowledge-graph/chairside.graph.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  8930,
+                      "sizeBytes":  9489,
                       "typeSymbols":  [
 
                                       ],
@@ -576,7 +577,7 @@
                   {
                       "path":  "docs/knowledge-graph/decisions.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  8507,
+                      "sizeBytes":  9311,
                       "typeSymbols":  [
 
                                       ],
@@ -647,7 +648,7 @@
                   {
                       "path":  "docs/Production-Pilot-Checklist.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  7016,
+                      "sizeBytes":  7256,
                       "typeSymbols":  [
 
                                       ],
@@ -687,7 +688,7 @@
                   {
                       "path":  "docs/TrainingDataReset.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  6342,
+                      "sizeBytes":  6361,
                       "typeSymbols":  [
 
                                       ],
@@ -814,7 +815,7 @@
                   {
                       "path":  "README.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  34031,
+                      "sizeBytes":  35574,
                       "typeSymbols":  [
 
                                       ],
@@ -979,6 +980,32 @@
                                    ]
                   },
                   {
+                      "path":  "src/ChairSide.Board/appsettings.Training.json",
+                      "kind":  "Json",
+                      "sizeBytes":  196,
+                      "typeSymbols":  [
+
+                                      ],
+                      "methodSymbols":  [
+
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
                       "path":  "src/ChairSide.Board/ChairSide.Board.csproj",
                       "kind":  "Project",
                       "sizeBytes":  997,
@@ -1033,7 +1060,7 @@
                   {
                       "path":  "src/ChairSide.Board/Options/AdminAccessOptions.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  1368,
+                      "sizeBytes":  1378,
                       "typeSymbols":  [
                                           "AdminAccessOptions",
                                           "AdminAccessOptionsValidator"
@@ -1328,7 +1355,7 @@
                   {
                       "path":  "src/ChairSide.Board/Program.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  92653,
+                      "sizeBytes":  93512,
                       "typeSymbols":  [
                                           "BeginPrestageRequest",
                                           "SeatRoomRequest",
@@ -1485,9 +1512,75 @@
                                    ]
                   },
                   {
+                      "path":  "src/ChairSide.Board/Services/DatabaseIsolationLayout.cs",
+                      "kind":  "CSharp",
+                      "sizeBytes":  701,
+                      "typeSymbols":  [
+                                          "DatabaseIsolationLayout"
+                                      ],
+                      "methodSymbols":  [
+
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
+                      "path":  "src/ChairSide.Board/Services/DatabaseIsolationPolicy.cs",
+                      "kind":  "CSharp",
+                      "sizeBytes":  10769,
+                      "typeSymbols":  [
+                                          "DatabaseIsolationException",
+                                          "DatabaseIsolationPolicy",
+                                          "NormalizedDatabaseIsolationLayout"
+                                      ],
+                      "methodSymbols":  [
+                                            "ResolveAndValidate",
+                                            "RescanDeployedPath",
+                                            "NormalizeLayout",
+                                            "InspectDeployedPathComponents",
+                                            "RefuseDirectoryDatabaseLeaf",
+                                            "InspectAttributes",
+                                            "EnumeratePathComponents",
+                                            "RefuseInsideProtectedRoot",
+                                            "RefuseOppositeDeployment",
+                                            "RequireExactCanonicalPath",
+                                            "IsPathInside",
+                                            "PathsEqual",
+                                            "NormalizePath"
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
                       "path":  "src/ChairSide.Board/Services/DemoBoardStore.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  251347,
+                      "sizeBytes":  251364,
                       "typeSymbols":  [
                                           "ExceptionReasons",
                                           "ReportingExceptionReasons",
@@ -1587,7 +1680,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/DeploymentEnvironmentPolicy.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  2338,
+                      "sizeBytes":  2402,
                       "typeSymbols":  [
                                           "ChairSideEnvironmentNames",
                                           "DeploymentRole",
@@ -1675,9 +1768,36 @@
                                    ]
                   },
                   {
+                      "path":  "src/ChairSide.Board/Services/IReparsePointInspector.cs",
+                      "kind":  "CSharp",
+                      "sizeBytes":  541,
+                      "typeSymbols":  [
+                                          "IReparsePointInspector",
+                                          "FileSystemReparsePointInspector"
+                                      ],
+                      "methodSymbols":  [
+                                            "GetAttributesIfExists"
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
                       "path":  "src/ChairSide.Board/Services/MaintenanceCommands.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  13635,
+                      "sizeBytes":  13699,
                       "typeSymbols":  [
                                           "MaintenanceOutcome",
                                           "MaintenanceResolution",
@@ -2132,7 +2252,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/SqliteBoardRepository.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  151572,
+                      "sizeBytes":  150456,
                       "typeSymbols":  [
                                           "SqliteBoardRepository",
                                           "DoctorWorkingRoomRecord",
@@ -2700,7 +2820,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/BoardStoreTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  482330,
+                      "sizeBytes":  484127,
                       "typeSymbols":  [
                                           "BoardStoreTests",
                                           "StoreContext",
@@ -2850,6 +2970,64 @@
                                    ]
                   },
                   {
+                      "path":  "tests/ChairSide.Board.Tests/DatabaseIsolationPolicyTests.cs",
+                      "kind":  "CSharp",
+                      "sizeBytes":  24906,
+                      "typeSymbols":  [
+                                          "DatabaseIsolationPolicyTests",
+                                          "DelegateReparsePointInspector",
+                                          "RecordingReparsePointInspector"
+                                      ],
+                      "methodSymbols":  [
+                                            "Null_or_blank_configured_path_is_refused",
+                                            "Null_or_blank_ContentRootPath_is_refused",
+                                            "Deployed_canonical_path_is_accepted",
+                                            "Training_pointed_at_Production_path_is_refused",
+                                            "Production_pointed_at_Training_path_is_refused",
+                                            "Deployed_relative_and_drive_relative_paths_are_refused",
+                                            "Wrong_filename_under_correct_data_root_is_refused",
+                                            "Deployed_path_inside_actual_content_root_is_refused",
+                                            "Deployed_path_inside_Production_app_root_is_refused",
+                                            "Deployed_path_inside_Training_app_root_is_refused",
+                                            "Development_relative_path_resolves_against_ContentRootPath",
+                                            "Development_temporary_absolute_path_is_accepted",
+                                            "Development_paths_under_deployed_protected_roots_are_refused",
+                                            "Canonical_path_equality_is_case_insensitive",
+                                            "Data2_does_not_match_protected_Data_root",
+                                            "Existing_directory_at_database_filename_is_refused",
+                                            "Simulated_reparse_point_component_is_refused",
+                                            "Unexpected_metadata_access_error_fails_closed",
+                                            "Missing_canonical_deployed_directory_is_created_after_validation_and_rescanned",
+                                            "Invalid_pure_policy_path_creates_no_database_artifacts",
+                                            "Production_store_startup_succeeds_with_injected_canonical_layout",
+                                            "Training_store_startup_succeeds_with_injected_canonical_layout_and_available_rooms",
+                                            "Development_relative_repository_startup_remains_compatible_and_seeds_demo_rooms",
+                                            "Training_configuration_contains_only_the_approved_paths",
+                                            "Process_level_path_refusal_creates_no_database_or_diagnostic_log_artifacts",
+                                            "Authorized_Training_maintenance_path_refusal_is_controlled_and_creates_no_artifacts",
+                                            "AssertControlledProcessRefusalAsync",
+                                            "Policy",
+                                            "FindRepositoryRoot",
+                                            "GetAttributesIfExists",
+                                            "Count"
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
                       "path":  "tests/ChairSide.Board.Tests/DurableFailureInjectionTests.cs",
                       "kind":  "CSharp",
                       "sizeBytes":  28117,
@@ -2899,7 +3077,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/EnvironmentMaintenancePreflightTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  13233,
+                      "sizeBytes":  13575,
                       "typeSymbols":  [
                                           "EnvironmentMaintenancePreflightTests"
                                       ],
@@ -2981,7 +3159,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/LifecycleFixtureCorrectionTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  35506,
+                      "sizeBytes":  35571,
                       "typeSymbols":  [
                                           "LifecycleFixtureCorrectionTests",
                                           "RoomStatusSnapshot",
