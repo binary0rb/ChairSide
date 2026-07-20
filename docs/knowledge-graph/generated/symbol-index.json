@@ -1,7 +1,7 @@
 ﻿{
     "generatedStamp":  "deterministic",
     "root":  ".",
-    "fileCount":  96,
+    "fileCount":  97,
     "files":  [
                   {
                       "path":  ".github/pull_request_template.md",
@@ -33,7 +33,7 @@
                   {
                       "path":  "AGENTS.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  15697,
+                      "sizeBytes":  16775,
                       "typeSymbols":  [
 
                                       ],
@@ -74,7 +74,8 @@
                                        "Suggested technical direction",
                                        "Development priorities",
                                        "UX rules",
-                                       "Testing expectations"
+                                       "Testing expectations",
+                                       "Browser automation and UI verification"
                                    ]
                   },
                   {
@@ -1484,12 +1485,9 @@
                                           "LiveRoomFixture",
                                           "StressFixtureResult",
                                           "RoomState",
-                                          "so",
                                           "RoomStates",
-                                          "always",
                                           "TerminationKinds",
                                           "CancellationReasons",
-                                          "of",
                                           "AbortedRoomAssignment",
                                           "ReviewStatuses",
                                           "ExceptionReviewers",
@@ -1590,7 +1588,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/ExceptionReviewRecords.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  885,
+                      "sizeBytes":  916,
                       "typeSymbols":  [
                                           "ExceptionReviewSources",
                                           "ExceptionReviewRecord"
@@ -2072,12 +2070,8 @@
                       "sizeBytes":  151572,
                       "typeSymbols":  [
                                           "SqliteBoardRepository",
-                                          "the",
-                                          "and",
                                           "DoctorWorkingRoomRecord",
-                                          "DoctorWorkingRoomLookupResult",
-                                          "carries",
-                                          "on"
+                                          "DoctorWorkingRoomLookupResult"
                                       ],
                       "methodSymbols":  [
                                             "HasOperationalData",
@@ -2541,7 +2535,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/AfterHoursReviewEndpointTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  8338,
+                      "sizeBytes":  8528,
                       "typeSymbols":  [
                                           "AfterHoursReviewEndpointTests"
                                       ],
@@ -2575,7 +2569,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/AfterHoursSweepRetryTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  14099,
+                      "sizeBytes":  14387,
                       "typeSymbols":  [
                                           "AfterHoursSweepRetryTests"
                                       ],
@@ -2644,11 +2638,6 @@
                       "sizeBytes":  481743,
                       "typeSymbols":  [
                                           "BoardStoreTests",
-                                          "is",
-                                          "persisted",
-                                          "exists",
-                                          "a",
-                                          "for",
                                           "StoreContext",
                                           "TestWorkspace",
                                           "TestWebHostEnvironment",
@@ -2847,7 +2836,6 @@
                       "kind":  "CSharp",
                       "sizeBytes":  18066,
                       "typeSymbols":  [
-                                          "truthful",
                                           "FaultedReadyCancellationTests"
                                       ],
                       "methodSymbols":  [
@@ -3443,9 +3431,35 @@
                                    ]
                   },
                   {
+                      "path":  "tests/knowledge-graph/New-ChairSideKnowledgeGraph.Tests.ps1",
+                      "kind":  "PowerShell",
+                      "sizeBytes":  5423,
+                      "typeSymbols":  [
+
+                                      ],
+                      "methodSymbols":  [
+
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
                       "path":  "tools/knowledge-graph/New-ChairSideKnowledgeGraph.ps1",
                       "kind":  "PowerShell",
-                      "sizeBytes":  11682,
+                      "sizeBytes":  18091,
                       "typeSymbols":  [
 
                                       ],

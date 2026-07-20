@@ -573,6 +573,12 @@
                       "path":  "tests/ChairSide.Board.Tests/ScheduleFitReportTests.cs"
                   },
                   {
+                      "id":  "file:tests/knowledge-graph/New-ChairSideKnowledgeGraph.Tests.ps1",
+                      "label":  "tests/knowledge-graph/New-ChairSideKnowledgeGraph.Tests.ps1",
+                      "type":  "File",
+                      "path":  "tests/knowledge-graph/New-ChairSideKnowledgeGraph.Tests.ps1"
+                  },
+                  {
                       "id":  "file:tools/knowledge-graph/New-ChairSideKnowledgeGraph.ps1",
                       "label":  "tools/knowledge-graph/New-ChairSideKnowledgeGraph.ps1",
                       "type":  "File",
@@ -723,12 +729,6 @@
                       "path":  "src/ChairSide.Board/Program.cs"
                   },
                   {
-                      "id":  "symbol:type:a",
-                      "label":  "a",
-                      "type":  "CodeType",
-                      "path":  "tests/ChairSide.Board.Tests/BoardStoreTests.cs"
-                  },
-                  {
                       "id":  "symbol:type:AbortedRoomAssignment",
                       "label":  "AbortedRoomAssignment",
                       "type":  "CodeType",
@@ -799,18 +799,6 @@
                       "label":  "AllocationVarianceSummary",
                       "type":  "CodeType",
                       "path":  "src/ChairSide.Board/Services/DemoBoardStore.cs"
-                  },
-                  {
-                      "id":  "symbol:type:always",
-                      "label":  "always",
-                      "type":  "CodeType",
-                      "path":  "src/ChairSide.Board/Services/DemoBoardStore.cs"
-                  },
-                  {
-                      "id":  "symbol:type:and",
-                      "label":  "and",
-                      "type":  "CodeType",
-                      "path":  "src/ChairSide.Board/Services/SqliteBoardRepository.cs"
                   },
                   {
                       "id":  "symbol:type:AssignmentCompleteness",
@@ -955,12 +943,6 @@
                       "label":  "CanonicalRoomLifecycleState",
                       "type":  "CodeType",
                       "path":  "src/ChairSide.Board/Services/RoomAssignmentContracts.cs"
-                  },
-                  {
-                      "id":  "symbol:type:carries",
-                      "label":  "carries",
-                      "type":  "CodeType",
-                      "path":  "src/ChairSide.Board/Services/SqliteBoardRepository.cs"
                   },
                   {
                       "id":  "symbol:type:ClientErrorEntry",
@@ -1161,12 +1143,6 @@
                       "path":  "src/ChairSide.Board/Services/ExceptionReviewRecords.cs"
                   },
                   {
-                      "id":  "symbol:type:exists",
-                      "label":  "exists",
-                      "type":  "CodeType",
-                      "path":  "tests/ChairSide.Board.Tests/BoardStoreTests.cs"
-                  },
-                  {
                       "id":  "symbol:type:ExpectedAllocationContract",
                       "label":  "ExpectedAllocationContract",
                       "type":  "CodeType",
@@ -1183,12 +1159,6 @@
                       "label":  "FaultedReadyCancellationTests",
                       "type":  "CodeType",
                       "path":  "tests/ChairSide.Board.Tests/FaultedReadyCancellationTests.cs"
-                  },
-                  {
-                      "id":  "symbol:type:for",
-                      "label":  "for",
-                      "type":  "CodeType",
-                      "path":  "tests/ChairSide.Board.Tests/BoardStoreTests.cs"
                   },
                   {
                       "id":  "symbol:type:GuardedDoctorArrivedPersistenceOutcome",
@@ -1243,12 +1213,6 @@
                       "label":  "Harness",
                       "type":  "CodeType",
                       "path":  "tests/ChairSide.Board.Tests/PrestagingLifecycleEndpointTests.cs"
-                  },
-                  {
-                      "id":  "symbol:type:is",
-                      "label":  "is",
-                      "type":  "CodeType",
-                      "path":  "tests/ChairSide.Board.Tests/BoardStoreTests.cs"
                   },
                   {
                       "id":  "symbol:type:LifecycleFixtureCorrectionTests",
@@ -1347,28 +1311,10 @@
                       "path":  "src/ChairSide.Board/Services/ProjectionAssumptionChecklist.cs"
                   },
                   {
-                      "id":  "symbol:type:of",
-                      "label":  "of",
-                      "type":  "CodeType",
-                      "path":  "src/ChairSide.Board/Services/DemoBoardStore.cs"
-                  },
-                  {
-                      "id":  "symbol:type:on",
-                      "label":  "on",
-                      "type":  "CodeType",
-                      "path":  "src/ChairSide.Board/Services/SqliteBoardRepository.cs"
-                  },
-                  {
                       "id":  "symbol:type:ParsedSeatRequest",
                       "label":  "ParsedSeatRequest",
                       "type":  "CodeType",
                       "path":  "src/ChairSide.Board/Program.cs"
-                  },
-                  {
-                      "id":  "symbol:type:persisted",
-                      "label":  "persisted",
-                      "type":  "CodeType",
-                      "path":  "tests/ChairSide.Board.Tests/BoardStoreTests.cs"
                   },
                   {
                       "id":  "symbol:type:PersistedReadyHandoff",
@@ -1839,12 +1785,6 @@
                       "path":  "src/ChairSide.Board/Services/DemoBoardStore.cs"
                   },
                   {
-                      "id":  "symbol:type:so",
-                      "label":  "so",
-                      "type":  "CodeType",
-                      "path":  "src/ChairSide.Board/Services/DemoBoardStore.cs"
-                  },
-                  {
                       "id":  "symbol:type:SqliteBoardRepository",
                       "label":  "SqliteBoardRepository",
                       "type":  "CodeType",
@@ -1909,18 +1849,6 @@
                       "label":  "TestWorkspace",
                       "type":  "CodeType",
                       "path":  "tests/ChairSide.Board.Tests/BoardStoreTests.cs"
-                  },
-                  {
-                      "id":  "symbol:type:the",
-                      "label":  "the",
-                      "type":  "CodeType",
-                      "path":  "src/ChairSide.Board/Services/SqliteBoardRepository.cs"
-                  },
-                  {
-                      "id":  "symbol:type:truthful",
-                      "label":  "truthful",
-                      "type":  "CodeType",
-                      "path":  "tests/ChairSide.Board.Tests/FaultedReadyCancellationTests.cs"
                   },
                   {
                       "id":  "symbol:type:UpdateAssignmentRequest",
@@ -2262,11 +2190,6 @@
                   },
                   {
                       "from":  "file:src/ChairSide.Board/Services/DemoBoardStore.cs",
-                      "to":  "symbol:type:always",
-                      "label":  "declares"
-                  },
-                  {
-                      "from":  "file:src/ChairSide.Board/Services/DemoBoardStore.cs",
                       "to":  "symbol:type:BoardSnapshot",
                       "label":  "declares"
                   },
@@ -2357,11 +2280,6 @@
                   },
                   {
                       "from":  "file:src/ChairSide.Board/Services/DemoBoardStore.cs",
-                      "to":  "symbol:type:of",
-                      "label":  "declares"
-                  },
-                  {
-                      "from":  "file:src/ChairSide.Board/Services/DemoBoardStore.cs",
                       "to":  "symbol:type:ProcedureCategory",
                       "label":  "declares"
                   },
@@ -2413,11 +2331,6 @@
                   {
                       "from":  "file:src/ChairSide.Board/Services/DemoBoardStore.cs",
                       "to":  "symbol:type:SeedReportDataResult",
-                      "label":  "declares"
-                  },
-                  {
-                      "from":  "file:src/ChairSide.Board/Services/DemoBoardStore.cs",
-                      "to":  "symbol:type:so",
                       "label":  "declares"
                   },
                   {
@@ -2797,16 +2710,6 @@
                   },
                   {
                       "from":  "file:src/ChairSide.Board/Services/SqliteBoardRepository.cs",
-                      "to":  "symbol:type:and",
-                      "label":  "declares"
-                  },
-                  {
-                      "from":  "file:src/ChairSide.Board/Services/SqliteBoardRepository.cs",
-                      "to":  "symbol:type:carries",
-                      "label":  "declares"
-                  },
-                  {
-                      "from":  "file:src/ChairSide.Board/Services/SqliteBoardRepository.cs",
                       "to":  "symbol:type:DoctorWorkingRoomLookupResult",
                       "label":  "declares"
                   },
@@ -2817,17 +2720,7 @@
                   },
                   {
                       "from":  "file:src/ChairSide.Board/Services/SqliteBoardRepository.cs",
-                      "to":  "symbol:type:on",
-                      "label":  "declares"
-                  },
-                  {
-                      "from":  "file:src/ChairSide.Board/Services/SqliteBoardRepository.cs",
                       "to":  "symbol:type:SqliteBoardRepository",
-                      "label":  "declares"
-                  },
-                  {
-                      "from":  "file:src/ChairSide.Board/Services/SqliteBoardRepository.cs",
-                      "to":  "symbol:type:the",
                       "label":  "declares"
                   },
                   {
@@ -2847,27 +2740,7 @@
                   },
                   {
                       "from":  "file:tests/ChairSide.Board.Tests/BoardStoreTests.cs",
-                      "to":  "symbol:type:a",
-                      "label":  "declares"
-                  },
-                  {
-                      "from":  "file:tests/ChairSide.Board.Tests/BoardStoreTests.cs",
                       "to":  "symbol:type:BoardStoreTests",
-                      "label":  "declares"
-                  },
-                  {
-                      "from":  "file:tests/ChairSide.Board.Tests/BoardStoreTests.cs",
-                      "to":  "symbol:type:exists",
-                      "label":  "declares"
-                  },
-                  {
-                      "from":  "file:tests/ChairSide.Board.Tests/BoardStoreTests.cs",
-                      "to":  "symbol:type:for",
-                      "label":  "declares"
-                  },
-                  {
-                      "from":  "file:tests/ChairSide.Board.Tests/BoardStoreTests.cs",
-                      "to":  "symbol:type:is",
                       "label":  "declares"
                   },
                   {
@@ -2893,11 +2766,6 @@
                   {
                       "from":  "file:tests/ChairSide.Board.Tests/BoardStoreTests.cs",
                       "to":  "symbol:type:NoopHubClients",
-                      "label":  "declares"
-                  },
-                  {
-                      "from":  "file:tests/ChairSide.Board.Tests/BoardStoreTests.cs",
-                      "to":  "symbol:type:persisted",
                       "label":  "declares"
                   },
                   {
@@ -2953,11 +2821,6 @@
                   {
                       "from":  "file:tests/ChairSide.Board.Tests/FaultedReadyCancellationTests.cs",
                       "to":  "symbol:type:FaultedReadyCancellationTests",
-                      "label":  "declares"
-                  },
-                  {
-                      "from":  "file:tests/ChairSide.Board.Tests/FaultedReadyCancellationTests.cs",
-                      "to":  "symbol:type:truthful",
                       "label":  "declares"
                   },
                   {
@@ -3543,6 +3406,11 @@
                   {
                       "from":  "repo:chairside",
                       "to":  "file:tests/ChairSide.Board.Tests/ScheduleFitReportTests.cs",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:tests/knowledge-graph/New-ChairSideKnowledgeGraph.Tests.ps1",
                       "label":  "contains"
                   },
                   {
