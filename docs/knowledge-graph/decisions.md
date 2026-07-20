@@ -62,7 +62,7 @@ This file records decisions that should survive across tasks, PRs, and debugging
 
 ## Development seed
 
-**Decision:** Demo data seeds only outside Production when all operational tables are empty before configured-room initialization. The seed is persisted, and demo Ready rooms have canonical episodes, assignments, and owned Active handoffs.
+**Decision:** Demo data seeds only in Development when all operational tables are empty before configured-room initialization. The seed is persisted, and demo Ready rooms have canonical episodes, assignments, and owned Active handoffs. Fresh Training and Production databases initialize configured rooms as Available.
 
 **Rationale:** A first run should be useful, while restart must restore and never overwrite durable state.
 
@@ -71,6 +71,14 @@ This file records decisions that should survive across tasks, PRs, and debugging
 **Decision:** Stress-fixture reset atomically deletes completed cycles, all Active handoffs, and active rooms, then recreates configured Available rooms. Withdrawn, Accepted, and Terminated handoffs and aborted assignments survive.
 
 **Rationale:** The command promises deterministic current fixture state and cannot leave an orphan Active handoff. It does not promise convergence of total preserved history or generated GUID identities.
+
+## Environment and maintenance preflight
+
+**Decision:** ChairSide recognizes exactly Development, Training, and Production. Names compare case-insensitively but may not be null, blank, padded, or unknown. The environment is resolved before application build and service resolution. Every known destructive maintenance command is allowlisted in Development and Training and refused in Production before the application or repository is constructed; unknown future commands default to denied.
+
+**Rationale:** Environment ambiguity and late maintenance authorization can point destructive behavior at the wrong database. One canonical preflight gives normal and maintenance startup the same fail-closed deployment semantics while preserving command-specific confirmation tokens.
+
+**Training posture:** Training does not receive Development demo seeding or the Development HTTP seed endpoint, initializes fresh rooms as Available, disables the Demo Timer, rejects simulated elapsed time, rejects the sample Development admin token when protection is enabled, and emits the same disabled-security warnings as Production. Environment-specific Training database paths and deployment-role markers remain separate work.
 
 ## Reporting population semantics
 

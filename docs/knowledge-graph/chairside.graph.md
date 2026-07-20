@@ -74,6 +74,9 @@ flowchart LR
     Realtime["StoreOrService: SignalR + polling fallback"] --> BoardUi
 
     DevelopmentSeed["DeploymentAsset: Development demo seed"] --> Persistence
+    EnvironmentPolicy["DesignDecision: Recognized environment preflight"] --> DevelopmentSeed
+    EnvironmentPolicy --> MaintenanceReset
+    EnvironmentPolicy --> DeployedSecurity["ConfigOption: Training / Production security posture"]
     MaintenanceReset["DeploymentAsset: Stress fixture reset"] --> Persistence
     MaintenanceReset --> CanonicalFixtures["TestGuard: Canonical Ready fixtures"]
 ```
@@ -97,7 +100,9 @@ flowchart LR
 
 ## Fixture and seed invariants
 
-- Non-Production demo seeding occurs only when all operational tables are empty, persists canonical Ready handoffs, and does not overwrite durable state on restart.
+- Development demo seeding occurs only when all operational tables are empty, persists canonical Ready handoffs, and does not overwrite durable state on restart. Fresh Training and Production databases initialize configured rooms as Available.
+- Only Development, Training, and Production are recognized. Unknown names fail before application build, service resolution, database access, log creation, or endpoint mapping.
+- Destructive maintenance is allowlisted in Development and Training and refused in Production before application build or repository construction.
 - Maintenance reset atomically deletes completed cycles, all Active handoffs, and active rooms, then recreates Available rooms.
 - Withdrawn, Accepted, and Terminated handoffs and aborted assignments survive maintenance reset.
 - Repeated fixtures converge in current state and Active-handoff counts, not total resolved-history rows or generated identities.

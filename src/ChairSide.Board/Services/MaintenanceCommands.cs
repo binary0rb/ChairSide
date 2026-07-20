@@ -228,15 +228,6 @@ public static class MaintenanceCommands
         return (completedCycles, null);
     }
 
-    /// <summary>
-    /// True for maintenance commands that must never run against a Production database, regardless of
-    /// a correct confirmation token. The environment check itself lives in the maintenance runner;
-    /// this keeps the "which commands are Production-forbidden" policy pure and unit-testable.
-    /// </summary>
-    public static bool IsProductionForbidden(string? command) =>
-        string.Equals(command, LargeSyntheticSeedCommand, StringComparison.Ordinal)
-        || string.Equals(command, StressFixtureCommand, StringComparison.Ordinal);
-
     // Returns the value following the given flag, or null when the flag is absent or has no value.
     private static string? GetFlagValue(string[] args, string flag)
     {
@@ -249,5 +240,66 @@ public static class MaintenanceCommands
         }
 
         return null;
+    }
+}
+
+/// <summary>
+/// Fail-closed environment gate for operator-run maintenance. Confirmation-token and command-shape
+/// validation remain in <see cref="MaintenanceCommands.Resolve"/>; this gate runs before the callback
+/// is allowed to build the application or resolve any service.
+/// </summary>
+public static class MaintenanceExecutionPolicy
+{
+    private static readonly HashSet<string> AllowedDestructiveCommands = new(StringComparer.Ordinal)
+    {
+        MaintenanceCommands.TrainingSeedCommand,
+        MaintenanceCommands.EmptyBetaCommand,
+        MaintenanceCommands.LargeSyntheticSeedCommand,
+        MaintenanceCommands.StressFixtureCommand
+    };
+
+    public static bool IsAllowed(DeploymentEnvironment environment, string? command) =>
+        environment.Role is DeploymentRole.Development or DeploymentRole.Training
+        && command is not null
+        && AllowedDestructiveCommands.Contains(command);
+
+    public static int Execute(
+        DeploymentEnvironment environment,
+        MaintenanceResolution resolution,
+        Func<int> authorizedAction,
+        TextWriter? error = null)
+    {
+        ArgumentNullException.ThrowIfNull(environment);
+        ArgumentNullException.ThrowIfNull(resolution);
+        ArgumentNullException.ThrowIfNull(authorizedAction);
+        error ??= Console.Error;
+
+        if (resolution.Outcome == MaintenanceOutcome.NotRequested)
+        {
+            WriteRefusal(error, "No maintenance command was requested.");
+            return 2;
+        }
+
+        if (resolution.Outcome == MaintenanceOutcome.Refused)
+        {
+            WriteRefusal(error, resolution.RefusalReason ?? "Maintenance command was refused.");
+            return 2;
+        }
+
+        if (!IsAllowed(environment, resolution.Command))
+        {
+            WriteRefusal(
+                error,
+                $"'{resolution.Command ?? "<unknown>"}' cannot run in {environment.EnvironmentName}.");
+            return 2;
+        }
+
+        return authorizedAction();
+    }
+
+    private static void WriteRefusal(TextWriter error, string reason)
+    {
+        error.WriteLine($"[ChairSide Maintenance] Refused: {reason}");
+        error.WriteLine("[ChairSide Maintenance] No data was changed.");
     }
 }

@@ -163,7 +163,9 @@ Change those values to adjust room timing without code edits. `StaleMinutes` mus
 
 `RoomCount` controls how many room states are configured. The default is 12, so Room 1 through Room 12 are active. Change `BoardOptions:RoomCount` and restart the app to use a different room count. Increasing `RoomCount` is safe and creates/loads additional rooms. Decreasing `RoomCount` hides higher-numbered rooms from the board but does not delete their persisted SQLite state. If `RoomCount` is increased again later, previous higher-room state may reappear unless it was reset or cleared intentionally.
 
-`BoardPersistenceOptions:DatabasePath` controls the SQLite database location. The default development path is local to the app project, `./data/chairside-dev.db`. For staging or production, set this to an operational data location such as `C:\ChairSide\Data\chairside.db` through environment-specific configuration or command-line configuration:
+ChairSide recognizes exactly three application environments: `Development`, `Training`, and `Production` (case-insensitive, without surrounding whitespace). Startup refuses null, blank, padded, or any other environment name before application build, service resolution, database access, log creation, or endpoint mapping.
+
+`BoardPersistenceOptions:DatabasePath` controls the SQLite database location. The default development path is local to the app project, `./data/chairside-dev.db`. For Training or Production, set this to the intended operational data location through environment-specific configuration or command-line configuration. Environment-specific database path isolation is not implemented by this change and remains a separate deployment requirement.
 
 ```powershell
 dotnet run --project .\src\ChairSide.Board\ChairSide.Board.csproj --BoardPersistenceOptions:DatabasePath="C:\ChairSide\Data\chairside.db"
@@ -191,7 +193,7 @@ Read-only board views and APIs remain open for the internal board: `/master.html
 
 Doctor-arrival conflict resolution preserves the room-local workflow: resolving from the new room can auto-complete the previous room into Turnover only after the server confirms the same doctor conflict. The resolving room and auto-completed room are both audit-logged.
 
-Production tokens must not use the `dev-room-*-token` sample values. Supply production tokens through environment-specific configuration or deployment-time configuration, and do not commit real room tokens as source-controlled secrets.
+Training and Production must use separate environment-specific room tokens when room-device binding is enabled. Do not use the `dev-room-*-token` sample values in either deployed environment. Supply tokens through environment-specific or deployment-time configuration, and do not commit real room tokens as source-controlled secrets.
 
 Room tokens are operational controls, not full authentication. They do not replace HTTPS and do not provide user-level access control. Before enabling room-device binding for a pilot, define a room-token delivery plan for each tablet. Full access control, CSRF protection, and stronger room-device binding remain future hardening work before broader rollout.
 
@@ -216,11 +218,11 @@ Admin/report access protection is a first-pass shared-token control for report d
 
 Report API calls send the token in the `X-ChairSide-Admin-Token` header. The reports page uses a queryless browser-session prompt and stores the entered token in `sessionStorage` for that tab/session. Do not place admin/report tokens in URLs because URLs may be logged by IIS, browsers, proxies, network tools, and browser history.
 
-This is not full user authentication and does not provide user identity, roles, audit trails, CSRF protection, or network encryption. Production tokens must not use the `dev-admin-token` sample value and should be supplied through environment-specific configuration or deployment-time configuration, not committed as real source-controlled secrets.
+This is not full user authentication and does not provide user identity, roles, audit trails, CSRF protection, or network encryption. Training and Production must use separate environment-specific admin/report tokens and must not use the `dev-admin-token` sample value. Supply them through environment-specific or deployment-time configuration, not as real source-controlled secrets.
 
-On startup, ChairSide logs whether room-device binding and admin/report access protection are enabled. In Production, the app logs a warning when either control is disabled, but it does not fail startup solely because they are disabled.
+On startup, ChairSide logs whether room-device binding and admin/report access protection are enabled. In Training and Production, the app logs a warning when either control is disabled, but it does not fail startup solely because they are disabled.
 
-The room-panel Demo Timer is available by default outside Production and hidden/disabled by default in Production. To explicitly enable it for a controlled production demo, set `BoardUiOptions:DemoTimerEnabled` to `true` through environment-specific configuration. The server also enforces this setting: when disabled, submitted demo elapsed values are ignored; when enabled, server-side demo elapsed values remain clamped.
+The room-panel Demo Timer is available by default in Development. Training always disables it and refuses simulated elapsed-time behavior. Production remains hidden/disabled by default and retains its existing explicit `BoardUiOptions:DemoTimerEnabled` presentation override; server-side simulated elapsed time remains Development-only.
 
 Room expiration:
 
@@ -434,7 +436,7 @@ Deployment smoke checklist:
 
 The development database is stored at `src/ChairSide.Board/data/chairside-dev.db` by default. Stop the app and delete that file, plus any matching `chairside-dev.db-wal` or `chairside-dev.db-shm` files, to reset local demo data.
 
-Demo room states are seeded only outside Production when `active_rooms`, `completed_room_cycles`, `ready_handoffs`, and `aborted_room_assignments` are all empty before configured rooms are initialized. The seed is persisted, canonical Ready rooms own Active handoffs, and restart restores the seed or any subsequently modified durable state without overwriting or reseeding it. Production starts with configured Available rooms and never seeds demo activity.
+Demo room states are seeded only in Development when `active_rooms`, `completed_room_cycles`, `ready_handoffs`, and `aborted_room_assignments` are all empty before configured rooms are initialized. The seed is persisted, canonical Ready rooms own Active handoffs, and restart restores the seed or any subsequently modified durable state without overwriting or reseeding it. Fresh Training and Production databases start with configured Available rooms and never seed demo activity.
 
 ## Deterministic Stress Fixtures (Maintenance)
 
@@ -468,7 +470,7 @@ dotnet run --project .\src\ChairSide.Board\ChairSide.Board.csproj -- --environme
 dotnet run --project .\src\ChairSide.Board\ChairSide.Board.csproj -- --environment Development --BoardPersistenceOptions:DatabasePath=.\src\ChairSide.Board\data\chairside-dev.db --maintenance reset-stress-fixture --confirm RESET_STRESS_FIXTURE --profile all-scenarios
 ```
 
-Like `reset-large-synthetic-report-data`, this command is destructive to whatever database it targets. One transaction deletes completed cycles, every Active handoff, and active rooms, then recreates configured Available rooms before the selected fixture runs. Withdrawn, Accepted, and Terminated handoffs and aborted assignments are preserved. Repeated runs converge in current room state and Active-handoff counts; preserved resolved-history counts and generated GUID identities are not deterministic promises. Use it only against a Development/test database. It hard-refuses Production and has no HTTP or startup path.
+Like `reset-large-synthetic-report-data`, this command is destructive to whatever database it targets. One transaction deletes completed cycles, every Active handoff, and active rooms, then recreates configured Available rooms before the selected fixture runs. Withdrawn, Accepted, and Terminated handoffs and aborted assignments are preserved. Repeated runs converge in current room state and Active-handoff counts; preserved resolved-history counts and generated GUID identities are not deterministic promises. The four known maintenance commands are allowlisted only in Development and Training, retain their command-specific confirmation requirements, and all hard-refuse Production before application build or repository construction. Maintenance has no HTTP or normal-startup path.
 
 ## Reports
 
@@ -492,7 +494,7 @@ A future `ReportTimeZoneOptions` design could align report windows to clinic-loc
 
 ## Demo Aging
 
-Room panels include a `Demo Timer` select outside Production. Use `Start now`, `Simulate aging wait`, or `Simulate stale wait` before seating a room to test the aging and stale board states without waiting for the configured thresholds. In Production, the Demo Timer is hidden/disabled unless `BoardUiOptions:DemoTimerEnabled` is explicitly set to `true`. Direct API submissions of demo elapsed minutes are ignored when the setting is disabled.
+Development room panels include a `Demo Timer` select. Use `Start now`, `Simulate aging wait`, or `Simulate stale wait` before seating a room to test the aging and stale board states without waiting for the configured thresholds. Training keeps the control disabled even if configuration requests it and rejects nonzero simulated elapsed values. Production retains its existing optional presentation override, while server-side simulated elapsed values remain Development-only.
 
 ## Demo Script
 
