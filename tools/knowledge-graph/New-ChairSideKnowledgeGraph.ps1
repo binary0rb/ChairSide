@@ -98,6 +98,7 @@ function Select-Matches {
     param(
         [Parameter(Mandatory = $true)][string]$Content,
         [Parameter(Mandatory = $true)][string]$Pattern,
+        [AllowNull()]$CodeMask = $null,
         [int]$Max = 40
     )
 
@@ -109,6 +110,18 @@ function Select-Matches {
     )
 
     foreach ($match in $matches) {
+        if ($null -ne $CodeMask) {
+            if ($match.Index -ge $CodeMask.Length) {
+                continue
+            }
+
+            $maskedLength = [Math]::Min($match.Length, $CodeMask.Length - $match.Index)
+            $maskedMatch = $CodeMask.Substring($match.Index, $maskedLength)
+            if (-not [System.Text.RegularExpressions.Regex]::IsMatch($maskedMatch, '\S')) {
+                continue
+            }
+        }
+
         if ($match.Groups.Count -gt 1) {
             $value = $match.Groups[1].Value.Trim()
 
@@ -123,6 +136,183 @@ function Select-Matches {
     }
 
     return $result
+}
+
+function Set-CSharpMaskedRange {
+    param(
+        [Parameter(Mandatory = $true)][System.Text.StringBuilder]$Characters,
+        [Parameter(Mandatory = $true)][int]$Start,
+        [Parameter(Mandatory = $true)][int]$Length
+    )
+
+    $end = [Math]::Min($Characters.Length, $Start + $Length)
+    for ($index = $Start; $index -lt $end; $index++) {
+        if ($Characters[$index] -ne "`r" -and $Characters[$index] -ne "`n") {
+            $Characters[$index] = " "
+        }
+    }
+}
+
+function Get-CSharpCodeMask {
+    param([Parameter(Mandatory = $true)][string]$Content)
+
+    $characters = [System.Text.StringBuilder]::new($Content)
+    $contentLength = $Content.Length
+    $index = 0
+
+    while ($index -lt $contentLength) {
+        $literalStart = -1
+        $quoteIndex = -1
+        $quoteCount = 0
+        $isVerbatim = $false
+        $isCharacter = $false
+
+        if ($Content[$index] -eq "/" -and $index + 1 -lt $contentLength) {
+            if ($Content[$index + 1] -eq "/") {
+                $end = $index + 2
+                while ($end -lt $contentLength -and $Content[$end] -ne "`r" -and $Content[$end] -ne "`n") {
+                    $end++
+                }
+
+                Set-CSharpMaskedRange -Characters $characters -Start $index -Length ($end - $index)
+                $index = $end
+                continue
+            }
+
+            if ($Content[$index + 1] -eq "*") {
+                $end = $index + 2
+                while ($end + 1 -lt $contentLength -and -not ($Content[$end] -eq "*" -and $Content[$end + 1] -eq "/")) {
+                    $end++
+                }
+
+                if ($end + 1 -lt $contentLength) {
+                    $end += 2
+                }
+                else {
+                    $end = $contentLength
+                }
+
+                Set-CSharpMaskedRange -Characters $characters -Start $index -Length ($end - $index)
+                $index = $end
+                continue
+            }
+        }
+
+        if ($Content[$index] -eq "'") {
+            $literalStart = $index
+            $quoteIndex = $index
+            $quoteCount = 1
+            $isCharacter = $true
+        }
+        elseif ($Content[$index] -eq '"') {
+            $literalStart = $index
+            $quoteIndex = $index
+            while ($quoteIndex + $quoteCount -lt $contentLength -and $Content[$quoteIndex + $quoteCount] -eq '"') {
+                $quoteCount++
+            }
+        }
+        elseif ($Content[$index] -eq "@" -and $index + 1 -lt $contentLength -and $Content[$index + 1] -eq '"') {
+            $literalStart = $index
+            $quoteIndex = $index + 1
+            $quoteCount = 1
+            $isVerbatim = $true
+        }
+        elseif ($Content[$index] -eq "@" -and $index + 2 -lt $contentLength -and $Content[$index + 1] -eq '$' -and $Content[$index + 2] -eq '"') {
+            $literalStart = $index
+            $quoteIndex = $index + 2
+            $quoteCount = 1
+            $isVerbatim = $true
+        }
+        elseif ($Content[$index] -eq '$') {
+            $prefixEnd = $index
+            while ($prefixEnd -lt $contentLength -and $Content[$prefixEnd] -eq '$') {
+                $prefixEnd++
+            }
+
+            if ($prefixEnd + 1 -lt $contentLength -and $Content[$prefixEnd] -eq "@" -and $Content[$prefixEnd + 1] -eq '"') {
+                $literalStart = $index
+                $quoteIndex = $prefixEnd + 1
+                $quoteCount = 1
+                $isVerbatim = $true
+            }
+            elseif ($prefixEnd -lt $contentLength -and $Content[$prefixEnd] -eq '"') {
+                $literalStart = $index
+                $quoteIndex = $prefixEnd
+                while ($quoteIndex + $quoteCount -lt $contentLength -and $Content[$quoteIndex + $quoteCount] -eq '"') {
+                    $quoteCount++
+                }
+            }
+        }
+
+        if ($literalStart -lt 0) {
+            $index++
+            continue
+        }
+
+        if (-not $isCharacter -and $quoteCount -ge 3) {
+            $delimiterLength = $quoteCount
+            $end = $quoteIndex + $delimiterLength
+
+            while ($end -lt $contentLength) {
+                if ($Content[$end] -ne '"') {
+                    $end++
+                    continue
+                }
+
+                $closingQuoteCount = 0
+                while ($end + $closingQuoteCount -lt $contentLength -and $Content[$end + $closingQuoteCount] -eq '"') {
+                    $closingQuoteCount++
+                }
+
+                if ($closingQuoteCount -ge $delimiterLength) {
+                    $end += $delimiterLength
+                    break
+                }
+
+                $end += $closingQuoteCount
+            }
+
+            Set-CSharpMaskedRange -Characters $characters -Start $literalStart -Length ($end - $literalStart)
+            $index = $end
+            continue
+        }
+
+        $end = $quoteIndex + 1
+        while ($end -lt $contentLength) {
+            if ($isVerbatim) {
+                if ($Content[$end] -eq '"') {
+                    if ($end + 1 -lt $contentLength -and $Content[$end + 1] -eq '"') {
+                        $end += 2
+                        continue
+                    }
+
+                    $end++
+                    break
+                }
+
+                $end++
+                continue
+            }
+
+            if ($Content[$end] -eq "\") {
+                $end = [Math]::Min($contentLength, $end + 2)
+                continue
+            }
+
+            $closingCharacter = if ($isCharacter) { "'" } else { '"' }
+            if ($Content[$end] -eq $closingCharacter) {
+                $end++
+                break
+            }
+
+            $end++
+        }
+
+        Set-CSharpMaskedRange -Characters $characters -Start $literalStart -Length ($end - $literalStart)
+        $index = $end
+    }
+
+    return $characters.ToString()
 }
 
 function Get-DiscoveredSymbols {
@@ -142,10 +332,11 @@ function Get-DiscoveredSymbols {
     }
 
     if ($Kind -eq "CSharp" -or $Kind -eq "Razor") {
-        $symbols.types = @(Select-Matches -Content $Content -Pattern '\b(?:public|internal|private|protected)?\s*(?:static\s+)?(?:partial\s+)?(?:class|record|interface|enum|struct)\s+([A-Za-z_][A-Za-z0-9_]*)')
-        $symbols.methods = @(Select-Matches -Content $Content -Pattern '\b(?:public|internal|private|protected)\s+(?:async\s+)?(?:static\s+)?[A-Za-z0-9_<>,\[\]\?\.]+\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(')
-        $symbols.routes = @(Select-Matches -Content $Content -Pattern 'Map(?:Get|Post|Put|Delete|Patch|Hub)\s*(?:<[^>]+>)?\s*\(\s*"([^"]+)"')
-        $symbols.hubs = @(Select-Matches -Content $Content -Pattern 'MapHub\s*<\s*([A-Za-z_][A-Za-z0-9_]*)\s*>')
+        $codeMask = Get-CSharpCodeMask -Content $Content
+        $symbols.types = @(Select-Matches -Content $Content -CodeMask $codeMask -Pattern '\b(?:public|internal|private|protected)?\s*(?:static\s+)?(?:partial\s+)?(?:class|record|interface|enum|struct)\s+([A-Za-z_][A-Za-z0-9_]*)')
+        $symbols.methods = @(Select-Matches -Content $Content -CodeMask $codeMask -Pattern '\b(?:public|internal|private|protected)\s+(?:async\s+)?(?:static\s+)?[A-Za-z0-9_<>,\[\]\?\.]+\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(')
+        $symbols.routes = @(Select-Matches -Content $Content -CodeMask $codeMask -Pattern 'Map(?:Get|Post|Put|Delete|Patch|Hub)\s*(?:<[^>]+>)?\s*\(\s*"([^"]+)"')
+        $symbols.hubs = @(Select-Matches -Content $Content -CodeMask $codeMask -Pattern 'MapHub\s*<\s*([A-Za-z_][A-Za-z0-9_]*)\s*>')
     }
 
     if ($Kind -eq "Css") {
