@@ -5031,6 +5031,47 @@ public sealed class BoardStoreTests
     }
 
     [Fact]
+    public void Board_snapshot_identifies_only_the_Training_environment()
+    {
+        using var workspace = TestWorkspace.Create();
+
+        var development = StoreContext.Create(
+            workspace,
+            environmentName: ChairSideEnvironmentNames.Development,
+            databasePath: Path.Combine(workspace.DataRoot, "snapshot-development.db"));
+        var training = StoreContext.Create(
+            workspace,
+            environmentName: ChairSideEnvironmentNames.Training,
+            databasePath: Path.Combine(workspace.DataRoot, "snapshot-training.db"));
+        var production = StoreContext.Create(
+            workspace,
+            environmentName: ChairSideEnvironmentNames.Production,
+            databasePath: Path.Combine(workspace.DataRoot, "snapshot-production.db"));
+
+        Assert.False(development.Store.GetSnapshot().IsTraining);
+        Assert.True(training.Store.GetSnapshot().IsTraining);
+        Assert.False(production.Store.GetSnapshot().IsTraining);
+    }
+
+    [Fact]
+    public void Client_Training_badge_is_snapshot_driven_shared_and_duplicate_safe()
+    {
+        var root = FindRepositoryRoot();
+        var boardScript = File.ReadAllText(Path.Combine(root, "src", "ChairSide.Board", "wwwroot", "board.js"));
+        var styles = File.ReadAllText(Path.Combine(root, "src", "ChairSide.Board", "wwwroot", "styles.css"));
+
+        Assert.Contains("syncTrainingEnvironmentBadge(snapshot.isTraining === true)", boardScript, StringComparison.Ordinal);
+        Assert.Contains("document.getElementById(\"trainingEnvironmentBadge\")", boardScript, StringComparison.Ordinal);
+        Assert.Contains("if (!isTraining)", boardScript, StringComparison.Ordinal);
+        Assert.Contains("badge?.remove()", boardScript, StringComparison.Ordinal);
+        Assert.Contains("if (badge)", boardScript, StringComparison.Ordinal);
+        Assert.Contains("document.querySelector(\".brand-lockup\")", boardScript, StringComparison.Ordinal);
+        Assert.Contains("badge.textContent = \"TRAINING\"", boardScript, StringComparison.Ordinal);
+        Assert.DoesNotContain("hostname", boardScript, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(".training-environment-badge", styles, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Zero_demo_elapsed_uses_current_time_regardless_of_demo_timer_visibility()
     {
         using var workspace = TestWorkspace.Create();

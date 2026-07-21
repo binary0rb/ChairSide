@@ -645,6 +645,12 @@
                       "path":  "tests/knowledge-graph/New-ChairSideKnowledgeGraph.Tests.ps1"
                   },
                   {
+                      "id":  "file:tests/scripts/Reset-ChairSideTrainingData.Tests.ps1",
+                      "label":  "tests/scripts/Reset-ChairSideTrainingData.Tests.ps1",
+                      "type":  "File",
+                      "path":  "tests/scripts/Reset-ChairSideTrainingData.Tests.ps1"
+                  },
+                  {
                       "id":  "file:tools/knowledge-graph/New-ChairSideKnowledgeGraph.ps1",
                       "label":  "tools/knowledge-graph/New-ChairSideKnowledgeGraph.ps1",
                       "type":  "File",
@@ -3785,6 +3791,11 @@
                   {
                       "from":  "repo:chairside",
                       "to":  "file:tests/knowledge-graph/New-ChairSideKnowledgeGraph.Tests.ps1",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:tests/scripts/Reset-ChairSideTrainingData.Tests.ps1",
                       "label":  "contains"
                   },
                   {

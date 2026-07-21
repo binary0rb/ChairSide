@@ -2968,6 +2968,22 @@ button:disabled {
   margin: 0;
 }
 
+.training-environment-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  padding: 4px 10px;
+  border: 2px solid #9a3412;
+  border-radius: 8px;
+  background: #ffedd5;
+  color: #9a3412;
+  font-size: 13px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  line-height: 1;
+  white-space: nowrap;
+}
+
 .brand-logo {
   display: block;
   width: auto;
