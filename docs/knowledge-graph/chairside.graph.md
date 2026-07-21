@@ -79,7 +79,10 @@ flowchart LR
     EnvironmentPolicy --> DeployedSecurity["ConfigOption: Training / Production security posture"]
     EnvironmentPolicy --> DatabaseIsolation["DesignDecision: Deployed database path isolation"]
     DatabaseIsolation --> Persistence
+    DatabaseIsolation --> DatabaseIdentity["DesignDecision: Persisted deployment-role identity"]
+    DatabaseIdentity --> Persistence
     MaintenanceReset["DeploymentAsset: Stress fixture reset"] --> Persistence
+    DatabaseIdentity --> MaintenanceReset
     MaintenanceReset --> CanonicalFixtures["TestGuard: Canonical Ready fixtures"]
 ```
 
@@ -106,7 +109,10 @@ flowchart LR
 - Only Development, Training, and Production are recognized. Unknown names fail before application build, service resolution, database access, log creation, or endpoint mapping.
 - Destructive maintenance is allowlisted in Development and Training and refused in Production before application build or repository construction.
 - Production uses only `C:\ChairSide\Data\chairside.db`; Training uses only `C:\ChairSide\Training\Data\chairside-training.db` and logs to `C:\ChairSide\Training\Logs`. Deployed paths fail before SQLite access when they are non-canonical, cross environment boundaries, enter an application/content root, or contain an existing reparse-point component. Development paths remain flexible outside the protected deployed roots.
+- Production and Training require matching immutable deployment identity rows before ordinary schema mutation, migration, room initialization, maintenance mutation, or endpoint mapping. Development requires no marker but refuses deployed or malformed marker state.
+- Fresh deployed marker and current schema creation are atomic. Existing unmarked deployed databases are always refused. Formal Production begins with a genuinely new canonical database and a new reporting history on the approved go-live date.
 - Maintenance reset atomically deletes completed cycles, all Active handoffs, and active rooms, then recreates Available rooms.
+- All four row-level maintenance reset/seed entry points preserve the deployment identity exactly.
 - Withdrawn, Accepted, and Terminated handoffs and aborted assignments survive maintenance reset.
 - Repeated fixtures converge in current state and Active-handoff counts, not total resolved-history rows or generated identities.
 

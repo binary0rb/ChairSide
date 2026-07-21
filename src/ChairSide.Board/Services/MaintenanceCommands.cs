@@ -259,8 +259,8 @@ public static class MaintenanceExecutionPolicy
     };
 
     public static bool IsAllowed(DeploymentEnvironment environment, string? command) =>
-        environment.Role is DeploymentRole.Development or DeploymentRole.Training
-        && command is not null
+        command is not null
+        && environment.Role is DeploymentRole.Development or DeploymentRole.Training
         && AllowedDestructiveCommands.Contains(command);
 
     public static int Execute(

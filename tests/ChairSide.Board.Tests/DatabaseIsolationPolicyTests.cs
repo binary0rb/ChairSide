@@ -339,7 +339,8 @@ public sealed class DatabaseIsolationPolicyTests(ITestOutputHelper testOutput)
             Microsoft.Extensions.Options.Options.Create(new BoardPersistenceOptions { DatabasePath = databasePath }),
             new TestWebHostEnvironment(workspace.ContentRoot, ChairSideEnvironmentNames.Production),
             deploymentEnvironment,
-            new DatabaseIsolationPolicy(layout, recordingInspector));
+            new DatabaseIsolationPolicy(layout, recordingInspector),
+            new DatabaseDeploymentIdentityPolicy());
 
         Assert.Equal(Path.GetFullPath(databasePath), repository.DatabasePath, StringComparer.OrdinalIgnoreCase);
         Assert.True(Directory.Exists(Path.GetDirectoryName(databasePath)));

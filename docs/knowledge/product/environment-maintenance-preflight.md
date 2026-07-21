@@ -54,8 +54,41 @@ access errors fail closed. The pure policy creates nothing. After it succeeds, t
 create a missing canonical parent directory, must rescan all components, then performs its write
 test before configuring SQLite or running schema/room initialization.
 
-Persisted database deployment-role markers remain deferred to issue #143 PR C. This slice does not
-complete Training IIS deployment.
+## Database deployment identity
+
+Production and Training databases carry one immutable row in `chairside_deployment_identity`. The
+row uses singleton key 1, exact role `Production` or `Training`, identity schema version 1, a UTC
+round-trip establishment timestamp, and the sole provenance `FreshDatabase`. Development creates
+and requires no marker, but refuses any database containing a deployed or malformed reserved
+marker.
+
+```sql
+CREATE TABLE chairside_deployment_identity (
+    singleton_id INTEGER NOT NULL PRIMARY KEY CHECK (singleton_id = 1),
+    deployment_role TEXT NOT NULL CHECK (deployment_role IN ('Production', 'Training')),
+    identity_schema_version INTEGER NOT NULL CHECK (identity_schema_version = 1),
+    established_at_utc TEXT NOT NULL,
+    established_via TEXT NOT NULL
+        CHECK (established_via = 'FreshDatabase')
+) WITHOUT ROWID;
+```
+
+A genuinely new deployed database is an absent main file with no WAL/SHM companions. Its matching
+marker and current ChairSide schema/indexes commit in one immediate transaction before WAL is
+enabled. Existing zero-byte files, valid empty SQLite databases, main-file absence with sidecars,
+missing or malformed markers, and opposite roles fail closed. Existing markers are inspected
+read-only and revalidated under the normal SQLite write lock before WAL, schema changes, migrations,
+room initialization, maintenance mutation, or endpoint mapping.
+
+All ChairSide data before the approved go-live date is training, testing, demonstration, or
+stress-fixture data. The current beta database may be archived separately, but it will not be
+reused as formal Production. There is no legacy deployed-database adoption command and no automatic
+adoption behavior. Formal Production begins with a genuinely new canonical database and an empty
+reporting history; the approved go-live date begins official reporting history. Existing unmarked
+deployed databases are refused and must not be reused as Production.
+
+This implementation does not archive or clear the beta database, deploy or initialize Production,
+or complete Training IIS deployment.
 
 ## Maintenance posture
 
@@ -64,18 +97,26 @@ complete Training IIS deployment.
 allowlisted in Development and Training and refused in Production before application build or
 repository construction. Unknown commands default to denied.
 
+Authorized Training maintenance resolves the repository and validates the matching Training marker
+before any reset or seed mutation. Existing row-level reset methods preserve the marker exactly.
+Tests characterize this invariant for all four reset entry points: Training data, empty beta, large
+synthetic reporting data, and stress fixture.
+
 The existing `Reset-ChairSideTrainingData.ps1` wrapper invokes the CLI as Production and is therefore
 intentionally unusable. Updating that wrapper and completing a safe Training reset workflow belongs
-to a later issue #143 slice. Database deployment-role markers also remain separate PR C work.
+to a later issue #143 slice.
 
 ## Source and test anchors
 
 - `src/ChairSide.Board/Services/DeploymentEnvironmentPolicy.cs`
 - `src/ChairSide.Board/Services/DatabaseIsolationLayout.cs`
 - `src/ChairSide.Board/Services/DatabaseIsolationPolicy.cs`
+- `src/ChairSide.Board/Services/DatabaseDeploymentIdentityPolicy.cs`
 - `src/ChairSide.Board/Services/IReparsePointInspector.cs`
 - `src/ChairSide.Board/Services/MaintenanceCommands.cs`
 - `src/ChairSide.Board/Program.cs`
 - `src/ChairSide.Board/Services/DemoBoardStore.cs`
 - `tests/ChairSide.Board.Tests/EnvironmentMaintenancePreflightTests.cs`
 - `tests/ChairSide.Board.Tests/DatabaseIsolationPolicyTests.cs`
+- `tests/ChairSide.Board.Tests/DatabaseDeploymentIdentityPolicyTests.cs`
+- `tests/ChairSide.Board.Tests/DatabaseDeploymentIdentityProcessTests.cs`

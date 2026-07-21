@@ -38,10 +38,24 @@ Use this checklist for a small internal pilot. Do not enter PHI.
 - [ ] Review `appsettings.Production.json`.
 - [ ] Confirm `BoardPersistenceOptions:DatabasePath` is `C:\ChairSide\Data\chairside.db`.
 - [ ] Confirm startup refuses any non-canonical, application-root, Training-root, or reparse-point database path before creating SQLite files.
+- [ ] Confirm a genuinely new Production database receives exactly one `Production` / `FreshDatabase` row in `chairside_deployment_identity`.
+- [ ] Confirm a marked Training database, missing marker, malformed marker, zero-byte file, valid empty SQLite database, and orphan WAL/SHM state all fail before ordinary schema or room mutation.
 - [ ] Review and accept `RoomExpirationOptions`: active rooms expire after the configured max duration, and the after-hours sweep expires still-active rooms once per clinic day at the configured local time.
 - [ ] Confirm production secrets/tokens are environment-specific or deployment-time values.
 - [ ] Confirm no real tokens are committed to source control.
 - [ ] Confirm every destructive maintenance command is refused in Production before application build and database access.
+
+## Formal Production Data Boundary
+
+- [ ] Approve and record the go-live date that begins official reporting history.
+- [ ] Treat every ChairSide database and report from before that date as training, testing, demonstration, or stress-fixture data.
+- [ ] If the current beta database is retained, archive it separately and verify it cannot be selected by the Production application.
+- [ ] Do not copy, rename, mark, or otherwise reuse an existing beta or unmarked database as formal Production.
+- [ ] Before first Production startup, verify the canonical main database and WAL/SHM companions are genuinely absent.
+- [ ] Confirm first startup creates a new `Production` / `FreshDatabase` marker and an empty reporting history.
+- [ ] Stop if any existing unmarked deployed database is present; ChairSide provides no legacy database adoption path.
+
+These are future rollout checks. This repository change does not archive, clear, deploy, or initialize Production.
 
 ## Backup And Restore
 

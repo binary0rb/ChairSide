@@ -1,3 +1,5 @@
+using System.Security;
+
 using ChairSide.Board.Options;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Options;
@@ -13,8 +15,27 @@ public sealed class SqliteBoardRepository
         IOptions<BoardPersistenceOptions> options,
         IWebHostEnvironment environment,
         DeploymentEnvironment deploymentEnvironment,
-        DatabaseIsolationPolicy databaseIsolationPolicy)
+        DatabaseIsolationPolicy databaseIsolationPolicy,
+        DatabaseDeploymentIdentityPolicy databaseDeploymentIdentityPolicy)
+        : this(
+            options,
+            environment,
+            deploymentEnvironment,
+            databaseIsolationPolicy,
+            databaseDeploymentIdentityPolicy,
+            DatabaseInitializationTestHooks.None)
     {
+    }
+
+    internal SqliteBoardRepository(
+        IOptions<BoardPersistenceOptions> options,
+        IWebHostEnvironment environment,
+        DeploymentEnvironment deploymentEnvironment,
+        DatabaseIsolationPolicy databaseIsolationPolicy,
+        DatabaseDeploymentIdentityPolicy databaseDeploymentIdentityPolicy,
+        DatabaseInitializationTestHooks initializationHooks)
+    {
+        ArgumentNullException.ThrowIfNull(initializationHooks);
         _databasePath = databaseIsolationPolicy.ResolveAndValidate(
             options.Value.DatabasePath,
             environment.ContentRootPath,
@@ -25,16 +46,47 @@ public sealed class SqliteBoardRepository
             throw new InvalidOperationException("SQLite database path must include a directory.");
         }
 
-        Directory.CreateDirectory(directory);
-        databaseIsolationPolicy.RescanDeployedPath(_databasePath, deploymentEnvironment);
-        VerifyDirectoryWritable(directory);
+        try
+        {
+            initializationHooks.BeforeDirectoryPreparation?.Invoke();
+            Directory.CreateDirectory(directory);
+            databaseIsolationPolicy.RescanDeployedPath(_databasePath, deploymentEnvironment);
+            VerifyDirectoryWritable(directory);
+        }
+        catch (DatabaseIsolationException)
+        {
+            throw;
+        }
+        catch (Exception exception) when (exception is IOException
+                                          or UnauthorizedAccessException
+                                          or SecurityException
+                                          or ArgumentException
+                                          or NotSupportedException)
+        {
+            throw new DatabaseIsolationException(
+                $"Unable to prepare the SQLite database directory '{directory}'. Startup is refused.",
+                exception);
+        }
         _connectionString = new SqliteConnectionStringBuilder
         {
             DataSource = _databasePath,
             DefaultTimeout = 5
         }.ToString();
 
-        Initialize();
+        if (deploymentEnvironment.IsDevelopment)
+        {
+            InitializeDevelopment(
+                databaseDeploymentIdentityPolicy,
+                deploymentEnvironment,
+                initializationHooks);
+        }
+        else
+        {
+            InitializeDeployed(
+                databaseDeploymentIdentityPolicy,
+                deploymentEnvironment,
+                initializationHooks);
+        }
     }
 
     public string DatabasePath => _databasePath;
@@ -1792,17 +1844,109 @@ public sealed class SqliteBoardRepository
         }
     }
 
-    private void Initialize()
+    private void InitializeDevelopment(
+        DatabaseDeploymentIdentityPolicy identityPolicy,
+        DeploymentEnvironment deploymentEnvironment,
+        DatabaseInitializationTestHooks initializationHooks)
     {
-        using var connection = OpenConnection();
+        var inspectExistingIdentity = File.Exists(_databasePath) && new FileInfo(_databasePath).Length > 0;
+        if (inspectExistingIdentity)
+        {
+            using var readOnlyConnection = identityPolicy.OpenExistingReadOnly(_databasePath);
+            identityPolicy.ValidateConnection(readOnlyConnection, deploymentEnvironment);
+        }
+
+        using var connection = inspectExistingIdentity
+            ? identityPolicy.OpenExistingReadWrite(_databasePath)
+            : OpenConnection();
+        if (inspectExistingIdentity)
+        {
+            using var validationTransaction = connection.BeginTransaction(deferred: false);
+            identityPolicy.ValidateConnection(connection, deploymentEnvironment, validationTransaction);
+            validationTransaction.Commit();
+        }
+
+        EnableWal(connection, deploymentEnvironment, initializationHooks);
+        InitializeSchemaAndMigrations(connection);
+    }
+
+    private void InitializeDeployed(
+        DatabaseDeploymentIdentityPolicy identityPolicy,
+        DeploymentEnvironment deploymentEnvironment,
+        DatabaseInitializationTestHooks initializationHooks)
+    {
+        var fileState = identityPolicy.ClassifyDeployedDatabase(_databasePath);
+        if (fileState == DeployedDatabaseFileState.New)
+        {
+            using var connection = identityPolicy.OpenReadWrite(_databasePath);
+            try
+            {
+                using (var transaction = connection.BeginTransaction(deferred: false))
+                {
+                    identityPolicy.CreateIdentity(
+                        connection,
+                        transaction,
+                        deploymentEnvironment);
+                    CreateCurrentSchema(connection, transaction);
+                    initializationHooks.AfterFreshSchemaCreatedBeforeCommit?.Invoke();
+                    transaction.Commit();
+                }
+            }
+            catch (DatabaseIsolationException)
+            {
+                throw;
+            }
+            catch (Exception exception) when (exception is SqliteException
+                                              or InvalidOperationException
+                                              or IOException
+                                              or UnauthorizedAccessException)
+            {
+                throw new DatabaseIsolationException(
+                    $"Unable to atomically initialize the new {deploymentEnvironment.EnvironmentName} database. Startup is refused.",
+                    exception);
+            }
+
+            EnableWal(connection, deploymentEnvironment, initializationHooks);
+            return;
+        }
+
+        using (var readOnlyConnection = identityPolicy.OpenExistingReadOnly(_databasePath))
+        {
+            identityPolicy.ValidateConnection(readOnlyConnection, deploymentEnvironment);
+        }
+
+        using var writeConnection = identityPolicy.OpenExistingReadWrite(_databasePath);
+        try
+        {
+            using var validationTransaction = writeConnection.BeginTransaction(deferred: false);
+            identityPolicy.ValidateConnection(writeConnection, deploymentEnvironment, validationTransaction);
+            validationTransaction.Commit();
+        }
+        catch (DatabaseIsolationException)
+        {
+            throw;
+        }
+        catch (Exception exception) when (exception is SqliteException or InvalidOperationException)
+        {
+            throw new DatabaseIsolationException(
+                $"Unable to obtain the SQLite lock required to revalidate the {deploymentEnvironment.EnvironmentName} deployment identity. Startup is refused.",
+                exception);
+        }
+
+        EnableWal(writeConnection, deploymentEnvironment, initializationHooks);
+        InitializeSchemaAndMigrations(writeConnection);
+    }
+
+    private static void CreateCurrentSchema(
+        SqliteConnection connection,
+        SqliteTransaction? transaction = null)
+    {
 
         // Create tables (or no-op if they already exist).
         using (var command = connection.CreateCommand())
         {
+            command.Transaction = transaction;
             command.CommandText = """
-                PRAGMA journal_mode = WAL;
-                PRAGMA busy_timeout = 5000;
-
                 CREATE TABLE IF NOT EXISTS active_rooms (
                     room_id INTEGER PRIMARY KEY,
                     assigned_doctor_id TEXT NULL,
@@ -1945,7 +2089,12 @@ public sealed class SqliteBoardRepository
             command.ExecuteNonQuery();
         }
 
-        CreateReadyHandoffIndexes(connection);
+        CreateReadyHandoffIndexes(connection, transaction);
+    }
+
+    private static void InitializeSchemaAndMigrations(SqliteConnection connection)
+    {
+        CreateCurrentSchema(connection);
 
         // Migration: add new columns to existing databases that predate this schema version.
         // Each ALTER TABLE is attempted independently. Duplicate-column failures are benign
@@ -2434,9 +2583,12 @@ public sealed class SqliteBoardRepository
         transaction.Commit();
     }
 
-    private static void CreateReadyHandoffIndexes(SqliteConnection connection)
+    private static void CreateReadyHandoffIndexes(
+        SqliteConnection connection,
+        SqliteTransaction? transaction = null)
     {
         using var command = connection.CreateCommand();
+        command.Transaction = transaction;
         command.CommandText = """
             CREATE UNIQUE INDEX IF NOT EXISTS ix_ready_handoffs_one_active_per_episode
                 ON ready_handoffs(episode_id)
@@ -2450,6 +2602,26 @@ public sealed class SqliteBoardRepository
                 ON ready_handoffs(episode_id);
             """;
         command.ExecuteNonQuery();
+    }
+
+    private static void EnableWal(
+        SqliteConnection connection,
+        DeploymentEnvironment deploymentEnvironment,
+        DatabaseInitializationTestHooks initializationHooks)
+    {
+        try
+        {
+            initializationHooks.BeforeEnableWal?.Invoke();
+            using var command = connection.CreateCommand();
+            command.CommandText = "PRAGMA journal_mode = WAL; PRAGMA busy_timeout = 5000;";
+            command.ExecuteNonQuery();
+        }
+        catch (Exception exception) when (exception is SqliteException or InvalidOperationException)
+        {
+            throw new DatabaseIsolationException(
+                $"Unable to configure SQLite WAL mode for {deploymentEnvironment.EnvironmentName}. Startup is refused.",
+                exception);
+        }
     }
 
     private static void ApplyLosslessCanonicalBackfills(SqliteConnection connection)
@@ -3071,4 +3243,12 @@ public sealed class SqliteBoardRepository
 
     private static DateTimeOffset ReadRequiredDateTimeOffset(SqliteDataReader reader, int ordinal) =>
         DateTimeOffset.Parse(reader.GetString(ordinal));
+}
+
+internal sealed record DatabaseInitializationTestHooks(
+    Action? BeforeDirectoryPreparation = null,
+    Action? BeforeEnableWal = null,
+    Action? AfterFreshSchemaCreatedBeforeCommit = null)
+{
+    public static DatabaseInitializationTestHooks None { get; } = new();
 }

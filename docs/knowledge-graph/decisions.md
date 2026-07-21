@@ -82,7 +82,9 @@ This file records decisions that should survive across tasks, PRs, and debugging
 
 **Database isolation:** Production requires exactly `C:\ChairSide\Data\chairside.db`; Training requires exactly `C:\ChairSide\Training\Data\chairside-training.db` and uses `C:\ChairSide\Training\Logs`. These layout boundaries are code-owned. Deployed paths are fully qualified, case-insensitive, boundary-safe, outside the actual content root and both application roots, separate from the opposite deployment, and free of every existing reparse-point component. A missing canonical parent is created only after pure validation and is then rescanned before SQLite access. Development keeps relative and temporary absolute paths outside protected Production and Training roots.
 
-**Deferred identity boundary:** Path isolation does not prove database identity. A persisted Production/Training deployment-role marker and existing Production database adoption remain issue #143 PR C work.
+**Database identity:** Path isolation proves location, while `chairside_deployment_identity` proves persisted role. Production and Training require exactly one immutable, versioned marker with a matching role before ordinary schema mutation, migrations, room initialization, maintenance mutation, or endpoint mapping. Fresh marker and current schema creation commit atomically before WAL is enabled. Development creates and requires no marker but refuses deployed or malformed reserved marker state.
+
+**Pre-go-live data boundary:** All ChairSide data before the approved go-live date is training, testing, demonstration, or stress-fixture data. The beta database may be archived separately, but it is never reused or marked as formal Production. ChairSide has no deployed-database adoption path. Formal Production begins with a genuinely new canonical database, a `Production` / `FreshDatabase` identity, and a new reporting history whose official boundary is the approved go-live date. Existing unmarked deployed databases always fail closed.
 
 ## Reporting population semantics
 

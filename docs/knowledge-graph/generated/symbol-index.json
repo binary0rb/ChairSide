@@ -1,7 +1,7 @@
 ﻿{
     "generatedStamp":  "deterministic",
     "root":  ".",
-    "fileCount":  105,
+    "fileCount":  108,
     "files":  [
                   {
                       "path":  ".github/pull_request_template.md",
@@ -235,7 +235,7 @@
                   {
                       "path":  "docs/knowledge/product/environment-maintenance-preflight.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  4484,
+                      "sizeBytes":  6981,
                       "typeSymbols":  [
 
                                       ],
@@ -259,6 +259,7 @@
                                        "Recognized environments",
                                        "Runtime posture",
                                        "Database path isolation",
+                                       "Database deployment identity",
                                        "Maintenance posture",
                                        "Source and test anchors"
                                    ]
@@ -517,7 +518,7 @@
                   {
                       "path":  "docs/knowledge-graph/backlog-signals.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  1672,
+                      "sizeBytes":  1498,
                       "typeSymbols":  [
 
                                       ],
@@ -546,7 +547,7 @@
                   {
                       "path":  "docs/knowledge-graph/chairside.graph.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  9489,
+                      "sizeBytes":  10278,
                       "typeSymbols":  [
 
                                       ],
@@ -577,7 +578,7 @@
                   {
                       "path":  "docs/knowledge-graph/decisions.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  9311,
+                      "sizeBytes":  10152,
                       "typeSymbols":  [
 
                                       ],
@@ -648,7 +649,7 @@
                   {
                       "path":  "docs/Production-Pilot-Checklist.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  7256,
+                      "sizeBytes":  8558,
                       "typeSymbols":  [
 
                                       ],
@@ -673,6 +674,7 @@
                                        "IIS",
                                        "Permissions",
                                        "Publish And Config",
+                                       "Formal Production Data Boundary",
                                        "Backup And Restore",
                                        "Access Control Decisions",
                                        "Room Tablets",
@@ -815,7 +817,7 @@
                   {
                       "path":  "README.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  35574,
+                      "sizeBytes":  37515,
                       "typeSymbols":  [
 
                                       ],
@@ -982,7 +984,7 @@
                   {
                       "path":  "src/ChairSide.Board/appsettings.Training.json",
                       "kind":  "Json",
-                      "sizeBytes":  196,
+                      "sizeBytes":  204,
                       "typeSymbols":  [
 
                                       ],
@@ -1355,7 +1357,7 @@
                   {
                       "path":  "src/ChairSide.Board/Program.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  93512,
+                      "sizeBytes":  93612,
                       "typeSymbols":  [
                                           "BeginPrestageRequest",
                                           "SeatRoomRequest",
@@ -1512,9 +1514,45 @@
                                    ]
                   },
                   {
+                      "path":  "src/ChairSide.Board/Services/DatabaseDeploymentIdentityPolicy.cs",
+                      "kind":  "CSharp",
+                      "sizeBytes":  27192,
+                      "typeSymbols":  [
+                                          "DeployedDatabaseFileState",
+                                          "DatabaseDeploymentIdentityValues",
+                                          "DatabaseDeploymentIdentity",
+                                          "DatabaseDeploymentIdentityPolicy"
+                                      ],
+                      "methodSymbols":  [
+                                            "ClassifyDeployedDatabase",
+                                            "OpenExistingReadOnly",
+                                            "OpenReadWrite",
+                                            "OpenExistingReadWrite",
+                                            "ValidateConnection",
+                                            "CreateIdentity",
+                                            "IdentityTableExists",
+                                            "ValidateIdentityTableSchema"
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
                       "path":  "src/ChairSide.Board/Services/DatabaseIsolationLayout.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  701,
+                      "sizeBytes":  719,
                       "typeSymbols":  [
                                           "DatabaseIsolationLayout"
                                       ],
@@ -1540,7 +1578,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/DatabaseIsolationPolicy.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  10769,
+                      "sizeBytes":  11031,
                       "typeSymbols":  [
                                           "DatabaseIsolationException",
                                           "DatabaseIsolationPolicy",
@@ -1770,7 +1808,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/IReparsePointInspector.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  541,
+                      "sizeBytes":  566,
                       "typeSymbols":  [
                                           "IReparsePointInspector",
                                           "FileSystemReparsePointInspector"
@@ -1797,7 +1835,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/MaintenanceCommands.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  13699,
+                      "sizeBytes":  13679,
                       "typeSymbols":  [
                                           "MaintenanceOutcome",
                                           "MaintenanceResolution",
@@ -2252,11 +2290,12 @@
                   {
                       "path":  "src/ChairSide.Board/Services/SqliteBoardRepository.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  150456,
+                      "sizeBytes":  157705,
                       "typeSymbols":  [
                                           "SqliteBoardRepository",
                                           "DoctorWorkingRoomRecord",
-                                          "DoctorWorkingRoomLookupResult"
+                                          "DoctorWorkingRoomLookupResult",
+                                          "DatabaseInitializationTestHooks"
                                       ],
                       "methodSymbols":  [
                                             "HasOperationalData",
@@ -2297,8 +2336,8 @@
                                             "UpdateReadyHandoffOutcomeGuarded",
                                             "TerminateReadyHandoff",
                                             "InsertAbortedAssignment",
-                                            "Initialize",
-                                            "EnsureCompletedCycleIdColumn"
+                                            "InitializeDevelopment",
+                                            "InitializeDeployed"
                                         ],
                       "routes":  [
 
@@ -2820,7 +2859,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/BoardStoreTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  484127,
+                      "sizeBytes":  484289,
                       "typeSymbols":  [
                                           "BoardStoreTests",
                                           "StoreContext",
@@ -2970,9 +3009,92 @@
                                    ]
                   },
                   {
+                      "path":  "tests/ChairSide.Board.Tests/DatabaseDeploymentIdentityPolicyTests.cs",
+                      "kind":  "CSharp",
+                      "sizeBytes":  28627,
+                      "typeSymbols":  [
+                                          "DatabaseDeploymentIdentityPolicyTests"
+                                      ],
+                      "methodSymbols":  [
+                                            "Fresh_deployed_database_receives_matching_fresh_identity",
+                                            "Matching_deployed_restart_preserves_identity_exactly",
+                                            "Opposite_deployed_identity_is_refused",
+                                            "Unknown_and_case_variant_identity_roles_are_refused",
+                                            "Wrong_identity_version_is_refused",
+                                            "Malformed_timestamp_and_unknown_provenance_are_refused",
+                                            "Zero_row_identity_table_is_refused",
+                                            "Tampered_identity_schema_is_refused",
+                                            "Equivalent_identity_checks_allow_case_comments_and_redundant_outer_parentheses",
+                                            "Duplicate_capable_identity_schema_is_refused",
+                                            "Existing_unmarked_ChairSide_database_is_refused_in_deployed_environment",
+                                            "Missing_file_is_new_but_zero_byte_and_valid_empty_Sqlite_are_not",
+                                            "Missing_main_with_sidecar_is_refused_without_creating_main",
+                                            "Malformed_Sqlite_is_refused_controllably",
+                                            "Unreadable_locked_database_is_refused_controllably",
+                                            "Marker_refusal_occurs_before_migration_or_room_creation",
+                                            "Every_current_reset_entry_point_preserves_identity_exactly",
+                                            "Failed_repository_fresh_initialization_rolls_back_identity_and_schema_and_is_not_retried_as_new",
+                                            "Directory_preparation_access_failure_is_wrapped_as_database_isolation_refusal",
+                                            "Wal_configuration_failure_is_wrapped_as_database_isolation_refusal",
+                                            "Development_unmarked_database_remains_compatible_and_deployed_marker_is_refused",
+                                            "TamperedIdentitySchemas",
+                                            "CreateRepository",
+                                            "ReadIdentity",
+                                            "CreateRawIdentityDatabase",
+                                            "Open",
+                                            "TableExists",
+                                            "ReadColumnNames",
+                                            "ExecuteScalarString",
+                                            "Execute"
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
+                      "path":  "tests/ChairSide.Board.Tests/DatabaseDeploymentIdentityProcessTests.cs",
+                      "kind":  "CSharp",
+                      "sizeBytes":  4738,
+                      "typeSymbols":  [
+                                          "DatabaseDeploymentIdentityProcessTests"
+                                      ],
+                      "methodSymbols":  [
+                                            "Wrong_role_process_refusal_exits_two_without_crash_or_diagnostic_log",
+                                            "CreateProductionIdentity",
+                                            "FindRepositoryRoot"
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
                       "path":  "tests/ChairSide.Board.Tests/DatabaseIsolationPolicyTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  24906,
+                      "sizeBytes":  25543,
                       "typeSymbols":  [
                                           "DatabaseIsolationPolicyTests",
                                           "DelegateReparsePointInspector",
@@ -3077,7 +3199,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/EnvironmentMaintenancePreflightTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  13575,
+                      "sizeBytes":  16573,
                       "typeSymbols":  [
                                           "EnvironmentMaintenancePreflightTests"
                                       ],
@@ -3091,12 +3213,14 @@
                                             "Every_destructive_maintenance_command_is_refused_in_production_before_callback",
                                             "Missing_and_wrong_confirmation_tokens_still_refuse_before_callback",
                                             "Not_requested_maintenance_is_refused_before_callback",
+                                            "Authorized_Training_maintenance_validates_identity_before_mutation",
                                             "Production_refusal_leaves_database_data_directory_and_diagnostic_log_absent",
                                             "Training_fresh_store_starts_available_and_rejects_demo_elapsed_minutes",
                                             "Training_environment_does_not_satisfy_the_development_role_check",
                                             "Existing_development_and_production_fresh_startup_behavior_remains_valid",
                                             "Training_rejects_development_sample_admin_token_when_protection_is_enabled",
-                                            "After_hours_defaults_remain_seven_pm_central"
+                                            "After_hours_defaults_remain_seven_pm_central",
+                                            "ReadIdentityRole"
                                         ],
                       "routes":  [
 
@@ -3159,7 +3283,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/LifecycleFixtureCorrectionTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  35571,
+                      "sizeBytes":  35579,
                       "typeSymbols":  [
                                           "LifecycleFixtureCorrectionTests",
                                           "RoomStatusSnapshot",
@@ -3502,7 +3626,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/ReadyHandoffPersistenceTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  69353,
+                      "sizeBytes":  69350,
                       "typeSymbols":  [
                                           "ReadyHandoffPersistenceTests",
                                           "RoomSnapshot",
