@@ -3061,7 +3061,7 @@ public sealed class BoardStoreTests
         // is never forced through Prestaging.
         var context = StoreContext.Create(
             workspace,
-            environmentName: Environments.Production,
+            environmentName: Environments.Development,
             databasePath: legacyDbPath,
             roomCount: 3);
 
@@ -9028,7 +9028,8 @@ public sealed class BoardStoreTests
             deploymentEnvironment,
             new DatabaseIsolationPolicy(
                 workspace.DatabaseIsolationLayout(),
-                new FileSystemReparsePointInspector()));
+                new FileSystemReparsePointInspector()),
+            new DatabaseDeploymentIdentityPolicy());
 
         var cycles = repository.LoadCompletedCycles();
 
@@ -9538,7 +9539,8 @@ internal sealed class StoreContext
             Microsoft.Extensions.Options.Options.Create(new BoardPersistenceOptions { DatabasePath = resolvedDatabasePath }),
             environment,
             deploymentEnvironment,
-            new DatabaseIsolationPolicy(isolationLayout, new FileSystemReparsePointInspector()));
+            new DatabaseIsolationPolicy(isolationLayout, new FileSystemReparsePointInspector()),
+            new DatabaseDeploymentIdentityPolicy());
         var store = new DemoBoardStore(
             new TestOptionsMonitor<BoardThresholdOptions>(new BoardThresholdOptions
             {

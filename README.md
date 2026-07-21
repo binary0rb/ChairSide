@@ -169,7 +169,11 @@ ChairSide recognizes exactly three application environments: `Development`, `Tra
 
 Deployed database locations are code-owned safety boundaries, not configurable layout choices. Production requires exactly `C:\ChairSide\Data\chairside.db`. Training requires exactly `C:\ChairSide\Training\Data\chairside-training.db`, and `appsettings.Training.json` sets its diagnostic log directory to `C:\ChairSide\Training\Logs`. Path comparison is case-insensitive and directory-boundary-safe. Production and Training refuse relative or drive-relative paths, paths under either deployed application root or the actual content root, the opposite environment's application/data paths, wrong filenames, database filenames that are existing directories, and any existing reparse-point component from the volume root through the database leaf.
 
-Database path preflight is pure: it normalizes and validates without creating files or directories. After successful deployed preflight, a missing canonical parent directory may be created, then every deployed path component is rescanned for reparse points before the write test, SQLite connection setup, schema migration, or room initialization. Database deployment-role identity markers are not implemented in this slice and remain deferred to issue #143 PR C. The Training configuration establishes path isolation only; it does not complete IIS or Training deployment.
+Database path preflight is pure: it normalizes and validates without creating files or directories. After successful deployed preflight, a missing canonical parent directory may be created, then every deployed path component is rescanned for reparse points before the write test, SQLite connection setup, schema migration, or room initialization.
+
+Production and Training databases also carry exactly one immutable row in `chairside_deployment_identity`. The row records the exact `Production` or `Training` role, identity schema version 1, a UTC establishment timestamp, and the sole provenance `FreshDatabase`. Existing matching identities are validated read-only and revalidated under the SQLite write lock before WAL, ordinary schema creation, migrations, room initialization, maintenance mutation, or endpoint mapping. A wrong, missing, malformed, empty, duplicate-capable, or ambiguous identity fails with process exit code 2. Development does not create or require a marker, but refuses any database containing a deployed or malformed reserved marker.
+
+A genuinely new deployed database is only an absent main file with no WAL/SHM companions. ChairSide creates its marker and current schema in one immediate transaction, then enables WAL after commit. An existing zero-byte file, valid empty SQLite database, or main-file absence with an orphan WAL/SHM is refused rather than guessed to be new. This identity work does not complete IIS or Training deployment.
 
 ```powershell
 dotnet run --project .\src\ChairSide.Board\ChairSide.Board.csproj --BoardPersistenceOptions:DatabasePath=".\data\chairside-dev.db"
@@ -256,6 +260,7 @@ Production database requirements:
 - The IIS app pool identity needs Modify permission on `C:\ChairSide\Data`.
 - SQLite WAL mode creates `chairside.db-wal` and `chairside.db-shm` beside the database, so the directory must be writable, not just the database file.
 - Production fails before SQLite access unless the normalized path is the exact canonical path and every existing component is free of reparse points. A missing canonical data directory is created only after validation and is rescanned before use.
+- Production requires a matching `Production` database identity. Training requires a matching `Training` identity. Copying a marked database across canonical deployments is refused before schema or room mutation.
 
 Backup and restore:
 
@@ -377,7 +382,11 @@ Production configuration is supplied by `src/ChairSide.Board/appsettings.Product
 }
 ```
 
-The app validates this path at startup in Production. It must equal the code-owned canonical path, remain outside both application roots and the actual content root, and contain no existing reparse-point component. The app creates the SQLite database and schema if missing, but only after successful path preflight and a post-directory-creation reparse scan. The data directory must be writable by the IIS app pool identity.
+The app validates this path at startup in Production. It must equal the code-owned canonical path, remain outside both application roots and the actual content root, and contain no existing reparse-point component. A genuinely absent database receives its Production identity and current schema atomically after successful path preflight and a post-directory-creation reparse scan. The data directory must be writable by the IIS app pool identity.
+
+All ChairSide data created before the approved go-live date is training, testing, demonstration, or stress-fixture data. The current beta database may be archived for reference, but it must not be reused as formal Production. ChairSide has no legacy database adoption command and does not automatically mark existing databases. Formal Production begins with a genuinely absent canonical database, which receives a new `Production` / `FreshDatabase` identity and an empty reporting history. The approved go-live date begins official reporting history.
+
+Any existing unmarked deployed database is refused. Archiving, clearing, deploying, and initializing the future Production database are rollout operations that have not been performed by this repository change.
 
 `appsettings.Production.json` is environment-specific. Production deployment must use `C:\ChairSide\Data\chairside.db`; changing configuration to another path intentionally fails closed.
 
@@ -474,7 +483,7 @@ dotnet run --project .\src\ChairSide.Board\ChairSide.Board.csproj -- --environme
 dotnet run --project .\src\ChairSide.Board\ChairSide.Board.csproj -- --environment Development --BoardPersistenceOptions:DatabasePath=.\src\ChairSide.Board\data\chairside-dev.db --maintenance reset-stress-fixture --confirm RESET_STRESS_FIXTURE --profile all-scenarios
 ```
 
-Like `reset-large-synthetic-report-data`, this command is destructive to whatever database it targets. One transaction deletes completed cycles, every Active handoff, and active rooms, then recreates configured Available rooms before the selected fixture runs. Withdrawn, Accepted, and Terminated handoffs and aborted assignments are preserved. Repeated runs converge in current room state and Active-handoff counts; preserved resolved-history counts and generated GUID identities are not deterministic promises. The four known maintenance commands are allowlisted only in Development and Training, retain their command-specific confirmation requirements, and all hard-refuse Production before application build or repository construction. Maintenance has no HTTP or normal-startup path.
+Like `reset-large-synthetic-report-data`, this command is destructive to whatever database it targets. One transaction deletes completed cycles, every Active handoff, and active rooms, then recreates configured Available rooms before the selected fixture runs. Withdrawn, Accepted, and Terminated handoffs, aborted assignments, and the deployment identity row are preserved. Repeated runs converge in current state and Active-handoff counts; preserved resolved-history counts and generated GUID identities are not deterministic promises. The four destructive maintenance commands are allowlisted only in Development and Training, retain their command-specific confirmation requirements, and all hard-refuse Production before application build or repository construction. Maintenance has no HTTP or normal-startup path.
 
 ## Reports
 

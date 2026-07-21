@@ -180,7 +180,7 @@ public sealed class ReadyHandoffPersistenceTests
 
         var context = StoreContext.Create(
             workspace,
-            environmentName: Environments.Production,
+            environmentName: Environments.Development,
             databasePath: legacyDbPath);
 
         using var connection = OpenConnection(context.DatabasePath);

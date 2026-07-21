@@ -297,6 +297,12 @@
                       "path":  "src/ChairSide.Board/Services/ClientErrorRateLimiter.cs"
                   },
                   {
+                      "id":  "file:src/ChairSide.Board/Services/DatabaseDeploymentIdentityPolicy.cs",
+                      "label":  "src/ChairSide.Board/Services/DatabaseDeploymentIdentityPolicy.cs",
+                      "type":  "File",
+                      "path":  "src/ChairSide.Board/Services/DatabaseDeploymentIdentityPolicy.cs"
+                  },
+                  {
                       "id":  "file:src/ChairSide.Board/Services/DatabaseIsolationLayout.cs",
                       "label":  "src/ChairSide.Board/Services/DatabaseIsolationLayout.cs",
                       "type":  "File",
@@ -523,6 +529,18 @@
                       "label":  "tests/ChairSide.Board.Tests/ChairSide.Board.Tests.csproj",
                       "type":  "File",
                       "path":  "tests/ChairSide.Board.Tests/ChairSide.Board.Tests.csproj"
+                  },
+                  {
+                      "id":  "file:tests/ChairSide.Board.Tests/DatabaseDeploymentIdentityPolicyTests.cs",
+                      "label":  "tests/ChairSide.Board.Tests/DatabaseDeploymentIdentityPolicyTests.cs",
+                      "type":  "File",
+                      "path":  "tests/ChairSide.Board.Tests/DatabaseDeploymentIdentityPolicyTests.cs"
+                  },
+                  {
+                      "id":  "file:tests/ChairSide.Board.Tests/DatabaseDeploymentIdentityProcessTests.cs",
+                      "label":  "tests/ChairSide.Board.Tests/DatabaseDeploymentIdentityProcessTests.cs",
+                      "type":  "File",
+                      "path":  "tests/ChairSide.Board.Tests/DatabaseDeploymentIdentityProcessTests.cs"
                   },
                   {
                       "id":  "file:tests/ChairSide.Board.Tests/DatabaseIsolationPolicyTests.cs",
@@ -1041,6 +1059,42 @@
                       "path":  "tests/ChairSide.Board.Tests/DurableFailureInjectionTests.cs"
                   },
                   {
+                      "id":  "symbol:type:DatabaseDeploymentIdentity",
+                      "label":  "DatabaseDeploymentIdentity",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/DatabaseDeploymentIdentityPolicy.cs"
+                  },
+                  {
+                      "id":  "symbol:type:DatabaseDeploymentIdentityPolicy",
+                      "label":  "DatabaseDeploymentIdentityPolicy",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/DatabaseDeploymentIdentityPolicy.cs"
+                  },
+                  {
+                      "id":  "symbol:type:DatabaseDeploymentIdentityPolicyTests",
+                      "label":  "DatabaseDeploymentIdentityPolicyTests",
+                      "type":  "CodeType",
+                      "path":  "tests/ChairSide.Board.Tests/DatabaseDeploymentIdentityPolicyTests.cs"
+                  },
+                  {
+                      "id":  "symbol:type:DatabaseDeploymentIdentityProcessTests",
+                      "label":  "DatabaseDeploymentIdentityProcessTests",
+                      "type":  "CodeType",
+                      "path":  "tests/ChairSide.Board.Tests/DatabaseDeploymentIdentityProcessTests.cs"
+                  },
+                  {
+                      "id":  "symbol:type:DatabaseDeploymentIdentityValues",
+                      "label":  "DatabaseDeploymentIdentityValues",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/DatabaseDeploymentIdentityPolicy.cs"
+                  },
+                  {
+                      "id":  "symbol:type:DatabaseInitializationTestHooks",
+                      "label":  "DatabaseInitializationTestHooks",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/SqliteBoardRepository.cs"
+                  },
+                  {
                       "id":  "symbol:type:DatabaseIsolationException",
                       "label":  "DatabaseIsolationException",
                       "type":  "CodeType",
@@ -1081,6 +1135,12 @@
                       "label":  "DemoSeedPattern",
                       "type":  "CodeType",
                       "path":  "src/ChairSide.Board/Services/DemoBoardStore.cs"
+                  },
+                  {
+                      "id":  "symbol:type:DeployedDatabaseFileState",
+                      "label":  "DeployedDatabaseFileState",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/DatabaseDeploymentIdentityPolicy.cs"
                   },
                   {
                       "id":  "symbol:type:DeploymentEnvironment",
@@ -2323,6 +2383,26 @@
                       "label":  "declares"
                   },
                   {
+                      "from":  "file:src/ChairSide.Board/Services/DatabaseDeploymentIdentityPolicy.cs",
+                      "to":  "symbol:type:DatabaseDeploymentIdentity",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/DatabaseDeploymentIdentityPolicy.cs",
+                      "to":  "symbol:type:DatabaseDeploymentIdentityPolicy",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/DatabaseDeploymentIdentityPolicy.cs",
+                      "to":  "symbol:type:DatabaseDeploymentIdentityValues",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/DatabaseDeploymentIdentityPolicy.cs",
+                      "to":  "symbol:type:DeployedDatabaseFileState",
+                      "label":  "declares"
+                  },
+                  {
                       "from":  "file:src/ChairSide.Board/Services/DatabaseIsolationLayout.cs",
                       "to":  "symbol:type:DatabaseIsolationLayout",
                       "label":  "declares"
@@ -2914,6 +2994,11 @@
                   },
                   {
                       "from":  "file:src/ChairSide.Board/Services/SqliteBoardRepository.cs",
+                      "to":  "symbol:type:DatabaseInitializationTestHooks",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/SqliteBoardRepository.cs",
                       "to":  "symbol:type:DoctorWorkingRoomLookupResult",
                       "label":  "declares"
                   },
@@ -3000,6 +3085,16 @@
                   {
                       "from":  "file:tests/ChairSide.Board.Tests/CanonicalAssignmentDomainValidationTests.cs",
                       "to":  "symbol:type:LiveRoomSnapshot",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:tests/ChairSide.Board.Tests/DatabaseDeploymentIdentityPolicyTests.cs",
+                      "to":  "symbol:type:DatabaseDeploymentIdentityPolicyTests",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:tests/ChairSide.Board.Tests/DatabaseDeploymentIdentityProcessTests.cs",
+                      "to":  "symbol:type:DatabaseDeploymentIdentityProcessTests",
                       "label":  "declares"
                   },
                   {
@@ -3404,6 +3499,11 @@
                   },
                   {
                       "from":  "repo:chairside",
+                      "to":  "file:src/ChairSide.Board/Services/DatabaseDeploymentIdentityPolicy.cs",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
                       "to":  "file:src/ChairSide.Board/Services/DatabaseIsolationLayout.cs",
                       "label":  "contains"
                   },
@@ -3590,6 +3690,16 @@
                   {
                       "from":  "repo:chairside",
                       "to":  "file:tests/ChairSide.Board.Tests/ChairSide.Board.Tests.csproj",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:tests/ChairSide.Board.Tests/DatabaseDeploymentIdentityPolicyTests.cs",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:tests/ChairSide.Board.Tests/DatabaseDeploymentIdentityProcessTests.cs",
                       "label":  "contains"
                   },
                   {

@@ -96,6 +96,7 @@ builder.Services.AddSignalR();
 builder.Services.AddSingleton(DatabaseIsolationLayout.Approved);
 builder.Services.AddSingleton<IReparsePointInspector, FileSystemReparsePointInspector>();
 builder.Services.AddSingleton<DatabaseIsolationPolicy>();
+builder.Services.AddSingleton<DatabaseDeploymentIdentityPolicy>();
 builder.Services.AddSingleton<SqliteBoardRepository>();
 builder.Services.AddSingleton<DemoBoardStore>();
 builder.Services.AddSingleton<RoomDeviceTokenValidator>();

@@ -4,6 +4,7 @@ using ChairSide.Board.Options;
 using ChairSide.Board.Services;
 
 using Microsoft.AspNetCore.Http;
+using Microsoft.Data.Sqlite;
 
 namespace ChairSide.Board.Tests;
 
@@ -199,6 +200,57 @@ public sealed class EnvironmentMaintenancePreflightTests
     }
 
     [Fact]
+    public void Authorized_Training_maintenance_validates_identity_before_mutation()
+    {
+        using var workspace = TestWorkspace.Create();
+        var databasePath = Path.Combine(workspace.Root, "training-maintenance", "data", "chairside-training.db");
+        Directory.CreateDirectory(Path.GetDirectoryName(databasePath)!);
+        using (var connection = new SqliteConnection(
+                   new SqliteConnectionStringBuilder { DataSource = databasePath }.ToString()))
+        {
+            connection.Open();
+            using var transaction = connection.BeginTransaction(deferred: false);
+            _ = new DatabaseDeploymentIdentityPolicy().CreateIdentity(
+                connection,
+                transaction,
+                DeploymentEnvironmentPolicy.Resolve(ChairSideEnvironmentNames.Production));
+            transaction.Commit();
+        }
+
+        var resolution = MaintenanceCommands.Resolve(
+            [
+                MaintenanceCommands.MaintenanceFlag,
+                MaintenanceCommands.EmptyBetaCommand,
+                MaintenanceCommands.ConfirmFlag,
+                MaintenanceCommands.EmptyBetaToken
+            ]);
+        var mutationAttempted = false;
+        var trainingEnvironment = DeploymentEnvironmentPolicy.Resolve(ChairSideEnvironmentNames.Training);
+        var layout = workspace.DatabaseIsolationLayout(trainingDatabasePath: databasePath);
+
+        Assert.Throws<DatabaseIsolationException>(() =>
+            MaintenanceExecutionPolicy.Execute(
+                trainingEnvironment,
+                resolution,
+                () =>
+                {
+                    _ = new SqliteBoardRepository(
+                        Microsoft.Extensions.Options.Options.Create(
+                            new BoardPersistenceOptions { DatabasePath = databasePath }),
+                        new TestWebHostEnvironment(workspace.ContentRoot, ChairSideEnvironmentNames.Training),
+                        trainingEnvironment,
+                        new DatabaseIsolationPolicy(layout, new FileSystemReparsePointInspector()),
+                        new DatabaseDeploymentIdentityPolicy());
+                    mutationAttempted = true;
+                    return 0;
+                },
+                TextWriter.Null));
+
+        Assert.False(mutationAttempted);
+        Assert.Equal(ChairSideEnvironmentNames.Production, ReadIdentityRole(databasePath));
+    }
+
+    [Fact]
     public void Production_refusal_leaves_database_data_directory_and_diagnostic_log_absent()
     {
         var root = Path.Combine(Path.GetTempPath(), "ChairSide.Board.Tests", Guid.NewGuid().ToString("N"));
@@ -338,5 +390,19 @@ public sealed class EnvironmentMaintenancePreflightTests
         Assert.True(options.AfterHoursSweepEnabled);
         Assert.Equal("19:00", options.AfterHoursSweepTime);
         Assert.Equal("America/Chicago", options.TimeZone);
+    }
+
+    private static string ReadIdentityRole(string databasePath)
+    {
+        using var connection = new SqliteConnection(
+            new SqliteConnectionStringBuilder
+            {
+                DataSource = databasePath,
+                Mode = SqliteOpenMode.ReadOnly
+            }.ToString());
+        connection.Open();
+        using var command = connection.CreateCommand();
+        command.CommandText = "SELECT deployment_role FROM chairside_deployment_identity;";
+        return Convert.ToString(command.ExecuteScalar()) ?? string.Empty;
     }
 }
