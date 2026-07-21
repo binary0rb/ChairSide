@@ -102,6 +102,62 @@ function Get-AppPoolState {
     return $state
 }
 
+function Wait-AppPoolState {
+    param(
+        [Parameter(Mandatory = $true)][string]$Name,
+        [Parameter(Mandatory = $true)][string]$DesiredState,
+        [int]$TimeoutSeconds = 30,
+        [int]$PollIntervalMilliseconds = 250
+    )
+
+    $timeoutMilliseconds = $TimeoutSeconds * 1000
+    $stopwatch = [System.Diagnostics.Stopwatch]::StartNew()
+    $lastObservedState = Get-AppPoolState -Name $Name
+
+    while ($lastObservedState -ne $DesiredState) {
+        if ($stopwatch.Elapsed.TotalMilliseconds -ge $timeoutMilliseconds) {
+            throw "Timed out after $TimeoutSeconds seconds waiting for IIS app pool '$Name' to reach '$DesiredState'. Last observed state: '$lastObservedState'."
+        }
+
+        $remainingMilliseconds = [Math]::Max(1, $timeoutMilliseconds - $stopwatch.Elapsed.TotalMilliseconds)
+        $sleepMilliseconds = [Math]::Min($PollIntervalMilliseconds, [int][Math]::Ceiling($remainingMilliseconds))
+        Start-Sleep -Milliseconds $sleepMilliseconds
+        $lastObservedState = Get-AppPoolState -Name $Name
+    }
+
+    return $lastObservedState
+}
+
+function Restore-AppPoolToStarted {
+    param([Parameter(Mandatory = $true)][string]$Name)
+
+    $currentState = Get-AppPoolState -Name $Name
+    switch ($currentState) {
+        "Started" {
+            Write-Step "IIS app pool '$Name' is already started; restoration is complete."
+            return
+        }
+        "Starting" {
+            $null = Wait-AppPoolState -Name $Name -DesiredState "Started"
+            return
+        }
+        "Stopped" {
+            Set-AppPoolState -Name $Name -State "Started"
+            $null = Wait-AppPoolState -Name $Name -DesiredState "Started"
+            return
+        }
+        "Stopping" {
+            $null = Wait-AppPoolState -Name $Name -DesiredState "Stopped"
+            Set-AppPoolState -Name $Name -State "Started"
+            $null = Wait-AppPoolState -Name $Name -DesiredState "Started"
+            return
+        }
+        default {
+            throw "Cannot restore IIS app pool '$Name' to Started from unexpected state '$currentState'."
+        }
+    }
+}
+
 function Resolve-MaintenancePlan {
     param(
         [string]$SelectedMode,
@@ -222,18 +278,16 @@ try {
         exit 0
     }
 
-    $appPoolTransitionedFromStarted = $false
+    $restoreAppPoolToStarted = $false
     $backupDirectory = $null
+    $operationFailure = $null
+    $restorationFailure = $null
     try {
         $initialAppPoolState = Get-AppPoolState -Name $trainingAppPoolName
         if ($initialAppPoolState -eq "Started") {
+            $restoreAppPoolToStarted = $true
             Set-AppPoolState -Name $trainingAppPoolName -State "Stopped"
-            $stoppedAppPoolState = Get-AppPoolState -Name $trainingAppPoolName
-            if ($stoppedAppPoolState -ne "Stopped") {
-                throw "IIS app pool '$trainingAppPoolName' did not reach Stopped after the stop request. Current state: '$stoppedAppPoolState'."
-            }
-
-            $appPoolTransitionedFromStarted = $true
+            $null = Wait-AppPoolState -Name $trainingAppPoolName -DesiredState "Stopped"
         }
         elseif ($initialAppPoolState -eq "Stopped") {
             Write-Step "IIS app pool '$trainingAppPoolName' is already stopped; preserving that state."
@@ -286,10 +340,30 @@ try {
             $env:ASPNETCORE_ENVIRONMENT = $previousEnvironment
         }
     }
+    catch {
+        $operationFailure = $_
+    }
     finally {
-        if ($appPoolTransitionedFromStarted) {
-            Set-AppPoolState -Name $trainingAppPoolName -State "Started"
+        if ($restoreAppPoolToStarted) {
+            try {
+                Restore-AppPoolToStarted -Name $trainingAppPoolName
+            }
+            catch {
+                $restorationFailure = $_
+            }
         }
+    }
+
+    if ($null -ne $operationFailure -and $null -ne $restorationFailure) {
+        throw "Operation failure: $($operationFailure.Exception.Message)`nRestoration failure: $($restorationFailure.Exception.Message)"
+    }
+
+    if ($null -ne $operationFailure) {
+        throw $operationFailure
+    }
+
+    if ($null -ne $restorationFailure) {
+        throw $restorationFailure
     }
 
     $backupSummary = if ($null -eq $backupDirectory) { "none required" } else { $backupDirectory }

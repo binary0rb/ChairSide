@@ -22,6 +22,20 @@ function Assert-Contains {
     }
 }
 
+function Assert-ContainsIgnoringWhitespace {
+    param([string]$Actual, [string]$Expected, [string]$Label)
+
+    $normalizedActual = [regex]::Replace($Actual, '\s+', '')
+    $normalizedExpected = [regex]::Replace($Expected, '\s+', '')
+
+    if ($normalizedActual.IndexOf(
+        $normalizedExpected,
+        [System.StringComparison]::Ordinal
+    ) -lt 0) {
+        throw "$Label did not contain '$Expected' when whitespace was ignored. Actual output:`n$Actual"
+    }
+}
+
 function Assert-NotContains {
     param([string]$Actual, [string]$Unexpected, [string]$Label)
     if ($Actual.IndexOf($Unexpected, [System.StringComparison]::OrdinalIgnoreCase) -ge 0) {
@@ -127,7 +141,7 @@ foreach ($mode in @("Clean", "TrainingSeed", "FullStress")) {
         "-WhatIf"
     )
     Assert-True ($result.ExitCode -ne 0) "$mode unexpectedly accepted -CompletedCycles."
-    Assert-Contains $result.Output "-CompletedCycles is valid only with -Mode ReportingVolume" "$mode completed-cycle refusal"
+    Assert-ContainsIgnoringWhitespace $result.Output "-CompletedCycles is valid only with -Mode ReportingVolume" "$mode completed-cycle refusal"
 }
 
 foreach ($count in @(99, 10001)) {
@@ -201,22 +215,107 @@ $stoppedBranch = $wrapperSource.Substring($stoppedBranchIndex, $unknownBranchInd
 $unknownBranch = $wrapperSource.Substring($unknownBranchIndex, $backupIndex - $unknownBranchIndex)
 
 Assert-Contains $startedBranch 'Set-AppPoolState -Name $trainingAppPoolName -State "Stopped"' "Started app-pool branch"
-Assert-Contains $startedBranch '$stoppedAppPoolState = Get-AppPoolState -Name $trainingAppPoolName' "Started app-pool branch"
-Assert-Contains $startedBranch 'if ($stoppedAppPoolState -ne "Stopped")' "Started app-pool branch"
-Assert-Contains $startedBranch '$appPoolTransitionedFromStarted = $true' "Started app-pool branch"
-Assert-True ($startedBranch.IndexOf('$appPoolTransitionedFromStarted = $true', [System.StringComparison]::Ordinal) -gt $startedBranch.IndexOf('if ($stoppedAppPoolState -ne "Stopped")', [System.StringComparison]::Ordinal)) "The restart guard is set before the Stopped state is confirmed."
+Assert-Contains $startedBranch '$restoreAppPoolToStarted = $true' "Started app-pool branch"
+Assert-Contains $startedBranch 'Wait-AppPoolState -Name $trainingAppPoolName -DesiredState "Stopped"' "Started app-pool branch"
+$restoreGuardIndex = $startedBranch.IndexOf('$restoreAppPoolToStarted = $true', [System.StringComparison]::Ordinal)
+$stopRequestIndex = $startedBranch.IndexOf('Set-AppPoolState -Name $trainingAppPoolName -State "Stopped"', [System.StringComparison]::Ordinal)
+$waitForStoppedIndex = $startedBranch.IndexOf('Wait-AppPoolState -Name $trainingAppPoolName -DesiredState "Stopped"', [System.StringComparison]::Ordinal)
+Assert-True ($restoreGuardIndex -lt $stopRequestIndex) "The restart guard is not set before the stop request."
+Assert-True ($waitForStoppedIndex -gt $stopRequestIndex) "The bounded Stopped wait does not follow the stop request."
+Assert-True ($backupIndex -gt ($startedBranchIndex + $waitForStoppedIndex)) "Backup logic can run before the bounded Stopped wait."
 
 Assert-Contains $stoppedBranch "is already stopped; preserving that state" "Stopped app-pool branch"
 Assert-NotContains $stoppedBranch "Set-AppPoolState" "Stopped app-pool branch"
-Assert-NotContains $stoppedBranch '$appPoolTransitionedFromStarted = $true' "Stopped app-pool branch"
+Assert-NotContains $stoppedBranch '$restoreAppPoolToStarted = $true' "Stopped app-pool branch"
 
 Assert-Contains $unknownBranch "must be Started or Stopped before reset" "Unknown app-pool branch"
 Assert-NotContains $unknownBranch "Copy-Item" "Unknown app-pool branch"
 Assert-NotContains $unknownBranch "dotnet" "Unknown app-pool branch"
 
-$guardAssignments = [regex]::Matches($wrapperSource, '\$appPoolTransitionedFromStarted\s*=\s*\$true')
-Assert-True ($guardAssignments.Count -eq 1) "The restart guard must be set exactly once, only after a confirmed Started-to-Stopped transition."
-Assert-True ($wrapperSource -match '(?s)finally\s*\{\s*if \(\$appPoolTransitionedFromStarted\)\s*\{\s*Set-AppPoolState -Name \$trainingAppPoolName -State "Started"') "The confirmed Started-to-Stopped transition is not protected by the expected finally-based restart."
+$guardAssignments = [regex]::Matches($wrapperSource, '\$restoreAppPoolToStarted\s*=\s*\$true')
+Assert-True ($guardAssignments.Count -eq 1) "The restart guard must be set exactly once when the initial state is Started."
+Assert-True ($wrapperSource -match '(?s)finally\s*\{\s*if \(\$restoreAppPoolToStarted\)\s*\{\s*try\s*\{\s*Restore-AppPoolToStarted -Name \$trainingAppPoolName') "Started-state restoration is not protected by finally."
+
+$operationFailureInitializationIndex = $wrapperSource.IndexOf('$operationFailure = $null', [System.StringComparison]::Ordinal)
+$restorationFailureInitializationIndex = $wrapperSource.IndexOf('$restorationFailure = $null', [System.StringComparison]::Ordinal)
+$operationFailureCaptureIndex = $wrapperSource.IndexOf('$operationFailure = $_', [System.StringComparison]::Ordinal)
+$restorationFailureCaptureIndex = $wrapperSource.IndexOf('$restorationFailure = $_', [System.StringComparison]::Ordinal)
+$dualFailureBranchIndex = $wrapperSource.IndexOf('if ($null -ne $operationFailure -and $null -ne $restorationFailure) {', [System.StringComparison]::Ordinal)
+$operationOnlyBranchIndex = $wrapperSource.IndexOf('if ($null -ne $operationFailure) {', [System.StringComparison]::Ordinal)
+$restorationOnlyBranchIndex = $wrapperSource.IndexOf('if ($null -ne $restorationFailure) {', [System.StringComparison]::Ordinal)
+$operationFailureLabelIndex = $wrapperSource.IndexOf('Operation failure: $($operationFailure.Exception.Message)', [System.StringComparison]::Ordinal)
+$restorationFailureLabelIndex = $wrapperSource.IndexOf('Restoration failure: $($restorationFailure.Exception.Message)', [System.StringComparison]::Ordinal)
+$successIndex = $wrapperSource.IndexOf('Write-Step "Success:', [System.StringComparison]::Ordinal)
+
+Assert-True ($operationFailureInitializationIndex -ge 0) "Operation failure state is not initialized."
+Assert-True ($restorationFailureInitializationIndex -gt $operationFailureInitializationIndex) "Restoration failure state is not initialized after operation failure state."
+Assert-True ($operationFailureCaptureIndex -gt $restorationFailureInitializationIndex) "The operation exception is not captured separately."
+Assert-True ($restorationFailureCaptureIndex -gt $operationFailureCaptureIndex) "The restoration exception is not captured separately."
+Assert-True ($wrapperSource -match '(?s)catch\s*\{\s*\$operationFailure\s*=\s*\$_\s*\}\s*finally') "Operation failure capture does not precede restoration in finally."
+Assert-True ($wrapperSource -match '(?s)Restore-AppPoolToStarted -Name \$trainingAppPoolName\s*\}\s*catch\s*\{\s*\$restorationFailure\s*=\s*\$_') "Restoration failure is not captured from the restoration attempt."
+Assert-True ($dualFailureBranchIndex -gt $restorationFailureCaptureIndex) "Dual-failure evaluation does not occur after restoration."
+Assert-True ($operationFailureLabelIndex -gt $dualFailureBranchIndex) "The dual-failure message does not contain the labeled operation failure."
+Assert-True ($restorationFailureLabelIndex -gt $operationFailureLabelIndex) "Operation failure does not precede Restoration failure in the combined message."
+Assert-True ($operationOnlyBranchIndex -gt $restorationFailureLabelIndex) "The operation-only failure branch is missing or out of order."
+Assert-True ($restorationOnlyBranchIndex -gt $operationOnlyBranchIndex) "The restoration-only failure branch is missing or out of order."
+Assert-True ($successIndex -gt $restorationOnlyBranchIndex) "Success can be reported before all failure checks complete."
+
+$operationOnlyBranch = $wrapperSource.Substring($operationOnlyBranchIndex, $restorationOnlyBranchIndex - $operationOnlyBranchIndex)
+$restorationOnlyBranch = $wrapperSource.Substring($restorationOnlyBranchIndex, $successIndex - $restorationOnlyBranchIndex)
+Assert-Contains $operationOnlyBranch 'throw $operationFailure' "Operation-only failure branch"
+Assert-Contains $restorationOnlyBranch 'throw $restorationFailure' "Restoration-only failure branch"
+
+$waitFunctionStart = $wrapperSource.IndexOf('function Wait-AppPoolState {', [System.StringComparison]::Ordinal)
+$restoreFunctionStart = $wrapperSource.IndexOf('function Restore-AppPoolToStarted {', [System.StringComparison]::Ordinal)
+$planFunctionStart = $wrapperSource.IndexOf('function Resolve-MaintenancePlan {', [System.StringComparison]::Ordinal)
+Assert-True ($waitFunctionStart -ge 0) "The bounded app-pool state wait helper is missing."
+Assert-True ($restoreFunctionStart -gt $waitFunctionStart) "The app-pool restoration helper is missing or out of order."
+Assert-True ($planFunctionStart -gt $restoreFunctionStart) "The maintenance-plan helper does not follow the app-pool helpers."
+
+$waitFunction = $wrapperSource.Substring($waitFunctionStart, $restoreFunctionStart - $waitFunctionStart)
+$restoreFunction = $wrapperSource.Substring($restoreFunctionStart, $planFunctionStart - $restoreFunctionStart)
+Assert-Contains $waitFunction '[int]$TimeoutSeconds = 30' "App-pool wait helper"
+Assert-Contains $waitFunction '[int]$PollIntervalMilliseconds = 250' "App-pool wait helper"
+Assert-Contains $waitFunction '[System.Diagnostics.Stopwatch]::StartNew()' "App-pool wait helper"
+Assert-Contains $waitFunction 'Start-Sleep -Milliseconds $sleepMilliseconds' "App-pool wait helper"
+Assert-Contains $waitFunction '$stopwatch.Elapsed.TotalMilliseconds -ge $timeoutMilliseconds' "App-pool wait helper"
+Assert-Contains $waitFunction 'app pool ''$Name''' "App-pool wait timeout"
+Assert-Contains $waitFunction 'reach ''$DesiredState''' "App-pool wait timeout"
+Assert-Contains $waitFunction 'Last observed state: ''$lastObservedState''' "App-pool wait timeout"
+Assert-NotContains $waitFunction 'while ($true)' "App-pool wait helper"
+
+$restoreStartedIndex = $restoreFunction.IndexOf('"Started" {', [System.StringComparison]::Ordinal)
+$restoreStartingIndex = $restoreFunction.IndexOf('"Starting" {', [System.StringComparison]::Ordinal)
+$restoreStoppedIndex = $restoreFunction.IndexOf('"Stopped" {', [System.StringComparison]::Ordinal)
+$restoreStoppingIndex = $restoreFunction.IndexOf('"Stopping" {', [System.StringComparison]::Ordinal)
+$restoreDefaultIndex = $restoreFunction.IndexOf('default {', [System.StringComparison]::Ordinal)
+Assert-True ($restoreStartedIndex -ge 0) "Restoration does not account for Started."
+Assert-True ($restoreStartingIndex -gt $restoreStartedIndex) "Restoration does not account for Starting."
+Assert-True ($restoreStoppedIndex -gt $restoreStartingIndex) "Restoration does not account for Stopped."
+Assert-True ($restoreStoppingIndex -gt $restoreStoppedIndex) "Restoration does not account for Stopping."
+Assert-True ($restoreDefaultIndex -gt $restoreStoppingIndex) "Restoration does not reject unexpected states."
+
+$restoreStartedBranch = $restoreFunction.Substring($restoreStartedIndex, $restoreStartingIndex - $restoreStartedIndex)
+$restoreStartingBranch = $restoreFunction.Substring($restoreStartingIndex, $restoreStoppedIndex - $restoreStartingIndex)
+$restoreStoppedBranch = $restoreFunction.Substring($restoreStoppedIndex, $restoreStoppingIndex - $restoreStoppedIndex)
+$restoreStoppingBranch = $restoreFunction.Substring($restoreStoppingIndex, $restoreDefaultIndex - $restoreStoppingIndex)
+$restoreDefaultBranch = $restoreFunction.Substring($restoreDefaultIndex)
+Assert-NotContains $restoreStartedBranch 'Set-AppPoolState' "Started restoration branch"
+Assert-Contains $restoreStartingBranch 'Wait-AppPoolState -Name $Name -DesiredState "Started"' "Starting restoration branch"
+Assert-NotContains $restoreStartingBranch 'Set-AppPoolState' "Starting restoration branch"
+
+$stoppedStartIndex = $restoreStoppedBranch.IndexOf('Set-AppPoolState -Name $Name -State "Started"', [System.StringComparison]::Ordinal)
+$stoppedStartedWaitIndex = $restoreStoppedBranch.IndexOf('Wait-AppPoolState -Name $Name -DesiredState "Started"', [System.StringComparison]::Ordinal)
+Assert-True ($stoppedStartIndex -ge 0) "Stopped restoration does not request a start."
+Assert-True ($stoppedStartedWaitIndex -gt $stoppedStartIndex) "Stopped restoration does not wait for Started after requesting a start."
+
+$stoppingStoppedWaitIndex = $restoreStoppingBranch.IndexOf('Wait-AppPoolState -Name $Name -DesiredState "Stopped"', [System.StringComparison]::Ordinal)
+$stoppingStartIndex = $restoreStoppingBranch.IndexOf('Set-AppPoolState -Name $Name -State "Started"', [System.StringComparison]::Ordinal)
+$stoppingStartedWaitIndex = $restoreStoppingBranch.IndexOf('Wait-AppPoolState -Name $Name -DesiredState "Started"', [System.StringComparison]::Ordinal)
+Assert-True ($stoppingStoppedWaitIndex -ge 0) "Stopping restoration does not wait for Stopped."
+Assert-True ($stoppingStartIndex -gt $stoppingStoppedWaitIndex) "Stopping restoration requests a start before reaching Stopped."
+Assert-True ($stoppingStartedWaitIndex -gt $stoppingStartIndex) "Stopping restoration does not wait for Started after requesting a start."
+Assert-Contains $restoreDefaultBranch 'unexpected state ''$currentState''' "Unexpected-state restoration branch"
 Assert-Contains $wrapperSource 'Get-WebAppPoolState -Name $Name -ErrorAction Stop' "Wrapper source"
 Assert-NotContains $wrapperSource "BoardPersistenceOptions__DatabasePath" "Wrapper source"
 Assert-NotContains $wrapperSource "--BoardPersistenceOptions" "Wrapper source"
