@@ -496,11 +496,36 @@ function render() {
 function applySnapshot(snapshot) {
   app.snapshot = snapshot;
   app.lastSnapshotAt = Date.now();
+  syncTrainingEnvironmentBadge(snapshot.isTraining === true);
 
   const serverTime = Date.parse(snapshot.serverTime);
   if (!Number.isNaN(serverTime)) {
     app.serverOffsetMs = serverTime - Date.now();
   }
+}
+
+function syncTrainingEnvironmentBadge(isTraining) {
+  let badge = document.getElementById("trainingEnvironmentBadge");
+  if (!isTraining) {
+    badge?.remove();
+    return;
+  }
+
+  if (badge) {
+    return;
+  }
+
+  const brand = document.querySelector(".brand-lockup");
+  if (!brand) {
+    return;
+  }
+
+  badge = document.createElement("span");
+  badge.id = "trainingEnvironmentBadge";
+  badge.className = "training-environment-badge";
+  badge.textContent = "TRAINING";
+  badge.setAttribute("aria-label", "ChairSide Training environment");
+  brand.appendChild(badge);
 }
 
 function boardNowMs() {

@@ -55,6 +55,7 @@ public sealed class DemoBoardStore
     private readonly TimeProvider _timeProvider;
     private readonly int _roomCount;
     private readonly bool _demoTimerEnabled;
+    private readonly bool _isTraining;
     private readonly List<Doctor> _doctors;
     private readonly List<Doctor> _activeDoctors;
     private readonly List<ProcedureCategory> _procedures;
@@ -85,6 +86,7 @@ public sealed class DemoBoardStore
         _repository = repository;
         _timeProvider = timeProvider ?? TimeProvider.System;
         _roomCount = boardOptions.Value.RoomCount;
+        _isTraining = deploymentEnvironment.IsTraining;
         _demoTimerEnabled = deploymentEnvironment.IsTraining
             ? false
             : boardUiOptions.Value.DemoTimerEnabled ?? deploymentEnvironment.IsDevelopment;
@@ -122,6 +124,7 @@ public sealed class DemoBoardStore
                 Thresholds.AgingThreshold,
                 Thresholds.StaleThreshold,
                 _demoTimerEnabled,
+                _isTraining,
                 _activeDoctors,
                 _activeProcedures,
                 _rooms.Select(room => ToRoomStatus(room, now)).ToList(),
@@ -4318,6 +4321,7 @@ public sealed record BoardSnapshot(
     TimeSpan AgingThreshold,
     TimeSpan StaleThreshold,
     bool DemoTimerEnabled,
+    bool IsTraining,
     IReadOnlyList<Doctor> Doctors,
     IReadOnlyList<ProcedureCategory> Procedures,
     IReadOnlyList<RoomStatus> Rooms,

@@ -1,7 +1,7 @@
 ﻿{
     "generatedStamp":  "deterministic",
     "root":  ".",
-    "fileCount":  108,
+    "fileCount":  109,
     "files":  [
                   {
                       "path":  ".github/pull_request_template.md",
@@ -235,7 +235,7 @@
                   {
                       "path":  "docs/knowledge/product/environment-maintenance-preflight.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  6981,
+                      "sizeBytes":  7906,
                       "typeSymbols":  [
 
                                       ],
@@ -547,7 +547,7 @@
                   {
                       "path":  "docs/knowledge-graph/chairside.graph.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  10278,
+                      "sizeBytes":  10803,
                       "typeSymbols":  [
 
                                       ],
@@ -578,7 +578,7 @@
                   {
                       "path":  "docs/knowledge-graph/decisions.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  10152,
+                      "sizeBytes":  11053,
                       "typeSymbols":  [
 
                                       ],
@@ -649,7 +649,7 @@
                   {
                       "path":  "docs/Production-Pilot-Checklist.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  8558,
+                      "sizeBytes":  8574,
                       "typeSymbols":  [
 
                                       ],
@@ -690,7 +690,7 @@
                   {
                       "path":  "docs/TrainingDataReset.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  6361,
+                      "sizeBytes":  6753,
                       "typeSymbols":  [
 
                                       ],
@@ -711,20 +711,14 @@
                                           ],
                       "headings":  [
                                        "ChairSide Training Data Reset Runbook",
-                                       "Data lifecycle",
-                                       "What the two modes do",
-                                       "What gets backed up",
-                                       "What gets cleared / seeded",
+                                       "Code-owned Training deployment",
                                        "Prerequisites",
-                                       "Usage",
-                                       "Training fixture reset (seed synthetic data)",
-                                       "Official beta reset (empty board)",
-                                       "Overriding defaults",
-                                       "Direct CLI (advanced / already-stopped app)",
-                                       "Verifying after a TrainingSeed reset",
-                                       "Verifying after an EmptyBeta reset",
-                                       "Suggested operator sequence",
-                                       "Safety notes"
+                                       "Approved modes",
+                                       "Previewing a reset",
+                                       "Running a reset",
+                                       "Database safety",
+                                       "Verification after reset",
+                                       "Engineering-only profiles"
                                    ]
                   },
                   {
@@ -817,7 +811,7 @@
                   {
                       "path":  "README.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  37515,
+                      "sizeBytes":  37528,
                       "typeSymbols":  [
 
                                       ],
@@ -880,7 +874,7 @@
                   {
                       "path":  "scripts/Reset-ChairSideTrainingData.ps1",
                       "kind":  "PowerShell",
-                      "sizeBytes":  6256,
+                      "sizeBytes":  11987,
                       "typeSymbols":  [
 
                                       ],
@@ -1357,7 +1351,7 @@
                   {
                       "path":  "src/ChairSide.Board/Program.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  93612,
+                      "sizeBytes":  93624,
                       "typeSymbols":  [
                                           "BeginPrestageRequest",
                                           "SeatRoomRequest",
@@ -1516,7 +1510,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/DatabaseDeploymentIdentityPolicy.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  27192,
+                      "sizeBytes":  27924,
                       "typeSymbols":  [
                                           "DeployedDatabaseFileState",
                                           "DatabaseDeploymentIdentityValues",
@@ -1618,7 +1612,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/DemoBoardStore.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  251364,
+                      "sizeBytes":  251495,
                       "typeSymbols":  [
                                           "ExceptionReasons",
                                           "ReportingExceptionReasons",
@@ -1835,7 +1829,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/MaintenanceCommands.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  13679,
+                      "sizeBytes":  13699,
                       "typeSymbols":  [
                                           "MaintenanceOutcome",
                                           "MaintenanceResolution",
@@ -2290,7 +2284,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/SqliteBoardRepository.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  157705,
+                      "sizeBytes":  157929,
                       "typeSymbols":  [
                                           "SqliteBoardRepository",
                                           "DoctorWorkingRoomRecord",
@@ -2386,7 +2380,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/board.js",
                       "kind":  "JavaScript",
-                      "sizeBytes":  185667,
+                      "sizeBytes":  186289,
                       "typeSymbols":  [
 
                                       ],
@@ -2423,6 +2417,7 @@
                                               "scheduleRealtimeRetry",
                                               "render",
                                               "applySnapshot",
+                                              "syncTrainingEnvironmentBadge",
                                               "boardNowMs",
                                               "ensureConnectionStatusIndicator",
                                               "formatSnapshotAge",
@@ -2481,8 +2476,7 @@
                                               "initialsFromDoctorName",
                                               "doctorInitials",
                                               "formatAbsoluteMinutes",
-                                              "formatSignedMinutes",
-                                              "renderDoctorAllocationRow"
+                                              "formatSignedMinutes"
                                           ],
                       "headings":  [
 
@@ -2673,7 +2667,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/styles.css",
                       "kind":  "Css",
-                      "sizeBytes":  92302,
+                      "sizeBytes":  92618,
                       "typeSymbols":  [
 
                                       ],
@@ -2859,7 +2853,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/BoardStoreTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  484289,
+                      "sizeBytes":  486570,
                       "typeSymbols":  [
                                           "BoardStoreTests",
                                           "StoreContext",
@@ -3011,7 +3005,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/DatabaseDeploymentIdentityPolicyTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  28627,
+                      "sizeBytes":  29293,
                       "typeSymbols":  [
                                           "DatabaseDeploymentIdentityPolicyTests"
                                       ],
@@ -3066,7 +3060,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/DatabaseDeploymentIdentityProcessTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  4738,
+                      "sizeBytes":  4849,
                       "typeSymbols":  [
                                           "DatabaseDeploymentIdentityProcessTests"
                                       ],
@@ -3094,7 +3088,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/DatabaseIsolationPolicyTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  25543,
+                      "sizeBytes":  25547,
                       "typeSymbols":  [
                                           "DatabaseIsolationPolicyTests",
                                           "DelegateReparsePointInspector",
@@ -3199,7 +3193,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/EnvironmentMaintenancePreflightTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  16573,
+                      "sizeBytes":  16648,
                       "typeSymbols":  [
                                           "EnvironmentMaintenancePreflightTests"
                                       ],
@@ -3626,7 +3620,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/ReadyHandoffPersistenceTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  69350,
+                      "sizeBytes":  69354,
                       "typeSymbols":  [
                                           "ReadyHandoffPersistenceTests",
                                           "RoomSnapshot",
@@ -3841,6 +3835,32 @@
                       "path":  "tests/knowledge-graph/New-ChairSideKnowledgeGraph.Tests.ps1",
                       "kind":  "PowerShell",
                       "sizeBytes":  5546,
+                      "typeSymbols":  [
+
+                                      ],
+                      "methodSymbols":  [
+
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
+                      "path":  "tests/scripts/Reset-ChairSideTrainingData.Tests.ps1",
+                      "kind":  "PowerShell",
+                      "sizeBytes":  11235,
                       "typeSymbols":  [
 
                                       ],

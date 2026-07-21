@@ -23,6 +23,8 @@ mapping, and tests consume that policy rather than independently interpreting ar
   receive Development demo data.
 - Training does not map the Development seed endpoint, always disables the Demo Timer, and rejects
   nonzero simulated elapsed values.
+- Board snapshots identify Training explicitly so the shared application shell shows one persistent
+  `TRAINING` badge. Development and Production snapshots do not request the badge.
 - Training and Production reject the `dev-admin-token` sample when admin/report protection is
   enabled and warn when room-device binding or admin/report protection is disabled.
 - Training credentials must be separate from Development and Production credentials. No deployed
@@ -99,12 +101,17 @@ repository construction. Unknown commands default to denied.
 
 Authorized Training maintenance resolves the repository and validates the matching Training marker
 before any reset or seed mutation. Existing row-level reset methods preserve the marker exactly.
-Tests characterize this invariant for all four reset entry points: Training data, empty beta, large
+Tests characterize this invariant for all four reset entry points: Training data, clean, large
 synthetic reporting data, and stress fixture.
 
-The existing `Reset-ChairSideTrainingData.ps1` wrapper invokes the CLI as Production and is therefore
-intentionally unusable. Updating that wrapper and completing a safe Training reset workflow belongs
-to a later issue #143 slice.
+`Reset-ChairSideTrainingData.ps1` is a Training-only, backup-first operator wrapper. It code-owns the
+Training application, database, backup, app-pool, and child-environment values; accepts no deployment
+overrides; validates the published Training configuration before stopping IIS; and never passes a
+database-path override to the application. Its routine modes map to the existing clean, training,
+full-stress, and reporting-volume maintenance shapes. Standard PowerShell `-WhatIf` prints the
+complete plan without IIS, filesystem, or application side effects. Real execution accepts only an
+explicit Started or Stopped Training app-pool state, stops and finally restarts only a pool that this
+invocation confirmed it transitioned from Started to Stopped, and preserves an already Stopped pool.
 
 ## Source and test anchors
 
@@ -116,6 +123,9 @@ to a later issue #143 slice.
 - `src/ChairSide.Board/Services/MaintenanceCommands.cs`
 - `src/ChairSide.Board/Program.cs`
 - `src/ChairSide.Board/Services/DemoBoardStore.cs`
+- `src/ChairSide.Board/wwwroot/board.js`
+- `scripts/Reset-ChairSideTrainingData.ps1`
+- `tests/scripts/Reset-ChairSideTrainingData.Tests.ps1`
 - `tests/ChairSide.Board.Tests/EnvironmentMaintenancePreflightTests.cs`
 - `tests/ChairSide.Board.Tests/DatabaseIsolationPolicyTests.cs`
 - `tests/ChairSide.Board.Tests/DatabaseDeploymentIdentityPolicyTests.cs`

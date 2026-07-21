@@ -1,138 +1,148 @@
 # ChairSide Training Data Reset Runbook
 
-> **Status: intentionally unavailable.** ChairSide now refuses every destructive maintenance command
-> in `Production` before application build or repository construction. The current
-> `Reset-ChairSideTrainingData.ps1` wrapper invokes the maintenance CLI as `Production`, so it cannot
-> perform either reset described below. Do not work around this guard by running Production as
-> Development. Restoring a safe Training-only wrapper and reset workflow belongs to the later issue
-> #143 Training reset slice; the commands below are retained only as deferred workflow reference.
+`Reset-ChairSideTrainingData.ps1` is the routine operator entry point for returning the separate
+ChairSide Training deployment to a known, non-PHI sandbox state. It cannot target caller-supplied
+paths, app pools, or environments, and it does not expose a web reset endpoint or UI reset button.
 
-Operator-only maintenance for resetting ChairSide data. **Destructive, but backup-first.** There is
-**no** staff-facing reset button and **no** production web endpoint that wipes data. All resets run
-through an in-app maintenance CLI invoked by a PowerShell wrapper that the operator runs deliberately
-on the server.
+The reset is destructive and backup-first. Run it only for a deliberate Training session.
 
-> Do **not** run the production VM as `Development`. Production maintenance is refused even with a
-> valid confirmation token.
+## Code-owned Training deployment
 
-## Data lifecycle
+The wrapper always uses:
 
-1. **Alpha DB** - current click-through / demo / training-session data. Disposable, but **archive
-   before removal**.
-2. **Training fixture DB** - clean, deterministic synthetic data for staff/doctor training and
-   reporting walkthroughs. Produced by the `TrainingSeed` reset.
-3. **Official beta DB** - a fresh, empty database used when ChairSide becomes the real beta source of
-   truth. Produced by the `EmptyBeta` reset.
+- Application: `C:\ChairSide\Training\App`
+- Application DLL: `C:\ChairSide\Training\App\ChairSide.Board.dll`
+- Configuration: `C:\ChairSide\Training\App\appsettings.Training.json`
+- Database: `C:\ChairSide\Training\Data\chairside-training.db`
+- Backups: `C:\ChairSide\Training\Backups`
+- IIS app pool: `ChairSideBoard-Training`
+- Child environment: `Training`
 
-## What the two modes do
-
-| Mode | CLI command | Confirmation token | Clears completed cycles | Resets active rooms | Seeds synthetic data |
-|---|---|---|---|---|---|
-| `TrainingSeed` | `reset-training-data` | `RESET_TRAINING_DATA` | Yes | Yes (all rooms -> Available) | **Yes** (clean, non-PHI, deterministic) |
-| `EmptyBeta` | `reset-empty` | `RESET_EMPTY_BETA` | Yes | Yes (all rooms -> Available) | **No** (empty board) |
-
-Both modes operate through the app's own repository logic (WAL-consistent SQLite), never raw SQL file
-edits.
-
-## What gets backed up
-
-Before any mutation the script stops the IIS app pool and copies a timestamped set under
-`C:\ChairSide\Backups\chairside-pre-<Mode>-<timestamp>\`:
-
-- `chairside.db`
-- `chairside.db-wal` (if present)
-- `chairside.db-shm` (if present)
-
-The app is stopped first so the WAL sidecars are stable for the file-set copy.
-
-## What gets cleared / seeded
-
-- **Cleared:** every row in `completed_room_cycles`; every `active_rooms` row is reset so all
-  configured rooms are `Available` with no lifecycle or allocation residue.
-- **Seeded (TrainingSeed only):** ~48 deterministic completed cycles across recent weekdays, all four
-  doctors, seven procedure families, sedation only as a `+SED` modifier, expected-allocation snapshots
-  on every cycle, and a realistic over/under/at-expected variance spread. **No PHI. No standalone
-  Sedation procedure. Zero reporting exceptions.**
+These values are not command-line parameters. The wrapper does not pass a database-path override to
+the application. `appsettings.Training.json` and ChairSide's code-owned database isolation policy
+must independently resolve the canonical Training database.
 
 ## Prerequisites
 
-- Published app at `C:\ChairSide\App` (contains `ChairSide.Board.dll`).
-- .NET 8 runtime on the server (already required by the IIS-hosted app).
-- IIS app pool `ChairSideBoard`.
-- Permission to stop/start the app pool and write to the data/backup folders.
+The separate Training deployment must already exist. Before running a real reset, confirm:
 
-## Usage
+- The published app and `appsettings.Training.json` exist under `C:\ChairSide\Training\App`.
+- The Training app pool is named `ChairSideBoard-Training`.
+- The operator can stop/start that pool and write to the Training data and backup folders.
+- The .NET 8 runtime is installed.
+- The Training URL and deployment configuration have already been established operationally.
 
-Run from an elevated PowerShell on the server, from the repo `scripts` folder (or copy the script to
-the server).
+`-WhatIf` does not require the deployment to exist; it resolves and prints the complete code-owned
+plan without touching IIS, the filesystem, or the application.
 
-### Training fixture reset (seed synthetic data)
+## Approved modes
 
-```powershell
-.\Reset-ChairSideTrainingData.ps1 -Mode TrainingSeed -Confirm RESET_TRAINING_DATA
-```
+| Mode | Maintenance command | Required `-ConfirmationToken` | Result |
+|---|---|---|---|
+| `Clean` | `reset-empty` | `RESET_EMPTY_BETA` | All rooms Available; no completed history |
+| `TrainingSeed` | `reset-training-data` | `RESET_TRAINING_DATA` | All rooms Available plus the clean deterministic training history |
+| `FullStress` | `reset-stress-fixture --profile full-stress` | `RESET_STRESS_FIXTURE` | Live board states plus scenario-rich report history |
+| `ReportingVolume` | `reset-stress-fixture --profile reporting-volume` | `RESET_STRESS_FIXTURE` | Large clean completed-cycle history |
 
-### Official beta reset (empty board)
+`ReportingVolume` alone accepts `-CompletedCycles`, from 100 through 10000. When omitted, the
+application uses its existing default of 1000. Every other mode refuses that parameter.
 
-```powershell
-.\Reset-ChairSideTrainingData.ps1 -Mode EmptyBeta -Confirm RESET_EMPTY_BETA
-```
+`-ConfirmationToken` is the ChairSide safety token. PowerShell reserves `-Confirm` as a common
+`ShouldProcess` switch, so it is not the token parameter.
 
-### Overriding defaults
+## Previewing a reset
 
-```powershell
-.\Reset-ChairSideTrainingData.ps1 `
-    -Mode TrainingSeed -Confirm RESET_TRAINING_DATA `
-    -AppPath "C:\ChairSide\App" `
-    -DatabasePath "C:\ChairSide\Data\chairside.db" `
-    -BackupRoot "C:\ChairSide\Backups" `
-    -AppPoolName "ChairSideBoard"
-```
-
-The script prints the resolved paths, mode, and CLI command before acting. A wrong or missing
-`-Confirm` token aborts **before** stopping the app or touching data.
-
-### Direct CLI (advanced / already-stopped app)
-
-The PowerShell wrapper is preferred (it handles stop/backup/start). The underlying CLI, if invoked
-manually after stopping the app pool and taking a backup:
+Preview each plan before its first operational use:
 
 ```powershell
-$env:ASPNETCORE_ENVIRONMENT = "Production"
-dotnet C:\ChairSide\App\ChairSide.Board.dll --maintenance reset-training-data --confirm RESET_TRAINING_DATA
-dotnet C:\ChairSide\App\ChairSide.Board.dll --maintenance reset-empty       --confirm RESET_EMPTY_BETA
+.\scripts\Reset-ChairSideTrainingData.ps1 `
+    -Mode Clean `
+    -ConfirmationToken RESET_EMPTY_BETA `
+    -WhatIf
+
+.\scripts\Reset-ChairSideTrainingData.ps1 `
+    -Mode FullStress `
+    -ConfirmationToken RESET_STRESS_FIXTURE `
+    -WhatIf
+
+.\scripts\Reset-ChairSideTrainingData.ps1 `
+    -Mode ReportingVolume `
+    -ConfirmationToken RESET_STRESS_FIXTURE `
+    -CompletedCycles 500 `
+    -WhatIf
 ```
 
-An unknown command, missing token, or wrong token prints a refusal, changes nothing, and exits
-non-zero. The maintenance CLI never starts the web server.
+The preview prints the exact app, configuration, data, database, backup, app-pool, environment, and
+maintenance CLI values. It performs no deployment existence check and no side effect.
 
-## Verifying after a TrainingSeed reset
+## Running a reset
 
-1. Confirm the app pool is running and browse `http://chairside/reports.html`.
-2. **Data Quality** card: `0 excluded`, `0 reporting exceptions`.
-3. **Allocation Balance**: many calculable cases.
-4. **Doctor Allocation Balance**: synthetic doctor examples load with varied, non-identical operational patterns.
-5. **Procedure Family Allocation Balance**: multiple families.
-6. Variance examples show over / under / at-expected cases without ranking doctors or staff.
-7. No standalone Sedation procedure and no "sedation time" metric.
+Run from an elevated PowerShell on the Training server:
 
-## Verifying after an EmptyBeta reset
+```powershell
+.\scripts\Reset-ChairSideTrainingData.ps1 `
+    -Mode TrainingSeed `
+    -ConfirmationToken RESET_TRAINING_DATA
+```
 
-1. Browse `http://chairside/reports.html`: no completed cycles; empty-state messaging.
-2. Browse `http://chairside/master.html`: all rooms Available.
+For a scenario-rich demonstration:
 
-## Suggested operator sequence
+```powershell
+.\scripts\Reset-ChairSideTrainingData.ps1 `
+    -Mode FullStress `
+    -ConfirmationToken RESET_STRESS_FIXTURE
+```
 
-1. Archive current alpha DB: `.\Backup-ChairSideSqlite.ps1` (or the pre-reset backup created by this
-   script).
-2. `TrainingSeed` reset -> start app -> verify reports -> run training.
-3. After training, run `EmptyBeta` reset (this also backs up the training DB first).
-4. Start app -> confirm empty board -> ChairSide is the beta source of truth.
+Before stopping IIS, the wrapper validates the mode, token, completed-cycle usage, every code-owned
+Training value, the published DLL, and the Training configuration's database and log paths. It then:
 
-## Safety notes
+1. Reads the exact `ChairSideBoard-Training` state. A Started pool is stopped and later restarted; an
+   already Stopped pool remains stopped. Every other state is refused before backup or maintenance.
+2. Copies each present SQLite main, WAL, and SHM file to a timestamped directory under
+   `C:\ChairSide\Training\Backups`.
+3. Runs the published DLL from the Training app directory with `ASPNETCORE_ENVIRONMENT=Training`.
+4. Restores the parent PowerShell process's previous environment value.
+5. Restarts the Training app pool in a `finally` block only after this invocation confirmed a
+   Started-to-Stopped transition.
 
-- The reset is **destructive** but always takes a timestamped backup first.
-- Never run the production VM as `Development`.
-- `TrainingSeed` and `EmptyBeta` use **different** confirmation tokens so seeding can never happen
-  during a go-live clean.
-- Backups contain non-PHI operational data only; still protect them per clinic policy.
+A backup, maintenance, or restart failure returns a nonzero exit. When this invocation stopped a
+previously Started pool, restart is still attempted after backup or maintenance failure.
+
+## Database safety
+
+The maintenance CLI validates the persisted `Training` deployment marker during repository
+construction, before any reset or fixture mutation. A missing, malformed, or wrong-role marker is a
+controlled refusal. All current reset implementations preserve the complete marker row unchanged.
+
+Every destructive maintenance command remains refused in Production before application build or
+repository construction. Do not work around this policy by changing an environment name or by
+copying a marked database between deployments.
+
+## Verification after reset
+
+After any successful reset:
+
+1. Confirm `ChairSideBoard-Training` is running.
+2. Open the separate Training URL and confirm the persistent `TRAINING` badge is visible.
+3. Confirm the master board and reports match the selected mode.
+4. Complete one intended teaching or demonstration workflow.
+5. Confirm no patient-identifying fields are requested or displayed.
+
+Mode-specific expectations:
+
+- `Clean`: every room is Available and Reports shows no completed cycles.
+- `TrainingSeed`: rooms are Available and clean allocation/report examples are present.
+- `FullStress`: the live board contains representative active states and Reports contains bounded
+  scenario history.
+- `ReportingVolume`: rooms are Available and Reports contains the requested completed-cycle volume.
+
+## Engineering-only profiles
+
+The underlying `reset-stress-fixture` command continues to support `live-board-stress`,
+`doctor-view-stress`, `doctor-view-overflow-stress`, `scenario-rich`, and `all-scenarios` in addition
+to the two routine wrapper profiles. They remain available for deliberate engineering validation
+through the already-stopped, already-backed-up Training maintenance CLI. They are not exposed by the
+routine operator wrapper, and no new fixture profile is introduced by this workflow.
+
+Backups contain non-PHI operational room, doctor, procedure, and timing data. Protect them according
+to clinic policy.
