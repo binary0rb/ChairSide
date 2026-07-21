@@ -127,7 +127,7 @@ $wrongToken = Invoke-Wrapper @(
     "-WhatIf"
 )
 Assert-True ($wrongToken.ExitCode -ne 0) "Wrong token unexpectedly succeeded."
-Assert-Contains $wrongToken.Output "Confirmation token does not match" "Wrong-token refusal"
+Assert-ContainsIgnoringWhitespace $wrongToken.Output "Confirmation token does not match" "Wrong-token refusal"
 foreach ($unexpected in @("Mode:              FullStress", "Stopping IIS", "Backup created", "CLI command:")) {
     Assert-NotContains $wrongToken.Output $unexpected "Wrong-token refusal"
 }
