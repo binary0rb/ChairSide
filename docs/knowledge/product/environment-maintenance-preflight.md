@@ -1,7 +1,7 @@
 ---
 title: Environment and maintenance preflight
 tags: [deployment, data-persistence, permissions, production-config, design-decision, active, last-verified]
-last_verified_commit: pending-issue-143
+last_verified_commit: 2b42ec3
 ---
 
 # Environment and maintenance preflight
@@ -89,8 +89,8 @@ adoption behavior. Formal Production begins with a genuinely new canonical datab
 reporting history; the approved go-live date begins official reporting history. Existing unmarked
 deployed databases are refused and must not be reused as Production.
 
-This implementation does not archive or clear the beta database, deploy or initialize Production,
-or complete Training IIS deployment.
+This implementation does not archive or clear the beta database or deploy or initialize Production.
+The separate Training IIS deployment was completed and independently verified on 2026-07-22.
 
 ## Maintenance posture
 
@@ -110,8 +110,21 @@ overrides; validates the published Training configuration before stopping IIS; a
 database-path override to the application. Its routine modes map to the existing clean, training,
 full-stress, and reporting-volume maintenance shapes. Standard PowerShell `-WhatIf` prints the
 complete plan without IIS, filesystem, or application side effects. Real execution accepts only an
-explicit Started or Stopped Training app-pool state, stops and finally restarts only a pool that this
-invocation confirmed it transitioned from Started to Stopped, and preserves an already Stopped pool.
+explicit Started or Stopped initial Training app-pool state and preserves an already Stopped pool. A
+Started pool is stopped with bounded polling to exact Stopped state. Only a pool that began Started is
+restored in `finally`; restoration safely handles Started, Starting, Stopped, and Stopping states with
+bounded waits to exact Started state. Timeout errors retain the last observed state. Operation and
+restoration failures are captured separately and both causes are reported when both fail.
+
+## Verified Training deployment status
+
+As of 2026-07-22, the isolated `ChairSideBoard-Training` IIS site and app pool serve
+`http://chairside-training.aospeoria.local` from `C:\ChairSide\Training\App` with
+`ASPNETCORE_ENVIRONMENT=Training`. The deployed build was `16c41d5`. The final `TrainingSeed`
+baseline contained 12 Available rooms, 4 active doctors, 114 synthetic completed cycles, 7 procedure
+families, 114 expected-allocation cases, and 0 reporting exceptions. State survived an independent
+app-pool restart before the environment was deliberately reset to that baseline. Production remained
+untouched throughout the Training deployment and reset validation.
 
 ## Source and test anchors
 

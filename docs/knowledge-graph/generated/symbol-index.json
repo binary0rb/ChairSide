@@ -235,7 +235,7 @@
                   {
                       "path":  "docs/knowledge/product/environment-maintenance-preflight.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  7906,
+                      "sizeBytes":  8949,
                       "typeSymbols":  [
 
                                       ],
@@ -261,6 +261,7 @@
                                        "Database path isolation",
                                        "Database deployment identity",
                                        "Maintenance posture",
+                                       "Verified Training deployment status",
                                        "Source and test anchors"
                                    ]
                   },
@@ -547,7 +548,7 @@
                   {
                       "path":  "docs/knowledge-graph/chairside.graph.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  10803,
+                      "sizeBytes":  11295,
                       "typeSymbols":  [
 
                                       ],
@@ -578,7 +579,7 @@
                   {
                       "path":  "docs/knowledge-graph/decisions.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  11053,
+                      "sizeBytes":  11357,
                       "typeSymbols":  [
 
                                       ],
@@ -690,7 +691,7 @@
                   {
                       "path":  "docs/TrainingDataReset.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  6753,
+                      "sizeBytes":  8289,
                       "typeSymbols":  [
 
                                       ],
@@ -712,6 +713,7 @@
                       "headings":  [
                                        "ChairSide Training Data Reset Runbook",
                                        "Code-owned Training deployment",
+                                       "Verified Training deployment",
                                        "Prerequisites",
                                        "Approved modes",
                                        "Previewing a reset",
@@ -874,7 +876,7 @@
                   {
                       "path":  "scripts/Reset-ChairSideTrainingData.ps1",
                       "kind":  "PowerShell",
-                      "sizeBytes":  11987,
+                      "sizeBytes":  14824,
                       "typeSymbols":  [
 
                                       ],
@@ -1612,7 +1614,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/DemoBoardStore.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  251495,
+                      "sizeBytes":  251513,
                       "typeSymbols":  [
                                           "ExceptionReasons",
                                           "ReportingExceptionReasons",
@@ -2380,7 +2382,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/board.js",
                       "kind":  "JavaScript",
-                      "sizeBytes":  186289,
+                      "sizeBytes":  186322,
                       "typeSymbols":  [
 
                                       ],
@@ -2667,7 +2669,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/styles.css",
                       "kind":  "Css",
-                      "sizeBytes":  92618,
+                      "sizeBytes":  92637,
                       "typeSymbols":  [
 
                                       ],
@@ -2853,7 +2855,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/BoardStoreTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  486570,
+                      "sizeBytes":  486614,
                       "typeSymbols":  [
                                           "BoardStoreTests",
                                           "StoreContext",
@@ -3860,7 +3862,7 @@
                   {
                       "path":  "tests/scripts/Reset-ChairSideTrainingData.Tests.ps1",
                       "kind":  "PowerShell",
-                      "sizeBytes":  11235,
+                      "sizeBytes":  21883,
                       "typeSymbols":  [
 
                                       ],
