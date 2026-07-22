@@ -22,6 +22,24 @@ These values are not command-line parameters. The wrapper does not pass a databa
 the application. `appsettings.Training.json` and ChairSide's code-owned database isolation policy
 must independently resolve the canonical Training database.
 
+## Verified Training deployment
+
+The separate Training environment was operationally verified on 2026-07-22 with:
+
+- Internal URL: `http://chairside-training.aospeoria.local`
+- IIS site and app pool: `ChairSideBoard-Training`
+- Application root: `C:\ChairSide\Training\App`
+- Database: `C:\ChairSide\Training\Data\chairside-training.db`
+- Logs: `C:\ChairSide\Training\Logs`
+- Backups: `C:\ChairSide\Training\Backups`
+- Environment: `ASPNETCORE_ENVIRONMENT=Training`
+- Deployed application build: `16c41d5`
+
+After the final `TrainingSeed` reset, the verified baseline was 12 Available rooms, 4 active doctors,
+114 synthetic completed cycles, 7 procedure families, 114 expected-allocation cases, and 0 reporting
+exceptions. That state survived an independent app-pool restart and was then deliberately returned to
+the same baseline. Production was not mutated during Training deployment or reset verification.
+
 ## Prerequisites
 
 The separate Training deployment must already exist. Before running a real reset, confirm:
@@ -96,17 +114,21 @@ For a scenario-rich demonstration:
 Before stopping IIS, the wrapper validates the mode, token, completed-cycle usage, every code-owned
 Training value, the published DLL, and the Training configuration's database and log paths. It then:
 
-1. Reads the exact `ChairSideBoard-Training` state. A Started pool is stopped and later restarted; an
-   already Stopped pool remains stopped. Every other state is refused before backup or maintenance.
+1. Reads the exact initial `ChairSideBoard-Training` state. A Started pool receives a stop request and
+   is polled every 250 milliseconds for up to 30 seconds until it reaches Stopped; an already Stopped
+   pool remains stopped. Every other initial state is refused before backup or maintenance.
 2. Copies each present SQLite main, WAL, and SHM file to a timestamped directory under
    `C:\ChairSide\Training\Backups`.
 3. Runs the published DLL from the Training app directory with `ASPNETCORE_ENVIRONMENT=Training`.
 4. Restores the parent PowerShell process's previous environment value.
-5. Restarts the Training app pool in a `finally` block only after this invocation confirmed a
-   Started-to-Stopped transition.
+5. Restores the Training app pool in a `finally` block only when its initial state was Started. The
+   restoration path accepts Started, Starting, Stopped, or Stopping: it waits for an in-progress
+   transition when necessary, starts a stopped pool, and polls for exact Started state.
 
-A backup, maintenance, or restart failure returns a nonzero exit. When this invocation stopped a
-previously Started pool, restart is still attempted after backup or maintenance failure.
+Every app-pool wait is bounded to 30 seconds and reports the last observed state on timeout. A backup,
+maintenance, wait, or restoration failure returns a nonzero exit. When the initial pool state was
+Started, restoration is still attempted after backup or maintenance failure. Operation and restoration
+failures are preserved separately; if both occur, the final error reports both causes.
 
 ## Database safety
 
