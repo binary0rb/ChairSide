@@ -153,6 +153,42 @@ public sealed class BoardReadyPresentationTests
         Assert.DoesNotContain("Update Assignment", roomOne, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void Primary_workflow_highlights_only_the_enabled_next_action()
+    {
+        var root = FindRepositoryRoot();
+        var boardScript = File.ReadAllText(Path.Combine(root, "src", "ChairSide.Board", "wwwroot", "board.js"));
+        var styles = File.ReadAllText(Path.Combine(root, "src", "ChairSide.Board", "wwwroot", "styles.css"));
+        var genericRoom = File.ReadAllText(Path.Combine(root, "src", "ChairSide.Board", "wwwroot", "room.html"));
+        var roomOne = File.ReadAllText(Path.Combine(root, "src", "ChairSide.Board", "wwwroot", "room-1.html"));
+        var primaryActionIds = new[]
+        {
+            "beginPrestageButton", "seatButton", "readyForDoctorButton", "doctorArrivedButton",
+            "doctorCompleteButton", "roomAvailableButton"
+        };
+
+        Assert.All(primaryActionIds, id =>
+        {
+            Assert.Contains($"class=\"secondary-button\" id=\"{id}\"", genericRoom, StringComparison.Ordinal);
+            Assert.Contains($"class=\"secondary-button\" id=\"{id}\"", roomOne, StringComparison.Ordinal);
+        });
+        Assert.Contains("/styles.css?v=20260722-primary-workflow-action-colors", genericRoom, StringComparison.Ordinal);
+        Assert.Contains("/styles.css?v=20260722-primary-workflow-action-colors", roomOne, StringComparison.Ordinal);
+        Assert.Contains("/board.js?v=20260722-primary-workflow-action-colors", genericRoom, StringComparison.Ordinal);
+        Assert.Contains("/board.js?v=20260722-primary-workflow-action-colors", roomOne, StringComparison.Ordinal);
+        Assert.Contains("function setNextPrimaryAction(room, state)", boardScript, StringComparison.Ordinal);
+        Assert.Contains("draft.confirmedValue !== null", boardScript, StringComparison.Ordinal);
+        Assert.Contains("document.getElementById(id)?.classList.toggle(\"is-next-action\", id === nextActionId);", boardScript, StringComparison.Ordinal);
+        Assert.All(primaryActionIds, id =>
+            Assert.Contains($"nextActionId = \"{id}\";", boardScript, StringComparison.Ordinal));
+        Assert.Matches(
+            "(?s)\\.primary-action-grid \\.is-next-action:not\\(:disabled\\)\\s*\\{[^}]*border-color:\\s*#15803d;[^}]*background:\\s*#15803d;[^}]*color:\\s*#ffffff;",
+            styles);
+        Assert.Matches(
+            "(?s)button:disabled\\s*\\{[^}]*opacity:\\s*0\\.55;",
+            styles);
+    }
+
     private static string StateKey(string html)
     {
         var match = Regex.Match(html, "<div class=\"state-key\">(?<content>[\\s\\S]*?)</div>");

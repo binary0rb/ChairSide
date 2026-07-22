@@ -1195,6 +1195,17 @@ button:not(:disabled):active {
   color: #172033;
 }
 
+.primary-action-grid .is-next-action:not(:disabled) {
+  border-color: #15803d;
+  background: #15803d;
+  color: #ffffff;
+}
+
+.primary-action-grid .is-next-action:not(:disabled):hover {
+  border-color: #166534;
+  background: #166534;
+}
+
 .available-button {
   border-color: #cbd5e1;
   background: #e2e8f0;
