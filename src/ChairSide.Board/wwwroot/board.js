@@ -3339,6 +3339,41 @@ function setRoomControlsEnabled(room) {
   setHidden("discardChangesButton", !isDirty);
   setHidden("withdrawReadyButton", !isReady);
   setHidden("cancelSeatingButton", !isEnabled || !cancelableStates.has(state));
+  setNextPrimaryAction(room, state);
+}
+
+function setNextPrimaryAction(room, state) {
+  const draft = draftAssignmentShape();
+  const draftCanBecomeReady = Boolean(
+    draft.doctorId
+    && draft.procedureCode
+    && draft.confirmedValue !== null);
+  let nextActionId = null;
+
+  if (room && state === "empty") {
+    nextActionId = "beginPrestageButton";
+  } else if (room && state === "prestaging") {
+    nextActionId = "seatButton";
+  } else if (room && activeSeatedStates.has(state) && room.episodeId && draftCanBecomeReady) {
+    nextActionId = "readyForDoctorButton";
+  } else if (room && doctorArrivedStates.has(state)) {
+    nextActionId = "doctorArrivedButton";
+  } else if (room && state === "doctor-in-room") {
+    nextActionId = "doctorCompleteButton";
+  } else if (room && state === "turnover") {
+    nextActionId = "roomAvailableButton";
+  }
+
+  [
+    "beginPrestageButton",
+    "seatButton",
+    "readyForDoctorButton",
+    "doctorArrivedButton",
+    "doctorCompleteButton",
+    "roomAvailableButton"
+  ].forEach(id => {
+    document.getElementById(id)?.classList.toggle("is-next-action", id === nextActionId);
+  });
 }
 
 function setDisabled(id, isDisabled) {

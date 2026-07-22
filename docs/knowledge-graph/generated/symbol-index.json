@@ -726,7 +726,7 @@
                   {
                       "path":  "docs/ui-cohesion-audit.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  25580,
+                      "sizeBytes":  25599,
                       "typeSymbols":  [
 
                                       ],
@@ -2382,7 +2382,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/board.js",
                       "kind":  "JavaScript",
-                      "sizeBytes":  186322,
+                      "sizeBytes":  187486,
                       "typeSymbols":  [
 
                                       ],
@@ -2591,7 +2591,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/room.html",
                       "kind":  "Html",
-                      "sizeBytes":  6098,
+                      "sizeBytes":  6114,
                       "typeSymbols":  [
 
                                       ],
@@ -2617,7 +2617,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/room-1.html",
                       "kind":  "Html",
-                      "sizeBytes":  6119,
+                      "sizeBytes":  6135,
                       "typeSymbols":  [
 
                                       ],
@@ -2669,7 +2669,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/styles.css",
                       "kind":  "Css",
-                      "sizeBytes":  92637,
+                      "sizeBytes":  92882,
                       "typeSymbols":  [
 
                                       ],
@@ -2823,7 +2823,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/BoardReadyPresentationTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  10512,
+                      "sizeBytes":  12931,
                       "typeSymbols":  [
                                           "BoardReadyPresentationTests"
                                       ],
@@ -2832,6 +2832,7 @@
                                             "Ready_remains_primary_while_withdrawal_and_arrival_clear_urgency_and_keep_assignment",
                                             "Master_and_doctor_cards_share_canonical_assignment_and_ready_presentation",
                                             "Doctor_operational_header_and_room_panel_contracts_remain_in_place",
+                                            "Primary_workflow_highlights_only_the_enabled_next_action",
                                             "StateKey",
                                             "ElementIds",
                                             "FindRepositoryRoot"
