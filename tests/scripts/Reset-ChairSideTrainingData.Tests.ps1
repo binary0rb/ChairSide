@@ -46,19 +46,47 @@ function Assert-NotContains {
 function Invoke-Wrapper {
     param([Parameter(Mandatory = $true)][string[]]$Arguments)
 
-    $previousErrorActionPreference = $ErrorActionPreference
+    $stdoutPath = [System.IO.Path]::GetTempFileName()
+    $stderrPath = [System.IO.Path]::GetTempFileName()
+
     try {
-        $ErrorActionPreference = "Continue"
-        $output = & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $wrapperPath @Arguments 2>&1 | Out-String
-        $exitCode = $LASTEXITCODE
+        $quotedWrapperPath = '"' + $wrapperPath + '"'
+        $processArguments = @(
+            "-NoProfile",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-File",
+            $quotedWrapperPath
+        ) + $Arguments
+
+        $process = Start-Process `
+            -FilePath "powershell.exe" `
+            -ArgumentList $processArguments `
+            -Wait `
+            -PassThru `
+            -NoNewWindow `
+            -RedirectStandardOutput $stdoutPath `
+            -RedirectStandardError $stderrPath
+
+        $standardOutput = Get-Content -Raw -LiteralPath $stdoutPath
+        $standardError = Get-Content -Raw -LiteralPath $stderrPath
+        if ($null -eq $standardOutput) {
+            $standardOutput = ""
+        }
+        if ($null -eq $standardError) {
+            $standardError = ""
+        }
+
+        return [pscustomobject]@{
+            ExitCode = $process.ExitCode
+            Output = @(
+                $standardOutput
+                $standardError
+            ) -join [Environment]::NewLine
+        }
     }
     finally {
-        $ErrorActionPreference = $previousErrorActionPreference
-    }
-
-    return [pscustomobject]@{
-        ExitCode = $exitCode
-        Output = $output
+        Remove-Item -LiteralPath $stdoutPath, $stderrPath -Force -ErrorAction SilentlyContinue
     }
 }
 
@@ -127,7 +155,7 @@ $wrongToken = Invoke-Wrapper @(
     "-WhatIf"
 )
 Assert-True ($wrongToken.ExitCode -ne 0) "Wrong token unexpectedly succeeded."
-Assert-ContainsIgnoringWhitespace $wrongToken.Output "Confirmation token does not match" "Wrong-token refusal"
+Assert-ContainsIgnoringWhitespace $wrongToken.Output "Confirmation token does not match. Mode 'FullStress' requires -ConfirmationToken RESET_STRESS_FIXTURE. No action was taken." "Wrong-token refusal"
 foreach ($unexpected in @("Mode:              FullStress", "Stopping IIS", "Backup created", "CLI command:")) {
     Assert-NotContains $wrongToken.Output $unexpected "Wrong-token refusal"
 }
