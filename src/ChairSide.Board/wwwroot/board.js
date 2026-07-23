@@ -1732,7 +1732,6 @@ function renderSelectedDoctorFlow(r, agg) {
     (max, day) => Number.isFinite(day.maxActiveRoomCount) ? Math.max(max, day.maxActiveRoomCount) : max,
     0
   );
-  const oneRoomMinutes = days.reduce((sum, day) => sum + observedLoadNumber(day.minutesWithOneActiveRoom), 0);
   const twoRoomMinutes = days.reduce((sum, day) => sum + observedLoadNumber(day.minutesWithTwoActiveRooms), 0);
   const threePlusRoomMinutes = days.reduce((sum, day) => sum + observedLoadNumber(day.minutesWithThreeOrMoreActiveRooms), 0);
   const stackedMinutes = twoRoomMinutes + threePlusRoomMinutes;
@@ -4644,7 +4643,7 @@ function applyRoomMutationResult(result) {
 // to complete the conflicting room and arrive the current room. The server revalidates the
 // conflict, so a stale confirmation fails safely with a clear message.
 async function handleDoctorArrivalConflict(response) {
-  let conflict = null;
+  let conflict;
   try {
     conflict = await response.json();
   } catch {
@@ -4754,10 +4753,6 @@ function elapsedSeconds(seatedAt) {
   return Math.max(0, Math.floor((boardNowMs() - Date.parse(seatedAt)) / 1000));
 }
 
-function secondsBetweenDates(start, end) {
-  return Math.max(0, Math.round((Date.parse(end) - Date.parse(start)) / 1000));
-}
-
 function formatElapsed(seatedAt) {
   const totalSeconds = elapsedSeconds(seatedAt);
   const minutes = Math.floor(totalSeconds / 60);
@@ -4823,7 +4818,7 @@ function formatDateTime(value) {
       connectionStatus = app.connectionStatus || null;
       lastSnapshotAt = app.lastSnapshotAt || null;
       snapshotAgeMs = app.lastSnapshotAt ? Date.now() - app.lastSnapshotAt : null;
-    } catch (_) { /* app may not be initialised yet */ }
+    } catch { /* app may not be initialised yet */ }
 
     return {
       timestamp: new Date().toISOString(),
