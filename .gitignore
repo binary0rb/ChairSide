@@ -16,3 +16,4 @@ Backups/
 
 publish/
 .claude/
+node_modules/

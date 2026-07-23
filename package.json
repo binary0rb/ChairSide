@@ -1,0 +1,12 @@
+{
+  "name": "chairside",
+  "scripts": {
+    "lint": "eslint src/ChairSide.Board/wwwroot/*.js"
+  },
+  "private": true,
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "eslint": "10.7.0",
+    "globals": "17.7.0"
+  }
+}
