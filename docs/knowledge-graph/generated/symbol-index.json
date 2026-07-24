@@ -1,7 +1,7 @@
 ﻿{
     "generatedStamp":  "deterministic",
     "root":  ".",
-    "fileCount":  109,
+    "fileCount":  113,
     "files":  [
                   {
                       "path":  ".github/pull_request_template.md",
@@ -31,9 +31,35 @@
                                    ]
                   },
                   {
+                      "path":  ".github/workflows/javascript-lint.yml",
+                      "kind":  "Yaml",
+                      "sizeBytes":  518,
+                      "typeSymbols":  [
+
+                                      ],
+                      "methodSymbols":  [
+
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
                       "path":  "AGENTS.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  16775,
+                      "sizeBytes":  16895,
                       "typeSymbols":  [
 
                                       ],
@@ -133,7 +159,7 @@
                   {
                       "path":  "docs/design/prestage-assignment-lifecycle.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  10213,
+                      "sizeBytes":  10687,
                       "typeSymbols":  [
 
                                       ],
@@ -164,7 +190,7 @@
                                        "Persistence, compare-and-swap, and failure ordering",
                                        "Reporting",
                                        "Development and maintenance fixtures",
-                                       "Explicit non-goals and separate issues",
+                                       "Issue #120 non-goals and completed follow-up work",
                                        "Acceptance summary"
                                    ]
                   },
@@ -360,7 +386,7 @@
                   {
                       "path":  "docs/knowledge/reports/reporting-population.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  3094,
+                      "sizeBytes":  3084,
                       "typeSymbols":  [
 
                                       ],
@@ -421,7 +447,7 @@
                   {
                       "path":  "docs/knowledge/tests/deterministic-stress-fixtures.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  3531,
+                      "sizeBytes":  3521,
                       "typeSymbols":  [
 
                                       ],
@@ -452,7 +478,7 @@
                   {
                       "path":  "docs/knowledge/ui/doctor-view-operational-header.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  6752,
+                      "sizeBytes":  6694,
                       "typeSymbols":  [
 
                                       ],
@@ -486,7 +512,7 @@
                   {
                       "path":  "docs/knowledge/workflow/room-lifecycle.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  6333,
+                      "sizeBytes":  6443,
                       "typeSymbols":  [
 
                                       ],
@@ -513,7 +539,7 @@
                                        "Concurrency and durability",
                                        "Authorization and conflict handling",
                                        "Source and test anchors",
-                                       "Separate known issue"
+                                       "Knowledge-graph extraction follow-up"
                                    ]
                   },
                   {
@@ -548,7 +574,7 @@
                   {
                       "path":  "docs/knowledge-graph/chairside.graph.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  11295,
+                      "sizeBytes":  11398,
                       "typeSymbols":  [
 
                                       ],
@@ -573,13 +599,13 @@
                                        "Core invariants",
                                        "Fixture and seed invariants",
                                        "Reporting semantics",
-                                       "Deferred and separate work"
+                                       "Completed follow-up work"
                                    ]
                   },
                   {
                       "path":  "docs/knowledge-graph/decisions.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  11357,
+                      "sizeBytes":  11380,
                       "typeSymbols":  [
 
                                       ],
@@ -613,7 +639,7 @@
                                        "Environment and maintenance preflight",
                                        "Reporting population semantics",
                                        "Reporting UI philosophy",
-                                       "Explicitly separate issues"
+                                       "Completed follow-up work"
                                    ]
                   },
                   {
@@ -811,9 +837,87 @@
                                    ]
                   },
                   {
+                      "path":  "eslint.config.mjs",
+                      "kind":  "JavaScript",
+                      "sizeBytes":  501,
+                      "typeSymbols":  [
+
+                                      ],
+                      "methodSymbols":  [
+
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
+                      "path":  "package.json",
+                      "kind":  "Json",
+                      "sizeBytes":  235,
+                      "typeSymbols":  [
+
+                                      ],
+                      "methodSymbols":  [
+
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
+                      "path":  "package-lock.json",
+                      "kind":  "Json",
+                      "sizeBytes":  33007,
+                      "typeSymbols":  [
+
+                                      ],
+                      "methodSymbols":  [
+
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
                       "path":  "README.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  37528,
+                      "sizeBytes":  38418,
                       "typeSymbols":  [
 
                                       ],
@@ -2382,7 +2486,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/board.js",
                       "kind":  "JavaScript",
-                      "sizeBytes":  187486,
+                      "sizeBytes":  187233,
                       "typeSymbols":  [
 
                                       ],
@@ -3837,7 +3941,7 @@
                   {
                       "path":  "tests/knowledge-graph/New-ChairSideKnowledgeGraph.Tests.ps1",
                       "kind":  "PowerShell",
-                      "sizeBytes":  5546,
+                      "sizeBytes":  7272,
                       "typeSymbols":  [
 
                                       ],
@@ -3889,7 +3993,7 @@
                   {
                       "path":  "tools/knowledge-graph/New-ChairSideKnowledgeGraph.ps1",
                       "kind":  "PowerShell",
-                      "sizeBytes":  18301,
+                      "sizeBytes":  18401,
                       "typeSymbols":  [
 
                                       ],

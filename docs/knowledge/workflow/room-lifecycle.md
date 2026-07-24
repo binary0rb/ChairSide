@@ -1,7 +1,7 @@
 ---
 title: Room lifecycle
 tags: [room, board, room-lifecycle, data-persistence, permissions, device-binding, domain-rule, active, last-verified]
-last_verified_commit: pending-issue-129
+last_verified_commit: ca75b09
 ---
 
 # Room lifecycle
@@ -18,7 +18,7 @@ ChairSide tracks room episodes, not patients. The canonical lifecycle is:
 6. Doctor Complete records `DoctorCompleteAt` and enters `Turnover`.
 7. Room Available records completion and releases the room to `Available`.
 
-Issue #120 exposes canonical Begin Prestage, Save Details, Seat, Ready, Withdraw Ready, and Doctor Arrived endpoints. Omitted Ready and Doctor Arrived bodies preserve the current room-panel `RoomStatus` response; explicit canonical bodies return the lifecycle action envelope. UI migration is deferred to issue #121.
+Issue #120 exposed canonical Begin Prestage, Save Details, Seat, Ready, Withdraw Ready, and Doctor Arrived endpoints. Issue #121 / PR #133 (`d902a27`) completed the room-panel migration to those contracts. Omitted Ready and Doctor Arrived bodies preserve the legacy-compatible `RoomStatus` response, while the canonical room panel sends explicit bodies and consumes the lifecycle action envelope.
 
 ## Ready handoff and urgency
 
@@ -64,6 +64,6 @@ Room lifecycle mutation remains room-local and device-token guarded. Doctors are
 - `tests/ChairSide.Board.Tests/MalformedAssignmentIntegrityTests.cs`
 - `tests/ChairSide.Board.Tests/DurableFailureInjectionTests.cs`
 
-## Separate known issue
+## Knowledge-graph extraction follow-up
 
-Knowledge-graph comment/string false-positive extraction remains issue #126.
+Issue #126 / PR #142 (`47da8f9`) corrected knowledge-graph comment/string false-positive extraction.

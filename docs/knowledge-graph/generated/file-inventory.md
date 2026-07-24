@@ -7,6 +7,7 @@ This file is mechanical output from `tools/knowledge-graph/New-ChairSideKnowledg
 | Path | Kind | Discovered symbols | Routes / hubs |
 | --- | --- | --- | --- |
 | `.github/pull_request_template.md` | Markdown | headings: Knowledge impact, Validation | - |
+| `.github/workflows/javascript-lint.yml` | Yaml | - | - |
 | `AGENTS.md` | Markdown | headings: AGENTS, ChairSide Project Brief, Project name, Purpose, Scope, Repository orientation and token discipline, Private development knowledge graph, PR knowledge-impact check | - |
 | `ChairSide.Board.sln` | Solution | - | - |
 | `CLAUDE.md` | Markdown | headings: Claude Code note | - |
@@ -21,9 +22,9 @@ This file is mechanical output from `tools/knowledge-graph/New-ChairSideKnowledg
 | `docs/knowledge/reports/sedation-as-modifier.md` | Markdown | headings: Sedation as a modifier, Intent, How it is represented, Constraints, Source anchors, Verification notes | - |
 | `docs/knowledge/tests/deterministic-stress-fixtures.md` | Markdown | headings: Deterministic stress fixtures, Intent, Canonical live-room representation, Profiles, Atomic reset contract, Source and test anchors | - |
 | `docs/knowledge/ui/doctor-view-operational-header.md` | Markdown | headings: Doctor View operational header, Intent, Layout rule, Current-room frame posture, Room counting: assignment-based, not state-filtered, Canonical room-card presentation, Scope, Source anchors | - |
-| `docs/knowledge/workflow/room-lifecycle.md` | Markdown | headings: Room lifecycle, Canonical sequence, Ready handoff and urgency, Cancellation, expiration, and recovery, Concurrency and durability, Authorization and conflict handling, Source and test anchors, Separate known issue | - |
+| `docs/knowledge/workflow/room-lifecycle.md` | Markdown | headings: Room lifecycle, Canonical sequence, Ready handoff and urgency, Cancellation, expiration, and recovery, Concurrency and durability, Authorization and conflict handling, Source and test anchors, Knowledge-graph extraction follow-up | - |
 | `docs/knowledge-graph/backlog-signals.md` | Markdown | headings: ChairSide knowledge graph backlog signals, High-value future graph expansions, Risks to preserve, Candidate relationships to add later | - |
-| `docs/knowledge-graph/chairside.graph.md` | Markdown | headings: ChairSide knowledge graph, Conceptual graph, Core invariants, Fixture and seed invariants, Reporting semantics, Deferred and separate work | - |
+| `docs/knowledge-graph/chairside.graph.md` | Markdown | headings: ChairSide knowledge graph, Conceptual graph, Core invariants, Fixture and seed invariants, Reporting semantics, Completed follow-up work | - |
 | `docs/knowledge-graph/decisions.md` | Markdown | headings: ChairSide durable decisions, Knowledge graph scope, Non-PHI boundary, Prestaging and assignment drafts, Ready handoff boundary, Ready urgency, Cancellation, expiration, and recovery, Concurrency and durable ordering | - |
 | `docs/knowledge-graph/README.md` | Markdown | headings: ChairSide private knowledge graph, What lives here, What does not live here, Node types, Edge labels, Update rule | - |
 | `docs/Production-Pilot-Checklist.md` | Markdown | headings: ChairSide Board Production Pilot Checklist, Server Layout, IIS, Permissions, Publish And Config, Formal Production Data Boundary, Backup And Restore, Access Control Decisions | - |
@@ -31,6 +32,9 @@ This file is mechanical output from `tools/knowledge-graph/New-ChairSideKnowledg
 | `docs/ui-cohesion-audit.md` | Markdown | headings: ChairSide UI Cohesion Audit, 1. Summary, 2. Existing visual strengths, 3. Reusable assets and patterns already available, 4. Visual inconsistencies by category, 5. Protected visual semantics, 6. Reuse-first design principles, 7. Proposed design tokens/components to standardize later | - |
 | `docs/visual-language.md` | Markdown | headings: Visual Language | - |
 | `docs/workflow.md` | Markdown | headings: Workflow | - |
+| `eslint.config.mjs` | JavaScript | - | - |
+| `package.json` | Json | - | - |
+| `package-lock.json` | Json | - | - |
 | `README.md` | Markdown | headings: ChairSide Board, Scaffold, Seed Data, Run Locally, IIS Deployment, Reset Demo Data, Deterministic Stress Fixtures (Maintenance), Reports | - |
 | `scripts/Backup-ChairSideSqlite.ps1` | PowerShell | - | - |
 | `scripts/Reset-ChairSideTrainingData.ps1` | PowerShell | - | - |

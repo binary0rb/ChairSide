@@ -1,7 +1,7 @@
 ---
 title: Doctor View operational header
 tags: [ui-cohesion, doctors, room, design-decision, active, last-verified]
-last_verified_commit: pending-issue-122
+last_verified_commit: b847dd1
 ---
 
 # Doctor View operational header
@@ -63,7 +63,7 @@ This is a UI and operational-awareness rule only. It does not change report sema
 
 ## Verification notes
 
-Verified during issue #122 implementation against the working-tree layout: the current-room frame remains above the reporting detail; the reporting snapshot remains right-aligned and compact; canonical assignment controls Doctor View membership and card details; Ready urgency is subordinate; and the adaptive room-count posture remains structurally unchanged. Focused browser smoke covers the rendered master and Doctor View states; full browser acceptance remains issue #125.
+Implemented by issue #122 / PR #134 (`2d59c70`) and verified through the full browser acceptance completed by issue #125 / PR #136 (`b847dd1`): the current-room frame remains above the reporting detail; the reporting snapshot remains right-aligned and compact; canonical assignment controls Doctor View membership and card details; Ready urgency is subordinate; and the adaptive room-count posture remains structurally unchanged.
 
 Known limits: this note documents the layout rule and intent, not every responsive breakpoint or the exact flex-basis values, which live in the CSS. The greater-than-four-rooms case is deliberately conservative and not heavily designed.
 

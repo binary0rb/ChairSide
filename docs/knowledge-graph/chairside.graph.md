@@ -128,8 +128,8 @@ flowchart LR
 - Standard completed metrics exclude incomplete cycles and exception populations.
 - Ready urgency threshold flags are captured without newly persisting Aging/Stale primary states.
 
-## Deferred and separate work
+## Completed follow-up work
 
-- Room-panel workflow changes are implemented by #121, and canonical master/doctor-view presentation is implemented by #122.
-- Reporting-population work remains #123; issue #120 preserves the existing accepted-handoff attribution contract.
-- Knowledge-graph comment/string false-positive extraction remains issue #126.
+- Issue #121 / PR #133 (`d902a27`) completed the room-panel workflow, and issue #122 / PR #134 (`2d59c70`) completed canonical master/Doctor View presentation.
+- Issue #123 / PR #132 (`9eb5e66`) completed the reporting-population work while preserving the accepted-handoff attribution contract established by issue #120.
+- Issue #126 / PR #142 (`47da8f9`) corrected knowledge-graph comment/string false-positive extraction.

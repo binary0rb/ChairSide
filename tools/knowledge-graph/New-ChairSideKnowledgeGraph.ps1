@@ -85,7 +85,9 @@ function Get-FileKind {
         ".html" { return "Html" }
         ".css" { return "Css" }
         ".js" { return "JavaScript" }
+        ".mjs" { return "JavaScript" }
         ".json" { return "Json" }
+        ".yml" { return "Yaml" }
         ".md" { return "Markdown" }
         ".sln" { return "Solution" }
         ".csproj" { return "Project" }
@@ -395,7 +397,9 @@ $allowedExtensions = @(
     ".html",
     ".css",
     ".js",
+    ".mjs",
     ".json",
+    ".yml",
     ".md",
     ".sln",
     ".csproj",

@@ -98,6 +98,6 @@ This file records decisions that should survive across tasks, PRs, and debugging
 
 **Decision:** Reporting favors summary cards, plain-English interpretation, progressive disclosure, and operational questions over dense rankings or punitive comparisons.
 
-## Explicitly separate issues
+## Completed follow-up work
 
-- Knowledge-graph comment/string false-positive extraction is tracked in issue #126.
+- Knowledge-graph comment/string false-positive extraction was corrected by issue #126 / PR #142 (`47da8f9`).
