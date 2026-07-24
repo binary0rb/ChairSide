@@ -32,6 +32,8 @@ $repositoryRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot "../.."
 $generatorPath = Join-Path $repositoryRoot "tools/knowledge-graph/New-ChairSideKnowledgeGraph.ps1"
 $fixtureRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("chairside-knowledge-graph-" + [Guid]::NewGuid().ToString("N"))
 $fixturePath = Join-Path $fixtureRoot "ExtractorFixture.cs"
+$moduleFixturePath = Join-Path $fixtureRoot "eslint.config.mjs"
+$workflowFixturePath = Join-Path $fixtureRoot "WorkflowFixture.yml"
 $outputPath = Join-Path $fixtureRoot "docs/knowledge-graph/generated"
 
 $fixture = @'
@@ -67,9 +69,14 @@ app.MapGet("/api/legitimate", () => "record ResponseStringType");
 app.MapHub<LegitimateHub>("/legitimateHub");
 '@
 
+$moduleFixture = "export function lintConfigFactory() { return []; }"
+$workflowFixture = "name: Fixture workflow`non:`n  push:"
+
 try {
     New-Item -ItemType Directory -Force -Path $fixtureRoot | Out-Null
     [System.IO.File]::WriteAllText($fixturePath, $fixture, [System.Text.UTF8Encoding]::new($false))
+    [System.IO.File]::WriteAllText($moduleFixturePath, $moduleFixture, [System.Text.UTF8Encoding]::new($false))
+    [System.IO.File]::WriteAllText($workflowFixturePath, $workflowFixture, [System.Text.UTF8Encoding]::new($false))
 
     & $generatorPath -Root $fixtureRoot | Out-Null
 
@@ -82,6 +89,45 @@ try {
     if ($entry.Count -ne 1) {
         throw "Expected exactly one fixture entry, found $($entry.Count)."
     }
+
+    $moduleEntry = @(
+        $symbolIndex.files |
+            Where-Object { $_.path -eq "eslint.config.mjs" }
+    )
+
+    $workflowEntry = @(
+        $symbolIndex.files |
+            Where-Object { $_.path -eq "WorkflowFixture.yml" }
+    )
+
+    if ($moduleEntry.Count -ne 1) {
+        throw "Expected exactly one MJS fixture entry, found $($moduleEntry.Count)."
+    }
+
+    if ($workflowEntry.Count -ne 1) {
+        throw "Expected exactly one YML fixture entry, found $($workflowEntry.Count)."
+    }
+
+    if ($moduleEntry[0].kind -ne "JavaScript") {
+        throw "MJS fixture was not classified as JavaScript."
+    }
+
+    if ($workflowEntry[0].kind -ne "Yaml") {
+        throw "YML fixture was not classified as Yaml."
+    }
+
+    $inventory = Get-Content -Raw (Join-Path $outputPath "file-inventory.md")
+
+    foreach ($fixtureEntry in @("eslint.config.mjs", "WorkflowFixture.yml")) {
+        if (-not $inventory.Contains($fixtureEntry)) {
+            throw "Generated inventory omitted fixture: $fixtureEntry"
+        }
+    }
+
+    Assert-SequenceEqual `
+        -Label "MJS functions" `
+        -Expected @("lintConfigFactory") `
+        -Actual @($moduleEntry[0].scriptFunctions)
 
     Assert-SequenceEqual -Label "Types" -Expected @("LegitimateType") -Actual @($entry[0].typeSymbols)
     Assert-SequenceEqual -Label "Methods" -Expected @("LegitimateMethod") -Actual @($entry[0].methodSymbols)
@@ -112,7 +158,7 @@ try {
 
     Get-Content -Raw $symbolIndexPath | ConvertFrom-Json | Out-Null
     Get-Content -Raw $graphDataPath | ConvertFrom-Json | Out-Null
-    Write-Host "Knowledge graph C# lexical extraction regression passed."
+    Write-Host "Knowledge graph extraction and file coverage regression passed."
 }
 finally {
     $resolvedTemp = [System.IO.Path]::GetFullPath([System.IO.Path]::GetTempPath())

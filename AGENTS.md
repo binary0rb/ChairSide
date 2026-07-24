@@ -223,7 +223,7 @@ Ready is the assignment-lock boundary. Cancellation and expiration before Doctor
 
 Canonical lifecycle persistence is compare-and-swap guarded by the complete originally loaded room expectation: episode and lifecycle identity, assignment and allocation values, both handoff references, and lifecycle timestamps. Stale writes return a typed failure and do not mutate live state, reload, or retry. Ready, Withdraw Ready, and Doctor Arrived validate handoff history transactionally; Doctor Arrived also serializes durable cross-room doctor ownership. SQLite failures roll back transaction-local writes and leave live memory unchanged.
 
-Issue #120 exposes optional draft-bearing Ready atomically through the canonical API. Omitted Ready and Doctor Arrived bodies retain the current room-panel `RoomStatus` response, while explicit canonical bodies return the lifecycle action envelope. The room-panel migration remains issue #121.
+Issue #120 exposed optional draft-bearing Ready atomically through the canonical API. Omitted Ready and Doctor Arrived bodies retain the legacy-compatible `RoomStatus` response, while explicit canonical bodies return the lifecycle action envelope. Issue #121 / PR #133 (`d902a27`) completed the room-panel migration to canonical Begin Prestage, Save Details, Seat, Ready, Withdraw Ready, and Doctor Arrived flows.
 
 Doctors should be able to view room status from a phone or workstation, but they should not be able to acknowledge or clear the room remotely.
 

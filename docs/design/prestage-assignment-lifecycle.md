@@ -2,7 +2,7 @@
 
 ## Status and traceability
 
-Issue #119 implements the store and persistence lifecycle described here. Issue #120 exposes that lifecycle through canonical HTTP contracts, including optional assignment-bearing Seat and Ready actions. The room-panel workflow remains issue #121.
+Issue #119 implemented the store and persistence lifecycle described here. Issue #120 exposed that lifecycle through canonical HTTP contracts, including optional assignment-bearing Seat and Ready actions. Issue #121 / PR #133 (`d902a27`) completed the canonical room-panel workflow, and issue #126 / PR #142 (`47da8f9`) later corrected knowledge-graph comment/string extraction.
 
 ## Primary lifecycle
 
@@ -89,16 +89,16 @@ Outside Production, the demo seed runs only when all operational tables are empt
 
 The stress-fixture reset transaction deletes completed cycles, all Active handoffs, and active rooms, then recreates configured Available rooms. It preserves Withdrawn, Accepted, and Terminated handoffs plus aborted assignments. Repeated runs converge in current state and Active-handoff counts, not in preserved history totals or generated GUID identities.
 
-## Explicit non-goals and separate issues
+## Issue #120 non-goals and completed follow-up work
 
 - No patient identity or PHI.
-- No room-panel implementation in issue #120; see #121.
-- No master/doctor-view implementation in issue #120; see #122.
-- No reporting-population or metric changes in issue #120; see #123.
+- Issue #120 intentionally excluded room-panel implementation; issue #121 / PR #133 (`d902a27`) subsequently completed it.
+- Issue #120 intentionally excluded master/Doctor View presentation; issue #122 / PR #134 (`2d59c70`) subsequently completed it.
+- Issue #120 intentionally excluded reporting-population changes; issue #123 / PR #132 (`9eb5e66`) subsequently completed that work without changing the accepted-handoff attribution contract.
 - No automatic replay of stale assignment intent.
 - No migration that rewrites legacy Aging/Stale rows or historical cycles.
 - Issue #129 later made the after-hours sweep independently retryable per room and added a truthful unified review projection for pre-arrival after-hours history.
-- No knowledge-graph comment/string extraction fix; false-positive extraction is issue #126.
+- Issue #120 intentionally excluded knowledge-graph extraction changes; issue #126 / PR #142 (`47da8f9`) subsequently corrected comment/string false-positive extraction.
 
 ## Acceptance summary
 

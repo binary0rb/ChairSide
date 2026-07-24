@@ -63,13 +63,13 @@ The canonical room lifecycle is:
 - Turnover
 - Available
 
-`Begin Prestage` creates an episode without requiring assignment. `Save Details` explicitly commits absent, partial, or complete assignment details while Prestaging or Seated. `Seat Room` records truthful `seatedAt`; an assignment-bearing Seat can persist its canonical draft atomically. `Ready for Doctor` requires a complete, currently valid, durably saved assignment, creates an immutable Active handoff, records `readyForDoctorAt`, and locks assignment editing. Draft-bearing Ready is deferred to API/UI issues #120 and #121.
+`Begin Prestage` creates an episode without requiring assignment. `Save Details` explicitly commits absent, partial, or complete assignment details while Prestaging or Seated. `Seat Room` records truthful `seatedAt`; an assignment-bearing Seat can persist its canonical draft atomically. `Ready for Doctor` requires a complete, currently valid assignment, creates an immutable Active handoff, records `readyForDoctorAt`, and locks assignment editing. The canonical API and room panel can persist a complete current draft atomically with Seat or Ready.
 
 `Withdraw Ready` returns the same episode to Seated, clears urgency, and leaves the handoff historical as Withdrawn so corrected details can be saved. Reissuing Ready creates a new handoff and a new urgency interval. `Doctor Arrived` accepts the current handoff, clears urgency, records `doctorArrivedAt`, calculates wait timing, and moves the room to Doctor In Room. `Doctor Complete` enters Turnover, and `Room Available` completes the cycle and resets the active room.
 
 Before Ready, staff can safely correct common assignment mistakes:
 
-- `Update Assignment` changes the draft assignment only while Prestaging or Seated and preserves episode/lifecycle timestamps.
+- Doctor, procedure, sedation, and expected-allocation controls remain directly editable while Prestaging or Seated; `Save Details` explicitly commits the current draft and preserves episode/lifecycle timestamps.
 - A Ready assignment must first be withdrawn before it can be edited.
 - `Cancel Seating` requires confirmation, resets the room to available, and does not create a report entry.
 
@@ -189,10 +189,13 @@ Doctor and procedure rosters are configured through `DoctorRosterOptions` and `P
 
 Room-device binding is a first-pass operational control for room tablets. When `RoomDeviceBindingOptions:Enabled` is `true`, room-local mutation actions require the configured token for that room:
 
+- Begin Prestage
+- Save Details
 - Seat Room
-- Update Assignment
+- Cancel Prestage
 - Cancel Seating
 - Ready for Doctor
+- Withdraw Ready
 - Doctor Arrived
 - Doctor Complete
 - Room Available
@@ -436,14 +439,17 @@ Deployment smoke checklist:
 2. Browse `http://chairside/room.html?roomId=1`.
 3. Browse `http://chairside/doctor.html`.
 4. Browse `http://chairside/reports.html`.
-5. Seat Room 1 from the room panel.
-6. Restart the IIS site or `ChairSideBoard` app pool.
-7. Confirm Room 1 is still seated after restart.
-8. Mark Doctor Arrived, Doctor Complete, and Room Available.
-9. Confirm `/reports.html` shows the completed room cycle.
-10. Restart the IIS site or app pool again.
-11. Confirm the report remains after restart.
-12. Confirm no patient-identifying fields are requested or displayed.
+5. Click `Begin Prestage` for Room 1.
+6. Select a complete assignment and click `Save Details`.
+7. Click `Seat Room`, then `Ready for Doctor`.
+8. Restart the IIS site or `ChairSideBoard` app pool.
+9. Confirm Room 1 remains Ready with its saved assignment and Active handoff.
+10. Click `Withdraw Ready`, correct and save an assignment detail, then reissue `Ready for Doctor`.
+11. Mark Doctor Arrived, Doctor Complete, and Room Available.
+12. Confirm `/reports.html` shows the completed room cycle.
+13. Restart the IIS site or app pool again.
+14. Confirm the report remains after restart.
+15. Confirm no patient-identifying fields are requested or displayed.
 
 ## Reset Demo Data
 
@@ -512,16 +518,18 @@ Development room panels include a `Demo Timer` select. Use `Start now`, `Simulat
 ## Demo Script
 
 1. Open `http://localhost:5000/master.html` and `http://localhost:5000/room.html?roomId=1`.
-2. On the Room 1 panel, choose `Start now` and click `Seat Room`. Expected result: Room 1 appears on the master board as an in-prep room with a seated timer.
-3. Change the selected doctor or procedure and click `Update Assignment`. Expected result: Room 1 keeps the same seated timer but updates doctor/procedure on the master board.
-4. Click `Cancel Seating` and confirm. Expected result: Room 1 returns to available without creating a report entry.
-5. Choose `Simulate aging wait`, click `Seat Room`, then click `Ready for Doctor`. Expected result: Room 1 appears with the aging status treatment.
-6. Click `Doctor Arrived`, `Doctor Complete`, then `Room Available` to reset Room 1 again.
-7. Choose `Simulate stale wait`, click `Seat Room`, then click `Ready for Doctor`. Expected result: Room 1 appears with the stale status treatment.
-8. Click `Doctor Arrived`. Expected result: Room 1 changes to stable doctor color with the `IN ROOM` badge, and seated-to-doctor metrics are recorded.
-9. Click `Doctor Complete`. Expected result: Room 1 changes to the neutral diagonal stripe turnover card with the `TURNOVER` badge.
-10. Click `Room Available`. Expected result: Room 1 returns to the slate available state.
-11. Open `http://localhost:5000/reports.html`. Expected result: reports show non-PHI room-flow metrics and completed Room 1 cycles.
+2. Click `Begin Prestage`. Expected result: Room 1 enters Prestaging without fabricating assignment details or a seated timestamp.
+3. Choose `Start now`, select a complete assignment, and click `Save Details`. Expected result: the assignment persists while Room 1 remains Prestaging.
+4. Click `Seat Room`. Expected result: Room 1 appears on the master board as an in-prep room with a seated timer.
+5. Change the selected doctor or procedure, complete any newly required sedation or expected-allocation choices, and click `Save Details`. Expected result: Room 1 keeps the same seated timer while the saved assignment updates.
+6. Click `Cancel Seating` and confirm. Expected result: Room 1 returns to Available without creating a report entry.
+7. Click `Begin Prestage`, choose `Simulate aging wait`, save a complete assignment, click `Seat Room`, and then click `Ready for Doctor`. Expected result: Room 1 appears with Ready as its primary state and Aging as secondary urgency.
+8. Click `Doctor Arrived`, `Doctor Complete`, then `Room Available` to reset Room 1 again.
+9. Click `Begin Prestage`, choose `Simulate stale wait`, save a complete assignment, click `Seat Room`, and then click `Ready for Doctor`. Expected result: Room 1 appears with Ready as its primary state and Stale as secondary urgency.
+10. Click `Doctor Arrived`. Expected result: Room 1 changes to stable doctor color with the `IN ROOM` badge, Ready urgency clears, and seated-to-doctor metrics are recorded.
+11. Click `Doctor Complete`. Expected result: Room 1 changes to the neutral diagonal stripe turnover card with the `TURNOVER` badge.
+12. Click `Room Available`. Expected result: Room 1 returns to the slate available state.
+13. Open `http://localhost:5000/reports.html`. Expected result: reports show non-PHI room-flow metrics and completed Room 1 cycles.
 
 ## Persistence
 

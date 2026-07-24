@@ -9,6 +9,12 @@
                       "path":  ".github/pull_request_template.md"
                   },
                   {
+                      "id":  "file:.github/workflows/javascript-lint.yml",
+                      "label":  ".github/workflows/javascript-lint.yml",
+                      "type":  "File",
+                      "path":  ".github/workflows/javascript-lint.yml"
+                  },
+                  {
                       "id":  "file:AGENTS.md",
                       "label":  "AGENTS.md",
                       "type":  "File",
@@ -151,6 +157,24 @@
                       "label":  "docs/workflow.md",
                       "type":  "File",
                       "path":  "docs/workflow.md"
+                  },
+                  {
+                      "id":  "file:eslint.config.mjs",
+                      "label":  "eslint.config.mjs",
+                      "type":  "File",
+                      "path":  "eslint.config.mjs"
+                  },
+                  {
+                      "id":  "file:package.json",
+                      "label":  "package.json",
+                      "type":  "File",
+                      "path":  "package.json"
+                  },
+                  {
+                      "id":  "file:package-lock.json",
+                      "label":  "package-lock.json",
+                      "type":  "File",
+                      "path":  "package-lock.json"
                   },
                   {
                       "id":  "file:README.md",
@@ -3265,6 +3289,11 @@
                   },
                   {
                       "from":  "repo:chairside",
+                      "to":  "file:.github/workflows/javascript-lint.yml",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
                       "to":  "file:AGENTS.md",
                       "label":  "contains"
                   },
@@ -3381,6 +3410,21 @@
                   {
                       "from":  "repo:chairside",
                       "to":  "file:docs/workflow.md",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:eslint.config.mjs",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:package.json",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:package-lock.json",
                       "label":  "contains"
                   },
                   {

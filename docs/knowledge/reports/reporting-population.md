@@ -1,7 +1,7 @@
 ---
 title: Reporting population
 tags: [reports, reporting-population, reporting-metrics, exception-handling, domain-rule, active, last-verified]
-last_verified_commit: pending-issue-129
+last_verified_commit: ca75b09
 ---
 
 # Reporting population
