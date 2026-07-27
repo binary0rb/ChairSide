@@ -58,13 +58,6 @@ const app = {
 };
 
 const stateNames = ["empty", "seated", "aging", "stale", "ready-for-doctor", "doctor-in-room", "turnover"];
-const editableAssignmentStates = new Set(["prestaging", "seated"]);
-// States where "Ready for Doctor" button is enabled (only the neutral In Prep state).
-const activeSeatedStates = new Set(["seated"]);
-// States where cancellation is available. Assignment editing remains locked at Ready.
-const cancelableStates = new Set(["prestaging", "seated", "ready-for-doctor", "aging", "stale"]);
-// States where "Doctor Arrived" is enabled - all ready-for-doctor phase states.
-const doctorArrivedStates = new Set(["ready-for-doctor", "aging", "stale"]);
 const staffLoungeRoomNumber = 99;
 const trendMinimumComparisonCases = 3;
 const trendAboutSameThresholdSeconds = 60;
@@ -3316,32 +3309,47 @@ function renderInvalidRoomMessage() {
   `;
 }
 
-function setRoomControlsEnabled(room) {
-  const isEnabled = Boolean(room);
-  const state = room ? normalizeState(room) : "empty";
-  const canEdit = canEditAssignment(room);
-  const isDirty = canEdit && isAssignmentDraftDirty(room);
-  const isReady = doctorArrivedStates.has(state);
-
-  setDisabled("demoElapsedSelect", !isEnabled || state !== "empty" || !isDemoTimerEnabled());
-  setDisabled("beginPrestageButton", !isEnabled || state !== "empty");
-  setDisabled("seatButton", !isEnabled || state !== "prestaging");
-  setDisabled("readyForDoctorButton", !isEnabled || !activeSeatedStates.has(state) || !room?.episodeId);
-  setDisabled("saveDetailsButton", !isDirty);
-  setDisabled("discardChangesButton", !isDirty);
-  setDisabled("withdrawReadyButton", !isReady);
-  setDisabled("cancelSeatingButton", !isEnabled || !cancelableStates.has(state));
-  setDisabled("doctorArrivedButton", !isEnabled || !isReady);
-  setDisabled("doctorCompleteButton", !isEnabled || state !== "doctor-in-room");
-  setDisabled("roomAvailableButton", !isEnabled || state !== "turnover");
-  setHidden("saveDetailsButton", !isDirty);
-  setHidden("discardChangesButton", !isDirty);
-  setHidden("withdrawReadyButton", !isReady);
-  setHidden("cancelSeatingButton", !isEnabled || !cancelableStates.has(state));
-  setNextPrimaryAction(room, state);
+function roomCapabilities(room) {
+  return {
+    canBeginPrestage: room?.capabilities?.canBeginPrestage === true,
+    canEditAssignment: room?.capabilities?.canEditAssignment === true,
+    canSaveDetails: room?.capabilities?.canSaveDetails === true,
+    canSeat: room?.capabilities?.canSeat === true,
+    canCancelPrestage: room?.capabilities?.canCancelPrestage === true,
+    canCancelSeating: room?.capabilities?.canCancelSeating === true,
+    canReady: room?.capabilities?.canReady === true,
+    canWithdrawReady: room?.capabilities?.canWithdrawReady === true,
+    canDoctorArrive: room?.capabilities?.canDoctorArrive === true,
+    canDoctorComplete: room?.capabilities?.canDoctorComplete === true,
+    canRoomAvailable: room?.capabilities?.canRoomAvailable === true
+  };
 }
 
-function setNextPrimaryAction(room, state) {
+function setRoomControlsEnabled(room) {
+  const capabilities = roomCapabilities(room);
+  const isDirty = capabilities.canEditAssignment && isAssignmentDraftDirty(room);
+  const canCancel = capabilities.canCancelPrestage || capabilities.canCancelSeating;
+
+  setDisabled("demoElapsedSelect", !capabilities.canBeginPrestage || !isDemoTimerEnabled());
+  setDisabled("beginPrestageButton", !capabilities.canBeginPrestage);
+  setDisabled("seatButton", !capabilities.canSeat);
+  setDisabled("readyForDoctorButton", !capabilities.canReady);
+  setDisabled("saveDetailsButton", !capabilities.canSaveDetails || !isDirty);
+  setDisabled("discardChangesButton", !isDirty);
+  setDisabled("withdrawReadyButton", !capabilities.canWithdrawReady);
+  setDisabled("cancelSeatingButton", !canCancel);
+  setDisabled("doctorArrivedButton", !capabilities.canDoctorArrive);
+  setDisabled("doctorCompleteButton", !capabilities.canDoctorComplete);
+  setDisabled("roomAvailableButton", !capabilities.canRoomAvailable);
+  setHidden("saveDetailsButton", !isDirty);
+  setHidden("discardChangesButton", !isDirty);
+  setHidden("withdrawReadyButton", !capabilities.canWithdrawReady);
+  setHidden("cancelSeatingButton", !canCancel);
+  setNextPrimaryAction(room);
+}
+
+function setNextPrimaryAction(room) {
+  const capabilities = roomCapabilities(room);
   const draft = draftAssignmentShape();
   const draftCanBecomeReady = Boolean(
     draft.doctorId
@@ -3349,17 +3357,17 @@ function setNextPrimaryAction(room, state) {
     && draft.confirmedValue !== null);
   let nextActionId = null;
 
-  if (room && state === "empty") {
+  if (capabilities.canBeginPrestage) {
     nextActionId = "beginPrestageButton";
-  } else if (room && state === "prestaging") {
+  } else if (capabilities.canSeat) {
     nextActionId = "seatButton";
-  } else if (room && activeSeatedStates.has(state) && room.episodeId && draftCanBecomeReady) {
+  } else if (capabilities.canReady && draftCanBecomeReady) {
     nextActionId = "readyForDoctorButton";
-  } else if (room && doctorArrivedStates.has(state)) {
+  } else if (capabilities.canDoctorArrive) {
     nextActionId = "doctorArrivedButton";
-  } else if (room && state === "doctor-in-room") {
+  } else if (capabilities.canDoctorComplete) {
     nextActionId = "doctorCompleteButton";
-  } else if (room && state === "turnover") {
+  } else if (capabilities.canRoomAvailable) {
     nextActionId = "roomAvailableButton";
   }
 
@@ -3688,8 +3696,9 @@ function renderAssignmentGuidance(room) {
     target.dataset.tone = "neutral";
     return;
   }
-  if (room.assignmentLocked || doctorArrivedStates.has(state) || state === "doctor-in-room" || state === "turnover") {
-    target.textContent = doctorArrivedStates.has(state)
+  const capabilities = roomCapabilities(room);
+  if (room.assignmentLocked || capabilities.canWithdrawReady || state === "doctor-in-room" || state === "turnover") {
+    target.textContent = capabilities.canWithdrawReady
       ? "Assignment locked for the active Ready handoff. Withdraw Ready to make a correction."
       : "Assignment locked.";
     target.dataset.tone = "neutral";
@@ -4030,9 +4039,7 @@ function renderSedationToggle(room) {
   const eligible = selectedProcedureIsSedationEligible();
   const stateName = room ? normalizeState(room) : "empty";
   const assignmentLocked = room?.assignmentLocked === true
-    || doctorArrivedStates.has(stateName)
-    || stateName === "doctor-in-room"
-    || stateName === "turnover";
+    || (Boolean(room) && !canEdit && stateName !== "empty");
   let interactable;
   let isOn;
 
@@ -4078,18 +4085,12 @@ function renderSedationToggle(room) {
 // True when the doctor / procedure / sedation selection controls are live. They remain
 // directly editable in Prestaging and Seated / In Prep and lock at Ready.
 function canEditAssignment(room) {
-  if (!room) {
-    return false;
-  }
-
-  return editableAssignmentStates.has(normalizeState(room))
-    && !isLegacyActiveRoom(room)
-    && room.assignmentLocked !== true;
+  return roomCapabilities(room).canEditAssignment;
 }
 
 function isLegacyActiveRoom(room) {
   return Boolean(room)
-    && editableAssignmentStates.has(normalizeState(room))
+    && (normalizeState(room) === "prestaging" || normalizeState(room) === "seated")
     && !room.episodeId;
 }
 
@@ -4204,7 +4205,7 @@ function wireRoomPanel() {
   wireSelectionTiles();
 
   beginPrestageButton.addEventListener("click", async () => {
-    if (!isConfiguredRoom(app.roomNumber) || !isRoomInState("empty")) {
+    if (!roomCapabilities(getCurrentRoom()).canBeginPrestage) {
       setRoomActionStatus("Begin Prestage is only available when the room is available.", "error");
       return;
     }
@@ -4243,7 +4244,7 @@ function wireRoomPanel() {
       return;
     }
 
-    if (!isRoomInState("prestaging")) {
+    if (!roomCapabilities(getCurrentRoom()).canSeat) {
       setRoomActionStatus("Seat Room is only available after Prestaging begins.", "error");
       return;
     }
@@ -4264,7 +4265,7 @@ function wireRoomPanel() {
       return;
     }
 
-    if (!activeSeatedStates.has(currentRoomState())) {
+    if (!roomCapabilities(getCurrentRoom()).canReady) {
       setRoomActionStatus("Ready for Doctor is only available while the room is in prep (Patient Seated).", "error");
       return;
     }
@@ -4284,7 +4285,7 @@ function wireRoomPanel() {
   });
 
   withdrawReadyButton.addEventListener("click", async () => {
-    if (!doctorArrivedStates.has(currentRoomState())) {
+    if (!roomCapabilities(getCurrentRoom()).canWithdrawReady) {
       setRoomActionStatus("Withdraw Ready is only available before Doctor Arrived.", "error");
       return;
     }
@@ -4304,7 +4305,8 @@ function wireRoomPanel() {
       return;
     }
 
-    if (!cancelableStates.has(currentRoomState())) {
+    const capabilities = roomCapabilities(getCurrentRoom());
+    if (!capabilities.canCancelPrestage && !capabilities.canCancelSeating) {
       setRoomActionStatus("Cancel Seating is only available before Doctor Arrived.", "error");
       return;
     }
@@ -4319,7 +4321,8 @@ function wireRoomPanel() {
     setRoomActionStatus("Canceling seating...", "pending");
 
     try {
-      const result = await sendRoomAction(app.roomNumber, "cancel-seating", "Cancel Seating");
+      const action = capabilities.canCancelPrestage ? "cancel-prestage" : "cancel-seating";
+      const result = await sendRoomAction(app.roomNumber, action, "Cancel Seating");
       applyRoomMutationResult(result);
       console.log("[ChairSide] Cancel Seating succeeded.", { roomNumber: app.roomNumber });
       setRoomActionStatus("Seating canceled. Room available.", "success");
@@ -4335,7 +4338,7 @@ function wireRoomPanel() {
       return;
     }
 
-    if (!doctorArrivedStates.has(currentRoomState())) {
+    if (!roomCapabilities(getCurrentRoom()).canDoctorArrive) {
       setRoomActionStatus("Doctor Arrived is only available after Ready for Doctor.", "error");
       return;
     }
@@ -4379,7 +4382,7 @@ function wireRoomPanel() {
       return;
     }
 
-    if (!isRoomInState("doctor-in-room")) {
+    if (!roomCapabilities(getCurrentRoom()).canDoctorComplete) {
       setRoomActionStatus("Doctor Complete is only available when the doctor is in the room.", "error");
       return;
     }
@@ -4404,7 +4407,7 @@ function wireRoomPanel() {
       return;
     }
 
-    if (!isRoomInState("turnover")) {
+    if (!roomCapabilities(getCurrentRoom()).canRoomAvailable) {
       setRoomActionStatus("Room Available is only available during turnover.", "error");
       return;
     }
@@ -4569,15 +4572,6 @@ function isConfiguredRoom(roomNumber) {
 
 function getCurrentRoom() {
   return app.snapshot?.rooms.find(room => getRoomId(room) === app.roomNumber) || null;
-}
-
-function currentRoomState() {
-  const room = getCurrentRoom();
-  return room ? normalizeState(room) : "empty";
-}
-
-function isRoomInState(state) {
-  return currentRoomState() === state;
 }
 
 async function sendCanonicalRoomAction(action, body) {

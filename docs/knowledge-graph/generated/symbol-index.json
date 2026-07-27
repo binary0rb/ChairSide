@@ -1708,7 +1708,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/DemoBoardStore.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  246627,
+                      "sizeBytes":  247714,
                       "typeSymbols":  [
                                           "ExceptionReasons",
                                           "ReportingExceptionReasons",
@@ -2164,7 +2164,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/RoomAssignmentContracts.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  14656,
+                      "sizeBytes":  17420,
                       "typeSymbols":  [
                                           "AssignmentCompleteness",
                                           "SedationState",
@@ -2476,7 +2476,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/board.js",
                       "kind":  "JavaScript",
-                      "sizeBytes":  187233,
+                      "sizeBytes":  187306,
                       "typeSymbols":  [
 
                                       ],
@@ -2581,7 +2581,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/doctor.html",
                       "kind":  "Html",
-                      "sizeBytes":  2817,
+                      "sizeBytes":  2810,
                       "typeSymbols":  [
 
                                       ],
@@ -2607,7 +2607,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/index.html",
                       "kind":  "Html",
-                      "sizeBytes":  2830,
+                      "sizeBytes":  2823,
                       "typeSymbols":  [
 
                                       ],
@@ -2633,7 +2633,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/master.html",
                       "kind":  "Html",
-                      "sizeBytes":  2830,
+                      "sizeBytes":  2823,
                       "typeSymbols":  [
 
                                       ],
@@ -2659,7 +2659,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/reports.html",
                       "kind":  "Html",
-                      "sizeBytes":  9898,
+                      "sizeBytes":  9891,
                       "typeSymbols":  [
 
                                       ],
@@ -2685,7 +2685,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/room.html",
                       "kind":  "Html",
-                      "sizeBytes":  6114,
+                      "sizeBytes":  6101,
                       "typeSymbols":  [
 
                                       ],
@@ -2711,7 +2711,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/room-1.html",
                       "kind":  "Html",
-                      "sizeBytes":  6135,
+                      "sizeBytes":  6122,
                       "typeSymbols":  [
 
                                       ],
@@ -2823,7 +2823,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/workshop.html",
                       "kind":  "Html",
-                      "sizeBytes":  11411,
+                      "sizeBytes":  11404,
                       "typeSymbols":  [
 
                                       ],
@@ -2917,7 +2917,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/BoardReadyPresentationTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  12931,
+                      "sizeBytes":  15229,
                       "typeSymbols":  [
                                           "BoardReadyPresentationTests"
                                       ],
@@ -3457,7 +3457,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/PrestagingAssignmentContractTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  20147,
+                      "sizeBytes":  22867,
                       "typeSymbols":  [
                                           "PrestagingAssignmentContractTests",
                                           "HandoffEnvelope"
@@ -3498,10 +3498,11 @@
                                             "Legacy_zero_sentinel_is_not_canonical_confirmed_allocation",
                                             "Procedure_suggestion_is_not_allocation_confirmation",
                                             "Capabilities_follow_canonical_lifecycle",
+                                            "Canonical_prearrival_capabilities_require_an_episode",
+                                            "Integrity_faults_block_progression_but_preserve_ready_cancellation",
                                             "New_contract_status_values_serialize_as_strings_with_web_property_names",
                                             "Nullable_handoff_absence_serializes_as_null",
-                                            "AbsentAssignment",
-                                            "CompleteIneligibleAssignment"
+                                            "AbsentAssignment"
                                         ],
                       "routes":  [
 
@@ -3815,7 +3816,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/RoomPanelPrestagingWorkflowTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  8591,
+                      "sizeBytes":  8603,
                       "typeSymbols":  [
                                           "RoomPanelPrestagingWorkflowTests"
                                       ],
