@@ -1,7 +1,7 @@
 ﻿{
     "generatedStamp":  "deterministic",
     "root":  ".",
-    "fileCount":  113,
+    "fileCount":  119,
     "files":  [
                   {
                       "path":  ".github/pull_request_template.md",
@@ -2950,18 +2950,9 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/BoardStoreTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  443128,
+                      "sizeBytes":  434176,
                       "typeSymbols":  [
-                                          "BoardStoreTests",
-                                          "StoreContext",
-                                          "TestWorkspace",
-                                          "TestWebHostEnvironment",
-                                          "TestOptionsMonitor",
-                                          "ManualTimeProvider",
-                                          "NoopBoardHubContext",
-                                          "NoopHubClients",
-                                          "NoopGroupManager",
-                                          "NoopClientProxy"
+                                          "BoardStoreTests"
                                       ],
                       "methodSymbols":  [
                                             "Lifecycle_actions_preserve_expected_state_and_report_behavior",
@@ -3910,6 +3901,180 @@
                                             "Schedule_fit_totals_agree_with_allocation_variance_summary_for_standard_population",
                                             "Utc",
                                             "SeedCleanCycle"
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
+                      "path":  "tests/ChairSide.Board.Tests/TestSupport/ManualTimeProvider.cs",
+                      "kind":  "CSharp",
+                      "sizeBytes":  303,
+                      "typeSymbols":  [
+                                          "ManualTimeProvider"
+                                      ],
+                      "methodSymbols":  [
+                                            "SetUtcNow"
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
+                      "path":  "tests/ChairSide.Board.Tests/TestSupport/NoopBoardHubContext.cs",
+                      "kind":  "CSharp",
+                      "sizeBytes":  1683,
+                      "typeSymbols":  [
+                                          "NoopBoardHubContext",
+                                          "NoopHubClients",
+                                          "NoopGroupManager",
+                                          "NoopClientProxy"
+                                      ],
+                      "methodSymbols":  [
+                                            "AllExcept",
+                                            "Client",
+                                            "Clients",
+                                            "Group",
+                                            "GroupExcept",
+                                            "Groups",
+                                            "User",
+                                            "Users",
+                                            "AddToGroupAsync",
+                                            "RemoveFromGroupAsync",
+                                            "SendCoreAsync"
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
+                      "path":  "tests/ChairSide.Board.Tests/TestSupport/StoreContext.cs",
+                      "kind":  "CSharp",
+                      "sizeBytes":  4269,
+                      "typeSymbols":  [
+                                          "StoreContext"
+                                      ],
+                      "methodSymbols":  [
+                                            "Create"
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
+                      "path":  "tests/ChairSide.Board.Tests/TestSupport/TestOptionsMonitor.cs",
+                      "kind":  "CSharp",
+                      "sizeBytes":  326,
+                      "typeSymbols":  [
+                                          "TestOptionsMonitor"
+                                      ],
+                      "methodSymbols":  [
+                                            "Get",
+                                            "OnChange"
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
+                      "path":  "tests/ChairSide.Board.Tests/TestSupport/TestWebHostEnvironment.cs",
+                      "kind":  "CSharp",
+                      "sizeBytes":  727,
+                      "typeSymbols":  [
+                                          "TestWebHostEnvironment"
+                                      ],
+                      "methodSymbols":  [
+
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
+                      "path":  "tests/ChairSide.Board.Tests/TestSupport/TestWorkspace.cs",
+                      "kind":  "CSharp",
+                      "sizeBytes":  2030,
+                      "typeSymbols":  [
+                                          "TestWorkspace"
+                                      ],
+                      "methodSymbols":  [
+                                            "Create",
+                                            "ProductionDatabasePath",
+                                            "TrainingDatabasePath",
+                                            "DatabaseIsolationLayout",
+                                            "Dispose"
                                         ],
                       "routes":  [
 
