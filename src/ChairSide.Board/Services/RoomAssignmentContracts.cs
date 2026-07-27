@@ -454,27 +454,3 @@ public static class RoomCapabilitiesEvaluator
 public sealed record RoomIntegrityFault(
     RoomIntegrityFaultCode Code,
     RoomAssignmentContract Assignment);
-
-public static class RoomIntegrityFaultEvaluator
-{
-    public static IReadOnlyList<RoomIntegrityFault> Evaluate(
-        CanonicalRoomLifecycleState primaryState,
-        RoomAssignmentContract assignment)
-    {
-        ArgumentNullException.ThrowIfNull(assignment);
-
-        if (IsReadyOrLater(primaryState) && assignment.Completeness != AssignmentCompleteness.Complete)
-        {
-            return [new RoomIntegrityFault(RoomIntegrityFaultCode.ReadyAssignmentIncomplete, assignment)];
-        }
-
-        return [];
-    }
-
-    private static bool IsReadyOrLater(CanonicalRoomLifecycleState primaryState) =>
-        primaryState is
-            CanonicalRoomLifecycleState.ReadyForDoctor or
-            CanonicalRoomLifecycleState.DoctorWorking or
-            CanonicalRoomLifecycleState.DoctorComplete or
-            CanonicalRoomLifecycleState.Turnover;
-}
