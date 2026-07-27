@@ -410,7 +410,7 @@ public sealed class LifecycleFixtureCorrectionTests
         Assert.NotNull(context.Store.BeginPrestage(1));
         Assert.NotNull(context.Store.SaveAssignmentDetails(1, InitialAssignment()));
         clock.SetUtcNow(now.AddMinutes(1));
-        Assert.NotNull(context.Store.SeatRoom(1));
+        Assert.NotNull(context.Store.SeatRoomCanonical(1, null).Room);
         clock.SetUtcNow(now.AddMinutes(2));
         Assert.NotNull(context.Store.MarkReadyForDoctor(1));
 
@@ -573,7 +573,7 @@ public sealed class LifecycleFixtureCorrectionTests
     {
         Assert.NotNull(context.Store.BeginPrestage(roomId));
         Assert.NotNull(context.Store.SaveAssignmentDetails(roomId, InitialAssignment()));
-        Assert.NotNull(context.Store.SeatRoom(roomId));
+        Assert.NotNull(context.Store.SeatRoomCanonical(roomId, null).Room);
         Assert.NotNull(context.Store.MarkReadyForDoctor(roomId));
     }
 

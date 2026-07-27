@@ -157,7 +157,7 @@ public sealed class CanonicalAssignmentDomainValidationTests
             databasePath: databasePath,
             timeProvider: clock);
         Assert.NotNull(seed.Store.BeginPrestage(1, "otte", "CON"));
-        Assert.NotNull(seed.Store.SeatRoom(1));
+        Assert.NotNull(seed.Store.SeatRoomCanonical(1, null).Room);
 
         var contextA = StoreContext.Create(
             workspace,
@@ -225,7 +225,7 @@ public sealed class CanonicalAssignmentDomainValidationTests
         Assert.Equal(RoomStates.Prestaging, staleLiveBefore.State);
 
         clock.SetUtcNow(now.AddMinutes(2));
-        Assert.NotNull(contextA.Store.SeatRoom(1));
+        Assert.NotNull(contextA.Store.SeatRoomCanonical(1, null).Room);
         clock.SetUtcNow(now.AddMinutes(4));
         Assert.NotNull(contextA.Store.MarkReadyForDoctor(1));
         var durableReadyBefore = contextA.Repository.LoadRooms(3).Single(room => room.RoomId == 1);
@@ -239,7 +239,7 @@ public sealed class CanonicalAssignmentDomainValidationTests
             "EXT+SED",
             SedationContract.EligibleYes(),
             ExpectedAllocationContract.ConfirmedAdjustedValue(3, 5));
-        var result = contextB.Store.SeatRoom(1, staleAssignment);
+        var result = contextB.Store.SeatRoomCanonical(1, staleAssignment).Room;
 
         Assert.Null(result);
         AssertReadyTruthUnchanged(contextA, durableReadyBefore, activeHandoffBefore);
@@ -364,7 +364,7 @@ public sealed class CanonicalAssignmentDomainValidationTests
             SedationContract.UnavailableProcedureIneligible(),
             ExpectedAllocationContract.ConfirmedSuggestedValue(1));
 
-        var result = context.Store.SeatRoom(1, assignment);
+        var result = context.Store.SeatRoomCanonical(1, assignment).Room;
 
         Assert.NotNull(result);
         Assert.Equal(RoomStates.Seated, result!.State);
@@ -402,7 +402,7 @@ public sealed class CanonicalAssignmentDomainValidationTests
         Assert.NotNull(context.Store.BeginPrestage(1));
         Assert.NotNull(context.Store.SaveAssignmentDetails(1, assignment));
         clock.SetUtcNow(SeedNow.AddMinutes(2));
-        Assert.NotNull(context.Store.SeatRoom(1));
+        Assert.NotNull(context.Store.SeatRoomCanonical(1, null).Room);
         clock.SetUtcNow(SeedNow.AddMinutes(4));
         var ready = context.Store.MarkReadyForDoctor(1);
 
@@ -432,7 +432,7 @@ public sealed class CanonicalAssignmentDomainValidationTests
     {
         var before = context.Repository.LoadRooms(3).Single(room => room.RoomId == 1);
 
-        Assert.Null(context.Store.SeatRoom(1, invalid));
+        Assert.Null(context.Store.SeatRoomCanonical(1, invalid).Room);
 
         var live = context.Store.GetRoom(1);
         Assert.Equal(RoomStates.Prestaging, live!.State);

@@ -18,7 +18,7 @@ ChairSide tracks room episodes, not patients. The canonical lifecycle is:
 6. Doctor Complete records `DoctorCompleteAt` and enters `Turnover`.
 7. Room Available records completion and releases the room to `Available`.
 
-Issue #120 exposed canonical Begin Prestage, Save Details, Seat, Ready, Withdraw Ready, and Doctor Arrived endpoints. Issue #121 / PR #133 (`d902a27`) completed the room-panel migration to those contracts. Omitted Ready and Doctor Arrived bodies preserve the legacy-compatible `RoomStatus` response, while the canonical room panel sends explicit bodies and consumes the lifecycle action envelope.
+Issue #120 exposed canonical Begin Prestage, Save Details, Seat, Ready, Withdraw Ready, and Doctor Arrived endpoints. Issue #121 / PR #133 (`d902a27`) completed the room-panel migration to those contracts. Issue #158 verified that maintained deployed callers no longer use flat assignment-bearing Seat, `/update-assignment`, or `/assignment`; issue #159 removed those legacy transports. Omitted Ready and Doctor Arrived bodies preserve the legacy-compatible `RoomStatus` response, while the canonical room panel sends explicit bodies and consumes the lifecycle action envelope.
 
 ## Ready handoff and urgency
 

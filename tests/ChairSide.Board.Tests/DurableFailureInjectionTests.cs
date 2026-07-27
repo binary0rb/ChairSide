@@ -29,7 +29,7 @@ public sealed class DurableFailureInjectionTests
 
         Assert.NotNull(context.Store.BeginPrestage(1, "otte", "CON"));
         clock.SetUtcNow(now.AddMinutes(5));
-        Assert.NotNull(context.Store.SeatRoom(1));
+        Assert.NotNull(context.Store.SeatRoomCanonical(1, null).Room);
 
         var liveBefore = RoomSnapshot.From(GetLiveRoom(context.Store));
         var durableBefore = RoomSnapshot.From(LoadRoom(context));
@@ -77,7 +77,7 @@ public sealed class DurableFailureInjectionTests
             timeProvider: clock);
 
         Assert.NotNull(context.Store.BeginPrestage(1, "otte", "CON"));
-        Assert.NotNull(context.Store.SeatRoom(1));
+        Assert.NotNull(context.Store.SeatRoomCanonical(1, null).Room);
         Assert.NotNull(context.Store.MarkReadyForDoctor(1));
 
         var liveBefore = RoomSnapshot.From(GetLiveRoom(context.Store));
@@ -131,7 +131,7 @@ public sealed class DurableFailureInjectionTests
             expirationOptions: EnabledExpiration());
 
         Assert.NotNull(context.Store.BeginPrestage(1, "otte", "CON"));
-        Assert.NotNull(context.Store.SeatRoom(1));
+        Assert.NotNull(context.Store.SeatRoomCanonical(1, null).Room);
         Assert.NotNull(context.Store.MarkReadyForDoctor(1));
 
         var liveBefore = RoomSnapshot.From(GetLiveRoom(context.Store));
@@ -187,7 +187,7 @@ public sealed class DurableFailureInjectionTests
             expirationOptions: EnabledExpiration());
 
         Assert.NotNull(context.Store.BeginPrestage(1, "otte", "CON"));
-        Assert.NotNull(context.Store.SeatRoom(1));
+        Assert.NotNull(context.Store.SeatRoomCanonical(1, null).Room);
         Assert.NotNull(context.Store.MarkReadyForDoctor(1));
         Assert.NotNull(context.Store.MarkDoctorArrived(1));
 

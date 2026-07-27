@@ -145,7 +145,7 @@ public sealed class AfterHoursReviewEndpointTests
     private static void ActivateReady(DemoBoardStore store, int roomId, string doctorId, string procedureCode)
     {
         Assert.NotNull(store.BeginPrestage(roomId, doctorId, procedureCode));
-        Assert.NotNull(store.SeatRoom(roomId));
+        Assert.NotNull(store.SeatRoomCanonical(roomId, null).Room);
         Assert.NotNull(store.MarkReadyForDoctor(roomId));
     }
 
