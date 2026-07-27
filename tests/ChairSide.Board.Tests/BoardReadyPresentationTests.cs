@@ -27,6 +27,11 @@ public sealed class BoardReadyPresentationTests
         Assert.Null(prestaging.Assignment.ProcedureCode);
         Assert.Equal(SedationState.UnavailableNoProcedure, prestaging.Assignment.Sedation.State);
         Assert.Equal(ExpectedAllocationState.Unknown, prestaging.Assignment.ExpectedAllocation.State);
+        Assert.True(prestaging.Capabilities?.CanEditAssignment);
+        Assert.True(prestaging.Capabilities?.CanSaveDetails);
+        Assert.True(prestaging.Capabilities?.CanSeat);
+        Assert.True(prestaging.Capabilities?.CanCancelPrestage);
+        Assert.False(prestaging.Capabilities?.CanReady);
 
         var partial = context.Store.ConvertCanonicalAssignment(
             new CanonicalAssignmentRequest("otte", null, null, null)).Value!;
@@ -45,6 +50,11 @@ public sealed class BoardReadyPresentationTests
         Assert.NotNull(seated.SeatedAt);
         Assert.Equal("otte", seated.Assignment?.DoctorId);
         Assert.Null(seated.Assignment?.ProcedureCode);
+        Assert.True(seated.Capabilities?.CanEditAssignment);
+        Assert.True(seated.Capabilities?.CanSaveDetails);
+        Assert.True(seated.Capabilities?.CanReady);
+        Assert.True(seated.Capabilities?.CanCancelSeating);
+        Assert.False(seated.Capabilities?.CanSeat);
     }
 
     [Theory]
@@ -76,6 +86,9 @@ public sealed class BoardReadyPresentationTests
         Assert.True(urgent.AssignmentLocked);
         Assert.Equal("pledger", urgent.Assignment?.DoctorId);
         Assert.Equal("EXT", urgent.Assignment?.ProcedureCode);
+        Assert.True(urgent.Capabilities?.CanWithdrawReady);
+        Assert.True(urgent.Capabilities?.CanDoctorArrive);
+        Assert.True(urgent.Capabilities?.CanCancelSeating);
 
         var withdrawn = Assert.IsType<RoomStatus>(context.Store.WithdrawReadyCanonical(1).Room);
         Assert.Equal(RoomStates.Seated, withdrawn.State);
@@ -83,6 +96,8 @@ public sealed class BoardReadyPresentationTests
         Assert.False(withdrawn.AssignmentLocked);
         Assert.Equal("pledger", withdrawn.Assignment?.DoctorId);
         Assert.Equal("EXT", withdrawn.Assignment?.ProcedureCode);
+        Assert.True(withdrawn.Capabilities?.CanReady);
+        Assert.True(withdrawn.Capabilities?.CanEditAssignment);
 
         Assert.Equal(PrestagingLifecycleMutationOutcome.Success, context.Store.MarkReadyForDoctorCanonical(1, null).Outcome);
         clock.SetUtcNow(clock.GetUtcNow().AddMinutes(elapsedMinutes));
@@ -95,6 +110,17 @@ public sealed class BoardReadyPresentationTests
         Assert.Equal("pledger", arrived.Assignment?.DoctorId);
         Assert.Equal("EXT", arrived.Assignment?.ProcedureCode);
         Assert.NotNull(arrived.AcceptedReadyHandoffId);
+        Assert.True(arrived.Capabilities?.CanDoctorComplete);
+
+        var completed = Assert.IsType<RoomStatus>(context.Store.MarkDoctorComplete(1));
+        Assert.Equal(RoomStates.Turnover, completed.State);
+        Assert.True(completed.Capabilities?.CanRoomAvailable);
+        Assert.False(completed.Capabilities?.CanDoctorComplete);
+
+        var available = Assert.IsType<RoomStatus>(context.Store.MarkRoomAvailable(1));
+        Assert.Equal(RoomStates.Available, available.State);
+        Assert.True(available.Capabilities?.CanBeginPrestage);
+        Assert.False(available.Capabilities?.CanRoomAvailable);
     }
 
     [Fact]
@@ -174,13 +200,23 @@ public sealed class BoardReadyPresentationTests
         });
         Assert.Contains("/styles.css?v=20260722-primary-workflow-action-colors", genericRoom, StringComparison.Ordinal);
         Assert.Contains("/styles.css?v=20260722-primary-workflow-action-colors", roomOne, StringComparison.Ordinal);
-        Assert.Contains("/board.js?v=20260722-primary-workflow-action-colors", genericRoom, StringComparison.Ordinal);
-        Assert.Contains("/board.js?v=20260722-primary-workflow-action-colors", roomOne, StringComparison.Ordinal);
-        Assert.Contains("function setNextPrimaryAction(room, state)", boardScript, StringComparison.Ordinal);
+        Assert.Contains("/board.js?v=20260727-room-capabilities", genericRoom, StringComparison.Ordinal);
+        Assert.Contains("/board.js?v=20260727-room-capabilities", roomOne, StringComparison.Ordinal);
+        Assert.Contains("function roomCapabilities(room)", boardScript, StringComparison.Ordinal);
+        Assert.Contains("function setNextPrimaryAction(room)", boardScript, StringComparison.Ordinal);
+        Assert.Contains("room?.capabilities?.canBeginPrestage === true", boardScript, StringComparison.Ordinal);
+        Assert.Contains("room?.capabilities?.canDoctorComplete === true", boardScript, StringComparison.Ordinal);
         Assert.Contains("draft.confirmedValue !== null", boardScript, StringComparison.Ordinal);
         Assert.Contains("document.getElementById(id)?.classList.toggle(\"is-next-action\", id === nextActionId);", boardScript, StringComparison.Ordinal);
         Assert.All(primaryActionIds, id =>
             Assert.Contains($"nextActionId = \"{id}\";", boardScript, StringComparison.Ordinal));
+        Assert.DoesNotContain("activeSeatedStates", boardScript, StringComparison.Ordinal);
+        Assert.DoesNotContain("cancelableStates", boardScript, StringComparison.Ordinal);
+        Assert.DoesNotContain("doctorArrivedStates", boardScript, StringComparison.Ordinal);
+        Assert.Contains(
+            "const action = capabilities.canCancelPrestage ? \"cancel-prestage\" : \"cancel-seating\";",
+            boardScript,
+            StringComparison.Ordinal);
         Assert.Matches(
             "(?s)\\.primary-action-grid \\.is-next-action:not\\(:disabled\\)\\s*\\{[^}]*border-color:\\s*#15803d;[^}]*background:\\s*#15803d;[^}]*color:\\s*#ffffff;",
             styles);

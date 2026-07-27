@@ -340,49 +340,113 @@ public static class ReadyUrgencyEvaluator
 }
 
 public sealed record RoomCapabilities(
+    bool CanBeginPrestage,
     bool CanEditAssignment,
     bool CanSaveDetails,
     bool CanSeat,
+    bool CanCancelPrestage,
+    bool CanCancelSeating,
     bool CanReady,
     bool CanWithdrawReady,
-    bool CanDoctorArrive);
+    bool CanDoctorArrive,
+    bool CanDoctorComplete,
+    bool CanRoomAvailable);
 
 public static class RoomCapabilitiesEvaluator
 {
     public static RoomCapabilities Evaluate(
         CanonicalRoomLifecycleState primaryState,
-        bool hasUnsavedAssignmentChanges)
+        bool hasCanonicalEpisode,
+        bool hasIntegrityFaults)
     {
+        var canonicalPreArrival = hasCanonicalEpisode && !hasIntegrityFaults;
+
         return primaryState switch
         {
+            CanonicalRoomLifecycleState.Available => new RoomCapabilities(
+                CanBeginPrestage: true,
+                CanEditAssignment: false,
+                CanSaveDetails: false,
+                CanSeat: false,
+                CanCancelPrestage: false,
+                CanCancelSeating: false,
+                CanReady: false,
+                CanWithdrawReady: false,
+                CanDoctorArrive: false,
+                CanDoctorComplete: false,
+                CanRoomAvailable: false),
             CanonicalRoomLifecycleState.Prestaging => new RoomCapabilities(
-                CanEditAssignment: true,
-                CanSaveDetails: hasUnsavedAssignmentChanges,
-                CanSeat: true,
+                CanBeginPrestage: false,
+                CanEditAssignment: canonicalPreArrival,
+                CanSaveDetails: canonicalPreArrival,
+                CanSeat: canonicalPreArrival,
+                CanCancelPrestage: true,
+                CanCancelSeating: false,
                 CanReady: false,
                 CanWithdrawReady: false,
-                CanDoctorArrive: false),
+                CanDoctorArrive: false,
+                CanDoctorComplete: false,
+                CanRoomAvailable: false),
             CanonicalRoomLifecycleState.SeatedInPrep => new RoomCapabilities(
-                CanEditAssignment: true,
-                CanSaveDetails: hasUnsavedAssignmentChanges,
+                CanBeginPrestage: false,
+                CanEditAssignment: canonicalPreArrival,
+                CanSaveDetails: canonicalPreArrival,
                 CanSeat: false,
-                CanReady: true,
+                CanCancelPrestage: false,
+                CanCancelSeating: true,
+                CanReady: canonicalPreArrival,
                 CanWithdrawReady: false,
-                CanDoctorArrive: false),
+                CanDoctorArrive: false,
+                CanDoctorComplete: false,
+                CanRoomAvailable: false),
             CanonicalRoomLifecycleState.ReadyForDoctor => new RoomCapabilities(
+                CanBeginPrestage: false,
                 CanEditAssignment: false,
                 CanSaveDetails: false,
                 CanSeat: false,
+                CanCancelPrestage: false,
+                CanCancelSeating: true,
                 CanReady: false,
-                CanWithdrawReady: true,
-                CanDoctorArrive: true),
-            _ => new RoomCapabilities(
+                CanWithdrawReady: !hasIntegrityFaults,
+                CanDoctorArrive: !hasIntegrityFaults,
+                CanDoctorComplete: false,
+                CanRoomAvailable: false),
+            CanonicalRoomLifecycleState.DoctorWorking => new RoomCapabilities(
+                CanBeginPrestage: false,
                 CanEditAssignment: false,
                 CanSaveDetails: false,
                 CanSeat: false,
+                CanCancelPrestage: false,
+                CanCancelSeating: false,
                 CanReady: false,
                 CanWithdrawReady: false,
-                CanDoctorArrive: false)
+                CanDoctorArrive: false,
+                CanDoctorComplete: !hasIntegrityFaults,
+                CanRoomAvailable: false),
+            CanonicalRoomLifecycleState.Turnover => new RoomCapabilities(
+                CanBeginPrestage: false,
+                CanEditAssignment: false,
+                CanSaveDetails: false,
+                CanSeat: false,
+                CanCancelPrestage: false,
+                CanCancelSeating: false,
+                CanReady: false,
+                CanWithdrawReady: false,
+                CanDoctorArrive: false,
+                CanDoctorComplete: false,
+                CanRoomAvailable: !hasIntegrityFaults),
+            _ => new RoomCapabilities(
+                CanBeginPrestage: false,
+                CanEditAssignment: false,
+                CanSaveDetails: false,
+                CanSeat: false,
+                CanCancelPrestage: false,
+                CanCancelSeating: false,
+                CanReady: false,
+                CanWithdrawReady: false,
+                CanDoctorArrive: false,
+                CanDoctorComplete: false,
+                CanRoomAvailable: false)
         };
     }
 }

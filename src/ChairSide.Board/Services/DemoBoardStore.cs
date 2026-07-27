@@ -2802,6 +2802,10 @@ public sealed class DemoBoardStore
             : null;
         var assignmentLocked = room.State is
             RoomStates.ReadyForDoctor or RoomStates.Aging or RoomStates.Stale or RoomStates.DoctorInRoom or RoomStates.Turnover;
+        var capabilities = RoomCapabilitiesEvaluator.Evaluate(
+            ToCanonicalLifecycleState(room.State),
+            hasCanonicalEpisode: !string.IsNullOrWhiteSpace(room.EpisodeId),
+            hasIntegrityFaults: faults.Count > 0);
 
         return new RoomStatus(
             room.RoomId,
@@ -2830,8 +2834,22 @@ public sealed class DemoBoardStore
             assignment,
             assignmentLocked,
             room.ActiveReadyHandoffId,
-            room.AcceptedReadyHandoffId);
+            room.AcceptedReadyHandoffId,
+            capabilities);
     }
+
+    private static CanonicalRoomLifecycleState ToCanonicalLifecycleState(string state) =>
+        state switch
+        {
+            RoomStates.Available => CanonicalRoomLifecycleState.Available,
+            RoomStates.Prestaging => CanonicalRoomLifecycleState.Prestaging,
+            RoomStates.Seated => CanonicalRoomLifecycleState.SeatedInPrep,
+            RoomStates.ReadyForDoctor or RoomStates.Aging or RoomStates.Stale =>
+                CanonicalRoomLifecycleState.ReadyForDoctor,
+            RoomStates.DoctorInRoom => CanonicalRoomLifecycleState.DoctorWorking,
+            RoomStates.Turnover => CanonicalRoomLifecycleState.Turnover,
+            _ => throw new InvalidOperationException($"Unsupported room lifecycle state '{state}'.")
+        };
 
     private ReadyUrgency ProjectReadyUrgency(RoomState room, DateTimeOffset now)
     {
@@ -4260,7 +4278,8 @@ public sealed record RoomStatus(
     RoomAssignmentContract? Assignment = null,
     bool AssignmentLocked = false,
     string? ActiveReadyHandoffId = null,
-    string? AcceptedReadyHandoffId = null);
+    string? AcceptedReadyHandoffId = null,
+    RoomCapabilities? Capabilities = null);
 
 public sealed record RoomEvent(
     int RoomNumber,

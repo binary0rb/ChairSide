@@ -458,32 +458,96 @@ public sealed class PrestagingAssignmentContractTests
     [Fact]
     public void Capabilities_follow_canonical_lifecycle()
     {
+        var available = RoomCapabilitiesEvaluator.Evaluate(
+            CanonicalRoomLifecycleState.Available,
+            hasCanonicalEpisode: false,
+            hasIntegrityFaults: false);
         var prestaging = RoomCapabilitiesEvaluator.Evaluate(
             CanonicalRoomLifecycleState.Prestaging,
-            hasUnsavedAssignmentChanges: true);
+            hasCanonicalEpisode: true,
+            hasIntegrityFaults: false);
         var seated = RoomCapabilitiesEvaluator.Evaluate(
             CanonicalRoomLifecycleState.SeatedInPrep,
-            hasUnsavedAssignmentChanges: true);
+            hasCanonicalEpisode: true,
+            hasIntegrityFaults: false);
         var ready = RoomCapabilitiesEvaluator.Evaluate(
             CanonicalRoomLifecycleState.ReadyForDoctor,
-            hasUnsavedAssignmentChanges: true);
+            hasCanonicalEpisode: true,
+            hasIntegrityFaults: false);
         var working = RoomCapabilitiesEvaluator.Evaluate(
             CanonicalRoomLifecycleState.DoctorWorking,
-            hasUnsavedAssignmentChanges: true);
+            hasCanonicalEpisode: true,
+            hasIntegrityFaults: false);
+        var turnover = RoomCapabilitiesEvaluator.Evaluate(
+            CanonicalRoomLifecycleState.Turnover,
+            hasCanonicalEpisode: true,
+            hasIntegrityFaults: false);
 
+        Assert.True(available.CanBeginPrestage);
+        Assert.False(available.CanEditAssignment);
         Assert.True(prestaging.CanEditAssignment);
         Assert.True(prestaging.CanSaveDetails);
         Assert.True(prestaging.CanSeat);
+        Assert.True(prestaging.CanCancelPrestage);
+        Assert.False(prestaging.CanCancelSeating);
         Assert.False(prestaging.CanReady);
         Assert.True(seated.CanEditAssignment);
         Assert.True(seated.CanReady);
+        Assert.True(seated.CanCancelSeating);
         Assert.False(seated.CanSeat);
         Assert.False(ready.CanEditAssignment);
         Assert.False(ready.CanSaveDetails);
+        Assert.True(ready.CanCancelSeating);
         Assert.True(ready.CanWithdrawReady);
         Assert.True(ready.CanDoctorArrive);
         Assert.False(working.CanEditAssignment);
         Assert.False(working.CanWithdrawReady);
+        Assert.True(working.CanDoctorComplete);
+        Assert.True(turnover.CanRoomAvailable);
+
+        var json = JsonSerializer.Serialize(seated, JsonOptions);
+        Assert.Contains("\"canReady\":true", json);
+        Assert.Contains("\"canCancelSeating\":true", json);
+        Assert.DoesNotContain("\"CanReady\":", json);
+    }
+
+    [Theory]
+    [InlineData(CanonicalRoomLifecycleState.Prestaging)]
+    [InlineData(CanonicalRoomLifecycleState.SeatedInPrep)]
+    public void Canonical_prearrival_capabilities_require_an_episode(
+        CanonicalRoomLifecycleState state)
+    {
+        var capabilities = RoomCapabilitiesEvaluator.Evaluate(
+            state,
+            hasCanonicalEpisode: false,
+            hasIntegrityFaults: false);
+
+        Assert.False(capabilities.CanEditAssignment);
+        Assert.False(capabilities.CanSaveDetails);
+        Assert.False(capabilities.CanSeat);
+        Assert.False(capabilities.CanReady);
+        Assert.True(capabilities.CanCancelPrestage || capabilities.CanCancelSeating);
+    }
+
+    [Theory]
+    [InlineData(CanonicalRoomLifecycleState.ReadyForDoctor)]
+    [InlineData(CanonicalRoomLifecycleState.DoctorWorking)]
+    [InlineData(CanonicalRoomLifecycleState.Turnover)]
+    public void Integrity_faults_block_progression_but_preserve_ready_cancellation(
+        CanonicalRoomLifecycleState state)
+    {
+        var capabilities = RoomCapabilitiesEvaluator.Evaluate(
+            state,
+            hasCanonicalEpisode: true,
+            hasIntegrityFaults: true);
+
+        Assert.False(capabilities.CanWithdrawReady);
+        Assert.False(capabilities.CanDoctorArrive);
+        Assert.False(capabilities.CanDoctorComplete);
+        Assert.False(capabilities.CanRoomAvailable);
+        Assert.Equal(
+            state == CanonicalRoomLifecycleState.ReadyForDoctor,
+            capabilities.CanCancelSeating);
     }
 
     [Fact]
