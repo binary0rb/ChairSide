@@ -60,7 +60,6 @@ public sealed class DemoBoardStore
     private readonly List<Doctor> _activeDoctors;
     private readonly List<ProcedureCategory> _procedures;
     private readonly List<ProcedureCategory> _activeProcedures;
-    private readonly bool _demoOffsetsAllowed;
 
     private readonly List<RoomState> _rooms;
     private readonly List<RoomEvent> _events = [];
@@ -90,7 +89,6 @@ public sealed class DemoBoardStore
         _demoTimerEnabled = deploymentEnvironment.IsTraining
             ? false
             : boardUiOptions.Value.DemoTimerEnabled ?? deploymentEnvironment.IsDevelopment;
-        _demoOffsetsAllowed = deploymentEnvironment.IsDevelopment;
         _doctors = BuildDoctors(doctorRosterOptions.Value).ToList();
         _activeDoctors = BuildDoctors(doctorRosterOptions.Value, activeOnly: true).ToList();
         _procedures = BuildProcedures(procedureRosterOptions.Value).ToList();
@@ -349,105 +347,6 @@ public sealed class DemoBoardStore
             AddEvent(new RoomEvent(room.RoomId, "AssignmentSaved", Now, candidate.AssignedDoctor, candidate.ProcedureCode));
             return ToRoomStatus(room, Now);
         }
-    }
-
-    /// <summary>
-    /// Corrects the provisional doctor/procedure/sedation/allocation assignment while an active room
-    /// is Prestaging or Seated. Ready for Doctor locks the durably saved assignment into an immutable
-    /// handoff; staff must withdraw Ready before correcting it. Preserves the same episode and all
-    /// existing phase timestamps; replaces only the assignment/allocation snapshot. Creates no
-    /// completed cycle and no aborted-assignment record - this is a correction, not a termination.
-    /// </summary>
-    public RoomStatus? UpdateRoomAssignment(int roomNumber, string doctorId, string procedureCode, bool sedation = false, int? expectedAllocationUnits = null)
-    {
-        var doctor = _activeDoctors.FirstOrDefault(item => item.Id == doctorId);
-        var procedure = FindActiveProcedure(procedureCode);
-        if (doctor is null || procedure is null || !HasValidExpectedAllocation(procedure) || (sedation && !procedure.SedationEligible))
-        {
-            return null;
-        }
-
-        return SaveAssignmentDetails(roomNumber, CreateLegacyCompatibleAssignment(doctor, procedure, sedation, expectedAllocationUnits));
-    }
-
-    public RoomStatus? SeatRoom(int roomNumber, int demoElapsedMinutes = 0)
-    {
-        return SeatRoomWithAssignment(roomNumber, assignment: null, demoElapsedMinutes);
-    }
-
-    public RoomStatus? SeatRoom(int roomNumber, RoomAssignmentContract assignment, int demoElapsedMinutes = 0)
-    {
-        ArgumentNullException.ThrowIfNull(assignment);
-        return SeatRoomWithAssignment(roomNumber, assignment, demoElapsedMinutes);
-    }
-
-    public RoomStatus? SeatRoom(int roomNumber, string doctorId, string procedureCode, int demoElapsedMinutes = 0, bool sedation = false, int? expectedAllocationUnits = null)
-    {
-        var doctor = _activeDoctors.FirstOrDefault(item => item.Id == doctorId);
-        var procedure = FindActiveProcedure(procedureCode);
-        if (doctor is null || procedure is null || !HasValidExpectedAllocation(procedure) || (sedation && !procedure.SedationEligible))
-        {
-            return null;
-        }
-
-        return SeatRoomWithAssignment(
-            roomNumber,
-            CreateLegacyCompatibleAssignment(doctor, procedure, sedation, expectedAllocationUnits),
-            demoElapsedMinutes);
-    }
-
-    private RoomStatus? SeatRoomWithAssignment(int roomNumber, RoomAssignmentContract? assignment, int demoElapsedMinutes)
-    {
-        lock (_syncRoot)
-        {
-            if (!IsDemoElapsedMinutesAllowed(demoElapsedMinutes))
-            {
-                return null;
-            }
-
-            var room = _rooms.FirstOrDefault(item => item.RoomId == roomNumber);
-            if (room is null || !CanSeat(room) || room.PrestageStartedAt is null)
-            {
-                return null;
-            }
-
-            if (assignment is not null && !IsAssignmentValidForRoster(assignment))
-            {
-                return null;
-            }
-
-            var expectation = ActiveRoomWriteExpectation.FromRoom(room);
-            var now = Now;
-            var offset = TimeSpan.FromMinutes(demoElapsedMinutes);
-            var candidate = CopyRoomState(room);
-            if (demoElapsedMinutes != 0)
-            {
-                candidate.PrestageStartedAt = candidate.PrestageStartedAt!.Value - offset;
-            }
-
-            var persisted = assignment is null
-                ? GetCanonicalAssignment(candidate)
-                : PersistedRoomAssignment.FromCanonicalContract(
-                    assignment,
-                    ResolveDoctorDisplayName(assignment.DoctorId),
-                    ResolveProcedure(assignment.ProcedureCode)?.Label);
-            ApplyPersistedAssignment(candidate, persisted);
-            candidate.SeatedAt = now - offset;
-            candidate.State = RoomStates.Seated;
-            var committed = _repository.SaveCanonicalAssignment(candidate, persisted, expectation, _doctors, _procedures);
-            if (committed is null)
-            {
-                return null;
-            }
-            ApplyCommittedRoom(room, committed.Room);
-            AddEvent(new RoomEvent(room.RoomId, "Seated", now, room.AssignedDoctor, room.ProcedureCode));
-            return ToRoomStatus(room, now);
-        }
-    }
-
-    public RoomStatus? UpdateAssignment(int roomNumber, string doctorId, string procedureCode, bool sedation = false)
-    {
-        return UpdateRoomAssignment(roomNumber, doctorId, procedureCode, sedation);
     }
 
     public RoomStatus? CancelPrestage(int roomNumber, string? cancellationReason = null) =>
@@ -3719,10 +3618,6 @@ public sealed class DemoBoardStore
     }
 
     private static string NewEpisodeId() => Guid.NewGuid().ToString("N");
-
-    private bool IsDemoElapsedMinutesAllowed(int demoElapsedMinutes) =>
-        demoElapsedMinutes is >= 0 and <= 240
-        && (demoElapsedMinutes == 0 || _demoOffsetsAllowed);
 
     private static bool CanBeginPrestage(RoomState room) =>
         room.State == RoomStates.Available && room.PrestageStartedAt is null && room.SeatedAt is null;

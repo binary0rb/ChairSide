@@ -1,9 +1,6 @@
-using System.Text;
-
 using ChairSide.Board.Options;
 using ChairSide.Board.Services;
 
-using Microsoft.AspNetCore.Http;
 using Microsoft.Data.Sqlite;
 
 namespace ChairSide.Board.Tests;
@@ -284,63 +281,6 @@ public sealed class EnvironmentMaintenancePreflightTests
         Assert.False(File.Exists(databasePath + "-wal"));
         Assert.False(File.Exists(databasePath + "-shm"));
         Assert.False(File.Exists(diagnosticLogPath));
-    }
-
-    [Fact]
-    public async Task Training_fresh_store_starts_available_and_rejects_demo_elapsed_minutes()
-    {
-        using var workspace = TestWorkspace.Create();
-        var context = StoreContext.Create(
-            workspace,
-            environmentName: ChairSideEnvironmentNames.Training,
-            roomCount: 12);
-
-        var snapshot = context.Store.GetSnapshot();
-
-        Assert.False(snapshot.DemoTimerEnabled);
-        Assert.All(snapshot.Rooms, room =>
-        {
-            Assert.Equal(RoomStates.Available, room.State);
-            Assert.Null(room.AssignedDoctor);
-            Assert.Null(room.SeatedAt);
-        });
-        Assert.False(DeploymentEnvironmentPolicy.Resolve(ChairSideEnvironmentNames.Training).IsDevelopment);
-
-        Assert.NotNull(context.Store.BeginPrestage(1, "otte", "CON"));
-        var requestContext = new DefaultHttpContext();
-        var body = Encoding.UTF8.GetBytes(
-            """
-            {"doctorId":"otte","procedureCode":"CON","procedureId":"CON","sedation":false,"expectedAllocationUnits":1,"demoElapsedMinutes":1}
-            """);
-        requestContext.Request.Path = "/api/rooms/1/seat";
-        requestContext.Request.Body = new MemoryStream(body);
-        requestContext.Request.ContentLength = body.Length;
-        requestContext.Request.ContentType = "application/json";
-        var trainingEnvironment = new TestWebHostEnvironment(
-            workspace.ContentRoot,
-            ChairSideEnvironmentNames.Training);
-        var diagnosticLogger = new DiagnosticLogger(
-            Microsoft.Extensions.Options.Options.Create(new DiagnosticOptions
-            {
-                LogDirectory = Path.Combine(workspace.DataRoot, "logs")
-            }),
-            trainingEnvironment);
-        var rejection = await global::RoomLifecycleEndpointHandler.SeatAsync(
-            1,
-            requestContext,
-            new RoomDeviceTokenValidator(
-                new TestOptionsMonitor<RoomDeviceBindingOptions>(
-                    new RoomDeviceBindingOptions { Enabled = false })),
-            context.Store,
-            trainingEnvironment,
-            diagnosticLogger,
-            new NoopBoardHubContext());
-
-        Assert.Equal(400, Assert.IsAssignableFrom<IStatusCodeHttpResult>(rejection).StatusCode);
-        Assert.Equal(
-            "demoElapsedMinutes is only available in Development.",
-            Assert.IsType<string>(Assert.IsAssignableFrom<IValueHttpResult>(rejection).Value));
-        Assert.Equal(RoomStates.Prestaging, context.Store.GetRoom(1)!.State);
     }
 
     [Fact]

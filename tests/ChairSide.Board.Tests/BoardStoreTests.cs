@@ -29,7 +29,12 @@ public sealed class BoardStoreTests
         Assert.Equal(RoomStates.Seated, seated.State);
 
         var seatedAt = seated.SeatedAt;
-        var updated = context.Store.UpdateAssignment(1, "pledger", "EXT");
+        var correctedAssignment = RoomAssignmentContract.Create(
+            "pledger",
+            "EXT",
+            SedationContract.EligibleNo(),
+            ExpectedAllocationContract.ConfirmedSuggestedValue(3));
+        var updated = context.Store.SaveAssignmentDetails(1, correctedAssignment);
         Assert.NotNull(updated);
         Assert.Equal(seatedAt, updated.SeatedAt);
         Assert.Equal("pledger", updated.AssignedDoctor);
@@ -191,14 +196,14 @@ public sealed class BoardStoreTests
         var clock = new ManualTimeProvider(prestageAt);
         var context = StoreContext.Create(workspace, environmentName: Environments.Production, timeProvider: clock);
 
-        Assert.Null(context.Store.SeatRoom(1));
+        Assert.Null(context.Store.SeatRoomCanonical(1, null).Room);
         Assert.Equal(RoomStates.Available, context.Store.GetRoom(1)?.State);
 
         Assert.NotNull(context.Store.BeginPrestage(1, "otte", "EXT", sedation: true, expectedAllocationUnits: 5));
         var beforeSeat = context.Repository.LoadRooms(3).Single(room => room.RoomId == 1);
 
         clock.SetUtcNow(seatAt);
-        var seated = context.Store.SeatRoom(1);
+        var seated = context.Store.SeatRoomCanonical(1, null).Room;
 
         Assert.NotNull(seated);
         Assert.Equal(RoomStates.Seated, seated.State);
@@ -234,173 +239,6 @@ public sealed class BoardStoreTests
         Assert.False(string.IsNullOrWhiteSpace(room1Episode));
         Assert.False(string.IsNullOrWhiteSpace(room2Episode));
         Assert.NotEqual(room1Episode, room2Episode);
-    }
-
-    [Fact]
-    public void Development_demo_offset_shifts_prestage_and_seated_timestamps_together()
-    {
-        using var workspace = TestWorkspace.Create();
-        var prestageAt = new DateTimeOffset(2026, 7, 1, 13, 0, 0, TimeSpan.Zero);
-        var seatAt = prestageAt.AddMinutes(4);
-        var clock = new ManualTimeProvider(prestageAt);
-        var context = StoreContext.Create(workspace, environmentName: Environments.Development, timeProvider: clock);
-
-        Assert.NotNull(context.Store.BeginPrestage(1, "otte", "CON"));
-        clock.SetUtcNow(seatAt);
-
-        var seated = context.Store.SeatRoom(1, demoElapsedMinutes: 15);
-
-        Assert.NotNull(seated);
-        var stored = context.Repository.LoadRooms(3).Single(room => room.RoomId == 1);
-        Assert.Equal(prestageAt.AddMinutes(-15), stored.PrestageStartedAt);
-        Assert.Equal(seatAt.AddMinutes(-15), stored.SeatedAt);
-        Assert.Equal(TimeSpan.FromMinutes(4), stored.SeatedAt!.Value - stored.PrestageStartedAt!.Value);
-    }
-
-    [Fact]
-    public void Development_negative_demo_offset_is_rejected_without_mutating_room()
-    {
-        using var workspace = TestWorkspace.Create();
-        var databasePath = Path.Combine(workspace.DataRoot, "negative-demo-offset.db");
-        var prestageAt = new DateTimeOffset(2026, 7, 1, 13, 30, 0, TimeSpan.Zero);
-        var clock = new ManualTimeProvider(prestageAt);
-        var context = StoreContext.Create(
-            workspace,
-            environmentName: Environments.Development,
-            databasePath: databasePath,
-            timeProvider: clock);
-
-        Assert.NotNull(context.Store.BeginPrestage(1, "otte", "CON"));
-        var before = context.Repository.LoadRooms(3).Single(room => room.RoomId == 1);
-        clock.SetUtcNow(prestageAt.AddMinutes(3));
-
-        Assert.Null(context.Store.SeatRoom(1, demoElapsedMinutes: -1));
-
-        var after = context.Repository.LoadRooms(3).Single(room => room.RoomId == 1);
-        AssertSameRoomState(before, after);
-
-        var reloaded = StoreContext.Create(
-            workspace,
-            environmentName: Environments.Development,
-            databasePath: databasePath,
-            timeProvider: clock);
-        AssertSameRoomState(before, reloaded.Repository.LoadRooms(3).Single(room => room.RoomId == 1));
-    }
-
-    [Fact]
-    public void Development_demo_offset_above_maximum_is_rejected_without_mutating_room()
-    {
-        using var workspace = TestWorkspace.Create();
-        var databasePath = Path.Combine(workspace.DataRoot, "oversized-demo-offset.db");
-        var prestageAt = new DateTimeOffset(2026, 7, 1, 13, 45, 0, TimeSpan.Zero);
-        var clock = new ManualTimeProvider(prestageAt);
-        var context = StoreContext.Create(
-            workspace,
-            environmentName: Environments.Development,
-            databasePath: databasePath,
-            timeProvider: clock);
-
-        Assert.NotNull(context.Store.BeginPrestage(1, "otte", "CON"));
-        var before = context.Repository.LoadRooms(3).Single(room => room.RoomId == 1);
-        clock.SetUtcNow(prestageAt.AddMinutes(3));
-
-        Assert.Null(context.Store.SeatRoom(1, demoElapsedMinutes: 241));
-
-        var after = context.Repository.LoadRooms(3).Single(room => room.RoomId == 1);
-        AssertSameRoomState(before, after);
-
-        var reloaded = StoreContext.Create(
-            workspace,
-            environmentName: Environments.Development,
-            databasePath: databasePath,
-            timeProvider: clock);
-        AssertSameRoomState(before, reloaded.Repository.LoadRooms(3).Single(room => room.RoomId == 1));
-    }
-
-    [Fact]
-    public void Production_demo_offset_is_rejected_before_state_derivation_or_mutation()
-    {
-        using var workspace = TestWorkspace.Create();
-        var databasePath = workspace.ProductionDatabasePath();
-        var prestageAt = new DateTimeOffset(2026, 7, 1, 14, 0, 0, TimeSpan.Zero);
-        var seatAt = prestageAt.AddMinutes(3);
-        var clock = new ManualTimeProvider(prestageAt);
-        var context = StoreContext.Create(
-            workspace,
-            environmentName: Environments.Production,
-            databasePath: databasePath,
-            boardUiOptions: new BoardUiOptions { DemoTimerEnabled = true },
-            timeProvider: clock);
-
-        Assert.NotNull(context.Store.BeginPrestage(1, "otte", "CON"));
-        var persistedBefore = context.Repository.LoadRooms(3).Single(room => room.RoomId == 1);
-
-        var roomsField = typeof(DemoBoardStore).GetField(
-            "_rooms",
-            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-        var inMemoryRooms = Assert.IsType<List<RoomState>>(roomsField?.GetValue(context.Store));
-        var inMemoryRoom = inMemoryRooms.Single(room => room.RoomId == 1);
-        var sentinelAgingAt = prestageAt.AddMinutes(-2);
-        var sentinelStaleAt = prestageAt.AddMinutes(-1);
-        inMemoryRoom.State = RoomStates.Available;
-        inMemoryRoom.AgingStartedAt = sentinelAgingAt;
-        inMemoryRoom.StaleStartedAt = sentinelStaleAt;
-
-        clock.SetUtcNow(seatAt);
-
-        Assert.Null(context.Store.SeatRoom(1, demoElapsedMinutes: 15));
-        Assert.Equal(RoomStates.Available, inMemoryRoom.State);
-        Assert.Equal(sentinelAgingAt, inMemoryRoom.AgingStartedAt);
-        Assert.Equal(sentinelStaleAt, inMemoryRoom.StaleStartedAt);
-        Assert.Null(inMemoryRoom.SeatedAt);
-
-        var persistedAfter = context.Repository.LoadRooms(3).Single(room => room.RoomId == 1);
-        AssertSameRoomState(persistedBefore, persistedAfter);
-
-        var reloaded = StoreContext.Create(
-            workspace,
-            environmentName: Environments.Production,
-            databasePath: databasePath,
-            timeProvider: clock);
-        AssertSameRoomState(persistedBefore, reloaded.Repository.LoadRooms(3).Single(room => room.RoomId == 1));
-    }
-
-    [Fact]
-    public void Development_demo_offset_boundaries_zero_and_240_are_applied_without_clamping()
-    {
-        using var workspace = TestWorkspace.Create();
-        var prestageAt = new DateTimeOffset(2026, 7, 1, 14, 30, 0, TimeSpan.Zero);
-        var seatAt = prestageAt.AddMinutes(5);
-        var zeroClock = new ManualTimeProvider(prestageAt);
-        var maximumClock = new ManualTimeProvider(prestageAt);
-        var zeroContext = StoreContext.Create(
-            workspace,
-            environmentName: Environments.Development,
-            databasePath: Path.Combine(workspace.DataRoot, "zero-demo-offset.db"),
-            timeProvider: zeroClock);
-        var maximumContext = StoreContext.Create(
-            workspace,
-            environmentName: Environments.Development,
-            databasePath: Path.Combine(workspace.DataRoot, "maximum-demo-offset.db"),
-            timeProvider: maximumClock);
-
-        Assert.NotNull(zeroContext.Store.BeginPrestage(1, "otte", "CON"));
-        Assert.NotNull(maximumContext.Store.BeginPrestage(1, "pledger", "EXT"));
-        zeroClock.SetUtcNow(seatAt);
-        maximumClock.SetUtcNow(seatAt);
-
-        Assert.NotNull(zeroContext.Store.SeatRoom(1, demoElapsedMinutes: 0));
-        Assert.NotNull(maximumContext.Store.SeatRoom(1, demoElapsedMinutes: 240));
-
-        var zeroOffsetRoom = zeroContext.Repository.LoadRooms(3).Single(room => room.RoomId == 1);
-        var maximumOffsetRoom = maximumContext.Repository.LoadRooms(3).Single(room => room.RoomId == 1);
-        Assert.Equal(prestageAt, zeroOffsetRoom.PrestageStartedAt);
-        Assert.Equal(seatAt, zeroOffsetRoom.SeatedAt);
-        Assert.Equal(prestageAt.AddMinutes(-240), maximumOffsetRoom.PrestageStartedAt);
-        Assert.Equal(seatAt.AddMinutes(-240), maximumOffsetRoom.SeatedAt);
-        Assert.Equal(
-            zeroOffsetRoom.SeatedAt!.Value - zeroOffsetRoom.PrestageStartedAt!.Value,
-            maximumOffsetRoom.SeatedAt!.Value - maximumOffsetRoom.PrestageStartedAt!.Value);
     }
 
     [Fact]
@@ -468,7 +306,7 @@ public sealed class BoardStoreTests
         Assert.NotNull(context.Store.BeginPrestage(1, "otte", "CON"));
         var activeEpisode = context.Repository.LoadRooms(3).Single(room => room.RoomId == 1).EpisodeId;
         clock.SetUtcNow(prestageAt.AddMinutes(5));
-        Assert.NotNull(context.Store.SeatRoom(1));
+        Assert.NotNull(context.Store.SeatRoomCanonical(1, null).Room);
         clock.SetUtcNow(prestageAt.AddMinutes(8));
         Assert.NotNull(context.Store.MarkReadyForDoctor(1));
         clock.SetUtcNow(prestageAt.AddMinutes(12));
@@ -692,7 +530,7 @@ public sealed class BoardStoreTests
         Assert.NotNull(context.Store.BeginPrestage(1, "otte", "EXT", expectedAllocationUnits: 5));
         var episodeId = context.Repository.LoadRooms(3).Single(room => room.RoomId == 1).EpisodeId;
         clock.SetUtcNow(seatedAt);
-        Assert.NotNull(context.Store.SeatRoom(1));
+        Assert.NotNull(context.Store.SeatRoomCanonical(1, null).Room);
         clock.SetUtcNow(readyAt);
         Assert.NotNull(context.Store.MarkReadyForDoctor(1));
         clock.SetUtcNow(terminatedAt);
@@ -968,7 +806,7 @@ public sealed class BoardStoreTests
 
         Assert.NotNull(context.Store.BeginPrestage(1, "otte", "EXT", expectedAllocationUnits: 5));
         clock.SetUtcNow(seatedAt);
-        Assert.NotNull(context.Store.SeatRoom(1));
+        Assert.NotNull(context.Store.SeatRoomCanonical(1, null).Room);
         clock.SetUtcNow(readyAt);
         Assert.NotNull(context.Store.MarkReadyForDoctor(1));
         clock.SetUtcNow(arrivedAt);
@@ -1032,7 +870,7 @@ public sealed class BoardStoreTests
             timeProvider: clock);
 
         Assert.NotNull(first.Store.BeginPrestage(1, "otte", "CON"));
-        Assert.NotNull(first.Store.SeatRoom(1));
+        Assert.NotNull(first.Store.SeatRoomCanonical(1, null).Room);
         Assert.NotNull(first.Store.MarkReadyForDoctor(1));
         Assert.NotNull(first.Store.MarkDoctorArrived(1));
         Assert.NotNull(first.Store.MarkDoctorComplete(1));
@@ -1654,11 +1492,10 @@ public sealed class BoardStoreTests
         var snapshot = context.Store.GetSnapshot();
         Assert.DoesNotContain("SED", snapshot.Procedures.Select(procedure => procedure.Code));
 
-        // Standalone sedation is not seatable, by code or by id, for new seating or updates.
+        // Standalone sedation is not seatable, by code or by id.
         Assert.Null(SeatViaPrestage(context.Store, 1, "otte", "SED"));
         Assert.Null(SeatViaPrestage(context.Store, 1, "otte", "sedation"));
         Assert.NotNull(SeatViaPrestage(context.Store, 1, "otte", "EXT"));
-        Assert.Null(context.Store.UpdateAssignment(1, "otte", "SED"));
     }
 
     [Fact]
@@ -1749,24 +1586,42 @@ public sealed class BoardStoreTests
     }
 
     [Fact]
-    public void Sedation_modifier_can_be_added_and_removed_via_update_assignment()
+    public void Sedation_modifier_can_be_added_and_removed_via_save_details()
     {
         using var workspace = TestWorkspace.Create();
         var context = StoreContext.Create(workspace, environmentName: Environments.Production);
 
         Assert.NotNull(SeatViaPrestage(context.Store, 1, "otte", "IMP"));
 
-        var withSedation = context.Store.UpdateAssignment(1, "otte", "IMP", sedation: true);
+        var withSedation = context.Store.SaveAssignmentDetails(
+            1,
+            RoomAssignmentContract.Create(
+                "otte",
+                "IMP+SED",
+                SedationContract.EligibleYes(),
+                ExpectedAllocationContract.ConfirmedSuggestedValue(6)));
         Assert.NotNull(withSedation);
         Assert.Equal("IMP+SED", withSedation.ProcedureCode);
         Assert.Equal("Implant + Sedation", withSedation.Procedure?.Label);
 
-        var withoutSedation = context.Store.UpdateAssignment(1, "otte", "IMP");
+        var withoutSedation = context.Store.SaveAssignmentDetails(
+            1,
+            RoomAssignmentContract.Create(
+                "otte",
+                "IMP",
+                SedationContract.EligibleNo(),
+                ExpectedAllocationContract.ConfirmedSuggestedValue(6)));
         Assert.NotNull(withoutSedation);
         Assert.Equal("IMP", withoutSedation.ProcedureCode);
 
         // Switching to a non-eligible procedure cannot carry sedation forward.
-        Assert.Null(context.Store.UpdateAssignment(1, "otte", "POST", sedation: true));
+        Assert.Null(context.Store.SaveAssignmentDetails(
+            1,
+            RoomAssignmentContract.Create(
+                "otte",
+                "POST",
+                SedationContract.EligibleYes(),
+                ExpectedAllocationContract.ConfirmedSuggestedValue(1))));
     }
 
     [Fact]
@@ -3720,7 +3575,6 @@ public sealed class BoardStoreTests
             timeProvider: clock);
         context.Store.ResetAllDataForEmptyBeta();
         var logger = CreateDiagnosticLogger(Path.Combine(workspace.DataRoot, "logs"), workspace.ContentRoot);
-        var environment = new TestWebHostEnvironment(workspace.ContentRoot, Environments.Development);
 
         Assert.Equal(200, await ExecuteBindingResult(await global::RoomLifecycleEndpointHandler.BeginPrestageAsync(
             1,
@@ -3731,10 +3585,10 @@ public sealed class BoardStoreTests
         var episodeId = prestaged.EpisodeId;
         var prestageAt = prestaged.PrestageStartedAt;
 
-        // Canonical Seat contract: empty JSON object, demoElapsedMinutes omitted -> means 0.
+        // Canonical Seat contract: an empty object preserves the saved assignment.
         var response = await global::RoomLifecycleEndpointHandler.SeatAsync(
             1, NewJsonBodyContext(1, token: null, "{}"),
-            CreateBindingValidator(enabled: false), context.Store, environment, logger, new NoopBoardHubContext());
+            CreateBindingValidator(enabled: false), context.Store, logger, new NoopBoardHubContext());
 
         Assert.Equal(200, await ExecuteBindingResult(response));
         var seated = context.Repository.LoadRooms(3).Single(room => room.RoomId == 1);
@@ -3747,101 +3601,9 @@ public sealed class BoardStoreTests
 
         var bypass = await global::RoomLifecycleEndpointHandler.SeatAsync(
             2, NewJsonBodyContext(2, token: null, "{}"),
-            CreateBindingValidator(enabled: false), context.Store, environment, logger, new NoopBoardHubContext());
+            CreateBindingValidator(enabled: false), context.Store, logger, new NoopBoardHubContext());
         Assert.Equal(409, await ExecuteBindingResult(bypass));
         Assert.Equal(RoomStates.Available, context.Store.GetRoom(2)?.State);
-    }
-
-    [Fact]
-    public async Task Seat_room_endpoint_supports_development_simulation_and_rejects_invalid_values()
-    {
-        using var workspace = TestWorkspace.Create();
-        var now = new DateTimeOffset(2026, 7, 5, 10, 0, 0, TimeSpan.Zero);
-        var clock = new ManualTimeProvider(now);
-        var databasePath = Path.Combine(workspace.DataRoot, "development-seat-simulation.db");
-        var context = StoreContext.Create(
-            workspace,
-            environmentName: Environments.Development,
-            databasePath: databasePath,
-            timeProvider: clock);
-        context.Store.ResetAllDataForEmptyBeta();
-        var logger = CreateDiagnosticLogger(Path.Combine(workspace.DataRoot, "logs"), workspace.ContentRoot);
-        var development = new TestWebHostEnvironment(workspace.ContentRoot, Environments.Development);
-
-        Assert.NotNull(context.Store.BeginPrestage(1, "otte", "CON"));
-        var originalPrestageAt = context.Repository.LoadRooms(3).Single(room => room.RoomId == 1).PrestageStartedAt;
-        var positive = await global::RoomLifecycleEndpointHandler.SeatAsync(
-            1, NewJsonBodyContext(1, token: null, """{"demoElapsedMinutes":240}"""),
-            CreateBindingValidator(enabled: false), context.Store, development, logger, new NoopBoardHubContext());
-        Assert.Equal(200, await ExecuteBindingResult(positive));
-        var simulated = context.Repository.LoadRooms(3).Single(room => room.RoomId == 1);
-        Assert.Equal(now.AddMinutes(-240), simulated.SeatedAt);
-        Assert.Equal(originalPrestageAt!.Value.AddMinutes(-240), simulated.PrestageStartedAt);
-
-        Assert.NotNull(context.Store.BeginPrestage(2, "pledger", "CON"));
-        var negative = await global::RoomLifecycleEndpointHandler.SeatAsync(
-            2, NewJsonBodyContext(2, token: null, """{"demoElapsedMinutes":-1}"""),
-            CreateBindingValidator(enabled: false), context.Store, development, logger, new NoopBoardHubContext());
-        Assert.Equal(400, await ExecuteBindingResult(negative));
-        Assert.Equal(RoomStates.Prestaging, context.Store.GetRoom(2)?.State);
-
-        Assert.NotNull(context.Store.BeginPrestage(3, "gibson", "CON"));
-        var overMaximum = await global::RoomLifecycleEndpointHandler.SeatAsync(
-            3, NewJsonBodyContext(3, token: null, """{"demoElapsedMinutes":241}"""),
-            CreateBindingValidator(enabled: false), context.Store, development, logger, new NoopBoardHubContext());
-        Assert.Equal(400, await ExecuteBindingResult(overMaximum));
-        Assert.Equal(RoomStates.Prestaging, context.Store.GetRoom(3)?.State);
-
-        using var productionWorkspace = TestWorkspace.Create();
-        var production = StoreContext.Create(productionWorkspace, environmentName: Environments.Production, timeProvider: clock);
-        var productionLogger = CreateDiagnosticLogger(Path.Combine(productionWorkspace.DataRoot, "logs"), productionWorkspace.ContentRoot);
-        Assert.NotNull(production.Store.BeginPrestage(1, "otte", "CON"));
-        var productionOffset = await global::RoomLifecycleEndpointHandler.SeatAsync(
-            1, NewJsonBodyContext(1, token: null, """{"demoElapsedMinutes":1}"""),
-            CreateBindingValidator(enabled: false), production.Store,
-            new TestWebHostEnvironment(productionWorkspace.ContentRoot, Environments.Production), productionLogger,
-            new NoopBoardHubContext());
-        Assert.Equal(400, await ExecuteBindingResult(productionOffset));
-        Assert.Equal(RoomStates.Prestaging, production.Store.GetRoom(1)?.State);
-    }
-
-    [Fact]
-    public async Task Assignment_bearing_seat_compatibility_request_starts_and_seats_without_overwriting_prestaging()
-    {
-        using var workspace = TestWorkspace.Create();
-        var context = StoreContext.Create(workspace, environmentName: Environments.Production);
-        var logger = CreateDiagnosticLogger(Path.Combine(workspace.DataRoot, "logs"), workspace.ContentRoot);
-        var environment = new TestWebHostEnvironment(workspace.ContentRoot, Environments.Development);
-
-        // Exact checked-in room-panel payload shape (board.js sendSeatRoom): doctorId, procedureCode,
-        // procedureId, sedation, expectedAllocationUnits, demoElapsedMinutes all present.
-        var compatibilityBody = """
-            {"doctorId":"otte","procedureCode":"EXT","procedureId":"EXT","sedation":true,"expectedAllocationUnits":5,"demoElapsedMinutes":0}
-            """;
-        var compatibility = await global::RoomLifecycleEndpointHandler.SeatAsync(
-            1, NewJsonBodyContext(1, token: null, compatibilityBody),
-            CreateBindingValidator(enabled: false), context.Store, environment, logger, new NoopBoardHubContext());
-        Assert.Equal(200, await ExecuteBindingResult(compatibility));
-        var seated = context.Store.GetRoom(1)!;
-        Assert.Equal(RoomStates.Seated, seated.State);
-        Assert.Equal("otte", seated.AssignedDoctor);
-        Assert.Equal("EXT+SED", seated.ProcedureCode);
-        Assert.Equal(5, seated.ExpectedAllocationUnits);
-
-        // A compatibility request while the room is already Prestaging must be rejected without
-        // overwriting the existing prestaged snapshot (Begin Prestage's own state guard, not a new
-        // atomic store method).
-        Assert.NotNull(context.Store.BeginPrestage(2, "pledger", "CON"));
-        var before = context.Repository.LoadRooms(3).Single(room => room.RoomId == 2);
-        var conflicting = await global::RoomLifecycleEndpointHandler.SeatAsync(
-            2, NewJsonBodyContext(2, token: null, """{"doctorId":"otte","procedureCode":"EXT"}"""),
-            CreateBindingValidator(enabled: false), context.Store, environment, logger, new NoopBoardHubContext());
-        Assert.Equal(400, await ExecuteBindingResult(conflicting));
-        var after = context.Repository.LoadRooms(3).Single(room => room.RoomId == 2);
-        Assert.Equal(RoomStates.Prestaging, after.State);
-        Assert.Equal(before.EpisodeId, after.EpisodeId);
-        Assert.Equal("pledger", after.AssignedDoctor);
-        Assert.Equal("CON", after.ProcedureCode);
     }
 
     [Fact]
@@ -3850,7 +3612,6 @@ public sealed class BoardStoreTests
         using var workspace = TestWorkspace.Create();
         var context = StoreContext.Create(workspace, environmentName: Environments.Production);
         var logger = CreateDiagnosticLogger(Path.Combine(workspace.DataRoot, "logs"), workspace.ContentRoot);
-        var environment = new TestWebHostEnvironment(workspace.ContentRoot, Environments.Production);
         var validator = CreateBindingValidator(enabled: false);
 
         // Begin Prestage: conflicting aliases are rejected before any mutation.
@@ -3882,21 +3643,6 @@ public sealed class BoardStoreTests
             NewRoomMutationHttpContext(1, token: null), validator, context.Store, logger, new NoopBoardHubContext());
         Assert.Equal(200, await ExecuteBindingResult(matchingBegin));
         Assert.Equal("EXT", context.Store.GetRoom(1)?.ProcedureCode);
-
-        // Compatibility Seat: conflicting aliases are rejected before any mutation.
-        var conflictingSeat = await global::RoomLifecycleEndpointHandler.SeatAsync(
-            2, NewJsonBodyContext(2, token: null, """{"doctorId":"pledger","procedureCode":"EXT","procedureId":"CON"}"""),
-            validator, context.Store, environment, logger, new NoopBoardHubContext());
-        Assert.Equal(400, await ExecuteBindingResult(conflictingSeat));
-        Assert.Equal(RoomStates.Available, context.Store.GetRoom(2)?.State);
-
-        // Compatibility Seat: matching aliases are accepted and seat through Begin Prestage -> Seat Room.
-        var matchingSeat = await global::RoomLifecycleEndpointHandler.SeatAsync(
-            2, NewJsonBodyContext(2, token: null, """{"doctorId":"pledger","procedureCode":"EXT","procedureId":"ext"}"""),
-            validator, context.Store, environment, logger, new NoopBoardHubContext());
-        Assert.Equal(200, await ExecuteBindingResult(matchingSeat));
-        Assert.Equal(RoomStates.Seated, context.Store.GetRoom(2)?.State);
-        Assert.Equal("EXT", context.Store.GetRoom(2)?.ProcedureCode);
     }
 
     [Fact]
@@ -3908,7 +3654,6 @@ public sealed class BoardStoreTests
         using var workspace = TestWorkspace.Create();
         var context = StoreContext.Create(workspace, environmentName: Environments.Production);
         var logger = CreateDiagnosticLogger(Path.Combine(workspace.DataRoot, "logs"), workspace.ContentRoot);
-        var environment = new TestWebHostEnvironment(workspace.ContentRoot, Environments.Production);
         var validator = CreateBindingValidator(enabled: false);
 
         // Begin Prestage: procedureCode blank, procedureId valid -> rejected, no mutation.
@@ -3931,42 +3676,20 @@ public sealed class BoardStoreTests
             NewRoomMutationHttpContext(1, token: null), validator, context.Store, logger, new NoopBoardHubContext());
         Assert.Equal(400, await ExecuteBindingResult(bothBlankBegin));
         Assert.Equal(RoomStates.Available, context.Store.GetRoom(1)?.State);
-
-        // Compatibility Seat: procedureCode blank, procedureId valid -> rejected, no mutation.
-        var codeBlankSeat = await global::RoomLifecycleEndpointHandler.SeatAsync(
-            2, NewJsonBodyContext(2, token: null, """{"doctorId":"pledger","procedureCode":"","procedureId":"EXT"}"""),
-            validator, context.Store, environment, logger, new NoopBoardHubContext());
-        Assert.Equal(400, await ExecuteBindingResult(codeBlankSeat));
-        Assert.Equal(RoomStates.Available, context.Store.GetRoom(2)?.State);
-
-        // Compatibility Seat: procedureCode valid, procedureId blank -> rejected, no mutation.
-        var idBlankSeat = await global::RoomLifecycleEndpointHandler.SeatAsync(
-            2, NewJsonBodyContext(2, token: null, """{"doctorId":"pledger","procedureCode":"EXT","procedureId":" "}"""),
-            validator, context.Store, environment, logger, new NoopBoardHubContext());
-        Assert.Equal(400, await ExecuteBindingResult(idBlankSeat));
-        Assert.Equal(RoomStates.Available, context.Store.GetRoom(2)?.State);
-
-        // Compatibility Seat: both blank -> rejected, no mutation.
-        var bothBlankSeat = await global::RoomLifecycleEndpointHandler.SeatAsync(
-            2, NewJsonBodyContext(2, token: null, """{"doctorId":"pledger","procedureCode":"","procedureId":"  "}"""),
-            validator, context.Store, environment, logger, new NoopBoardHubContext());
-        Assert.Equal(400, await ExecuteBindingResult(bothBlankSeat));
-        Assert.Equal(RoomStates.Available, context.Store.GetRoom(2)?.State);
     }
 
     [Fact]
-    public async Task Seat_endpoint_treats_no_body_empty_body_and_empty_object_as_canonical_zero_minutes()
+    public async Task Seat_endpoint_treats_no_body_empty_body_and_empty_object_as_canonical_empty_actions()
     {
         using var workspace = TestWorkspace.Create();
         var context = StoreContext.Create(workspace, environmentName: Environments.Production);
         var logger = CreateDiagnosticLogger(Path.Combine(workspace.DataRoot, "logs"), workspace.ContentRoot);
-        var environment = new TestWebHostEnvironment(workspace.ContentRoot, Environments.Production);
         var validator = CreateBindingValidator(enabled: false);
 
         // No body at all (matches the current reasonless-style caller expectations for optional bodies).
         Assert.NotNull(context.Store.BeginPrestage(1, "otte", "CON"));
         var noBody = await global::RoomLifecycleEndpointHandler.SeatAsync(
-            1, NewRoomMutationHttpContext(1, token: null), validator, context.Store, environment, logger, new NoopBoardHubContext());
+            1, NewRoomMutationHttpContext(1, token: null), validator, context.Store, logger, new NoopBoardHubContext());
         Assert.Equal(200, await ExecuteBindingResult(noBody));
         Assert.Equal(RoomStates.Seated, context.Store.GetRoom(1)?.State);
         Assert.NotNull(context.Store.CancelSeating(1));
@@ -3974,7 +3697,7 @@ public sealed class BoardStoreTests
         // Empty body (zero bytes).
         Assert.NotNull(context.Store.BeginPrestage(1, "otte", "CON"));
         var emptyBody = await global::RoomLifecycleEndpointHandler.SeatAsync(
-            1, NewJsonBodyContext(1, token: null, ""), validator, context.Store, environment, logger, new NoopBoardHubContext());
+            1, NewJsonBodyContext(1, token: null, ""), validator, context.Store, logger, new NoopBoardHubContext());
         Assert.Equal(200, await ExecuteBindingResult(emptyBody));
         Assert.Equal(RoomStates.Seated, context.Store.GetRoom(1)?.State);
         Assert.NotNull(context.Store.CancelSeating(1));
@@ -3982,13 +3705,13 @@ public sealed class BoardStoreTests
         // Empty JSON object.
         Assert.NotNull(context.Store.BeginPrestage(1, "otte", "CON"));
         var emptyObject = await global::RoomLifecycleEndpointHandler.SeatAsync(
-            1, NewJsonBodyContext(1, token: null, "{}"), validator, context.Store, environment, logger, new NoopBoardHubContext());
+            1, NewJsonBodyContext(1, token: null, "{}"), validator, context.Store, logger, new NoopBoardHubContext());
         Assert.Equal(200, await ExecuteBindingResult(emptyObject));
         Assert.Equal(RoomStates.Seated, context.Store.GetRoom(1)?.State);
     }
 
     [Fact]
-    public async Task Seat_endpoint_parses_canonical_body_and_rejects_unknown_malformed_or_wrong_content_type()
+    public async Task Seat_endpoint_accepts_canonical_null_assignment_and_rejects_flat_malformed_or_wrong_content_type()
     {
         using var workspace = TestWorkspace.Create();
         var now = new DateTimeOffset(2026, 7, 6, 9, 0, 0, TimeSpan.Zero);
@@ -3998,81 +3721,54 @@ public sealed class BoardStoreTests
             workspace, environmentName: Environments.Development, databasePath: databasePath, timeProvider: clock);
         context.Store.ResetAllDataForEmptyBeta();
         var logger = CreateDiagnosticLogger(Path.Combine(workspace.DataRoot, "logs"), workspace.ContentRoot);
-        var environment = new TestWebHostEnvironment(workspace.ContentRoot, Environments.Development);
         var validator = CreateBindingValidator(enabled: false);
 
-        // Canonical demoElapsedMinutes body: accepted, bare Seat Room transition.
+        // A canonical null assignment preserves the durably saved draft.
         Assert.NotNull(context.Store.BeginPrestage(1, "otte", "CON"));
         var canonical = await global::RoomLifecycleEndpointHandler.SeatAsync(
-            1, NewJsonBodyContext(1, token: null, """{"demoElapsedMinutes":15}"""),
-            validator, context.Store, environment, logger, new NoopBoardHubContext());
+            1, NewJsonBodyContext(1, token: null, """{"assignment":null}"""),
+            validator, context.Store, logger, new NoopBoardHubContext());
         Assert.Equal(200, await ExecuteBindingResult(canonical));
-        Assert.Equal(now.AddMinutes(-15), context.Store.GetRoom(1)?.SeatedAt);
+        Assert.Equal(now, context.Store.GetRoom(1)?.SeatedAt);
 
-        // Unknown property: rejected, no mutation.
+        // The former flat simulation property is now unknown and rejected without mutation.
         Assert.NotNull(context.Store.BeginPrestage(2, "pledger", "CON"));
         var unknownProperty = await global::RoomLifecycleEndpointHandler.SeatAsync(
-            2, NewJsonBodyContext(2, token: null, """{"demoElapsedMinutes":0,"unexpectedField":true}"""),
-            validator, context.Store, environment, logger, new NoopBoardHubContext());
+            2, NewJsonBodyContext(2, token: null, """{"demoElapsedMinutes":0}"""),
+            validator, context.Store, logger, new NoopBoardHubContext());
         Assert.Equal(400, await ExecuteBindingResult(unknownProperty));
         Assert.Equal(RoomStates.Prestaging, context.Store.GetRoom(2)?.State);
 
-        // Incomplete compatibility payload (sedation present, doctor/procedure absent): rejected via
-        // the existing missing-doctor/procedure validation, no mutation.
-        var incomplete = await global::RoomLifecycleEndpointHandler.SeatAsync(
+        // Any former flat assignment property is rejected by the canonical parser.
+        var flatAssignment = await global::RoomLifecycleEndpointHandler.SeatAsync(
             2, NewJsonBodyContext(2, token: null, """{"sedation":true}"""),
-            validator, context.Store, environment, logger, new NoopBoardHubContext());
-        Assert.Equal(400, await ExecuteBindingResult(incomplete));
+            validator, context.Store, logger, new NoopBoardHubContext());
+        Assert.Equal(400, await ExecuteBindingResult(flatAssignment));
         Assert.Equal(RoomStates.Prestaging, context.Store.GetRoom(2)?.State);
 
         // Malformed JSON: rejected, no mutation.
         var malformed = await global::RoomLifecycleEndpointHandler.SeatAsync(
             2, NewJsonBodyContext(2, token: null, "{not-json"),
-            validator, context.Store, environment, logger, new NoopBoardHubContext());
+            validator, context.Store, logger, new NoopBoardHubContext());
         Assert.Equal(400, await ExecuteBindingResult(malformed));
         Assert.Equal(RoomStates.Prestaging, context.Store.GetRoom(2)?.State);
 
         // Unsupported content type on a non-empty body: rejected, no mutation.
         var wrongContentType = await global::RoomLifecycleEndpointHandler.SeatAsync(
-            2, NewJsonBodyContext(2, token: null, """{"demoElapsedMinutes":0}""", contentType: "text/plain"),
-            validator, context.Store, environment, logger, new NoopBoardHubContext());
+            2, NewJsonBodyContext(2, token: null, """{"assignment":null}""", contentType: "text/plain"),
+            validator, context.Store, logger, new NoopBoardHubContext());
         Assert.Equal(400, await ExecuteBindingResult(wrongContentType));
         Assert.Equal(RoomStates.Prestaging, context.Store.GetRoom(2)?.State);
     }
 
     [Fact]
-    public async Task Compatibility_seat_rejects_positive_demo_elapsed_minutes_outside_development_before_begin_prestage()
+    public async Task Seat_endpoint_rejects_every_flat_compatibility_property_without_mutation()
     {
+        // Each former flat property is now outside the canonical Seat contract. The room is left
+        // Prestaging so an accidental fallback to a bare Seat transition would be observable.
         using var workspace = TestWorkspace.Create();
         var context = StoreContext.Create(workspace, environmentName: Environments.Production);
         var logger = CreateDiagnosticLogger(Path.Combine(workspace.DataRoot, "logs"), workspace.ContentRoot);
-        var productionEnvironment = new TestWebHostEnvironment(workspace.ContentRoot, Environments.Production);
-        var validator = CreateBindingValidator(enabled: false);
-
-        var body = """{"doctorId":"otte","procedureCode":"CON","demoElapsedMinutes":30}""";
-        var response = await global::RoomLifecycleEndpointHandler.SeatAsync(
-            1, NewJsonBodyContext(1, token: null, body), validator, context.Store, productionEnvironment, logger, new NoopBoardHubContext());
-
-        Assert.Equal(400, await ExecuteBindingResult(response));
-        // No Begin Prestage mutation occurred: room stays Available and no aborted-assignment record exists.
-        Assert.Equal(RoomStates.Available, context.Store.GetRoom(1)?.State);
-        Assert.Empty(context.Repository.LoadAbortedAssignments());
-    }
-
-    [Fact]
-    public async Task Seat_endpoint_classifies_compatibility_by_property_presence_not_value()
-    {
-        // Each of these bodies supplies one of the five assignment-bearing property NAMES with a
-        // null/false value. Presence alone must classify them as compatibility input - never as a
-        // canonical bare Seat request - so each is rejected as an incomplete compatibility payload
-        // (missing doctor/procedure) and never reaches store.SeatRoom. The room is left Prestaging
-        // beforehand specifically so a misclassification-as-canonical would be observable: if these
-        // were (wrongly) treated as canonical, the bare Seat transition would succeed against the
-        // room's EXISTING prestaged snapshot, silently ignoring what the caller sent.
-        using var workspace = TestWorkspace.Create();
-        var context = StoreContext.Create(workspace, environmentName: Environments.Production);
-        var logger = CreateDiagnosticLogger(Path.Combine(workspace.DataRoot, "logs"), workspace.ContentRoot);
-        var environment = new TestWebHostEnvironment(workspace.ContentRoot, Environments.Production);
         var validator = CreateBindingValidator(enabled: false);
 
         string[] bodies =
@@ -4082,7 +3778,8 @@ public sealed class BoardStoreTests
             """{"doctorId":null}""",
             """{"procedureCode":null}""",
             """{"procedureId":null}""",
-            """{"demoElapsedMinutes":0,"sedation":false}"""
+            """{"demoElapsedMinutes":0}""",
+            """{"doctorId":"otte","procedureCode":"CON","sedation":false,"expectedAllocationUnits":1}"""
         ];
 
         foreach (var body in bodies)
@@ -4091,10 +3788,8 @@ public sealed class BoardStoreTests
             var before = context.Repository.LoadRooms(3).Single(room => room.RoomId == 1);
 
             var response = await global::RoomLifecycleEndpointHandler.SeatAsync(
-                1, NewJsonBodyContext(1, token: null, body), validator, context.Store, environment, logger, new NoopBoardHubContext());
+                1, NewJsonBodyContext(1, token: null, body), validator, context.Store, logger, new NoopBoardHubContext());
 
-            // Rejected as an incomplete compatibility request (missing doctor/procedure), not silently
-            // accepted as canonical.
             Assert.Equal(400, await ExecuteBindingResult(response));
 
             // The existing prestaged snapshot is completely untouched - never silently seated.
@@ -4164,7 +3859,7 @@ public sealed class BoardStoreTests
         Assert.Equal(RoomStates.Prestaging, context.Store.GetRoom(3)?.State);
 
         // Existing lifecycle guard: wrong state remains a 400 even with a strictly-parsed empty body.
-        Assert.NotNull(context.Store.SeatRoom(3));
+        Assert.NotNull(context.Store.SeatRoomCanonical(3, null).Room);
         var wrongState = await global::RoomLifecycleEndpointHandler.CancelPrestageAsync(
             3, NewRoomMutationHttpContext(3, token: null), validator, context.Store, logger, new NoopBoardHubContext());
         Assert.Equal(400, await ExecuteBindingResult(wrongState));
@@ -4239,7 +3934,6 @@ public sealed class BoardStoreTests
         using var workspace = TestWorkspace.Create();
         var context = StoreContext.Create(workspace, environmentName: Environments.Production);
         var logger = CreateDiagnosticLogger(Path.Combine(workspace.DataRoot, "logs"), workspace.ContentRoot);
-        var environment = new TestWebHostEnvironment(workspace.ContentRoot, Environments.Production);
         var enabledValidator = CreateBindingValidator(enabled: true);
 
         async Task<int?> InvokeBegin(int room, DefaultHttpContext httpContext) =>
@@ -4249,7 +3943,7 @@ public sealed class BoardStoreTests
 
         async Task<int?> InvokeSeat(int room, DefaultHttpContext httpContext) =>
             await ExecuteBindingResult(await global::RoomLifecycleEndpointHandler.SeatAsync(
-                room, httpContext, enabledValidator, context.Store, environment, logger, new NoopBoardHubContext()));
+                room, httpContext, enabledValidator, context.Store, logger, new NoopBoardHubContext()));
 
         async Task<int?> InvokeCancelPrestage(int room, DefaultHttpContext httpContext) =>
             await ExecuteBindingResult(await global::RoomLifecycleEndpointHandler.CancelPrestageAsync(
@@ -4259,13 +3953,8 @@ public sealed class BoardStoreTests
             await ExecuteBindingResult(await global::RoomLifecycleEndpointHandler.CancelSeatingAsync(
                 room, httpContext, enabledValidator, context.Store, logger, new NoopBoardHubContext()));
 
-        async Task<int?> InvokeUpdateRoomAssignment(int room, DefaultHttpContext httpContext) =>
-            await ExecuteBindingResult(await global::RoomLifecycleEndpointHandler.UpdateRoomAssignmentAsync(
-                room, new BeginPrestageRequest(DoctorId: "pledger", ProcedureCode: "EXT"),
-                httpContext, enabledValidator, context.Store, logger, new NoopBoardHubContext()));
-
         // Table-driven: the same missing-token / invalid-token / cross-room-token cases run for all
-        // five routes. None of these should ever mutate a room, so rooms 1 and 2 are safely reused
+        // four routes. None of these should ever mutate a room, so rooms 1 and 2 are safely reused
         // across every route in the table (CreateBindingValidator configures room 1 -> "room-1-token",
         // room 2 -> "room-2-token").
         var routes = new (string Name, Func<int, DefaultHttpContext, Task<int?>> Invoke)[]
@@ -4273,8 +3962,7 @@ public sealed class BoardStoreTests
             ("begin-prestage", InvokeBegin),
             ("seat", InvokeSeat),
             ("cancel-prestage", InvokeCancelPrestage),
-            ("cancel-seating", InvokeCancelSeating),
-            ("update-room-assignment", InvokeUpdateRoomAssignment)
+            ("cancel-seating", InvokeCancelSeating)
         };
 
         foreach (var route in routes)
@@ -4302,7 +3990,6 @@ public sealed class BoardStoreTests
         using var workspace = TestWorkspace.Create();
         var context = StoreContext.Create(workspace, environmentName: Environments.Production);
         var logger = CreateDiagnosticLogger(Path.Combine(workspace.DataRoot, "logs"), workspace.ContentRoot);
-        var environment = new TestWebHostEnvironment(workspace.ContentRoot, Environments.Production);
         var validator = CreateBindingValidator(enabled: false);
         const int unconfiguredRoom = 999;
 
@@ -4313,7 +4000,7 @@ public sealed class BoardStoreTests
 
         var seat = await global::RoomLifecycleEndpointHandler.SeatAsync(
             unconfiguredRoom, NewRoomMutationHttpContext(unconfiguredRoom, token: null), validator,
-            context.Store, environment, logger, new NoopBoardHubContext());
+            context.Store, logger, new NoopBoardHubContext());
         Assert.Equal(404, await ExecuteBindingResult(seat));
 
         var cancelPrestage = await global::RoomLifecycleEndpointHandler.CancelPrestageAsync(
@@ -4326,14 +4013,10 @@ public sealed class BoardStoreTests
             context.Store, logger, new NoopBoardHubContext());
         Assert.Equal(404, await ExecuteBindingResult(cancelSeating));
 
-        var updateRoomAssignment = await global::RoomLifecycleEndpointHandler.UpdateRoomAssignmentAsync(
-            unconfiguredRoom, new BeginPrestageRequest(DoctorId: "otte", ProcedureCode: "CON"),
-            NewRoomMutationHttpContext(unconfiguredRoom, token: null), validator, context.Store, logger, new NoopBoardHubContext());
-        Assert.Equal(404, await ExecuteBindingResult(updateRoomAssignment));
     }
 
     [Fact]
-    public async Task Begin_prestage_and_compatibility_seat_endpoints_return_400_for_invalid_procedure_allocation()
+    public async Task Begin_prestage_endpoint_returns_400_for_invalid_procedure_allocation()
     {
         using var workspace = TestWorkspace.Create();
         var procedureRosterOptions = new ProcedureRosterOptions
@@ -4353,7 +4036,6 @@ public sealed class BoardStoreTests
         };
         var context = StoreContext.Create(workspace, environmentName: Environments.Production, procedureRosterOptions: procedureRosterOptions);
         var logger = CreateDiagnosticLogger(Path.Combine(workspace.DataRoot, "logs"), workspace.ContentRoot);
-        var environment = new TestWebHostEnvironment(workspace.ContentRoot, Environments.Production);
         var validator = CreateBindingValidator(enabled: false);
 
         var begin = await global::RoomLifecycleEndpointHandler.BeginPrestageAsync(
@@ -4361,449 +4043,6 @@ public sealed class BoardStoreTests
             NewRoomMutationHttpContext(1, token: null), validator, context.Store, logger, new NoopBoardHubContext());
         Assert.Equal(400, await ExecuteBindingResult(begin));
         Assert.Equal(RoomStates.Available, context.Store.GetRoom(1)?.State);
-
-        var seat = await global::RoomLifecycleEndpointHandler.SeatAsync(
-            2, NewJsonBodyContext(2, token: null, """{"doctorId":"otte","procedureCode":"BAD"}"""),
-            validator, context.Store, environment, logger, new NoopBoardHubContext());
-        Assert.Equal(400, await ExecuteBindingResult(seat));
-        Assert.Equal(RoomStates.Available, context.Store.GetRoom(2)?.State);
-    }
-
-    // -------------------------------------------------------------------------
-    // Draft Update Room Assignment (store)
-    //
-    // Prestaging and Seated assignments remain provisional and correctable. Ready is the immutable
-    // handoff boundary, including Aging/Stale urgency projections. Accepted changes preserve the
-    // same episode and every existing phase timestamp.
-    // -------------------------------------------------------------------------
-
-    [Theory]
-    [InlineData(RoomStates.Prestaging)]
-    [InlineData(RoomStates.Seated)]
-    [InlineData(RoomStates.ReadyForDoctor)]
-    [InlineData(RoomStates.Aging)]
-    [InlineData(RoomStates.Stale)]
-    public void Update_room_assignment_allows_draft_states_but_rejects_ready_lock_without_mutation(string effectiveState)
-    {
-        using var workspace = TestWorkspace.Create();
-        var now = new DateTimeOffset(2026, 8, 1, 9, 0, 0, TimeSpan.Zero);
-        var clock = new ManualTimeProvider(now);
-        var context = StoreContext.Create(
-            workspace, environmentName: Environments.Production, agingMinutes: 7, staleMinutes: 12, timeProvider: clock);
-
-        Assert.NotNull(context.Store.BeginPrestage(1, "otte", "CON", expectedAllocationUnits: 1));
-        if (effectiveState != RoomStates.Prestaging)
-        {
-            Assert.NotNull(context.Store.SeatRoom(1));
-            if (effectiveState != RoomStates.Seated)
-            {
-                Assert.NotNull(context.Store.MarkReadyForDoctor(1));
-                if (effectiveState == RoomStates.Aging)
-                {
-                    clock.SetUtcNow(now.AddMinutes(8)); // past aging (7), before stale (12)
-                }
-                else if (effectiveState == RoomStates.Stale)
-                {
-                    clock.SetUtcNow(now.AddMinutes(13)); // past stale (12)
-                }
-            }
-        }
-
-        // Ready is the primary state; Aging/Stale are derived urgency only.
-        Assert.Equal(
-            effectiveState is RoomStates.Aging or RoomStates.Stale ? RoomStates.ReadyForDoctor : effectiveState,
-            context.Store.GetRoom(1)?.State);
-        var before = context.Repository.LoadRooms(3).Single(room => room.RoomId == 1);
-
-        var updated = context.Store.UpdateRoomAssignment(1, "pledger", "EXT", sedation: true, expectedAllocationUnits: 5);
-
-        var after = context.Repository.LoadRooms(3).Single(room => room.RoomId == 1);
-
-        // Preserved: episode identity and every existing phase timestamp.
-        Assert.Equal(before.EpisodeId, after.EpisodeId);
-        Assert.Equal(before.PrestageStartedAt, after.PrestageStartedAt);
-        Assert.Equal(before.SeatedAt, after.SeatedAt);
-        Assert.Equal(before.ReadyForDoctorAt, after.ReadyForDoctorAt);
-        Assert.Null(after.DoctorArrivedAt);
-        Assert.Null(after.DoctorCompleteAt);
-        Assert.Null(after.RoomAvailableAt);
-
-        if (effectiveState is RoomStates.Prestaging or RoomStates.Seated)
-        {
-            Assert.NotNull(updated);
-            Assert.Equal("pledger", after.AssignedDoctor);
-            Assert.Equal("Dr. Pledger", after.AssignedDoctorDisplayName);
-            Assert.Equal("EXT+SED", after.ProcedureCode);
-            Assert.Equal("Extraction + Sedation", after.ProcedureCategory);
-            Assert.Equal(3, after.OriginalDefaultExpectedUnits);
-            Assert.Equal(5, after.ExpectedAllocationUnits);
-            Assert.Equal(50, after.ExpectedAllocationMinutes);
-            Assert.True(after.AllocationAdjustedFromDefault);
-        }
-        else
-        {
-            Assert.Null(updated);
-            Assert.Equal(before.AssignedDoctor, after.AssignedDoctor);
-            Assert.Equal(before.ProcedureCode, after.ProcedureCode);
-        }
-    }
-
-    [Theory]
-    [InlineData(RoomStates.Available)]
-    [InlineData(RoomStates.DoctorInRoom)]
-    [InlineData(RoomStates.Turnover)]
-    public void Update_room_assignment_rejects_disallowed_states_without_mutation(string disallowedState)
-    {
-        using var workspace = TestWorkspace.Create();
-        var context = StoreContext.Create(workspace, environmentName: Environments.Production);
-
-        if (disallowedState != RoomStates.Available)
-        {
-            Assert.NotNull(SeatViaPrestage(context.Store, 1, "otte", "CON"));
-            Assert.NotNull(context.Store.MarkReadyForDoctor(1));
-            Assert.NotNull(context.Store.MarkDoctorArrived(1));
-            if (disallowedState == RoomStates.Turnover)
-            {
-                Assert.NotNull(context.Store.MarkDoctorComplete(1));
-            }
-        }
-
-        Assert.Equal(disallowedState, context.Store.GetRoom(1)?.State);
-        var before = context.Repository.LoadRooms(3).Single(room => room.RoomId == 1);
-
-        var result = context.Store.UpdateRoomAssignment(1, "pledger", "EXT");
-
-        Assert.Null(result);
-        var after = context.Repository.LoadRooms(3).Single(room => room.RoomId == 1);
-        Assert.Equal(before.AssignedDoctor, after.AssignedDoctor);
-        Assert.Equal(before.ProcedureCode, after.ProcedureCode);
-        Assert.Equal(before.State, after.State);
-    }
-
-    [Fact]
-    public void Update_room_assignment_rejects_when_doctor_arrived_at_is_set_even_if_state_is_otherwise_allowed()
-    {
-        using var workspace = TestWorkspace.Create();
-        var databasePath = workspace.ProductionDatabasePath();
-        var now = new DateTimeOffset(2026, 8, 2, 9, 0, 0, TimeSpan.Zero);
-        var seed = StoreContext.Create(workspace, environmentName: Environments.Production, databasePath: databasePath);
-
-        // Directly persist a malformed row: State is one of the otherwise-allowed values (Seated),
-        // but DoctorArrivedAt is set - a combination the store's own transitions never produce. This
-        // proves the independent DoctorArrivedAt guard, not just the State allow-list.
-        var malformed = new RoomState(1)
-        {
-            AssignedDoctor = "otte",
-            AssignedDoctorDisplayName = "Dr. Otte",
-            ProcedureCode = "CON",
-            ProcedureCategory = "Consult",
-            State = RoomStates.Seated,
-            SeatedAt = now.AddMinutes(-30),
-            DoctorArrivedAt = now.AddMinutes(-10),
-            OriginalDefaultExpectedUnits = 1,
-            ExpectedAllocationUnits = 1,
-            ExpectedAllocationMinutes = 10
-        };
-        seed.Repository.SaveRoom(malformed, seed.Doctors, seed.Procedures);
-
-        var context = StoreContext.Create(workspace, environmentName: Environments.Production, databasePath: databasePath);
-        var before = context.Repository.LoadRooms(3).Single(room => room.RoomId == 1);
-        Assert.Equal(RoomStates.Seated, before.State);
-        Assert.NotNull(before.DoctorArrivedAt);
-
-        var result = context.Store.UpdateRoomAssignment(1, "pledger", "EXT");
-
-        Assert.Null(result);
-        var after = context.Repository.LoadRooms(3).Single(room => room.RoomId == 1);
-        Assert.Equal("otte", after.AssignedDoctor);
-        Assert.Equal("CON", after.ProcedureCode);
-    }
-
-    [Fact]
-    public void Update_room_assignment_rejects_invalid_input_without_mutation()
-    {
-        using var workspace = TestWorkspace.Create();
-        var procedureRosterOptions = new ProcedureRosterOptions
-        {
-            Procedures =
-            [
-                new() { Id = "consult", Code = "CON", Label = "Consult", Icon = "speech", Active = true, DefaultExpectedUnits = 1 },
-                new() { Id = "extraction", Code = "EXT", Label = "Extraction", Icon = "forceps", Active = true, SedationEligible = true, AllocationBehavior = AllocationBehaviors.Variable, DefaultExpectedUnits = 3 },
-                new() { Id = "bad-allocation", Code = "BAD", Label = "Bad allocation", Icon = "speech", Active = true, DefaultExpectedUnits = 0 }
-            ]
-        };
-        var context = StoreContext.Create(workspace, environmentName: Environments.Production, procedureRosterOptions: procedureRosterOptions);
-
-        Assert.NotNull(context.Store.BeginPrestage(1, "otte", "CON"));
-        var before = context.Repository.LoadRooms(3).Single(room => room.RoomId == 1);
-
-        Assert.Null(context.Store.UpdateRoomAssignment(1, "missing", "EXT"));
-        Assert.Null(context.Store.UpdateRoomAssignment(1, "pledger", "NOPE"));
-        Assert.Null(context.Store.UpdateRoomAssignment(1, "pledger", "CON", sedation: true)); // CON is not sedation-eligible
-        Assert.Null(context.Store.UpdateRoomAssignment(1, "pledger", "BAD")); // procedure's own default allocation is invalid
-
-        var after = context.Repository.LoadRooms(3).Single(room => room.RoomId == 1);
-        Assert.Equal(before.AssignedDoctor, after.AssignedDoctor);
-        Assert.Equal(before.ProcedureCode, after.ProcedureCode);
-        Assert.Equal(before.EpisodeId, after.EpisodeId);
-    }
-
-    [Fact]
-    public void Update_room_assignment_reload_preserves_corrected_assignment()
-    {
-        using var workspace = TestWorkspace.Create();
-        var databasePath = workspace.ProductionDatabasePath();
-        var first = StoreContext.Create(workspace, environmentName: Environments.Production, databasePath: databasePath);
-
-        Assert.NotNull(first.Store.BeginPrestage(1, "otte", "CON"));
-        Assert.NotNull(first.Store.UpdateRoomAssignment(1, "pledger", "EXT", sedation: true, expectedAllocationUnits: 5));
-
-        var second = StoreContext.Create(workspace, environmentName: Environments.Production, databasePath: databasePath);
-        var reloaded = second.Store.GetRoom(1);
-
-        Assert.NotNull(reloaded);
-        Assert.Equal("pledger", reloaded.AssignedDoctor);
-        Assert.Equal("EXT+SED", reloaded.ProcedureCode);
-        Assert.Equal(5, reloaded.ExpectedAllocationUnits);
-        Assert.Equal(RoomStates.Prestaging, reloaded.State);
-    }
-
-    [Fact]
-    public void Update_room_assignment_creates_no_completed_cycle_and_no_aborted_assignment()
-    {
-        using var workspace = TestWorkspace.Create();
-        var context = StoreContext.Create(workspace, environmentName: Environments.Production);
-
-        Assert.NotNull(context.Store.BeginPrestage(1, "otte", "CON"));
-        Assert.NotNull(context.Store.UpdateRoomAssignment(1, "pledger", "EXT"));
-
-        Assert.Empty(context.Store.GetReports().RecentCompletedCycles);
-        Assert.Empty(context.Repository.LoadAbortedAssignments());
-    }
-
-    [Fact]
-    public void Second_update_room_assignment_reuses_the_same_episode_without_creating_a_second_record()
-    {
-        using var workspace = TestWorkspace.Create();
-        var context = StoreContext.Create(workspace, environmentName: Environments.Production);
-
-        Assert.NotNull(context.Store.BeginPrestage(1, "otte", "CON"));
-        var originalEpisodeId = context.Repository.LoadRooms(3).Single(room => room.RoomId == 1).EpisodeId;
-        Assert.NotNull(originalEpisodeId);
-
-        Assert.NotNull(context.Store.UpdateRoomAssignment(1, "pledger", "EXT"));
-        Assert.NotNull(context.Store.UpdateRoomAssignment(1, "gibson", "BX", sedation: true, expectedAllocationUnits: 4));
-
-        var after = context.Repository.LoadRooms(3).Single(room => room.RoomId == 1);
-        Assert.Equal(originalEpisodeId, after.EpisodeId);
-        Assert.Equal("gibson", after.AssignedDoctor);
-        Assert.Equal("BX+SED", after.ProcedureCode);
-        Assert.Equal(4, after.ExpectedAllocationUnits);
-        Assert.Empty(context.Repository.LoadAbortedAssignments());
-        Assert.Empty(context.Store.GetReports().RecentCompletedCycles);
-    }
-
-    [Fact]
-    public void Update_room_assignment_preserves_legacy_null_episode_and_prestage_fields()
-    {
-        using var workspace = TestWorkspace.Create();
-        var databasePath = workspace.ProductionDatabasePath();
-        var now = new DateTimeOffset(2026, 8, 3, 9, 0, 0, TimeSpan.Zero);
-        var seed = StoreContext.Create(workspace, environmentName: Environments.Production, databasePath: databasePath);
-
-        // A legacy row predating the Prestaging feature: null EpisodeId, null PrestageStartedAt, but a
-        // real SeatedAt/ReadyForDoctorAt from before the feature shipped.
-        var legacyRoom = new RoomState(1)
-        {
-            AssignedDoctor = "otte",
-            AssignedDoctorDisplayName = "Dr. Otte",
-            ProcedureCode = "CON",
-            ProcedureCategory = "Consult",
-            State = RoomStates.ReadyForDoctor,
-            SeatedAt = now.AddMinutes(-20),
-            ReadyForDoctorAt = now.AddMinutes(-15),
-            OriginalDefaultExpectedUnits = 1,
-            ExpectedAllocationUnits = 1,
-            ExpectedAllocationMinutes = 10
-        };
-        seed.Repository.SaveRoom(legacyRoom, seed.Doctors, seed.Procedures);
-
-        var context = StoreContext.Create(workspace, environmentName: Environments.Production, databasePath: databasePath);
-        var before = context.Repository.LoadRooms(3).Single(room => room.RoomId == 1);
-        Assert.Null(before.EpisodeId);
-        Assert.Null(before.PrestageStartedAt);
-
-        var updated = context.Store.UpdateRoomAssignment(1, "pledger", "EXT", sedation: true, expectedAllocationUnits: 5);
-
-        Assert.Null(updated);
-        var after = context.Repository.LoadRooms(3).Single(room => room.RoomId == 1);
-        Assert.Null(after.EpisodeId);
-        Assert.Null(after.PrestageStartedAt);
-        Assert.Equal(before.SeatedAt, after.SeatedAt);
-        Assert.Equal(before.ReadyForDoctorAt, after.ReadyForDoctorAt);
-        Assert.Equal(before.AssignedDoctor, after.AssignedDoctor);
-        Assert.Equal(before.ProcedureCode, after.ProcedureCode);
-    }
-
-    [Fact]
-    public void Update_room_assignment_followed_by_cancellation_archives_the_corrected_assignment()
-    {
-        using var workspace = TestWorkspace.Create();
-        var context = StoreContext.Create(workspace, environmentName: Environments.Production);
-
-        Assert.NotNull(context.Store.BeginPrestage(1, "otte", "CON"));
-        Assert.NotNull(context.Store.UpdateRoomAssignment(1, "pledger", "EXT", sedation: true, expectedAllocationUnits: 5));
-
-        Assert.NotNull(context.Store.CancelPrestage(1, CancellationReasons.ProcedureChanged));
-
-        var abort = Assert.Single(context.Repository.LoadAbortedAssignments());
-        Assert.Equal("pledger", abort.AssignedDoctor);
-        Assert.Equal("EXT+SED", abort.ProcedureCode);
-        Assert.Equal(5, abort.ExpectedAllocationUnits);
-    }
-
-    [Fact]
-    public void Update_room_assignment_followed_by_doctor_arrived_creates_completed_cycle_from_corrected_assignment()
-    {
-        using var workspace = TestWorkspace.Create();
-        var context = StoreContext.Create(workspace, environmentName: Environments.Production);
-
-        Assert.NotNull(context.Store.BeginPrestage(1, "otte", "CON"));
-        Assert.NotNull(context.Store.SeatRoom(1));
-        Assert.NotNull(context.Store.UpdateRoomAssignment(1, "pledger", "EXT", sedation: true, expectedAllocationUnits: 5));
-        Assert.NotNull(context.Store.MarkReadyForDoctor(1));
-        Assert.NotNull(context.Store.MarkDoctorArrived(1));
-        Assert.NotNull(context.Store.MarkDoctorComplete(1));
-        Assert.NotNull(context.Store.MarkRoomAvailable(1));
-
-        var cycle = Assert.Single(context.Store.GetReports().RecentCompletedCycles);
-        Assert.Equal("pledger", cycle.AssignedDoctor);
-        Assert.Equal("EXT+SED", cycle.ProcedureCode);
-        Assert.Equal(5, cycle.ExpectedAllocationUnits);
-    }
-
-    // -------------------------------------------------------------------------
-    // Pre-arrival Update Room Assignment (API)
-    // -------------------------------------------------------------------------
-
-    [Fact]
-    public async Task Update_room_assignment_endpoint_succeeds_from_an_allowed_state()
-    {
-        using var workspace = TestWorkspace.Create();
-        var context = StoreContext.Create(workspace, environmentName: Environments.Production);
-        var logger = CreateDiagnosticLogger(Path.Combine(workspace.DataRoot, "logs"), workspace.ContentRoot);
-        var validator = CreateBindingValidator(enabled: false);
-
-        Assert.NotNull(context.Store.BeginPrestage(1, "otte", "CON"));
-        var before = context.Repository.LoadRooms(3).Single(room => room.RoomId == 1);
-
-        var response = await global::RoomLifecycleEndpointHandler.UpdateRoomAssignmentAsync(
-            1, new BeginPrestageRequest(DoctorId: "pledger", ProcedureCode: "EXT", Sedation: true, ExpectedAllocationUnits: 5),
-            NewRoomMutationHttpContext(1, token: null), validator, context.Store, logger, new NoopBoardHubContext());
-
-        Assert.Equal(200, await ExecuteBindingResult(response));
-        var after = context.Repository.LoadRooms(3).Single(room => room.RoomId == 1);
-        Assert.Equal(before.EpisodeId, after.EpisodeId);
-        Assert.Equal(before.PrestageStartedAt, after.PrestageStartedAt);
-        Assert.Equal(RoomStates.Prestaging, after.State);
-        Assert.Equal("pledger", after.AssignedDoctor);
-        Assert.Equal("EXT+SED", after.ProcedureCode);
-        Assert.Equal(5, after.ExpectedAllocationUnits);
-    }
-
-    [Theory]
-    [InlineData(RoomStates.Available)]
-    [InlineData(RoomStates.DoctorInRoom)]
-    [InlineData(RoomStates.Turnover)]
-    public async Task Update_room_assignment_endpoint_rejects_disallowed_states(string disallowedState)
-    {
-        using var workspace = TestWorkspace.Create();
-        var context = StoreContext.Create(workspace, environmentName: Environments.Production);
-        var logger = CreateDiagnosticLogger(Path.Combine(workspace.DataRoot, "logs"), workspace.ContentRoot);
-        var validator = CreateBindingValidator(enabled: false);
-
-        if (disallowedState != RoomStates.Available)
-        {
-            Assert.NotNull(SeatViaPrestage(context.Store, 1, "otte", "CON"));
-            Assert.NotNull(context.Store.MarkReadyForDoctor(1));
-            Assert.NotNull(context.Store.MarkDoctorArrived(1));
-            if (disallowedState == RoomStates.Turnover)
-            {
-                Assert.NotNull(context.Store.MarkDoctorComplete(1));
-            }
-        }
-
-        Assert.Equal(disallowedState, context.Store.GetRoom(1)?.State);
-
-        var response = await global::RoomLifecycleEndpointHandler.UpdateRoomAssignmentAsync(
-            1, new BeginPrestageRequest(DoctorId: "pledger", ProcedureCode: "EXT"),
-            NewRoomMutationHttpContext(1, token: null), validator, context.Store, logger, new NoopBoardHubContext());
-
-        Assert.Equal(400, await ExecuteBindingResult(response));
-        Assert.Equal(disallowedState, context.Store.GetRoom(1)?.State);
-    }
-
-    [Fact]
-    public async Task Update_room_assignment_endpoint_rejects_blank_and_conflicting_procedure_aliases_before_mutation()
-    {
-        using var workspace = TestWorkspace.Create();
-        var context = StoreContext.Create(workspace, environmentName: Environments.Production);
-        var logger = CreateDiagnosticLogger(Path.Combine(workspace.DataRoot, "logs"), workspace.ContentRoot);
-        var validator = CreateBindingValidator(enabled: false);
-
-        Assert.NotNull(context.Store.BeginPrestage(1, "otte", "CON"));
-        var before = context.Repository.LoadRooms(3).Single(room => room.RoomId == 1);
-
-        var blank = await global::RoomLifecycleEndpointHandler.UpdateRoomAssignmentAsync(
-            1, new BeginPrestageRequest(DoctorId: "pledger", ProcedureCode: "", ProcedureId: "EXT"),
-            NewRoomMutationHttpContext(1, token: null), validator, context.Store, logger, new NoopBoardHubContext());
-        Assert.Equal(400, await ExecuteBindingResult(blank));
-
-        var conflicting = await global::RoomLifecycleEndpointHandler.UpdateRoomAssignmentAsync(
-            1, new BeginPrestageRequest(DoctorId: "pledger", ProcedureCode: "EXT", ProcedureId: "CON"),
-            NewRoomMutationHttpContext(1, token: null), validator, context.Store, logger, new NoopBoardHubContext());
-        Assert.Equal(400, await ExecuteBindingResult(conflicting));
-
-        var after = context.Repository.LoadRooms(3).Single(room => room.RoomId == 1);
-        Assert.Equal(before.AssignedDoctor, after.AssignedDoctor);
-        Assert.Equal(before.ProcedureCode, after.ProcedureCode);
-    }
-
-    [Fact]
-    public async Task Update_room_assignment_endpoint_returns_400_for_invalid_doctor_procedure_and_allocation()
-    {
-        using var workspace = TestWorkspace.Create();
-        var procedureRosterOptions = new ProcedureRosterOptions
-        {
-            Procedures =
-            [
-                new() { Id = "consult", Code = "CON", Label = "Consult", Icon = "speech", Active = true, DefaultExpectedUnits = 1 },
-                new() { Id = "bad-allocation", Code = "BAD", Label = "Bad allocation", Icon = "speech", Active = true, DefaultExpectedUnits = 0 }
-            ]
-        };
-        var context = StoreContext.Create(workspace, environmentName: Environments.Production, procedureRosterOptions: procedureRosterOptions);
-        var logger = CreateDiagnosticLogger(Path.Combine(workspace.DataRoot, "logs"), workspace.ContentRoot);
-        var validator = CreateBindingValidator(enabled: false);
-
-        Assert.NotNull(context.Store.BeginPrestage(1, "otte", "CON"));
-
-        var invalidDoctor = await global::RoomLifecycleEndpointHandler.UpdateRoomAssignmentAsync(
-            1, new BeginPrestageRequest(DoctorId: "missing", ProcedureCode: "CON"),
-            NewRoomMutationHttpContext(1, token: null), validator, context.Store, logger, new NoopBoardHubContext());
-        Assert.Equal(400, await ExecuteBindingResult(invalidDoctor));
-
-        var invalidProcedure = await global::RoomLifecycleEndpointHandler.UpdateRoomAssignmentAsync(
-            1, new BeginPrestageRequest(DoctorId: "pledger", ProcedureCode: "NOPE"),
-            NewRoomMutationHttpContext(1, token: null), validator, context.Store, logger, new NoopBoardHubContext());
-        Assert.Equal(400, await ExecuteBindingResult(invalidProcedure));
-
-        var invalidAllocation = await global::RoomLifecycleEndpointHandler.UpdateRoomAssignmentAsync(
-            1, new BeginPrestageRequest(DoctorId: "pledger", ProcedureCode: "BAD"),
-            NewRoomMutationHttpContext(1, token: null), validator, context.Store, logger, new NoopBoardHubContext());
-        Assert.Equal(400, await ExecuteBindingResult(invalidAllocation));
-
-        Assert.Equal("otte", context.Store.GetRoom(1)?.AssignedDoctor);
-        Assert.Equal("CON", context.Store.GetRoom(1)?.ProcedureCode);
     }
 
     [Fact]
@@ -4841,7 +4080,7 @@ public sealed class BoardStoreTests
         Assert.Equal(400, await ExecuteBindingResult(unknown));
         Assert.Equal(RoomStates.Prestaging, context.Store.GetRoom(3)?.State);
 
-        Assert.NotNull(context.Store.SeatRoom(3));
+        Assert.NotNull(context.Store.SeatRoomCanonical(3, null).Room);
         var wrongState = await global::RoomLifecycleEndpointHandler.CancelPrestageAsync(
             3, NewRoomMutationHttpContext(3, token: null), validator,
             context.Store, logger, new NoopBoardHubContext());
@@ -8704,7 +7943,7 @@ public sealed class BoardStoreTests
             return;
         }
 
-        Assert.NotNull(context.Store.SeatRoom(1));
+        Assert.NotNull(context.Store.SeatRoomCanonical(1, null).Room);
         if (targetState == RoomStates.Seated)
         {
             return;
@@ -8785,14 +8024,13 @@ public sealed class BoardStoreTests
         int room,
         string doctor,
         string procedure,
-        int demoElapsedMinutes = 0,
         bool sedation = false,
         int? expectedAllocationUnits = null)
     {
         var prestaged = store.BeginPrestage(room, doctor, procedure, sedation, expectedAllocationUnits);
         return prestaged is null
             ? null
-            : store.SeatRoom(room, demoElapsedMinutes);
+            : store.SeatRoomCanonical(room, null).Room;
     }
 
     // Persists a single clean, allocation-calculable completed cycle anchored on completeAt (same UTC
@@ -9395,8 +8633,7 @@ public sealed class BoardStoreTests
     }
 
     // Builds a room-mutation HttpContext carrying a real request body, so tests exercise the actual
-    // strict JSON parsing path (StrictJsonRequestReader / SeatRequestParser / CancelRequestParser)
-    // through DefaultHttpContext rather than constructing a bound DTO directly.
+    // strict JSON parsing path through DefaultHttpContext rather than constructing a bound DTO.
     private static DefaultHttpContext NewJsonBodyContext(int roomNumber, string? token, string body, string? contentType = "application/json")
     {
         var context = NewRoomMutationHttpContext(roomNumber, token);

@@ -32,15 +32,15 @@ public sealed class PrestagingLifecycleEndpointTests
     }
 
     [Fact]
-    public async Task Compatibility_begin_and_flat_seat_retain_their_room_response_shape()
+    public async Task Assignment_bearing_begin_retains_room_response_while_flat_seat_is_rejected()
     {
         using var h = new Harness();
         var begin = await h.Begin(1, """{"doctorId":"otte","procedureCode":"EXT","sedation":true,"expectedAllocationUnits":5}""");
         Assert.Equal("EXT+SED", Assert.IsType<RoomStatus>(begin.Value).ProcedureCode);
 
         var seat = await h.Seat(2, """{"doctorId":"otte","procedureCode":"EXT","procedureId":"EXT","sedation":true,"expectedAllocationUnits":5,"demoElapsedMinutes":0}""");
-        Assert.Equal(200, seat.StatusCode);
-        Assert.IsType<RoomStatus>(seat.Value);
+        AssertError(seat, 400, PrestagingLifecycleErrorCodes.MalformedRequest);
+        Assert.Equal(RoomStates.Available, h.Context.Store.GetRoom(2)?.State);
     }
 
     [Fact]
@@ -190,7 +190,7 @@ public sealed class PrestagingLifecycleEndpointTests
     {
         using var h = new Harness();
         Assert.NotNull(h.Context.Store.BeginPrestage(1, "otte", "CON"));
-        Assert.NotNull(h.Context.Store.SeatRoom(1));
+        Assert.NotNull(h.Context.Store.SeatRoomCanonical(1, null).Room);
         Assert.NotNull(h.Context.Store.MarkReadyForDoctor(1));
         AssertError(await h.Save(1, """{"doctorId":"pledger","procedureCode":"EXT","sedationChoice":"no","confirmedExpectedAllocationUnits":3}"""), 409, PrestagingLifecycleErrorCodes.AssignmentLocked);
         AssertLastAudit(
@@ -2376,7 +2376,7 @@ public sealed class PrestagingLifecycleEndpointTests
         public StoreContext Context { get; }
         public async Task<Response> Begin(int room, string? body, string? contentType = "application/json") => Capture(await global::RoomLifecycleEndpointHandler.BeginPrestageRouteAsync(room, Request(room, body, contentType), _validator, Context.Store, _logger, new NoopBoardHubContext()));
         public async Task<Response> Save(int room, string? body, string? contentType = "application/json") => Capture(await global::RoomLifecycleEndpointHandler.SaveAssignmentDetailsAsync(room, Request(room, body, contentType), _validator, Context.Store, _logger, new NoopBoardHubContext()));
-        public async Task<Response> Seat(int room, string? body, string? contentType = "application/json") => Capture(await global::RoomLifecycleEndpointHandler.SeatAsync(room, Request(room, body, contentType), _validator, Context.Store, _environment, _logger, new NoopBoardHubContext()));
+        public async Task<Response> Seat(int room, string? body, string? contentType = "application/json") => Capture(await global::RoomLifecycleEndpointHandler.SeatAsync(room, Request(room, body, contentType), _validator, Context.Store, _logger, new NoopBoardHubContext()));
         public async Task<Response> Ready(int room, string? body, string? contentType = "application/json") => Capture(await global::RoomLifecycleEndpointHandler.ReadyForDoctorAsync(room, Request(room, body, contentType), _validator, Context.Store, _logger, new NoopBoardHubContext()));
         public async Task<Response> Withdraw(int room, string? body, string? contentType = "application/json") => Capture(await global::RoomLifecycleEndpointHandler.WithdrawReadyAsync(room, Request(room, body, contentType), _validator, Context.Store, _logger, new NoopBoardHubContext()));
         public async Task<Response> DoctorArrived(int room, string? body, string? contentType = "application/json") => Capture(await global::RoomLifecycleEndpointHandler.DoctorArrivedAsync(room, Request(room, body, contentType), _validator, Context.Store, _logger, new NoopBoardHubContext()));

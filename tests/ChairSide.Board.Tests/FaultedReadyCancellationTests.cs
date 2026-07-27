@@ -144,7 +144,7 @@ public sealed class FaultedReadyCancellationTests
         Assert.NotNull(context.Store.BeginPrestage(1));
         Assert.NotNull(context.Store.SaveAssignmentDetails(1, CompleteAssignment()));
         clock.SetUtcNow(SeedNow.AddMinutes(2));
-        Assert.NotNull(context.Store.SeatRoom(1));
+        Assert.NotNull(context.Store.SeatRoomCanonical(1, null).Room);
         clock.SetUtcNow(SeedNow.AddMinutes(4));
         var ready = context.Store.MarkReadyForDoctor(1);
         Assert.NotNull(ready);

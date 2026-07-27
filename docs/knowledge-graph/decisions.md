@@ -58,7 +58,9 @@ This file records decisions that should survive across tasks, PRs, and debugging
 
 **Decision:** Canonical Begin Prestage, Save Details, Seat, Ready, Withdraw Ready, and Doctor Arrived use strict JSON contracts, typed mutation outcomes, and stable HTTP error codes. Canonical procedure codes are undecorated; internal `+SED` persistence representation never crosses the canonical transport boundary.
 
-**Rationale:** Explicit wire shapes and typed failures let current and future clients recover without partial mutation or inference from free-form messages. Compatibility response branches remain narrow and test-guarded until the UI issues migrate them.
+**Rationale:** Explicit wire shapes and typed failures let current and future clients recover without partial mutation or inference from free-form messages. Issue #158 confirmed that no maintained deployed caller uses flat assignment-bearing Seat, `/update-assignment`, or `/assignment`; issue #159 removed those paths and their non-atomic Begin Prestage-to-Seat bridge.
+
+**Compatibility:** Omitted Ready and Doctor Arrived bodies retain their narrow, test-guarded top-level `RoomStatus` responses. This removal does not affect those response branches, legacy persisted Aging/Stale recovery, or legitimate legacy arrived-room completion.
 
 ## Development seed
 

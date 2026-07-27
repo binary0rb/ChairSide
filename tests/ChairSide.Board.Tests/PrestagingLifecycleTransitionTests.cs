@@ -47,7 +47,7 @@ public sealed class PrestagingLifecycleTransitionTests
         Assert.NotNull(context.Store.BeginPrestage(1));
         Assert.NotNull(context.Store.SaveAssignmentDetails(1, assignment));
         clock.SetUtcNow(now.AddMinutes(4));
-        Assert.NotNull(context.Store.SeatRoom(1));
+        Assert.NotNull(context.Store.SeatRoomCanonical(1, null).Room);
         clock.SetUtcNow(now.AddMinutes(6));
         var ready = context.Store.MarkReadyForDoctor(1);
         Assert.NotNull(ready);
@@ -82,7 +82,7 @@ public sealed class PrestagingLifecycleTransitionTests
         Assert.NotNull(context.Store.BeginPrestage(1));
         Assert.NotNull(context.Store.SaveAssignmentDetails(1, assignment));
         clock.SetUtcNow(now.AddMinutes(1));
-        Assert.NotNull(context.Store.SeatRoom(1));
+        Assert.NotNull(context.Store.SeatRoomCanonical(1, null).Room);
         clock.SetUtcNow(now.AddMinutes(2));
         Assert.NotNull(context.Store.MarkReadyForDoctor(1));
         clock.SetUtcNow(now.AddMinutes(4));
@@ -116,7 +116,7 @@ public sealed class PrestagingLifecycleTransitionTests
             ExpectedAllocationContract.ConfirmedSuggestedValue(3));
 
         Assert.NotNull(context.Store.BeginPrestage(1));
-        var seated = context.Store.SeatRoom(1, draft);
+        var seated = context.Store.SeatRoomCanonical(1, draft).Room;
 
         Assert.NotNull(seated);
         Assert.Equal(RoomStates.Seated, seated.State);
@@ -187,7 +187,7 @@ public sealed class PrestagingLifecycleTransitionTests
 
         Assert.NotNull(context.Store.BeginPrestage(1));
         Assert.NotNull(context.Store.SaveAssignmentDetails(1, consult));
-        Assert.NotNull(context.Store.SeatRoom(1));
+        Assert.NotNull(context.Store.SeatRoomCanonical(1, null).Room);
 
         // Change to sedation-eligible EXT but leave sedation unresolved: valid domain, still Partial.
         var partial = RoomAssignmentContract.Create(

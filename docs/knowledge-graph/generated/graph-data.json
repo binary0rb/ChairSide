@@ -741,12 +741,6 @@
                       "path":  "src/ChairSide.Board/Program.cs"
                   },
                   {
-                      "id":  "route:/api/rooms/{roomNumber:int}/assignment",
-                      "label":  "/api/rooms/{roomNumber:int}/assignment",
-                      "type":  "Route",
-                      "path":  "src/ChairSide.Board/Program.cs"
-                  },
-                  {
                       "id":  "route:/api/rooms/{roomNumber:int}/assignment-details",
                       "label":  "/api/rooms/{roomNumber:int}/assignment-details",
                       "type":  "Route",
@@ -803,12 +797,6 @@
                   {
                       "id":  "route:/api/rooms/{roomNumber:int}/seat",
                       "label":  "/api/rooms/{roomNumber:int}/seat",
-                      "type":  "Route",
-                      "path":  "src/ChairSide.Board/Program.cs"
-                  },
-                  {
-                      "id":  "route:/api/rooms/{roomNumber:int}/update-assignment",
-                      "label":  "/api/rooms/{roomNumber:int}/update-assignment",
                       "type":  "Route",
                       "path":  "src/ChairSide.Board/Program.cs"
                   },
@@ -1539,12 +1527,6 @@
                       "path":  "src/ChairSide.Board/Services/ProjectionAssumptionChecklist.cs"
                   },
                   {
-                      "id":  "symbol:type:ParsedSeatRequest",
-                      "label":  "ParsedSeatRequest",
-                      "type":  "CodeType",
-                      "path":  "src/ChairSide.Board/Program.cs"
-                  },
-                  {
                       "id":  "symbol:type:PersistedReadyHandoff",
                       "label":  "PersistedReadyHandoff",
                       "type":  "CodeType",
@@ -1983,22 +1965,10 @@
                       "path":  "src/ChairSide.Board/Services/ScheduleFitCalculator.cs"
                   },
                   {
-                      "id":  "symbol:type:SeatRequestParser",
-                      "label":  "SeatRequestParser",
-                      "type":  "CodeType",
-                      "path":  "src/ChairSide.Board/Program.cs"
-                  },
-                  {
                       "id":  "symbol:type:SeatRoomActionRequest",
                       "label":  "SeatRoomActionRequest",
                       "type":  "CodeType",
                       "path":  "src/ChairSide.Board/Services/PrestagingLifecycleApiContracts.cs"
-                  },
-                  {
-                      "id":  "symbol:type:SeatRoomRequest",
-                      "label":  "SeatRoomRequest",
-                      "type":  "CodeType",
-                      "path":  "src/ChairSide.Board/Program.cs"
                   },
                   {
                       "id":  "symbol:type:SedationContract",
@@ -2083,12 +2053,6 @@
                       "label":  "TestWorkspace",
                       "type":  "CodeType",
                       "path":  "tests/ChairSide.Board.Tests/BoardStoreTests.cs"
-                  },
-                  {
-                      "id":  "symbol:type:UpdateAssignmentRequest",
-                      "label":  "UpdateAssignmentRequest",
-                      "type":  "CodeType",
-                      "path":  "src/ChairSide.Board/Program.cs"
                   }
               ],
     "edges":  [
@@ -2229,11 +2193,6 @@
                   },
                   {
                       "from":  "file:src/ChairSide.Board/Program.cs",
-                      "to":  "route:/api/rooms/{roomNumber:int}/assignment",
-                      "label":  "maps"
-                  },
-                  {
-                      "from":  "file:src/ChairSide.Board/Program.cs",
                       "to":  "route:/api/rooms/{roomNumber:int}/assignment-details",
                       "label":  "maps"
                   },
@@ -2280,11 +2239,6 @@
                   {
                       "from":  "file:src/ChairSide.Board/Program.cs",
                       "to":  "route:/api/rooms/{roomNumber:int}/seat",
-                      "label":  "maps"
-                  },
-                  {
-                      "from":  "file:src/ChairSide.Board/Program.cs",
-                      "to":  "route:/api/rooms/{roomNumber:int}/update-assignment",
                       "label":  "maps"
                   },
                   {
@@ -2344,11 +2298,6 @@
                   },
                   {
                       "from":  "file:src/ChairSide.Board/Program.cs",
-                      "to":  "symbol:type:ParsedSeatRequest",
-                      "label":  "declares"
-                  },
-                  {
-                      "from":  "file:src/ChairSide.Board/Program.cs",
                       "to":  "symbol:type:ProcedureAliasResolver",
                       "label":  "declares"
                   },
@@ -2364,27 +2313,12 @@
                   },
                   {
                       "from":  "file:src/ChairSide.Board/Program.cs",
-                      "to":  "symbol:type:SeatRequestParser",
-                      "label":  "declares"
-                  },
-                  {
-                      "from":  "file:src/ChairSide.Board/Program.cs",
-                      "to":  "symbol:type:SeatRoomRequest",
-                      "label":  "declares"
-                  },
-                  {
-                      "from":  "file:src/ChairSide.Board/Program.cs",
                       "to":  "symbol:type:StrictJsonRequestReader",
                       "label":  "declares"
                   },
                   {
                       "from":  "file:src/ChairSide.Board/Program.cs",
                       "to":  "symbol:type:struct",
-                      "label":  "declares"
-                  },
-                  {
-                      "from":  "file:src/ChairSide.Board/Program.cs",
-                      "to":  "symbol:type:UpdateAssignmentRequest",
                       "label":  "declares"
                   },
                   {

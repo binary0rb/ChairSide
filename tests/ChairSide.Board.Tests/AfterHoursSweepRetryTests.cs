@@ -247,7 +247,7 @@ public sealed class AfterHoursSweepRetryTests
     private static void ActivateSeated(DemoBoardStore store, int roomId, string doctorId, string procedureCode)
     {
         Assert.NotNull(store.BeginPrestage(roomId, doctorId, procedureCode));
-        Assert.NotNull(store.SeatRoom(roomId));
+        Assert.NotNull(store.SeatRoomCanonical(roomId, null).Room);
     }
 
     private static void ActivateReady(DemoBoardStore store, int roomId, string doctorId, string procedureCode)

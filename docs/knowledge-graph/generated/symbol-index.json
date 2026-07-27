@@ -512,7 +512,7 @@
                   {
                       "path":  "docs/knowledge/workflow/room-lifecycle.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  6443,
+                      "sizeBytes":  6624,
                       "typeSymbols":  [
 
                                       ],
@@ -605,7 +605,7 @@
                   {
                       "path":  "docs/knowledge-graph/decisions.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  11380,
+                      "sizeBytes":  11766,
                       "typeSymbols":  [
 
                                       ],
@@ -1457,17 +1457,13 @@
                   {
                       "path":  "src/ChairSide.Board/Program.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  93624,
+                      "sizeBytes":  72446,
                       "typeSymbols":  [
                                           "BeginPrestageRequest",
-                                          "SeatRoomRequest",
                                           "CancelRoomAssignmentRequest",
-                                          "UpdateAssignmentRequest",
                                           "ProcedureAliasResolver",
                                           "struct",
                                           "StrictJsonRequestReader",
-                                          "ParsedSeatRequest",
-                                          "SeatRequestParser",
                                           "CancelRequestParser",
                                           "ExceptionReviewEndpointHandler",
                                           "RoomLifecycleEndpointHandler",
@@ -1483,14 +1479,10 @@
                                             "IsBlankButSupplied",
                                             "ValidatePropertySet",
                                             "TryParse",
-                                            "TryGetInt",
-                                            "TryGetNullableInt",
-                                            "TryGetNullableString",
                                             "LogCanonicalValidationFailureAsync",
                                             "CanonicalError",
                                             "CancelPrestageAsync",
                                             "CancelSeatingAsync",
-                                            "ValidateCompatibilityDemoElapsedMinutes",
                                             "From",
                                             "Build"
                                         ],
@@ -1507,8 +1499,6 @@
                                      "/api/rooms/{roomNumber:int}/prestage",
                                      "/api/rooms/{roomNumber:int}/assignment-details",
                                      "/api/rooms/{roomNumber:int}/seat",
-                                     "/api/rooms/{roomNumber:int}/update-assignment",
-                                     "/api/rooms/{roomNumber:int}/assignment",
                                      "/api/rooms/{roomNumber:int}/cancel-prestage",
                                      "/api/rooms/{roomNumber:int}/cancel-seating",
                                      "/api/rooms/{roomNumber:int}/ready-for-doctor",
@@ -1718,7 +1708,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/DemoBoardStore.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  251513,
+                      "sizeBytes":  246627,
                       "typeSymbols":  [
                                           "ExceptionReasons",
                                           "ReportingExceptionReasons",
@@ -1769,10 +1759,6 @@
                                             "CanonicalFailure",
                                             "BeginPrestage",
                                             "SaveAssignmentDetails",
-                                            "UpdateRoomAssignment",
-                                            "SeatRoom",
-                                            "SeatRoomWithAssignment",
-                                            "UpdateAssignment",
                                             "CancelPrestage",
                                             "CancelSeating",
                                             "CancelIncompleteAssignment",
@@ -1797,7 +1783,11 @@
                                             "ResetAllDataForEmptyBeta",
                                             "ClearCompletedAndResetRoomsLocked",
                                             "SeedSyntheticReportData",
-                                            "ResetAndSeedLargeSyntheticReportData"
+                                            "ResetAndSeedLargeSyntheticReportData",
+                                            "SeedLargeSyntheticReportData",
+                                            "UpsertSyntheticCycle",
+                                            "ResetAndSeedStressFixture",
+                                            "SeedLiveRoomFixtures"
                                         ],
                       "routes":  [
 
@@ -2859,7 +2849,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/AfterHoursReviewEndpointTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  8528,
+                      "sizeBytes":  8548,
                       "typeSymbols":  [
                                           "AfterHoursReviewEndpointTests"
                                       ],
@@ -2893,7 +2883,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/AfterHoursSweepRetryTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  14387,
+                      "sizeBytes":  14407,
                       "typeSymbols":  [
                                           "AfterHoursSweepRetryTests"
                                       ],
@@ -2960,7 +2950,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/BoardStoreTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  486614,
+                      "sizeBytes":  443128,
                       "typeSymbols":  [
                                           "BoardStoreTests",
                                           "StoreContext",
@@ -2980,11 +2970,6 @@
                                             "Prestaging_survives_store_restart_reconstruction",
                                             "Seat_room_rejects_available_and_accepts_prestaging_without_replacing_snapshot",
                                             "Fixed_clock_new_episodes_receive_distinct_episode_ids",
-                                            "Development_demo_offset_shifts_prestage_and_seated_timestamps_together",
-                                            "Development_negative_demo_offset_is_rejected_without_mutating_room",
-                                            "Development_demo_offset_above_maximum_is_rejected_without_mutating_room",
-                                            "Production_demo_offset_is_rejected_before_state_derivation_or_mutation",
-                                            "Development_demo_offset_boundaries_zero_and_240_are_applied_without_clamping",
                                             "Legacy_active_rows_without_episode_or_prestage_continue_normally",
                                             "Normally_completed_new_episode_persists_episode_id_and_prestage_started_at",
                                             "Cancel_prestage_persists_full_abort_snapshot_and_resets_room",
@@ -3013,7 +2998,12 @@
                                             "Default_rosters_load_current_doctors_and_procedures",
                                             "Procedure_roster_exposes_allocation_behavior_and_default_expected_units",
                                             "Procedure_allocation_behavior_classification_matches_known_and_variable_lists",
-                                            "Seating_without_units_applies_procedure_default_allocation"
+                                            "Seating_without_units_applies_procedure_default_allocation",
+                                            "Seating_with_explicit_units_stores_final_allocation",
+                                            "Allocation_adjusted_flag_is_false_when_units_equal_default",
+                                            "Allocation_adjusted_flag_is_true_when_units_differ_from_default",
+                                            "Seating_with_zero_units_clamps_to_minimum_and_never_yields_zero_minutes",
+                                            "Seating_with_negative_units_clamps_to_minimum"
                                         ],
                       "routes":  [
 
@@ -3034,7 +3024,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/CanonicalAssignmentDomainValidationTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  26970,
+                      "sizeBytes":  27072,
                       "typeSymbols":  [
                                           "CanonicalAssignmentDomainValidationTests",
                                           "LiveRoomSnapshot"
@@ -3253,7 +3243,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/DurableFailureInjectionTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  28117,
+                      "sizeBytes":  28197,
                       "typeSymbols":  [
                                           "DurableFailureInjectionTests",
                                           "HandoffSnapshot",
@@ -3300,7 +3290,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/EnvironmentMaintenancePreflightTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  16648,
+                      "sizeBytes":  13982,
                       "typeSymbols":  [
                                           "EnvironmentMaintenancePreflightTests"
                                       ],
@@ -3316,7 +3306,6 @@
                                             "Not_requested_maintenance_is_refused_before_callback",
                                             "Authorized_Training_maintenance_validates_identity_before_mutation",
                                             "Production_refusal_leaves_database_data_directory_and_diagnostic_log_absent",
-                                            "Training_fresh_store_starts_available_and_rejects_demo_elapsed_minutes",
                                             "Training_environment_does_not_satisfy_the_development_role_check",
                                             "Existing_development_and_production_fresh_startup_behavior_remains_valid",
                                             "Training_rejects_development_sample_admin_token_when_protection_is_enabled",
@@ -3342,7 +3331,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/FaultedReadyCancellationTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  18066,
+                      "sizeBytes":  18086,
                       "typeSymbols":  [
                                           "FaultedReadyCancellationTests"
                                       ],
@@ -3384,7 +3373,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/LifecycleFixtureCorrectionTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  35579,
+                      "sizeBytes":  35619,
                       "typeSymbols":  [
                                           "LifecycleFixtureCorrectionTests",
                                           "RoomStatusSnapshot",
@@ -3588,7 +3577,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/PrestagingLifecycleEndpointTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  146430,
+                      "sizeBytes":  146512,
                       "typeSymbols":  [
                                           "PrestagingLifecycleEndpointTests",
                                           "Harness",
@@ -3597,7 +3586,7 @@
                                       ],
                       "methodSymbols":  [
                                             "Canonical_begin_is_assignment_free_and_reports_typed_failures",
-                                            "Compatibility_begin_and_flat_seat_retain_their_room_response_shape",
+                                            "Assignment_bearing_begin_retains_room_response_while_flat_seat_is_rejected",
                                             "Assignment_details_requires_body_and_round_trips_absent_partial_and_complete",
                                             "Assignment_details_requires_json_content_type",
                                             "Begin_rejects_nonempty_malformed_or_non_json_bodies_without_mutation",
@@ -3656,7 +3645,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/PrestagingLifecycleTransitionTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  12822,
+                      "sizeBytes":  12896,
                       "typeSymbols":  [
                                           "PrestagingLifecycleTransitionTests"
                                       ],
