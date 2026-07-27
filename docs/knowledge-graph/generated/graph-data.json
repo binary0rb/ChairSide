@@ -663,6 +663,42 @@
                       "path":  "tests/ChairSide.Board.Tests/ScheduleFitReportTests.cs"
                   },
                   {
+                      "id":  "file:tests/ChairSide.Board.Tests/TestSupport/ManualTimeProvider.cs",
+                      "label":  "tests/ChairSide.Board.Tests/TestSupport/ManualTimeProvider.cs",
+                      "type":  "File",
+                      "path":  "tests/ChairSide.Board.Tests/TestSupport/ManualTimeProvider.cs"
+                  },
+                  {
+                      "id":  "file:tests/ChairSide.Board.Tests/TestSupport/NoopBoardHubContext.cs",
+                      "label":  "tests/ChairSide.Board.Tests/TestSupport/NoopBoardHubContext.cs",
+                      "type":  "File",
+                      "path":  "tests/ChairSide.Board.Tests/TestSupport/NoopBoardHubContext.cs"
+                  },
+                  {
+                      "id":  "file:tests/ChairSide.Board.Tests/TestSupport/StoreContext.cs",
+                      "label":  "tests/ChairSide.Board.Tests/TestSupport/StoreContext.cs",
+                      "type":  "File",
+                      "path":  "tests/ChairSide.Board.Tests/TestSupport/StoreContext.cs"
+                  },
+                  {
+                      "id":  "file:tests/ChairSide.Board.Tests/TestSupport/TestOptionsMonitor.cs",
+                      "label":  "tests/ChairSide.Board.Tests/TestSupport/TestOptionsMonitor.cs",
+                      "type":  "File",
+                      "path":  "tests/ChairSide.Board.Tests/TestSupport/TestOptionsMonitor.cs"
+                  },
+                  {
+                      "id":  "file:tests/ChairSide.Board.Tests/TestSupport/TestWebHostEnvironment.cs",
+                      "label":  "tests/ChairSide.Board.Tests/TestSupport/TestWebHostEnvironment.cs",
+                      "type":  "File",
+                      "path":  "tests/ChairSide.Board.Tests/TestSupport/TestWebHostEnvironment.cs"
+                  },
+                  {
+                      "id":  "file:tests/ChairSide.Board.Tests/TestSupport/TestWorkspace.cs",
+                      "label":  "tests/ChairSide.Board.Tests/TestSupport/TestWorkspace.cs",
+                      "type":  "File",
+                      "path":  "tests/ChairSide.Board.Tests/TestSupport/TestWorkspace.cs"
+                  },
+                  {
                       "id":  "file:tests/knowledge-graph/New-ChairSideKnowledgeGraph.Tests.ps1",
                       "label":  "tests/knowledge-graph/New-ChairSideKnowledgeGraph.Tests.ps1",
                       "type":  "File",
@@ -1476,7 +1512,7 @@
                       "id":  "symbol:type:ManualTimeProvider",
                       "label":  "ManualTimeProvider",
                       "type":  "CodeType",
-                      "path":  "tests/ChairSide.Board.Tests/BoardStoreTests.cs"
+                      "path":  "tests/ChairSide.Board.Tests/TestSupport/ManualTimeProvider.cs"
                   },
                   {
                       "id":  "symbol:type:MarkExceptionRequest",
@@ -1488,25 +1524,25 @@
                       "id":  "symbol:type:NoopBoardHubContext",
                       "label":  "NoopBoardHubContext",
                       "type":  "CodeType",
-                      "path":  "tests/ChairSide.Board.Tests/BoardStoreTests.cs"
+                      "path":  "tests/ChairSide.Board.Tests/TestSupport/NoopBoardHubContext.cs"
                   },
                   {
                       "id":  "symbol:type:NoopClientProxy",
                       "label":  "NoopClientProxy",
                       "type":  "CodeType",
-                      "path":  "tests/ChairSide.Board.Tests/BoardStoreTests.cs"
+                      "path":  "tests/ChairSide.Board.Tests/TestSupport/NoopBoardHubContext.cs"
                   },
                   {
                       "id":  "symbol:type:NoopGroupManager",
                       "label":  "NoopGroupManager",
                       "type":  "CodeType",
-                      "path":  "tests/ChairSide.Board.Tests/BoardStoreTests.cs"
+                      "path":  "tests/ChairSide.Board.Tests/TestSupport/NoopBoardHubContext.cs"
                   },
                   {
                       "id":  "symbol:type:NoopHubClients",
                       "label":  "NoopHubClients",
                       "type":  "CodeType",
-                      "path":  "tests/ChairSide.Board.Tests/BoardStoreTests.cs"
+                      "path":  "tests/ChairSide.Board.Tests/TestSupport/NoopBoardHubContext.cs"
                   },
                   {
                       "id":  "symbol:type:NormalizedDatabaseIsolationLayout",
@@ -1998,7 +2034,7 @@
                       "id":  "symbol:type:StoreContext",
                       "label":  "StoreContext",
                       "type":  "CodeType",
-                      "path":  "tests/ChairSide.Board.Tests/BoardStoreTests.cs"
+                      "path":  "tests/ChairSide.Board.Tests/TestSupport/StoreContext.cs"
                   },
                   {
                       "id":  "symbol:type:StressFixtureResult",
@@ -2040,19 +2076,19 @@
                       "id":  "symbol:type:TestOptionsMonitor",
                       "label":  "TestOptionsMonitor",
                       "type":  "CodeType",
-                      "path":  "tests/ChairSide.Board.Tests/BoardStoreTests.cs"
+                      "path":  "tests/ChairSide.Board.Tests/TestSupport/TestOptionsMonitor.cs"
                   },
                   {
                       "id":  "symbol:type:TestWebHostEnvironment",
                       "label":  "TestWebHostEnvironment",
                       "type":  "CodeType",
-                      "path":  "tests/ChairSide.Board.Tests/BoardStoreTests.cs"
+                      "path":  "tests/ChairSide.Board.Tests/TestSupport/TestWebHostEnvironment.cs"
                   },
                   {
                       "id":  "symbol:type:TestWorkspace",
                       "label":  "TestWorkspace",
                       "type":  "CodeType",
-                      "path":  "tests/ChairSide.Board.Tests/BoardStoreTests.cs"
+                      "path":  "tests/ChairSide.Board.Tests/TestSupport/TestWorkspace.cs"
                   }
               ],
     "edges":  [
@@ -2997,51 +3033,6 @@
                       "label":  "declares"
                   },
                   {
-                      "from":  "file:tests/ChairSide.Board.Tests/BoardStoreTests.cs",
-                      "to":  "symbol:type:ManualTimeProvider",
-                      "label":  "declares"
-                  },
-                  {
-                      "from":  "file:tests/ChairSide.Board.Tests/BoardStoreTests.cs",
-                      "to":  "symbol:type:NoopBoardHubContext",
-                      "label":  "declares"
-                  },
-                  {
-                      "from":  "file:tests/ChairSide.Board.Tests/BoardStoreTests.cs",
-                      "to":  "symbol:type:NoopClientProxy",
-                      "label":  "declares"
-                  },
-                  {
-                      "from":  "file:tests/ChairSide.Board.Tests/BoardStoreTests.cs",
-                      "to":  "symbol:type:NoopGroupManager",
-                      "label":  "declares"
-                  },
-                  {
-                      "from":  "file:tests/ChairSide.Board.Tests/BoardStoreTests.cs",
-                      "to":  "symbol:type:NoopHubClients",
-                      "label":  "declares"
-                  },
-                  {
-                      "from":  "file:tests/ChairSide.Board.Tests/BoardStoreTests.cs",
-                      "to":  "symbol:type:StoreContext",
-                      "label":  "declares"
-                  },
-                  {
-                      "from":  "file:tests/ChairSide.Board.Tests/BoardStoreTests.cs",
-                      "to":  "symbol:type:TestOptionsMonitor",
-                      "label":  "declares"
-                  },
-                  {
-                      "from":  "file:tests/ChairSide.Board.Tests/BoardStoreTests.cs",
-                      "to":  "symbol:type:TestWebHostEnvironment",
-                      "label":  "declares"
-                  },
-                  {
-                      "from":  "file:tests/ChairSide.Board.Tests/BoardStoreTests.cs",
-                      "to":  "symbol:type:TestWorkspace",
-                      "label":  "declares"
-                  },
-                  {
                       "from":  "file:tests/ChairSide.Board.Tests/CanonicalAssignmentDomainValidationTests.cs",
                       "to":  "symbol:type:CanonicalAssignmentDomainValidationTests",
                       "label":  "declares"
@@ -3214,6 +3205,51 @@
                   {
                       "from":  "file:tests/ChairSide.Board.Tests/ScheduleFitReportTests.cs",
                       "to":  "symbol:type:ScheduleFitReportTests",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:tests/ChairSide.Board.Tests/TestSupport/ManualTimeProvider.cs",
+                      "to":  "symbol:type:ManualTimeProvider",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:tests/ChairSide.Board.Tests/TestSupport/NoopBoardHubContext.cs",
+                      "to":  "symbol:type:NoopBoardHubContext",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:tests/ChairSide.Board.Tests/TestSupport/NoopBoardHubContext.cs",
+                      "to":  "symbol:type:NoopClientProxy",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:tests/ChairSide.Board.Tests/TestSupport/NoopBoardHubContext.cs",
+                      "to":  "symbol:type:NoopGroupManager",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:tests/ChairSide.Board.Tests/TestSupport/NoopBoardHubContext.cs",
+                      "to":  "symbol:type:NoopHubClients",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:tests/ChairSide.Board.Tests/TestSupport/StoreContext.cs",
+                      "to":  "symbol:type:StoreContext",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:tests/ChairSide.Board.Tests/TestSupport/TestOptionsMonitor.cs",
+                      "to":  "symbol:type:TestOptionsMonitor",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:tests/ChairSide.Board.Tests/TestSupport/TestWebHostEnvironment.cs",
+                      "to":  "symbol:type:TestWebHostEnvironment",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:tests/ChairSide.Board.Tests/TestSupport/TestWorkspace.cs",
+                      "to":  "symbol:type:TestWorkspace",
                       "label":  "declares"
                   },
                   {
@@ -3764,6 +3800,36 @@
                   {
                       "from":  "repo:chairside",
                       "to":  "file:tests/ChairSide.Board.Tests/ScheduleFitReportTests.cs",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:tests/ChairSide.Board.Tests/TestSupport/ManualTimeProvider.cs",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:tests/ChairSide.Board.Tests/TestSupport/NoopBoardHubContext.cs",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:tests/ChairSide.Board.Tests/TestSupport/StoreContext.cs",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:tests/ChairSide.Board.Tests/TestSupport/TestOptionsMonitor.cs",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:tests/ChairSide.Board.Tests/TestSupport/TestWebHostEnvironment.cs",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:tests/ChairSide.Board.Tests/TestSupport/TestWorkspace.cs",
                       "label":  "contains"
                   },
                   {
