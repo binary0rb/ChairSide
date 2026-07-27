@@ -1,7 +1,7 @@
 ---
 title: Deterministic stress fixtures
 tags: [tests, room-lifecycle, reporting-population, exception-handling, data-persistence, test-coverage, active, last-verified]
-last_verified_commit: 4c1a6f7
+last_verified_commit: 61dac09
 ---
 
 # Deterministic stress fixtures
@@ -47,4 +47,5 @@ The command is maintenance-only, non-HTTP, confirmation-token gated, allowlisted
 - `src/ChairSide.Board/Services/DemoBoardStore.cs` - `ResetAndSeedStressFixture`, fixture builders, and summary.
 - `src/ChairSide.Board/Services/SqliteBoardRepository.cs` - `ResetMaintenanceState`.
 - `tests/ChairSide.Board.Tests/BoardStoreTests.cs` - CLI/profile and scenario coverage.
+- `tests/ChairSide.Board.Tests/TestSupport/` - assembly-wide store, workspace, environment, options, clock, and no-op SignalR fixtures shared by behavior tests.
 - `tests/ChairSide.Board.Tests/LifecycleFixtureCorrectionTests.cs` - canonical Ready fixture, repeated reset, and development-seed durability coverage.

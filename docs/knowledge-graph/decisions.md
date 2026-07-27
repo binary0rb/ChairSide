@@ -62,6 +62,18 @@ This file records decisions that should survive across tasks, PRs, and debugging
 
 **Compatibility:** Omitted Ready and Doctor Arrived bodies retain their narrow, test-guarded top-level `RoomStatus` responses. This removal does not affect those response branches, legacy persisted Aging/Stale recovery, or legitimate legacy arrived-room completion.
 
+## Room capability authority
+
+**Decision:** `RoomCapabilitiesEvaluator`, projected through `DemoBoardStore.ToRoomStatus`, is authoritative for server-known base lifecycle capabilities. The browser consumes `RoomStatus.Capabilities` and retains only genuinely client-local guards such as unsaved draft completeness and dirtiness. Endpoint and store validation remain final for every mutation.
+
+**Rationale:** One server projection prevents the browser from drifting into a parallel lifecycle matrix while preserving the distinction between durable server state and an unsubmitted browser draft. Capability projection is advisory, not authorization.
+
+## Room integrity authority
+
+**Decision:** `DemoBoardStore.DeriveIntegrityFaults` is the production authority for room-integrity projection. It evaluates canonical assignment facts together with repository-backed Active or Accepted handoff context. The context-free `RoomIntegrityFaultEvaluator` was unused by production and was removed.
+
+**Rationale:** Integrity decisions after Ready depend on persisted ownership and handoff history. Production-path tests prove that a partial persisted Ready assignment projects `ReadyAssignmentIncomplete`, blocks Doctor Arrived without mutation, and retains safe cancellation.
+
 ## Development seed
 
 **Decision:** Demo data seeds only in Development when all operational tables are empty before configured-room initialization. The seed is persisted, and demo Ready rooms have canonical episodes, assignments, and owned Active handoffs. Fresh Training and Production databases initialize configured rooms as Available.

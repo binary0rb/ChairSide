@@ -1,7 +1,7 @@
 ---
 title: Procedure mix
 tags: [reports, doctor-flow, procedure-mix, reporting-population, sedation, domain-rule, active, last-verified]
-last_verified_commit: e2badc2
+last_verified_commit: 61dac09
 ---
 
 # Procedure mix
@@ -29,13 +29,13 @@ Population: built over `standardCompletedCycles`, the same standard completed-cy
 
 ## Source anchors
 
-- `src/ChairSide.Board/Services/DemoBoardStore.cs` - `DoctorProcedureMixRow` record (~line 2293); `BuildDoctorProcedureMix` (~1871); wired into the snapshot at `~605`.
-- `tests/ChairSide.Board.Tests/BoardStoreTests.cs` - `Doctor_procedure_mix_groups_by_doctor_and_variant_with_shares` (~824), `Doctor_procedure_mix_isolates_rows_and_denominators_per_doctor` (~862), `Doctor_procedure_mix_excludes_incomplete_and_reporting_exception_cycles` (~890), `Doctor_procedure_mix_skips_cycles_with_blank_doctor` (~941).
+- `src/ChairSide.Board/Services/DemoBoardStore.cs` - `DoctorProcedureMixRow`, `BuildDoctorProcedureMix`, and the `GetReports` snapshot construction.
+- `tests/ChairSide.Board.Tests/BoardStoreTests.cs` - `Doctor_procedure_mix_groups_by_doctor_and_variant_with_shares`, `Doctor_procedure_mix_isolates_rows_and_denominators_per_doctor`, `Doctor_procedure_mix_excludes_incomplete_and_reporting_exception_cycles`, and `Doctor_procedure_mix_skips_cycles_with_blank_doctor`.
 - `src/ChairSide.Board/wwwroot/board.js` - `renderSelectedDoctorProcedures` (Procedure Mix tab rendering).
 - `docs/knowledge-graph/chairside.graph.md` - procedure-mix nodes and reporting-semantics notes.
 
 ## Verification notes
 
-Verified at `e2badc2`: the `DoctorProcedureMixRow` record, the `BuildDoctorProcedureMix` builder over `standardCompletedCycles`, the doctor/variant grouping with per-doctor denominators, and the four guarding tests (grouping/shares, per-doctor isolation, exclusion of incomplete and reporting-exception cycles, blank-doctor skip) are present. Line numbers are approximate.
+Verified at `61dac09`: the `DoctorProcedureMixRow` record, the `BuildDoctorProcedureMix` builder over `standardCompletedCycles`, the doctor/variant grouping with per-doctor denominators, and the four guarding tests (grouping/shares, per-doctor isolation, exclusion of incomplete and reporting-exception cycles, blank-doctor skip) are present.
 
 Known limits: like [observed-load](observed-load.md), this is a recent read model whose UI may expand; keep the note focused on intent, grouping, and population rather than presentation.

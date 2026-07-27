@@ -219,8 +219,8 @@ app.MapPost("/api/reports/cycles/mark-exception", async Task<IResult> (
     DiagnosticLogger diagnosticLogger,
     Microsoft.AspNetCore.SignalR.IHubContext<BoardHub> hubContext) =>
 {
-    // Prefer the stable CompletedCycleId when supplied; otherwise fall back to the legacy
-    // (RoomId, SeatedAt) compound key so existing UI and older clients keep working.
+    // The checked-in UI supplies the stable CompletedCycleId. Retain the (RoomId, SeatedAt)
+    // compound-key fallback only for older report clients.
     bool success;
     int auditRoomNumber;
     if (request.CompletedCycleId is > 0)
