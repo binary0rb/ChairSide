@@ -382,41 +382,6 @@ public sealed class PrestagingAssignmentContractTests
     }
 
     [Fact]
-    public void Ready_or_later_incomplete_assignment_yields_integrity_fault()
-    {
-        var assignment = RoomAssignmentContract.Create(
-            "otte",
-            "EXT",
-            SedationContract.EligibleUnresolved(),
-            ExpectedAllocationContract.Suggested(4));
-
-        var faults = RoomIntegrityFaultEvaluator.Evaluate(
-            CanonicalRoomLifecycleState.ReadyForDoctor,
-            assignment);
-
-        var fault = Assert.Single(faults);
-        Assert.Equal(RoomIntegrityFaultCode.ReadyAssignmentIncomplete, fault.Code);
-        Assert.Same(assignment, fault.Assignment);
-    }
-
-    [Fact]
-    public void Integrity_fault_is_separate_from_assignment_completeness()
-    {
-        var assignment = RoomAssignmentContract.Create(
-            "otte",
-            "EXT",
-            SedationContract.EligibleUnresolved(),
-            ExpectedAllocationContract.Suggested(4));
-
-        var faults = RoomIntegrityFaultEvaluator.Evaluate(
-            CanonicalRoomLifecycleState.DoctorWorking,
-            assignment);
-
-        Assert.Equal(AssignmentCompleteness.Partial, assignment.Completeness);
-        Assert.Equal(RoomIntegrityFaultCode.ReadyAssignmentIncomplete, Assert.Single(faults).Code);
-    }
-
-    [Fact]
     public void Legacy_false_sentinel_is_not_automatically_canonical_eligible_no()
     {
         const bool legacySedationFlag = false;

@@ -1911,12 +1911,6 @@
                       "path":  "src/ChairSide.Board/Services/RoomAssignmentContracts.cs"
                   },
                   {
-                      "id":  "symbol:type:RoomIntegrityFaultEvaluator",
-                      "label":  "RoomIntegrityFaultEvaluator",
-                      "type":  "CodeType",
-                      "path":  "src/ChairSide.Board/Services/RoomAssignmentContracts.cs"
-                  },
-                  {
                       "id":  "symbol:type:RoomLifecycleEndpointHandler",
                       "label":  "RoomLifecycleEndpointHandler",
                       "type":  "CodeType",
@@ -2930,11 +2924,6 @@
                   {
                       "from":  "file:src/ChairSide.Board/Services/RoomAssignmentContracts.cs",
                       "to":  "symbol:type:RoomIntegrityFaultCode",
-                      "label":  "declares"
-                  },
-                  {
-                      "from":  "file:src/ChairSide.Board/Services/RoomAssignmentContracts.cs",
-                      "to":  "symbol:type:RoomIntegrityFaultEvaluator",
                       "label":  "declares"
                   },
                   {

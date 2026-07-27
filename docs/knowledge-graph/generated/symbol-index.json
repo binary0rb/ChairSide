@@ -2164,7 +2164,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/RoomAssignmentContracts.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  17420,
+                      "sizeBytes":  16534,
                       "typeSymbols":  [
                                           "AssignmentCompleteness",
                                           "SedationState",
@@ -2179,8 +2179,7 @@
                                           "ReadyUrgencyEvaluator",
                                           "RoomCapabilities",
                                           "RoomCapabilitiesEvaluator",
-                                          "RoomIntegrityFault",
-                                          "RoomIntegrityFaultEvaluator"
+                                          "RoomIntegrityFault"
                                       ],
                       "methodSymbols":  [
                                             "UnavailableNoProcedure",
@@ -2198,8 +2197,7 @@
                                             "NormalizeToken",
                                             "ValidateProcedureSedationCompatibility",
                                             "Evaluate",
-                                            "Validate",
-                                            "IsReadyOrLater"
+                                            "Validate"
                                         ],
                       "routes":  [
 
@@ -3421,11 +3419,12 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/MalformedAssignmentIntegrityTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  10615,
+                      "sizeBytes":  13282,
                       "typeSymbols":  [
                                           "MalformedAssignmentIntegrityTests"
                                       ],
                       "methodSymbols":  [
+                                            "Partial_ready_assignment_projects_fault_blocks_arrival_and_remains_cancellable",
                                             "Malformed_active_room_with_contradictory_sedation_recovers_visibly_faulted",
                                             "Malformed_active_room_with_non_positive_allocation_recovers_visibly_faulted",
                                             "Malformed_active_room_with_inconsistent_allocation_confirmation_recovers_visibly_faulted",
@@ -3457,7 +3456,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/PrestagingAssignmentContractTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  22867,
+                      "sizeBytes":  21589,
                       "typeSymbols":  [
                                           "PrestagingAssignmentContractTests",
                                           "HandoffEnvelope"
@@ -3492,8 +3491,6 @@
                                             "None_urgency_is_valid_outside_ready",
                                             "Aging_and_stale_urgency_are_valid_while_ready",
                                             "Aging_and_stale_urgency_are_rejected_outside_ready",
-                                            "Ready_or_later_incomplete_assignment_yields_integrity_fault",
-                                            "Integrity_fault_is_separate_from_assignment_completeness",
                                             "Legacy_false_sentinel_is_not_automatically_canonical_eligible_no",
                                             "Legacy_zero_sentinel_is_not_canonical_confirmed_allocation",
                                             "Procedure_suggestion_is_not_allocation_confirmation",
@@ -3502,7 +3499,8 @@
                                             "Integrity_faults_block_progression_but_preserve_ready_cancellation",
                                             "New_contract_status_values_serialize_as_strings_with_web_property_names",
                                             "Nullable_handoff_absence_serializes_as_null",
-                                            "AbsentAssignment"
+                                            "AbsentAssignment",
+                                            "CompleteIneligibleAssignment"
                                         ],
                       "routes":  [
 
