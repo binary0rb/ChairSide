@@ -1,7 +1,7 @@
 ---
 title: Sedation as a modifier
 tags: [reports, procedures, sedation, domain-rule, active, last-verified]
-last_verified_commit: e2badc2
+last_verified_commit: 61dac09
 ---
 
 # Sedation as a modifier
@@ -27,12 +27,12 @@ Sedation is a modifier of a primary procedure, never a standalone procedure and 
 
 ## Source anchors
 
-- `src/ChairSide.Board/Services/DemoBoardStore.cs` - `SedationModifierSuffix = "+SED"` (line ~1317), `HasSedationModifier` / `StripSedationModifier` / `ComposeProcedureCode` (~1319-1329), `LegacySedationCode = "SED"` (~1333), `IsSedationProcedureCode` (~1336-1338), `ResolveBaseProcedureCode` (~1342-1346); the `ProcedureCycleSummary` and `DoctorProcedureMixRow` records carry `BaseProcedureCode` / `IsSedationCase` (~2293-2301, ~2546-2550).
-- `tests/ChairSide.Board.Tests/BoardStoreTests.cs` - `Variant_summaries_carry_base_code_and_sedation_flag` and the sedation-partition test (`SedationCaseCount` + `NonSedationCaseCount`, ~1146-1186).
+- `src/ChairSide.Board/Services/DemoBoardStore.cs` - `SedationModifierSuffix`, `HasSedationModifier`, `StripSedationModifier`, `ComposeProcedureCode`, `LegacySedationCode`, `IsSedationProcedureCode`, and `ResolveBaseProcedureCode`; the `ProcedureCycleSummary` and `DoctorProcedureMixRow` records carry `BaseProcedureCode` and `IsSedationCase`.
+- `tests/ChairSide.Board.Tests/BoardStoreTests.cs` - `Variant_summaries_carry_base_code_and_sedation_flag` and `Sedation_and_non_sedation_counts_partition_completed_cycles`.
 - `AGENTS.md` - "Procedure categories and icons" (sedation as a category with a modifier role).
 
 ## Verification notes
 
-Verified at `e2badc2`: the `+SED` suffix, the compose/strip/resolve helpers, the legacy `SED` handling, and the `BaseProcedureCode` / `IsSedationCase` fields are all present. Line numbers are approximate; prefer the symbol names.
+Verified at `61dac09`: the `+SED` suffix, the compose/strip/resolve helpers, the legacy `SED` handling, and the `BaseProcedureCode` / `IsSedationCase` fields are all present.
 
 Known limits: the exact list of sedation-eligible procedures and the UI accent behavior for sedation chips are related but out of scope here.

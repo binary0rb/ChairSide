@@ -38,6 +38,11 @@ flowchart LR
 
     BoardStore["StoreOrService: Board store"] --> RoomLifecycle
     BoardStore --> Persistence["StoreOrService: SQLite persistence"]
+    BoardStore --> IntegrityAuthority["DesignDecision: Repository-aware integrity authority"]
+    IntegrityAuthority --> RoomCapabilities["Contract: Server-projected room capabilities"]
+    RoomCapabilities --> BoardUi
+    BrowserDraftGuards["DesignDecision: Browser-only unsaved draft guards"] --> BoardUi
+    Mutations["LifecycleEvent: Room-local writes"] --> ServerEnforcement["DesignDecision: Endpoint and store enforcement"]
     Persistence --> ActiveRooms["PersistenceModel: active_rooms"]
     Persistence --> Handoffs["PersistenceModel: ready_handoffs"]
     Persistence --> Aborts["PersistenceModel: aborted_room_assignments"]
@@ -70,7 +75,7 @@ flowchart LR
     ReadyHandoff --> ReadyPrimary["DesignDecision: Ready stays primary"]
     ReadyPrimary --> ReadyUrgency["UiSurface: Subordinate Aging / Stale badge"]
     SharedRoomCards --> DoctorView["UiSurface: Doctor View live-room frame"]
-    DeviceBinding["DomainConcept: Room device binding"] --> Mutations["LifecycleEvent: Room-local writes"]
+    DeviceBinding["DomainConcept: Room device binding"] --> Mutations
     Realtime["StoreOrService: SignalR + polling fallback"] --> BoardUi
 
     DevelopmentSeed["DeploymentAsset: Development demo seed"] --> Persistence
@@ -98,6 +103,8 @@ flowchart LR
 - Pre-arrival cancellation and max-duration expiration are aborted history outside throughput. Pre-arrival after-hours terminations remain aborted history but also enter the unified review queue. Post-arrival expiration is review-required exception history without a fabricated completion timestamp.
 - The after-hours sweep is independently retryable per room: successful rooms remain committed, failed and later active rooms retry, and the clinic day is marked complete only after a successful full pass.
 - Canonical lifecycle writes are compare-and-swap guarded against the complete originally loaded room, assignment, handoff, and timestamp expectation. Stale writes do not retry or mutate live state.
+- `RoomCapabilitiesEvaluator`, projected through the board store, is authoritative for server-known base action availability. Browser-only unsaved-draft guards remain local, and endpoint/store validation remains final.
+- `DemoBoardStore.DeriveIntegrityFaults` is the repository-aware production integrity authority. Faulted rooms remain visible, unsafe progression is blocked without rewriting persisted facts, and supported cancellation and legacy recovery remain available.
 - Doctor Arrived serializes durable cross-room doctor ownership and commits the room, Accepted handoff, and reporting cycle together.
 - Live state changes only after durable persistence succeeds; SQLite failures roll back transaction-local writes.
 - Legacy persisted Aging/Stale rows remain readable; recovery never fabricates or rewrites invalid handoffs.
@@ -133,3 +140,6 @@ flowchart LR
 - Issue #121 / PR #133 (`d902a27`) completed the room-panel workflow, and issue #122 / PR #134 (`2d59c70`) completed canonical master/Doctor View presentation.
 - Issue #123 / PR #132 (`9eb5e66`) completed the reporting-population work while preserving the accepted-handoff attribution contract established by issue #120.
 - Issue #126 / PR #142 (`47da8f9`) corrected knowledge-graph comment/string false-positive extraction.
+- Issues #158 and #159 verified and removed the unused flat Seat and legacy assignment transports while retaining bodyless Ready and Doctor Arrived responses.
+- Issue #160 moved assembly-wide test helpers from `BoardStoreTests.cs` into `tests/ChairSide.Board.Tests/TestSupport/`.
+- Issue #161 made server-projected room capabilities authoritative, and issue #162 removed the unused context-free integrity evaluator in favor of production store-path coverage.

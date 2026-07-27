@@ -1,7 +1,7 @@
 ---
 title: Observed load
 tags: [reports, doctor-flow, observed-load, reporting-population, domain-rule, active, last-verified]
-last_verified_commit: e2badc2
+last_verified_commit: 61dac09
 ---
 
 # Observed load
@@ -28,13 +28,13 @@ Population: built over `standardCompletedCycles`, the same standard completed-cy
 
 ## Source anchors
 
-- `src/ChairSide.Board/Services/DemoBoardStore.cs` - `ObservedDoctorDay` record (~line 2308); `BuildObservedDoctorDays` (~1706); wired into the snapshot at `~604`.
-- `tests/ChairSide.Board.Tests/BoardStoreTests.cs` - `Reports_observed_doctor_days_report_span_fields_for_included_completed_cycles` (~5034), `Reports_observed_doctor_days_bucket_active_room_minutes_by_concurrency` (~5082).
+- `src/ChairSide.Board/Services/DemoBoardStore.cs` - `ObservedDoctorDay`, `BuildObservedDoctorDays`, and the `GetReports` snapshot construction.
+- `tests/ChairSide.Board.Tests/BoardStoreTests.cs` - `Reports_observed_doctor_days_report_span_fields_for_included_completed_cycles` and `Reports_observed_doctor_days_bucket_active_room_minutes_by_concurrency`.
 - `src/ChairSide.Board/wwwroot/board.js` - selected-doctor Flow Breakdown rendering of observed load.
 - `docs/knowledge-graph/chairside.graph.md` - reporting-semantics notes reference the observed load read model.
 
 ## Verification notes
 
-Verified at `e2badc2`: the `ObservedDoctorDay` record fields, the `BuildObservedDoctorDays` builder over `standardCompletedCycles`, and the span and concurrency-bucket tests are present. Line numbers are approximate.
+Verified at `61dac09`: the `ObservedDoctorDay` record fields, the `BuildObservedDoctorDays` builder over `standardCompletedCycles`, and the span and concurrency-bucket tests are present.
 
 Known limits: observed load and [procedure-mix](procedure-mix.md) are the newest report read models; their core intent (descriptive-only, standard population) is stable, but their UI presentation may still expand. Keep this note focused on intent and population, not on tab layout.

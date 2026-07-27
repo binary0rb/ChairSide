@@ -1,7 +1,7 @@
 ---
 title: Room lifecycle
 tags: [room, board, room-lifecycle, data-persistence, permissions, device-binding, domain-rule, active, last-verified]
-last_verified_commit: ca75b09
+last_verified_commit: 61dac09
 ---
 
 # Room lifecycle
@@ -18,7 +18,9 @@ ChairSide tracks room episodes, not patients. The canonical lifecycle is:
 6. Doctor Complete records `DoctorCompleteAt` and enters `Turnover`.
 7. Room Available records completion and releases the room to `Available`.
 
-Issue #120 exposed canonical Begin Prestage, Save Details, Seat, Ready, Withdraw Ready, and Doctor Arrived endpoints. Issue #121 / PR #133 (`d902a27`) completed the room-panel migration to those contracts. Issue #158 verified that maintained deployed callers no longer use flat assignment-bearing Seat, `/update-assignment`, or `/assignment`; issue #159 removed those legacy transports. Omitted Ready and Doctor Arrived bodies preserve the legacy-compatible `RoomStatus` response, while the canonical room panel sends explicit bodies and consumes the lifecycle action envelope.
+Issue #120 exposed canonical Begin Prestage, Save Details, Seat, Ready, Withdraw Ready, and Doctor Arrived endpoints. Issue #121 / PR #133 (`d902a27`) completed the room-panel migration to those contracts. Issue #158 verified that maintained deployed callers no longer use flat assignment-bearing Seat, `/update-assignment`, or `/assignment`; issue #159 removed those legacy transports. The room panel sends Ready with its explicit assignment-bearing body and consumes the lifecycle action envelope. It sends Doctor Arrived without a body, consumes the top-level `RoomStatus` success response, and uses the retained bodyless conflict response when the doctor is already in another room.
+
+Canonical Seat accepts only the nested `assignment` shape. The removed flat Seat parser and assignment routes are not compatibility surfaces. The retained response boundary is narrower: bodyless Ready remains compatible with the top-level `RoomStatus` response, while bodyless Doctor Arrived is maintained transport required by the checked-in room panel and returns top-level `RoomStatus` on success. Explicit canonical bodies remain supported and return the lifecycle action envelope.
 
 ## Ready handoff and urgency
 
@@ -38,6 +40,14 @@ Restart recovery restores durable truth and projects urgency and integrity witho
 
 Canonical `DoctorInRoom` and `Turnover` progression revalidates the room assignment and in-progress reporting-cycle attribution against the immutable Accepted handoff. Contradictory recovered state projects or returns `integrity-fault` and blocks Doctor Complete or Room Available without mutating room, handoff, cycle, timestamps, reports, events, or live state. Legitimate legacy arrived rooms without handoff metadata retain their compatibility completion path.
 
+## Capability and integrity authority
+
+`RoomCapabilitiesEvaluator` defines the server-known base action matrix. `DemoBoardStore.ToRoomStatus` evaluates that policy with canonical lifecycle state, durable episode presence, and repository-aware integrity faults, then projects it as `RoomStatus.Capabilities`. `board.js` consumes those booleans instead of reconstructing server lifecycle legality from room state.
+
+Unsaved assignment-draft completeness and dirtiness are browser-only facts and remain local guards layered over the server projection. Dirtiness controls Save Details and Discard Changes; draft completeness controls Ready's next-action highlighting. Projected capabilities do not authorize a mutation: endpoint and store validation remain final and reject illegal, stale, invalid, or integrity-faulted requests.
+
+`DemoBoardStore.DeriveIntegrityFaults` is the production room-integrity authority. Its repository context covers assignment completeness, owned Active or Accepted handoffs, and contradictory references. The unused context-free `RoomIntegrityFaultEvaluator` was removed. Production-path coverage persists a partial Ready assignment, verifies `ReadyAssignmentIncomplete`, proves Doctor Arrived returns the canonical integrity-fault outcome without changing the durable assignment, and confirms safe cancellation remains available.
+
 ## Concurrency and durability
 
 Canonical lifecycle writes capture the complete originally loaded durable room expectation: room/episode/state identity, assignment and allocation values, both handoff references, and lifecycle timestamps. The guarded SQLite update uses null-safe comparisons. A stale context receives `stale-write`; it does not mutate live memory, retry, reload, append an event, regress Ready, overwrite the locked assignment, or orphan a handoff.
@@ -50,11 +60,12 @@ Room lifecycle mutation remains room-local and device-token guarded. Doctors are
 
 ## Source and test anchors
 
-- `src/ChairSide.Board/Services/DemoBoardStore.cs`
-- `src/ChairSide.Board/Program.cs`
+- `src/ChairSide.Board/Services/DemoBoardStore.cs` - `ToRoomStatus`, `DeriveIntegrityFaults`, and canonical mutation methods.
+- `src/ChairSide.Board/Program.cs` - `RoomLifecycleEndpointHandler` and its bodyless Ready/Doctor Arrived response branches.
 - `src/ChairSide.Board/Services/PrestagingLifecycleApiContracts.cs`
 - `src/ChairSide.Board/Services/SqliteBoardRepository.cs`
-- `src/ChairSide.Board/Services/RoomAssignmentContracts.cs`
+- `src/ChairSide.Board/Services/RoomAssignmentContracts.cs` - `RoomCapabilitiesEvaluator` and assignment contracts.
+- `src/ChairSide.Board/wwwroot/board.js` - `roomCapabilities`, `setRoomControlsEnabled`, `setNextPrimaryAction`, and browser-local draft guards.
 - `tests/ChairSide.Board.Tests/PrestagingLifecycleTransitionTests.cs`
 - `tests/ChairSide.Board.Tests/PrestagingLifecycleApiContractTests.cs`
 - `tests/ChairSide.Board.Tests/PrestagingLifecycleEndpointTests.cs`
@@ -62,6 +73,8 @@ Room lifecycle mutation remains room-local and device-token guarded. Doctors are
 - `tests/ChairSide.Board.Tests/CanonicalAssignmentDomainValidationTests.cs`
 - `tests/ChairSide.Board.Tests/FaultedReadyCancellationTests.cs`
 - `tests/ChairSide.Board.Tests/MalformedAssignmentIntegrityTests.cs`
+- `tests/ChairSide.Board.Tests/BoardReadyPresentationTests.cs`
+- `tests/ChairSide.Board.Tests/RoomPanelPrestagingWorkflowTests.cs`
 - `tests/ChairSide.Board.Tests/DurableFailureInjectionTests.cs`
 
 ## Knowledge-graph extraction follow-up

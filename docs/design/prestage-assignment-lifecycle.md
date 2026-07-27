@@ -2,7 +2,7 @@
 
 ## Status and traceability
 
-Issue #119 implemented the store and persistence lifecycle described here. Issue #120 exposed that lifecycle through canonical HTTP contracts, including optional assignment-bearing Seat and Ready actions. Issue #121 / PR #133 (`d902a27`) completed the canonical room-panel workflow, and issue #126 / PR #142 (`47da8f9`) later corrected knowledge-graph comment/string extraction.
+Issue #119 implemented the store and persistence lifecycle described here. Issue #120 exposed that lifecycle through canonical HTTP contracts, including optional assignment-bearing Seat and Ready actions. Issue #121 / PR #133 (`d902a27`) completed the canonical room-panel workflow. Issues #158 and #159 verified and removed the unused flat Seat and legacy assignment transports. Issue #161 made the server projection authoritative for server-known room capabilities, and issue #162 confirmed the repository-aware store as the room-integrity authority. Issue #126 / PR #142 (`47da8f9`) corrected knowledge-graph comment/string extraction.
 
 ## Primary lifecycle
 
@@ -41,15 +41,25 @@ Ready requires a complete, currently valid assignment. The assignment may alread
 - links it through `ActiveReadyHandoffId`; and
 - locks assignment editing.
 
-An omitted or explicit empty Ready request uses the durably saved assignment. An assignment-bearing canonical request persists the supplied complete draft and creates the Active handoff in one transaction. The canonical room panel sends its current draft and consumes the lifecycle action envelope; omitted-body compatibility remains available to older clients.
+An omitted or explicit empty Ready request uses the durably saved assignment. An assignment-bearing canonical request persists the supplied complete draft and creates the Active handoff in one transaction. The canonical room panel sends its current draft and consumes the lifecycle action envelope. A bodyless Ready request remains a deliberately supported compatibility branch and returns the top-level `RoomStatus` response.
 
 ## Canonical HTTP contract
 
 Issue #120 exposes canonical Begin Prestage, Save Details, Seat, Ready, Withdraw Ready, and Doctor Arrived operations. Canonical assignment input uses `doctorId`, undecorated `procedureCode`, `sedationChoice`, and `confirmedExpectedAllocationUnits`; the internal `+SED` decoration is never accepted or returned by canonical transport. For an eligible procedure, `sedationChoice: "yes"` persists `EligibleYes`, while omitted or null `sedationChoice` represents the unchecked modifier and persists `EligibleNo`. Explicit `"no"` remains compatible.
 
+The canonical Seat request nests assignment under `assignment`. The former flat assignment-bearing Seat parser, `/update-assignment`, and `/assignment` routes were removed after issue #158 found no maintained deployed callers. Bodyless Ready and Doctor Arrived were explicitly outside that removal: they retain the top-level `RoomStatus` success response, while explicit canonical request bodies return the lifecycle action envelope.
+
 Room reads expose the durable canonical assignment alongside the existing room projection so initial load, polling, SignalR refresh, and restart recovery can restore doctor, procedure, sedation, allocation confirmation, completeness, lock state, and handoff references without inferring them from display fields.
 
 Canonical mutation outcomes distinguish room-not-found, invalid or incomplete assignment, lifecycle conflict, assignment lock, integrity fault, stale write, and persistence failure. Malformed or invalid assignment input maps to HTTP 400, room-not-found to 404, lifecycle/integrity/concurrency conflicts to 409, and persistence failure to 500. Validation and persistence failures do not partially mutate the room, handoff, cycle, live state, or event stream.
+
+## Capability and integrity authority
+
+`RoomCapabilitiesEvaluator` is the single base policy for server-known lifecycle capabilities. `DemoBoardStore.ToRoomStatus` evaluates it from the projected canonical state, durable episode presence, and repository-aware integrity faults, then exposes the result as `RoomStatus.Capabilities`. The room browser consumes that projection instead of maintaining a parallel lifecycle-state matrix.
+
+Browser-only facts remain browser-owned. In particular, local draft dirtiness controls Save Details and Discard Changes, while local draft completeness controls whether Ready is highlighted as the next primary action. These client guards are advisory UI behavior; endpoint and store validation remain the final authority for every submitted mutation.
+
+`DemoBoardStore.DeriveIntegrityFaults` is the production authority for room-integrity projection because it can evaluate durable assignment and handoff context together. It keeps malformed or partial Ready rooms visible, blocks unsafe progression without rewriting persisted facts, and preserves supported cancellation and legacy recovery. The former context-free `RoomIntegrityFaultEvaluator` was unused by production and has been removed.
 
 ## Ready urgency, withdrawal, and acceptance
 
@@ -104,6 +114,8 @@ The stress-fixture reset transaction deletes completed cycles, all Active handof
 
 - Bare Prestage and incomplete Seated drafts persist truthfully.
 - Ready rejects incomplete or invalid durable assignment and locks a complete one in an owned handoff.
+- Server-projected capabilities govern server-known browser action availability; browser-local draft guards and endpoint/store enforcement retain their separate responsibilities.
+- Repository-aware integrity projection blocks unsafe progression without repairing or hiding malformed persisted facts.
 - Withdrawal and reissue preserve episode identity while starting a fresh handoff/urgency interval.
 - Doctor Arrived accepts, rather than reconstructs, the Ready assignment.
 - Stale canonical writes are harmless CAS rejections.

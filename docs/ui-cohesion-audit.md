@@ -41,7 +41,7 @@ Only classes/assets confirmed present in the repo are listed.
 
 **Shell / nav / header**
 - `.app-header`, `.app-header.compact`, `.brand-lockup`, `.compact-brand`, `.primary-nav`, `.nav-pill`, `.nav-item`, `.nav-menu`, `.nav-menu-item`, `.nav-caret` -- shared verbatim across every page.
-- `.master-shell` / `.panel-shell` / `.doctor-shell` / `.reports-shell` -- one shared width rule (`min(1540px, calc(100vw - 36px))`). `.workshop-shell` independently re-declares the identical width/margin/padding instead of joining this selector list.
+- `.master-shell` / `.panel-shell` / `.doctor-shell` / `.reports-shell` / `.workshop-shell` -- one shared width and margin rule (`min(1540px, calc(100vw - 36px))`).
 - `.connection-status` (`.live` / `.reconnecting` / `.stale`) and `.build-version` -- shared status affordances in the header, present on every page via `board.js`.
 
 **Cards / panels**
@@ -56,7 +56,7 @@ Only classes/assets confirmed present in the repo are listed.
 
 **Chips / badges / status**
 - `.doctor-chip`, `.procedure-chip` (board/legend, squared 8px radius).
-- `.report-badge` / `.report-badge-excluded`, `.sedation-chip`, `.workshop-status`, `.layer-pill` (all pill/999px-radius, reports/workshop scoped).
+- `.report-badge` / `.report-badge-excluded`, `.sedation-chip`, `.workshop-status`, `.layer-pill` (all pill/999px-radius, shared across Reports, Doctor View, and Workshop as applicable).
 - `.procedure-badge`, `.insight-code`.
 - `.state-dot` (`.empty` / `.seated` / `.aging` / `.stale` / `.ready-for-doctor` / `.doctor-in-room` / `.turnover`) -- the board's own state-identity chip language, deliberately distinct from the report chip language.
 
@@ -80,17 +80,17 @@ Only classes/assets confirmed present in the repo are listed.
 
 **Spacing.** Gap and padding values are chosen per component with no evident increment: gaps of `4px, 6px, 8px, 10px, 12px, 14px, 16px, 18px, 24px` and paddings of `8px, 9px, 10px, 12px, 14px, 16px, 18px, 20px, 24px, 28px` all appear, often for visually equivalent purposes (card internal padding is `14px 16px` on `.report-card`, `16px` on `.doctor-report-card`, `16px` on `.workshop-card`, `18px` on `.selected-doctor-panel`).
 
-**Page gutters.** Consistent at the shell level (`.master-shell`/`.panel-shell`/`.doctor-shell`/`.reports-shell` share one width rule) but `.workshop-shell` duplicates the identical declaration instead of joining the shared selector -- same value, separate source of truth.
+**Page gutters.** Consistent at the shell level: `.master-shell`, `.panel-shell`, `.doctor-shell`, `.reports-shell`, and `.workshop-shell` share one width and margin rule.
 
 **Card/panel treatment.** Two coherent-but-different families, and this split is largely load-bearing (see Section 5), not accidental: the "soft card" family (reports/workshop/doctor cockpit) uses 1px borders, 10-14px radius, and soft box-shadows; the "operational tile" family (`.room-tile`, `.touch-controls`, `.corrections-panel`, `.selection-tile`) uses 2px+ borders, an 8-10px radius, and explicitly sets `box-shadow: none` in the board/room/doctor-list scoped overrides. Within the operational-tile family itself there's unnecessary drift: `body[data-view="room"] .touch-controls` and `.corrections-panel` are hard-coded to `border-radius: 8px` while the unscoped base rules use `10px`, so room-panel supporting cards are subtly squarer than the same components would be by default.
 
 **Buttons and controls.** As noted in Section 3, there are two unrelated button idioms (large rectangular workflow buttons vs. small pill chips) with no shared base class, so hover/focus/disabled states are redefined per idiom. Within the chip idiom, `.report-filter-chip` and `.report-range-chip` are two selectors with byte-for-byte identical rule bodies (base, `:hover`, `:focus-visible`, `.is-active`) -- a direct duplication candidate.
 
-**Chips/badges/status indicators.** The pill idiom (`.report-badge`, `.sedation-chip`, `.workshop-status`, `.layer-pill`, all `border-radius: 999px`) is consistent within Reports/Workshop, but `.doctor-chip`/`.procedure-chip` on the board legend use a squared `8px` radius, breaking that pattern where the two systems sit near each other conceptually (both are "small labeled badges"). More concretely: **`.sedation-chip` is only styled under `body[data-view="reports"]`**, but `board.js`'s `renderSelectedDoctorProcedures()` (the Procedure Mix tab) renders `<span class="sedation-chip">` and is shared by both `reports.html` and `doctor.html` via `renderSelectedDoctorPanel`. On the doctor cockpit, that chip currently has no matching selector and renders as unstyled inline text instead of the blue pill it shows on Reports.
+**Chips/badges/status indicators.** The pill idiom (`.report-badge`, `.sedation-chip`, `.workshop-status`, `.layer-pill`, all `border-radius: 999px`) is consistent within Reports/Workshop, but `.doctor-chip`/`.procedure-chip` on the board legend use a squared `8px` radius, breaking that pattern where the two systems sit near each other conceptually (both are "small labeled badges"). The earlier `.sedation-chip` scoping gap is complete: the shared Reports/Doctor View selector now styles the output from `renderSelectedDoctorProcedures()` consistently on both pages.
 
 **Tables/metrics.** `.report-table` is consistently reused everywhere (a strength). But `.doctor-report-metrics` and `.selected-doctor-kpis` are two separately authored dt/dd metric-grid components (2-column vs. 4-column, different border/radius treatment) that visually serve the same purpose and could be one component with a column-count variant.
 
-**Page shell/header/nav.** No real inconsistency here -- see Section 2/Section 3. The only nit is `.workshop-shell`'s duplicated width declaration.
+**Page shell/header/nav.** No current inconsistency here -- see Section 2/Section 3. Workshop now participates in the shared shell selector.
 
 **Color usage.** `--doctor-color`/`--procedure-accent` are used consistently as semantic identity, which is correct and should stay. But neutral/structural colors are not tokenized: `#e2e8f0`, `#64748b`, `#0f172a`, `#334155`, `#6366f1`, and `rgba(23, 32, 51, ...)` each recur verbatim across many independent selectors (card borders, KPI text, workshop accent) rather than referencing a shared variable. This is the main reason the two "families" described in Section 2 can't easily be reconciled into one token set later without a dedicated pass.
 
@@ -126,14 +126,15 @@ These must not be casually changed by a cohesion pass. Where relevant, the confi
 
 Candidates for a future, separate CSS-foundation PR (not this one):
 
+Completed since the original audit: Workshop joined the shared shell width/margin selector, and the selected-doctor `.sedation-chip` style now applies on both Reports and Doctor View.
+
 - **Neutral color tokens** extending the existing `:root` set -- formalize the recurring `#e2e8f0` / `#64748b` / `#0f172a` / `#334155` / `#6366f1` / `rgba(23, 32, 51, *)` values noted in Section 4 into named variables, without touching `--doctor-color`/`--procedure-accent`/state colors.
 - **Typography scale** -- a small set of heading/body sizes to replace the dozen or so ad hoc `h2`/`h3`/`h4` sizes in Section 4.
 - **Spacing scale** -- a 4/8px-based scale to replace the current ad hoc gap/padding values.
 - **Border/radius/shadow rules** -- at minimum, name the two existing radius families ("soft card" ~10-14px vs. "operational tile" ~8-10px) so future components pick one on purpose instead of by accident.
-- **Page shell classes** -- fold `.workshop-shell` into the existing `.master-shell, .panel-shell, .doctor-shell, .reports-shell` selector group (or a shared `.app-shell` token) instead of duplicating the width rule.
 - **Card/panel classes** -- a shared base (`.report-card` is the closest existing candidate) that `.doctor-report-card`, `.workshop-card`, `.metric-card`, and `.selected-doctor-summary` could extend via modifiers instead of independent definitions.
 - **Button classes** -- decide explicitly whether the touch-button idiom and the chip-toggle idiom stay two systems (likely correct, given room-panel vs. filter-bar contexts) and, if so, name them as two documented systems rather than leaving the split implicit.
-- **Chip/badge classes** -- collapse `.report-badge`/`.sedation-chip`/`.workshop-status`/`.layer-pill` into one pill-badge base with color modifiers; fix the `.sedation-chip` doctor-view scoping gap found in Section 4 as part of this work (not this audit).
+- **Chip/badge classes** -- collapse `.report-badge`/`.sedation-chip`/`.workshop-status`/`.layer-pill` into one pill-badge base with color modifiers. The prior `.sedation-chip` Doctor View scoping gap is already fixed.
 - **Table classes** -- `.report-table` is already the shared base; no new work needed beyond documenting it as the canonical table.
 - **Metric card classes** -- unify `.doctor-report-metrics` and `.selected-doctor-kpis` into one dt/dd metric-grid component with a column-count modifier.
 - **Empty state classes** -- formalize `renderSelectedDoctorEmptyState()`'s markup shape as the canonical empty-state pattern and consider whether `.report-empty-state` (Reports headline) and `.workshop-note` should adopt it.
@@ -145,7 +146,7 @@ Candidates for a future, separate CSS-foundation PR (not this one):
 Small, ordered PRs, each independently safe to ship:
 
 1. **Design-system foundation/tokens PR.** Add the neutral color/spacing/type/radius tokens from Section 7 to `:root`. Additive only -- no selector's computed output changes yet.
-2. **Reuse existing card/panel/table/help patterns PR.** Fold `.workshop-shell`'s duplicate width rule into the shared shell selector; deduplicate `.report-filter-chip`/`.report-range-chip`; fix the `.sedation-chip` doctor-view scoping gap. All behavior-neutral, purely CSS-selector consolidation.
+2. **Reuse existing card/panel/table/help patterns PR.** Workshop shell sharing and the `.sedation-chip` doctor-view scoping correction are complete. The remaining candidate is to deduplicate `.report-filter-chip`/`.report-range-chip`. Keep any further work behavior-neutral and limited to CSS-selector consolidation.
 3. **Align low-risk supporting pages PR.** Apply the new tokens inside Reports/Workshop/doctor-cockpit component CSS (where the "soft card" language already lives) so those pages start reading from the shared scale instead of ad hoc values. No visual change intended -- same computed values, tokenized source.
 4. **Align room view PR.** Carefully apply the same token layer to `.touch-controls`, `.corrections-panel`, `.selection-tile`, and other room-panel supporting chrome (not the room-status tiles themselves), fixing the `body[data-view="room"]`-only 8px radius drift noted in Section 4.
 5. **Align main board last, conservatively.** Only after 1-4 are stable: fold the three duplicated "visual polish" blocks (`master`/`doctor-list`/`room .panel-status`) into one shared mixin-equivalent (a single scoped selector list, matching the existing `.master-shell, .panel-shell, ...` pattern) and collapse the four aging/stale `@keyframes` pairs into one shared pair -- verifying pixel-for-pixel that the board's current glanceable, high-contrast, `box-shadow: none` treatment is fully preserved before merging.
