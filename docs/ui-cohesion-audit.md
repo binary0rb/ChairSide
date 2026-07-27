@@ -56,7 +56,7 @@ Only classes/assets confirmed present in the repo are listed.
 
 **Chips / badges / status**
 - `.doctor-chip`, `.procedure-chip` (board/legend, squared 8px radius).
-- `.report-badge` / `.report-badge-excluded`, `.sedation-chip`, `.workshop-status`, `.layer-pill` (all pill/999px-radius, reports/workshop scoped).
+- `.report-badge` / `.report-badge-excluded`, `.sedation-chip`, `.workshop-status`, `.layer-pill` (all pill/999px-radius, shared across Reports, Doctor View, and Workshop as applicable).
 - `.procedure-badge`, `.insight-code`.
 - `.state-dot` (`.empty` / `.seated` / `.aging` / `.stale` / `.ready-for-doctor` / `.doctor-in-room` / `.turnover`) -- the board's own state-identity chip language, deliberately distinct from the report chip language.
 

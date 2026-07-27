@@ -18,9 +18,9 @@ ChairSide tracks room episodes, not patients. The canonical lifecycle is:
 6. Doctor Complete records `DoctorCompleteAt` and enters `Turnover`.
 7. Room Available records completion and releases the room to `Available`.
 
-Issue #120 exposed canonical Begin Prestage, Save Details, Seat, Ready, Withdraw Ready, and Doctor Arrived endpoints. Issue #121 / PR #133 (`d902a27`) completed the room-panel migration to those contracts. Issue #158 verified that maintained deployed callers no longer use flat assignment-bearing Seat, `/update-assignment`, or `/assignment`; issue #159 removed those legacy transports. Omitted Ready and Doctor Arrived bodies preserve the legacy-compatible `RoomStatus` response, while the canonical room panel sends explicit bodies and consumes the lifecycle action envelope.
+Issue #120 exposed canonical Begin Prestage, Save Details, Seat, Ready, Withdraw Ready, and Doctor Arrived endpoints. Issue #121 / PR #133 (`d902a27`) completed the room-panel migration to those contracts. Issue #158 verified that maintained deployed callers no longer use flat assignment-bearing Seat, `/update-assignment`, or `/assignment`; issue #159 removed those legacy transports. The room panel sends Ready with its explicit assignment-bearing body and consumes the lifecycle action envelope. It sends Doctor Arrived without a body, consumes the top-level `RoomStatus` success response, and uses the retained bodyless conflict response when the doctor is already in another room.
 
-Canonical Seat accepts only the nested `assignment` shape. The removed flat Seat parser and assignment routes are not compatibility surfaces. The intentionally retained compatibility boundary is narrower: bodyless Ready and Doctor Arrived return top-level `RoomStatus`, while explicit canonical bodies return the lifecycle action envelope.
+Canonical Seat accepts only the nested `assignment` shape. The removed flat Seat parser and assignment routes are not compatibility surfaces. The retained response boundary is narrower: bodyless Ready remains compatible with the top-level `RoomStatus` response, while bodyless Doctor Arrived is maintained transport required by the checked-in room panel and returns top-level `RoomStatus` on success. Explicit canonical bodies remain supported and return the lifecycle action envelope.
 
 ## Ready handoff and urgency
 

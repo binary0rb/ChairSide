@@ -513,7 +513,7 @@
                   {
                       "path":  "docs/knowledge/workflow/room-lifecycle.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  8806,
+                      "sizeBytes":  9061,
                       "typeSymbols":  [
 
                                       ],
@@ -607,7 +607,7 @@
                   {
                       "path":  "docs/knowledge-graph/decisions.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  13025,
+                      "sizeBytes":  13515,
                       "typeSymbols":  [
 
                                       ],
@@ -756,7 +756,7 @@
                   {
                       "path":  "docs/ui-cohesion-audit.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  25087,
+                      "sizeBytes":  25125,
                       "typeSymbols":  [
 
                                       ],

@@ -28,7 +28,7 @@ This file records decisions that should survive across tasks, PRs, and debugging
 
 **Rationale:** A doctor may act on the handoff as soon as Ready is issued, so silent assignment changes after that point are unsafe.
 
-**Compatibility:** Omitted Ready and Doctor Arrived bodies retain the legacy top-level `RoomStatus` response. Explicit canonical bodies return the lifecycle action envelope used by the canonical room panel.
+**Transport responses:** The checked-in room panel sends Ready with an explicit assignment-bearing body and consumes the lifecycle action envelope. It sends Doctor Arrived without a body, consumes the top-level `RoomStatus` success response, and relies on the retained bodyless conflict response contract. Bodyless Doctor Arrived is maintained panel transport, not an older-client-only path. Explicit-body Doctor Arrived remains supported and returns the lifecycle action envelope.
 
 ## Ready urgency
 
@@ -60,7 +60,7 @@ This file records decisions that should survive across tasks, PRs, and debugging
 
 **Rationale:** Explicit wire shapes and typed failures let current and future clients recover without partial mutation or inference from free-form messages. Issue #158 confirmed that no maintained deployed caller uses flat assignment-bearing Seat, `/update-assignment`, or `/assignment`; issue #159 removed those paths and their non-atomic Begin Prestage-to-Seat bridge.
 
-**Compatibility:** Omitted Ready and Doctor Arrived bodies retain their narrow, test-guarded top-level `RoomStatus` responses. This removal does not affect those response branches, legacy persisted Aging/Stale recovery, or legitimate legacy arrived-room completion.
+**Compatibility:** Omitted Ready retains its narrow, test-guarded top-level `RoomStatus` response. Bodyless Doctor Arrived remains the checked-in room panel transport, with top-level `RoomStatus` success and the retained room-panel conflict response; explicit-body Doctor Arrived remains supported with canonical lifecycle-envelope responses. This removal does not affect those response branches, legacy persisted Aging/Stale recovery, or legitimate legacy arrived-room completion.
 
 ## Room capability authority
 
