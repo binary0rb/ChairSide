@@ -61,6 +61,7 @@ public sealed class DemoBoardStore
     private readonly List<ProcedureCategory> _procedures;
     private readonly List<ProcedureCategory> _activeProcedures;
     private readonly ReportsSnapshotBuilder _reportsSnapshotBuilder;
+    private readonly DeterministicFixtureBuilder _fixtureBuilder;
 
     private readonly List<RoomState> _rooms;
     private readonly List<RoomEvent> _events = [];
@@ -95,6 +96,7 @@ public sealed class DemoBoardStore
         _procedures = BuildProcedures(procedureRosterOptions.Value).ToList();
         _activeProcedures = BuildProcedures(procedureRosterOptions.Value, activeOnly: true).ToList();
         _reportsSnapshotBuilder = new ReportsSnapshotBuilder(_doctors, _procedures, _activeProcedures);
+        _fixtureBuilder = new DeterministicFixtureBuilder(_activeDoctors, _activeProcedures);
         var now = Now;
 
         var hasOperationalData = _repository.HasOperationalData();
@@ -1148,47 +1150,7 @@ public sealed class DemoBoardStore
     {
         lock (_syncRoot)
         {
-            var doctorIds = _activeDoctors.Select(doctor => doctor.Id).ToList();
-            if (doctorIds.Count == 0)
-            {
-                return new SeedReportDataResult(0, 0, 0, 0, 0);
-            }
-
-            // Anchor on today's UTC date and walk back across a fixed history horizon. Every calendar
-            // day (including today, even on a weekend) gets a deterministic, front-loaded case count so
-            // the report date-range presets are all exercised: more cases recently, fewer further back.
-            var today = new DateTimeOffset(Now.UtcDateTime.Date, TimeSpan.Zero);
-            var written = 0;
-            var doctorsRepresented = new HashSet<string>(StringComparer.Ordinal);
-            var familiesRepresented = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            var globalIndex = 0;
-
-            for (var dayOffset = 0; dayOffset <= SyntheticHistoryDays; dayOffset++)
-            {
-                var day = today.AddDays(-dayOffset);
-                var casesForDay = CasesForDayOffset(dayOffset);
-                for (var caseInDay = 0; caseInDay < casesForDay; caseInDay++)
-                {
-                    // globalIndex advances once per slot (including skipped slots) so the doctor /
-                    // family rotation and the deterministic jitter stream are unchanged from before
-                    // this was extracted into WriteSyntheticCase.
-                    var completed = WriteSyntheticCase(doctorIds, dayOffset, day, caseInDay, globalIndex);
-                    globalIndex++;
-                    if (completed is { } write)
-                    {
-                        written++;
-                        doctorsRepresented.Add(write.DoctorId);
-                        familiesRepresented.Add(write.BaseFamilyCode);
-                    }
-                }
-            }
-
-            return new SeedReportDataResult(
-                written,
-                doctorsRepresented.Count,
-                familiesRepresented.Count,
-                written,
-                0);
+            return ApplySyntheticPlan(_fixtureBuilder.BuildSmallReportingPlan(Now, _roomCount));
         }
     }
 
@@ -1220,141 +1182,39 @@ public sealed class DemoBoardStore
     }
 
     // Seeds completedCycleTarget clean synthetic completed cycles (clamped to the CLI-accepted range
-    // as defense-in-depth). Reuses the exact per-case shaping/persistence as the small training seed
-    // via WriteSyntheticCase; the only difference is volume: a flat per-day case cap keeps every seat
+    // as defense-in-depth). Reuses the exact pure per-case builder and store-owned persistence as the
+    // small training seed; the only difference is volume: a flat per-day case cap keeps every seat
     // time inside its own UTC calendar day, and the requested total is spread across as many days
     // back as needed. Only successful writes count toward the target, so a roster with an unmapped
     // family still converges. Caller (ResetAndSeedLargeSyntheticReportData) already holds _syncRoot.
     private SeedReportDataResult SeedLargeSyntheticReportData(int completedCycleTarget)
     {
-        var doctorIds = _activeDoctors.Select(doctor => doctor.Id).ToList();
-        if (doctorIds.Count == 0)
+        return ApplySyntheticPlan(_fixtureBuilder.BuildLargeReportingPlan(Now, _roomCount, completedCycleTarget));
+    }
+
+    private SeedReportDataResult ApplySyntheticPlan(DeterministicFixturePlan plan)
+    {
+        foreach (var fixture in plan.SyntheticCycles)
         {
-            return new SeedReportDataResult(0, 0, 0, 0, 0);
-        }
-
-        var target = Math.Clamp(
-            completedCycleTarget,
-            MaintenanceCommands.MinCompletedCycles,
-            MaintenanceCommands.MaxCompletedCycles);
-
-        var today = new DateTimeOffset(Now.UtcDateTime.Date, TimeSpan.Zero);
-        var written = 0;
-        var doctorsRepresented = new HashSet<string>(StringComparer.Ordinal);
-        var familiesRepresented = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        var globalIndex = 0;
-
-        // Safety bound: one day per requested cycle is an unreachable-in-practice ceiling (given the
-        // flat per-day cap) that still guarantees termination if no family maps to an active procedure.
-        for (var dayOffset = 0; written < target && dayOffset <= target; dayOffset++)
-        {
-            var day = today.AddDays(-dayOffset);
-            for (var caseInDay = 0; caseInDay < LargeSyntheticCasesPerDay && written < target; caseInDay++)
-            {
-                var completed = WriteSyntheticCase(doctorIds, dayOffset, day, caseInDay, globalIndex);
-                globalIndex++;
-                if (completed is { } write)
-                {
-                    written++;
-                    doctorsRepresented.Add(write.DoctorId);
-                    familiesRepresented.Add(write.BaseFamilyCode);
-                }
-            }
+            UpsertSyntheticCycle(
+                fixture.RoomId,
+                fixture.DoctorId,
+                fixture.StoredProcedureCode,
+                fixture.SeatedAt,
+                fixture.PrepMinutes,
+                fixture.ReadyMinutes,
+                fixture.DoctorMinutes,
+                fixture.TurnoverMinutes,
+                fixture.DefaultExpectedUnits,
+                fixture.ExpectedUnits);
         }
 
         return new SeedReportDataResult(
-            written,
-            doctorsRepresented.Count,
-            familiesRepresented.Count,
-            written,
+            plan.SyntheticCycles.Count,
+            plan.DoctorsRepresented,
+            plan.ProcedureFamiliesRepresented,
+            plan.SyntheticCycles.Count,
             0);
-    }
-
-    // Deterministically shapes and upserts one clean synthetic completed cycle for the given day /
-    // case slot, returning the doctor id and base procedure family written (for coverage
-    // bookkeeping), or null when the rotated family has no active procedure (the slot is skipped).
-    // Shared by both the small training seed and the large report-data seed; the jitter draw order
-    // here is load-bearing (existing small-seed output is pinned by tests).
-    private (string DoctorId, string BaseFamilyCode)? WriteSyntheticCase(
-        IReadOnlyList<string> doctorIds,
-        int dayOffset,
-        DateTimeOffset day,
-        int caseInDay,
-        int globalIndex)
-    {
-        // Round-robin doctors so even a small window (e.g. Today) represents all four; the per-doctor
-        // style profile is aligned to the doctor.
-        var doctorIndex = globalIndex % doctorIds.Count;
-        var profile = SyntheticProfiles[doctorIndex % SyntheticProfiles.Count];
-        var doctorId = doctorIds[doctorIndex];
-
-        // Deterministic pseudo-randomness: the jitter stream is seeded from stable inputs (day offset,
-        // doctor, case-in-day), so the same slot always reproduces the same cycle.
-        var jitter = new SyntheticJitter(DeterministicSeed(dayOffset, doctorIndex, caseInDay));
-
-        // Rotate procedure families across the whole dataset to guarantee coverage.
-        var family = SyntheticFamilies[globalIndex % SyntheticFamilies.Count];
-        var procedure = FindActiveProcedure(family.Code);
-        if (procedure is null)
-        {
-            return null;
-        }
-
-        var sedation = family.SedationEligible
-            && procedure.SedationEligible
-            && jitter.Next(0, 99) < profile.SedationChancePercent;
-        var storedCode = ComposeProcedureCode(procedure.Code, sedation);
-
-        // Expected allocation: roster default, nudged by doctor style (generous vs tight) on variable
-        // families, plus a small bump for sedation burden.
-        var defaultUnits = Math.Clamp(procedure.DefaultExpectedUnits, MinExpectedUnits, MaxExpectedUnits);
-        var unitDelta = family.Code is "EXT" or "IMP" ? profile.VariableUnitDelta : 0;
-        if (sedation)
-        {
-            unitDelta += 1;
-        }
-        var expectedUnits = Math.Clamp(defaultUnits + unitDelta, MinExpectedUnits, MaxExpectedUnits);
-        var expectedMinutes = expectedUnits * 10;
-
-        // Measured case flow: doctor bias + (family character * profile weight) + jitter, clamped to a
-        // realistic per-family range. Always draw the jitter so the stream stays identical whether or
-        // not this case is forced to land at expected.
-        var minFlow = sedation ? family.MinFlowMinutes + 15 : family.MinFlowMinutes;
-        var maxFlow = sedation ? family.MaxFlowMinutes + 15 : family.MaxFlowMinutes;
-        var varianceJitter = jitter.Next(-profile.VarianceSpread, profile.VarianceSpread);
-        int measuredMinutes;
-        if (globalIndex % 9 == 0)
-        {
-            // Guarantee some exactly-at-expected cases for the neutral variance example.
-            measuredMinutes = Math.Clamp(expectedMinutes, minFlow, maxFlow);
-        }
-        else
-        {
-            var lean = family.CharacterLeanMinutes * profile.FamilyLeanWeight;
-            measuredMinutes = Math.Clamp(expectedMinutes + profile.VarianceBiasMinutes + lean + varianceJitter, minFlow, maxFlow);
-        }
-
-        // Split measured case flow into prep / ready / doctor minutes (doctor >= 1) so the
-        // timestamp-derived measured flow exactly equals measuredMinutes. Seat hours stay within the
-        // day (8am + case index) so no cycle crosses a UTC calendar day.
-        var prepMin = Math.Clamp(measuredMinutes * 12 / 100, 2, 12);
-        var readyMin = Math.Clamp(measuredMinutes * 18 / 100, 2, 20);
-        if (prepMin + readyMin >= measuredMinutes)
-        {
-            prepMin = Math.Max(1, measuredMinutes / 4);
-            readyMin = Math.Max(1, measuredMinutes / 4);
-        }
-        var doctorMin = Math.Max(1, measuredMinutes - prepMin - readyMin);
-        var turnoverMin = jitter.Next(4, 12);
-
-        var roomId = 1 + (caseInDay % Math.Max(1, _roomCount));
-        var seatedAt = day.AddHours(8 + caseInDay).AddMinutes(jitter.Next(0, 11) * 5);
-
-        UpsertSyntheticCycle(
-            roomId, doctorId, storedCode, seatedAt,
-            prepMin, readyMin, doctorMin, turnoverMin, defaultUnits, expectedUnits);
-
-        return (doctorId, ResolveBaseProcedureCode(storedCode));
     }
 
     // Writes (insert or deterministic update) one clean synthetic completed cycle. Keyed by
@@ -1419,11 +1279,9 @@ public sealed class DemoBoardStore
     }
 
     // ---------------------------------------------------------------------------
-    // Deterministic stress fixtures (maintenance-only, additive). These profiles never modify
-    // WriteSyntheticCase, UpsertSyntheticCycle, or the existing seeders above; they compose the
-    // same private helpers (FindActiveProcedure, ApplyExpectedAllocation, ComposeProcedureCode,
-    // the threshold-relative Aging/Stale/EarlySeated samples, and - for
-    // scenario-rich - WriteSyntheticCase itself) plus a small set of new, purpose-built builders.
+    // Deterministic stress fixtures (maintenance-only, additive). The catalog and pure builder
+    // describe fixture state; this store keeps reset ordering, live lifecycle/handoff construction,
+    // completed-cycle upserts, exception mutation, persistence, and result summaries.
     // See MaintenanceCommands.StressFixtureProfiles for the accepted --profile values.
     // ---------------------------------------------------------------------------
 
@@ -1450,72 +1308,36 @@ public sealed class DemoBoardStore
             var cyclesSeeded = 0;
             var doctorsRepresented = 0;
             var proceduresRepresented = 0;
+            var composition = DeterministicFixtureCatalog.ComposeProfile(
+                profile,
+                completedCycles ?? MaintenanceCommands.DefaultCompletedCycles);
 
-            switch (profile)
+            if (composition.LiveRooms.Count > 0)
             {
-                case MaintenanceCommands.ProfileReportingVolume:
+                SeedLiveRoomFixtures(composition.LiveRooms, now);
+            }
+
+            foreach (var segment in composition.HistorySegments)
+            {
+                var plan = segment.Kind switch
                 {
-                    var seed = SeedLargeSyntheticReportData(completedCycles ?? MaintenanceCommands.DefaultCompletedCycles);
-                    cyclesSeeded = seed.CyclesInserted;
-                    doctorsRepresented = seed.DoctorsRepresented;
-                    proceduresRepresented = seed.ProcedureFamiliesRepresented;
-                    break;
-                }
+                    FixtureHistoryKind.LargeReporting =>
+                        _fixtureBuilder.BuildLargeReportingPlan(now, _roomCount, segment.TargetCount),
+                    FixtureHistoryKind.ScenarioRich =>
+                        _fixtureBuilder.BuildScenarioRichPlan(now, _roomCount, segment.DayOffsetShift),
+                    _ => throw new InvalidOperationException($"Unknown fixture history kind '{segment.Kind}'.")
+                };
 
-                case MaintenanceCommands.ProfileLiveBoardStress:
-                    SeedLiveRoomFixtures(LiveBoardStressFixtures(), now);
-                    break;
+                var seed = ApplySyntheticPlan(plan);
+                cyclesSeeded += seed.CyclesInserted;
+                doctorsRepresented = seed.DoctorsRepresented;
+                proceduresRepresented = seed.ProcedureFamiliesRepresented;
+            }
 
-                case MaintenanceCommands.ProfileDoctorViewStress:
-                    SeedLiveRoomFixtures(DoctorViewStressFixtures(), now);
-                    break;
-
-                case MaintenanceCommands.ProfileDoctorViewOverflowStress:
-                    SeedLiveRoomFixtures(DoctorViewOverflowStressFixtures(), now);
-                    break;
-
-                case MaintenanceCommands.ProfileScenarioRich:
-                {
-                    var seed = SeedScenarioRichHistory();
-                    var edgeCasesWritten = SeedScenarioRichEdgeCases(now);
-                    cyclesSeeded = seed.CyclesInserted + edgeCasesWritten;
-                    doctorsRepresented = seed.DoctorsRepresented;
-                    proceduresRepresented = seed.ProcedureFamiliesRepresented;
-                    break;
-                }
-
-                case MaintenanceCommands.ProfileFullStress:
-                {
-                    // Composition only: the same live-room runner (with an overflow-shaped fixture
-                    // table) plus the same scenario-rich history/edge-case builders used above. No
-                    // bespoke seeding logic is introduced for this profile.
-                    SeedLiveRoomFixtures(FullStressLiveFixtures(), now);
-                    var seed = SeedScenarioRichHistory();
-                    var edgeCasesWritten = SeedScenarioRichEdgeCases(now);
-                    cyclesSeeded = seed.CyclesInserted + edgeCasesWritten;
-                    doctorsRepresented = seed.DoctorsRepresented;
-                    proceduresRepresented = seed.ProcedureFamiliesRepresented;
-                    break;
-                }
-
-                case MaintenanceCommands.ProfileAllScenarios:
-                    // Composition only: the same live-room runner (full-stress's overflow-shaped
-                    // fixture table, so Otte = 5), the existing large-synthetic seeder unmodified,
-                    // and the same scenario-rich history/edge-case builders used above - no bespoke
-                    // seeding logic. The bulk scenario-rich history is shifted by
-                    // AllScenariosHistoryDayOffsetShift so it can never land on the same calendar
-                    // days as the large-synthetic seed (see that constant's comment). cyclesSeeded/
-                    // doctorsRepresented/proceduresRepresented are intentionally left at 0 here and
-                    // computed from the ground-truth persisted completed cycles below instead of
-                    // summed from sub-seeder self-reports, so the summary is accurate regardless.
-                    SeedLiveRoomFixtures(FullStressLiveFixtures(), now);
-                    SeedLargeSyntheticReportData(completedCycles ?? MaintenanceCommands.DefaultCompletedCycles);
-                    SeedScenarioRichHistory(AllScenariosHistoryDayOffsetShift);
-                    SeedScenarioRichEdgeCases(now);
-                    break;
-
-                default:
-                    throw new InvalidOperationException($"Unknown stress fixture profile '{profile}'.");
+            if (composition.IncludeScenarioEdgeCases)
+            {
+                cyclesSeeded += ApplyExplicitCompletedCycleFixtures(
+                    _fixtureBuilder.BuildScenarioEdgeCases(now, _roomCount));
             }
 
             // Re-derive reporting-exception metadata over a detached reporting snapshot. Harmless
@@ -1544,9 +1366,9 @@ public sealed class DemoBoardStore
 
             if (string.Equals(profile, MaintenanceCommands.ProfileAllScenarios, StringComparison.Ordinal))
             {
-                // Ground truth, not a sum of sub-seeder self-reports: the large-synthetic seed and
-                // the scenario-rich history both write through the same WriteSyntheticCase/(RoomId,
-                // SeatedAt) upsert key, so a self-reported sum could overcount if any two writes ever
+                // Ground truth, not a sum of builder self-reports: the large-synthetic seed and the
+                // scenario-rich history both write through the same (RoomId, SeatedAt) upsert key,
+                // so a self-reported sum could overcount if any two writes ever
                 // targeted the same slot. Counting/deriving directly from the persisted completed
                 // cycles is correct regardless. SeedReportDataResult only exposes represented-doctor/
                 // family *counts* (not the sets themselves), so a true cross-seeder union is not
@@ -1868,268 +1690,58 @@ public sealed class DemoBoardStore
         return cycle;
     }
 
-    // live-board-stress: all 12 rooms filled, every one of the 7 room states present at least once,
-    // one intentionally unassigned Available room (no doctor coin), two sedation cases, and one
-    // long-label procedure (PCOC) to stress card text. Mixed doctors throughout.
-    private static IReadOnlyList<LiveRoomFixture> LiveBoardStressFixtures() =>
-    [
-        new(1, null, null, RoomStates.Available),
-        new(2, "otte", "CON", RoomStates.Seated),
-        new(3, "pledger", "EXT", RoomStates.ReadyForDoctor),
-        new(4, "gibson", "IMPRES", RoomStates.Aging),
-        new(5, "schroeder", "BX", RoomStates.Stale, Sedation: true),
-        new(6, "otte", "IMP", RoomStates.DoctorInRoom),
-        new(7, "pledger", "POST", RoomStates.Turnover),
-        new(8, "gibson", "PCOC", RoomStates.Seated),
-        new(9, "schroeder", "EXT", RoomStates.ReadyForDoctor, Sedation: true),
-        new(10, "otte", "BX", RoomStates.Aging),
-        new(11, "pledger", "IMP", RoomStates.Stale),
-        new(12, "gibson", "MISC", RoomStates.DoctorInRoom)
-    ];
-
-    // doctor-view-stress: fixed 1/3/4/4 active-room split across all four doctors (Otte 1, Pledger 3,
-    // Gibson 4, Schroeder 4 = 12), every counted room in a pre-arrival primary state (Seated or
-    // ReadyForDoctor, with threshold-relative urgency) so each Doctor View posture count is exact - see the assignment-based
-    // current-room-frame filter documented in docs/knowledge/ui/doctor-view-operational-header.md.
-    private static IReadOnlyList<LiveRoomFixture> DoctorViewStressFixtures() =>
-    [
-        new(1, "otte", "CON", RoomStates.Seated),
-        new(2, "pledger", "CON", RoomStates.Seated),
-        new(3, "pledger", "EXT", RoomStates.ReadyForDoctor),
-        new(4, "pledger", "IMP", RoomStates.Aging),
-        new(5, "gibson", "CON", RoomStates.Seated),
-        new(6, "gibson", "EXT", RoomStates.ReadyForDoctor),
-        new(7, "gibson", "IMP", RoomStates.Aging),
-        new(8, "gibson", "BX", RoomStates.Stale),
-        new(9, "schroeder", "CON", RoomStates.Seated),
-        new(10, "schroeder", "EXT", RoomStates.ReadyForDoctor),
-        new(11, "schroeder", "IMP", RoomStates.Aging),
-        new(12, "schroeder", "BX", RoomStates.Stale)
-    ];
-
-    // doctor-view-overflow-stress: one doctor (Otte) at 5 active rooms - the named overflow default,
-    // an odd count so the two-column posture ends in a ragged final row (the higher-risk visual
-    // case). Remaining doctors at 3/2/2 = 12 total, incidentally also covering the 3-room and
-    // 2-room postures. All counted rooms stay pre-arrival for the same reason as doctor-view-stress.
-    private static IReadOnlyList<LiveRoomFixture> DoctorViewOverflowStressFixtures() =>
-    [
-        new(1, "otte", "CON", RoomStates.Seated),
-        new(2, "otte", "EXT", RoomStates.Seated),
-        new(3, "otte", "IMP", RoomStates.ReadyForDoctor),
-        new(4, "otte", "BX", RoomStates.Aging),
-        new(5, "otte", "POST", RoomStates.Stale),
-        new(6, "pledger", "CON", RoomStates.Seated),
-        new(7, "pledger", "EXT", RoomStates.ReadyForDoctor),
-        new(8, "pledger", "IMP", RoomStates.Aging),
-        new(9, "gibson", "CON", RoomStates.Seated),
-        new(10, "gibson", "EXT", RoomStates.ReadyForDoctor),
-        new(11, "schroeder", "CON", RoomStates.Seated),
-        new(12, "schroeder", "EXT", RoomStates.ReadyForDoctor)
-    ];
-
-    // full-stress live-room component: renders all 12 room cards (11 assigned/active rooms plus 1
-    // intentionally unassigned Available room) - not "all 12 active". Reuses the doctor-view-overflow
-    // shape (Otte = 5, all pre-arrival) plus the master-board IN ROOM/TURNOVER states so the same
-    // fixture also exercises live-board-stress's state coverage. Doctor split: Otte 5, Gibson 2,
-    // Pledger 2, Schroeder 2, unassigned 1.
-    private static IReadOnlyList<LiveRoomFixture> FullStressLiveFixtures() =>
-    [
-        new(1, null, null, RoomStates.Available),
-        new(2, "otte", "CON", RoomStates.Seated),
-        new(3, "otte", "EXT", RoomStates.Seated),
-        new(4, "otte", "IMP", RoomStates.ReadyForDoctor),
-        new(5, "otte", "BX", RoomStates.Aging),
-        new(6, "otte", "POST", RoomStates.Stale),
-        new(7, "gibson", "IMPRES", RoomStates.DoctorInRoom),
-        new(8, "pledger", "POST", RoomStates.Turnover),
-        new(9, "schroeder", "PCOC", RoomStates.ReadyForDoctor),
-        new(10, "pledger", "MISC", RoomStates.Aging),
-        new(11, "gibson", "EXT", RoomStates.Stale, Sedation: true),
-        new(12, "schroeder", "BX", RoomStates.Seated)
-    ];
-
-    // --- scenario-rich history profile ----------------------------------------------------------
-
-    // Calendar days of clean synthetic history to seed (well beyond SyntheticHistoryDays=41, so
-    // Today/Last-7/Last-30/All-time all diverge and weekly trend buckets populate). Reuses
-    // WriteSyntheticCase unmodified - this is only a different orchestrating loop around it, the
-    // same relationship SeedSyntheticReportData and SeedLargeSyntheticReportData already have.
-    private const int ScenarioRichHistoryDays = 120;
-    private const int ScenarioRichCasesPerDay = 3;
-
-    // Fixed day-offset shift applied only by the all-scenarios profile so its scenario-rich bulk
-    // history never lands on the same calendar days as its large-synthetic seed. Both loops call the
-    // shared WriteSyntheticCase, whose (RoomId, SeatedAt) upsert key depends only on caseInDay (not
-    // on which loop calls it), so unshifted overlapping day ranges could silently collide and
-    // overwrite each other's rows. 2000 days is a fixed, deterministic margin comfortably beyond the
-    // worst-case large-synthetic span (MaxCompletedCycles / LargeSyntheticCasesPerDay = 10000 / 12,
-    // about 834 days), so it is safe regardless of the requested --completed-cycles count.
-    private const int AllScenariosHistoryDayOffsetShift = 2000;
-
-    // Seeds ScenarioRichHistoryDays of clean synthetic history ending dayOffsetShift days before
-    // today (0 = ends today, matching the scenario-rich profile's own unshifted default). Only the
-    // calendar day passed to WriteSyntheticCase shifts; the dayOffset value used for jitter/family
-    // seeding stays the original 0..ScenarioRichHistoryDays index, so a shifted call produces
-    // content-identical cycles to an unshifted call, just relocated to different calendar days.
-    private SeedReportDataResult SeedScenarioRichHistory(int dayOffsetShift = 0)
+    // Applies explicit completed-cycle descriptions through the existing store-owned upsert and
+    // manual-review paths. Construction is pure; persistence and review mutation remain here.
+    private int ApplyExplicitCompletedCycleFixtures(IReadOnlyList<ExplicitCompletedCycleFixture> fixtures)
     {
-        var doctorIds = _activeDoctors.Select(doctor => doctor.Id).ToList();
-        if (doctorIds.Count == 0)
+        foreach (var fixture in fixtures)
         {
-            return new SeedReportDataResult(0, 0, 0, 0, 0);
-        }
-
-        var today = new DateTimeOffset(Now.UtcDateTime.Date, TimeSpan.Zero);
-        var written = 0;
-        var doctorsRepresented = new HashSet<string>(StringComparer.Ordinal);
-        var familiesRepresented = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        var globalIndex = 0;
-
-        for (var dayOffset = 0; dayOffset <= ScenarioRichHistoryDays; dayOffset++)
-        {
-            var day = today.AddDays(-(dayOffset + dayOffsetShift));
-            for (var caseInDay = 0; caseInDay < ScenarioRichCasesPerDay; caseInDay++)
+            var candidate = fixture switch
             {
-                var completed = WriteSyntheticCase(doctorIds, dayOffset, day, caseInDay, globalIndex);
-                globalIndex++;
-                if (completed is { } write)
-                {
-                    written++;
-                    doctorsRepresented.Add(write.DoctorId);
-                    familiesRepresented.Add(write.BaseFamilyCode);
-                }
+                CleanCompletedCycleFixture clean => BuildCleanCompletedCycle(
+                    clean.RoomId,
+                    clean.DoctorId,
+                    clean.ProcedureCode,
+                    clean.SeatedAt,
+                    clean.PrepMinutes,
+                    clean.ReadyMinutes,
+                    clean.DoctorMinutes,
+                    clean.TurnoverMinutes),
+                MissingTimingCompletedCycleFixture missing => BuildMissingTimingCycle(
+                    missing.RoomId,
+                    missing.DoctorId,
+                    missing.ProcedureCode,
+                    missing.SeatedAt,
+                    missing.CompleteMinutes,
+                    missing.TurnoverMinutes),
+                _ => throw new InvalidOperationException(
+                    $"Unknown explicit completed-cycle fixture '{fixture.GetType().Name}'.")
+            };
+
+            var cycle = UpsertExplicitCompletedCycle(candidate);
+            if (fixture.ManualReviewSuggestion is not null)
+            {
+                MarkCycleAsException(cycle, ExceptionReasons.ManualReview, fixture.ManualReviewSuggestion);
             }
         }
 
-        return new SeedReportDataResult(written, doctorsRepresented.Count, familiesRepresented.Count, written, 0);
+        return fixtures.Count;
     }
 
-    // Seeds the explicit, deterministic edge-case cycles scenario-rich adds on top of the bulk clean
-    // history above: one clean, included cycle landing in each report date-range bucket boundary
-    // (Today; outside Today but inside Last-7; outside Last-7 but inside Last-30; older than
-    // Last-30 - offsets mirror the bucket comments already used by CasesForDayOffset), one cycle per
-    // derived reporting-exception reason engineered so only that reason's predicate is true (no
-    // accidental overlap - e.g. the ExtremeDuration cycle stays same-day, and the OvernightLifecycle
-    // cycle stays well under the extreme-duration thresholds), and one manual audit candidate flagged
-    // via the existing MarkCycleAsException path (composition, not duplicate logic). Returns the
-    // actual number of rows written (0 when there are no active doctors) rather than an assumed
-    // constant, so a caller's cycle-seeded count can never claim rows that were not written.
-    private int SeedScenarioRichEdgeCases(DateTimeOffset now)
-    {
-        var doctorIds = _activeDoctors.Select(doctor => doctor.Id).ToList();
-        if (doctorIds.Count == 0)
-        {
-            return 0;
-        }
-
-        var today = new DateTimeOffset(now.UtcDateTime.Date, TimeSpan.Zero);
-        var written = 0;
-
-        // Date-range bucket markers (Refinement 2). Each is a normal clean cycle - mapped active
-        // procedure, same-day, arrival present - so none of them trips a derived exception. The
-        // Today marker is anchored backward from `now` (with a same-day floor), never a fixed clock
-        // hour, so it is never seeded in the future regardless of what time this command runs.
-        var todayMarker = TodayMarkerTimestamps(today, now, prepMin: 6, readyMin: 8, doctorMin: 15, turnoverMin: 6);
-        UpsertExplicitCompletedCycle(BuildCleanCompletedCycle(
-            RoomForEdgeCase(1), doctorIds[0 % doctorIds.Count], "CON",
-            todayMarker.SeatedAt, todayMarker.PrepMin, todayMarker.ReadyMin, todayMarker.DoctorMin, todayMarker.TurnoverMin)); // Today
-        written++;
-
-        UpsertExplicitCompletedCycle(BuildCleanCompletedCycle(
-            RoomForEdgeCase(2), doctorIds[1 % doctorIds.Count], "EXT",
-            today.AddDays(-3).AddHours(9), prepMin: 8, readyMin: 10, doctorMin: 30, turnoverMin: 8)); // outside Today, inside Last-7
-        written++;
-
-        UpsertExplicitCompletedCycle(BuildCleanCompletedCycle(
-            RoomForEdgeCase(3), doctorIds[2 % doctorIds.Count], "IMP",
-            today.AddDays(-15).AddHours(9), prepMin: 10, readyMin: 15, doctorMin: 60, turnoverMin: 10)); // outside Last-7, inside Last-30
-        written++;
-
-        UpsertExplicitCompletedCycle(BuildCleanCompletedCycle(
-            RoomForEdgeCase(4), doctorIds[3 % doctorIds.Count], "BX",
-            today.AddDays(-40).AddHours(9), prepMin: 8, readyMin: 12, doctorMin: 25, turnoverMin: 8)); // older than Last-30
-        written++;
-
-        // One cycle per derived reporting-exception reason (Refinement 1), each isolated to only its
-        // own predicate.
-        UpsertExplicitCompletedCycle(BuildCleanCompletedCycle(
-            RoomForEdgeCase(5), doctorIds[0 % doctorIds.Count], "ZZZSTRESS",
-            today.AddDays(-2).AddHours(8), prepMin: 10, readyMin: 15, doctorMin: 35, turnoverMin: 10)); // UnmappedProcedure only
-        written++;
-
-        UpsertExplicitCompletedCycle(BuildCleanCompletedCycle(
-            RoomForEdgeCase(6), doctorIds[1 % doctorIds.Count], "SED",
-            today.AddDays(-2).AddHours(10), prepMin: 10, readyMin: 15, doctorMin: 35, turnoverMin: 10)); // LegacyProcedure only
-        written++;
-
-        UpsertExplicitCompletedCycle(BuildCleanCompletedCycle(
-            RoomForEdgeCase(7), doctorIds[2 % doctorIds.Count], "IMP",
-            today.AddDays(-2).AddHours(2), prepMin: 10, readyMin: 15, doctorMin: 245, turnoverMin: 10)); // ExtremeDuration only (case flow 4h30m, same day)
-        written++;
-
-        UpsertExplicitCompletedCycle(BuildCleanCompletedCycle(
-            RoomForEdgeCase(8), doctorIds[3 % doctorIds.Count], "EXT",
-            today.AddDays(-2).AddHours(23).AddMinutes(50), prepMin: 5, readyMin: 5, doctorMin: 15, turnoverMin: 5)); // OvernightLifecycle only (crosses midnight, tiny durations)
-        written++;
-
-        UpsertExplicitCompletedCycle(BuildMissingTimingCycle(
-            RoomForEdgeCase(9), doctorIds[0 % doctorIds.Count], "POST",
-            today.AddDays(-2).AddHours(14), completeMin: 50, turnoverMin: 10)); // MissingTiming only (no DoctorArrivedAt; DoctorCompleteAt/RoomAvailableAt set)
-        written++;
-
-        // Manual audit candidate: a normal clean cycle, then flagged through the same shared
-        // MarkCycleAsException path the real reports-page review workflow uses.
-        var manualCandidate = UpsertExplicitCompletedCycle(BuildCleanCompletedCycle(
-            RoomForEdgeCase(10), doctorIds[1 % doctorIds.Count], "BX",
-            today.AddDays(-1).AddHours(9), prepMin: 8, readyMin: 12, doctorMin: 28, turnoverMin: 8));
-        MarkCycleAsException(manualCandidate, ExceptionReasons.ManualReview, "Stress fixture: planted manual audit candidate for review-queue testing.");
-        written++;
-
-        return written;
-    }
-
-    // Deterministic room id for an edge-case cycle slot, wrapped into the configured room count so
-    // it stays a plausible room id regardless of RoomCount (historical completed-cycle rows do not
-    // need to reference a currently-configured room).
-    private int RoomForEdgeCase(int index) => 1 + (index % Math.Max(1, _roomCount));
-
-    // Computes the Today bucket marker's timestamps so it always lands on `today` and never in the
-    // future relative to `now`. A fixed clock-hour anchor (e.g. 09:00 UTC) would itself be a future
-    // timestamp whenever this command runs earlier than that, so this anchors backward from `now`
-    // instead. In the narrow edge case where `now` is within the marker's own total duration of UTC
-    // midnight, the phases are shrunk proportionally so every resulting timestamp still stays inside
-    // [today, now] - the marker is never seeded in the future, even in that edge case.
-    private static (DateTimeOffset SeatedAt, int PrepMin, int ReadyMin, int DoctorMin, int TurnoverMin) TodayMarkerTimestamps(
-        DateTimeOffset today, DateTimeOffset now, int prepMin, int readyMin, int doctorMin, int turnoverMin)
-    {
-        var totalMin = prepMin + readyMin + doctorMin + turnoverMin;
-        var elapsedTodayMin = Math.Max(0, (int)(now - today).TotalMinutes);
-        var safeTotalMin = Math.Min(totalMin, elapsedTodayMin);
-        var seatedAt = now.AddMinutes(-safeTotalMin);
-
-        if (safeTotalMin >= totalMin)
-        {
-            return (seatedAt, prepMin, readyMin, doctorMin, turnoverMin);
-        }
-
-        var scale = totalMin == 0 ? 0d : (double)safeTotalMin / totalMin;
-        var scaledPrep = (int)Math.Round(prepMin * scale);
-        var scaledReady = (int)Math.Round(readyMin * scale);
-        var scaledDoctor = (int)Math.Round(doctorMin * scale);
-        var scaledTurnover = Math.Max(0, safeTotalMin - scaledPrep - scaledReady - scaledDoctor);
-        return (seatedAt, scaledPrep, scaledReady, scaledDoctor, scaledTurnover);
-    }
-
-    // Builds a fully-completed, clean synthetic cycle with explicit minute splits (unlike
-    // WriteSyntheticCase, no jitter - every field here is directly authored so edge-case
-    // durations/day-crossings are exact and reproducible). Falls back to the procedure roster's
-    // default expected units when the code is legacy/inactive or entirely unmapped, since
-    // FindActiveProcedure would otherwise reject the two procedure-mapping edge cases outright.
     private CompletedRoomCycle BuildCleanCompletedCycle(
-        int roomId, string doctorId, string procedureCode, DateTimeOffset seatedAt,
-        int prepMin, int readyMin, int doctorMin, int turnoverMin)
+        int roomId,
+        string doctorId,
+        string procedureCode,
+        DateTimeOffset seatedAt,
+        int prepMin,
+        int readyMin,
+        int doctorMin,
+        int turnoverMin)
     {
-        var defaultUnits = Math.Clamp(FindProcedure(procedureCode)?.DefaultExpectedUnits ?? MinExpectedUnits, MinExpectedUnits, MaxExpectedUnits);
+        var defaultUnits = Math.Clamp(
+            FindProcedure(procedureCode)?.DefaultExpectedUnits ?? MinExpectedUnits,
+            MinExpectedUnits,
+            MaxExpectedUnits);
         var readyAt = seatedAt.AddMinutes(prepMin);
         var arrivedAt = readyAt.AddMinutes(readyMin);
         var completeAt = arrivedAt.AddMinutes(doctorMin);
@@ -2168,18 +1780,18 @@ public sealed class DemoBoardStore
         };
     }
 
-    // Builds the one deliberately abnormal cycle in the edge-case set: DoctorArrivedAt stays null
-    // (the MissingTiming predicate), but unlike a genuinely in-progress room, DoctorCompleteAt and
-    // RoomAvailableAt ARE set, since report date-range windows are anchored on DoctorCompleteAt
-    // (GetReports/ReportDateRange) - a null DoctorCompleteAt would only ever surface in the All-time
-    // range. Durations that depend on arrival (SeatedToDoctorSeconds - sentinel 0, since the field is
-    // non-nullable; ReadyToDoctorSeconds; DoctorInRoomSeconds) stay null/0; TurnoverSeconds and
-    // TotalRoomCycleSeconds are still computed since they do not depend on arrival.
     private CompletedRoomCycle BuildMissingTimingCycle(
-        int roomId, string doctorId, string procedureCode, DateTimeOffset seatedAt,
-        int completeMin, int turnoverMin)
+        int roomId,
+        string doctorId,
+        string procedureCode,
+        DateTimeOffset seatedAt,
+        int completeMin,
+        int turnoverMin)
     {
-        var defaultUnits = Math.Clamp(FindProcedure(procedureCode)?.DefaultExpectedUnits ?? MinExpectedUnits, MinExpectedUnits, MaxExpectedUnits);
+        var defaultUnits = Math.Clamp(
+            FindProcedure(procedureCode)?.DefaultExpectedUnits ?? MinExpectedUnits,
+            MinExpectedUnits,
+            MaxExpectedUnits);
         var completeAt = seatedAt.AddMinutes(completeMin);
         var availableAt = completeAt.AddMinutes(turnoverMin);
 
@@ -2214,84 +1826,6 @@ public sealed class DemoBoardStore
             ReviewedAt = null,
             ReviewedBy = null
         };
-    }
-
-    // Deterministic per-doctor synthetic style profiles (no punitive meaning). The profiles give
-    // each doctor a distinct, plausible allocation shape so the Reports page is not symmetrical:
-    //   Otte      - buffered: generous expected units, leans under/at expected.
-    //   Pledger   - balanced: mixed, net near zero.
-    //   Gibson    - variable case-mix: variance swings by procedure family (high family-lean weight).
-    //   Schroeder - tight: lower expected units, leans modestly over expected.
-    // DoctorIndex maps to the active-doctor roster order (Otte, Pledger, Gibson, Schroeder).
-    private static readonly IReadOnlyList<DoctorStyleProfile> SyntheticProfiles =
-    [
-        new(DoctorIndex: 0, VarianceBiasMinutes: -5, VarianceSpread: 6, FamilyLeanWeight: 1, VariableUnitDelta: 1, SedationChancePercent: 25),
-        new(DoctorIndex: 1, VarianceBiasMinutes: 0, VarianceSpread: 8, FamilyLeanWeight: 1, VariableUnitDelta: 0, SedationChancePercent: 20),
-        new(DoctorIndex: 2, VarianceBiasMinutes: 1, VarianceSpread: 14, FamilyLeanWeight: 2, VariableUnitDelta: 0, SedationChancePercent: 30),
-        new(DoctorIndex: 3, VarianceBiasMinutes: 7, VarianceSpread: 5, FamilyLeanWeight: 1, VariableUnitDelta: -1, SedationChancePercent: 15)
-    ];
-
-    // Procedure families used by the seeder. CharacterLeanMinutes is a small intrinsic over/under
-    // tendency (procedures that run long are positive); realistic case-flow bounds keep every record
-    // well under the extreme-duration thresholds. Default expected units come from the live roster.
-    private static readonly IReadOnlyList<SyntheticFamily> SyntheticFamilies =
-    [
-        new("CON", 10, 40, -3, false),
-        new("POST", 5, 25, -2, false),
-        new("IMPRES", 10, 35, -2, false),
-        new("BX", 20, 60, 3, false),
-        new("EXT", 20, 90, 5, true),
-        new("IMP", 45, 120, 5, true),
-        new("MISC", 10, 60, 2, false)
-    ];
-
-    // Stable FNV-1a hash of the seed components, used to seed the per-cycle jitter stream.
-    private static int DeterministicSeed(int dayIndex, int doctorIndex, int caseIndex)
-    {
-        unchecked
-        {
-            var hash = 2166136261u;
-            hash = (hash ^ (uint)dayIndex) * 16777619u;
-            hash = (hash ^ (uint)doctorIndex) * 16777619u;
-            hash = (hash ^ (uint)caseIndex) * 16777619u;
-            return (int)(hash & 0x7fffffff);
-        }
-    }
-
-    // How many calendar days back the synthetic history spans (inclusive of today). ~6 weeks so the
-    // "older than 30 days" bucket is populated for All-time vs Last-30 comparisons.
-    private const int SyntheticHistoryDays = 41;
-
-    // Flat per-day case cap for the large report-data seed. Kept low enough that the latest seat time
-    // (8am + this many hours, plus jitter and the longest case flow) still completes inside the same
-    // UTC calendar day, preserving the "no overnight cycle" cleanliness the reporting funnel expects.
-    private const int LargeSyntheticCasesPerDay = 12;
-
-    // Deterministic, front-loaded case count per day offset from today (0 = today). Recent days carry
-    // more cases than older days so every report date-range preset is meaningfully different:
-    //   today          -> 8           (Today preset is small but non-empty)
-    //   1-6 days ago    -> 4 each      (Last 7 days noticeably larger than Today)
-    //   7-29 days ago   -> 2-3 each    (Last 30 days larger than Last 7)
-    //   30+ days ago    -> 2 each      (All time larger than Last 30)
-    // Totals: Today 8, Last 7 ~32, Last 30 ~90, All time ~114.
-    private static int CasesForDayOffset(int dayOffset)
-    {
-        if (dayOffset == 0)
-        {
-            return 8;
-        }
-
-        if (dayOffset <= 6)
-        {
-            return 4;
-        }
-
-        if (dayOffset <= 29)
-        {
-            return 2 + (dayOffset % 2);
-        }
-
-        return 2;
     }
 
     /// <summary>
@@ -3976,41 +3510,6 @@ public sealed record DemoSeedPattern(
     Func<BoardThresholdOptions, TimeSpan> Elapsed,
     Func<BoardThresholdOptions, TimeSpan>? ReadyForDoctorElapsed = null);
 
-// Development/test only synthetic data shaping (see DemoBoardStore.SeedSyntheticReportData).
-// A per-doctor style profile that gives each doctor a distinct, non-punitive allocation shape.
-public sealed record DoctorStyleProfile(
-    int DoctorIndex,
-    int VarianceBiasMinutes,
-    int VarianceSpread,
-    int FamilyLeanWeight,
-    int VariableUnitDelta,
-    int SedationChancePercent);
-
-// A procedure family used by the seeder, with realistic case-flow bounds and a small intrinsic
-// over/under lean. Default expected units are read from the live roster, not stored here.
-public sealed record SyntheticFamily(
-    string Code,
-    int MinFlowMinutes,
-    int MaxFlowMinutes,
-    int CharacterLeanMinutes,
-    bool SedationEligible);
-
-// Tiny deterministic xorshift32 stream. Seeded from stable inputs so seeded data is reproducible
-// (pseudo-random feel, fully deterministic) - never wall-clock or Random-default seeded.
-public struct SyntheticJitter(int seed)
-{
-    private uint _state = (uint)seed | 1u;
-
-    public int Next(int minInclusive, int maxInclusive)
-    {
-        _state ^= _state << 13;
-        _state ^= _state >> 17;
-        _state ^= _state << 5;
-        var span = (uint)(maxInclusive - minInclusive + 1);
-        return minInclusive + (int)(_state % span);
-    }
-}
-
 /// <summary>Non-PHI summary returned by the dev-only synthetic report-data seeder.</summary>
 public sealed record SeedReportDataResult(
     int CyclesInserted,
@@ -4038,18 +3537,6 @@ public sealed record MaintenanceResetResult(
     int ProcedureFamiliesRepresented,
     int ExpectedAllocationCases,
     int ExceptionsExpected);
-
-/// <summary>
-/// One deterministic live-room allocation for a stress-fixture profile: which room, which doctor
-/// and procedure (null for an intentionally unassigned Available room), the target room state, and
-/// whether the case is a sedation case. See DemoBoardStore.SeedLiveRoomFixtures / BuildLiveRoom.
-/// </summary>
-public sealed record LiveRoomFixture(
-    int RoomId,
-    string? DoctorId,
-    string? ProcedureCode,
-    string TargetState,
-    bool Sedation = false);
 
 /// <summary>
 /// Non-PHI summary returned by the reset-stress-fixture maintenance command. RoomStateCounts covers

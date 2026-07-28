@@ -351,6 +351,18 @@
                       "path":  "src/ChairSide.Board/Services/DeploymentEnvironmentPolicy.cs"
                   },
                   {
+                      "id":  "file:src/ChairSide.Board/Services/DeterministicFixtureBuilder.cs",
+                      "label":  "src/ChairSide.Board/Services/DeterministicFixtureBuilder.cs",
+                      "type":  "File",
+                      "path":  "src/ChairSide.Board/Services/DeterministicFixtureBuilder.cs"
+                  },
+                  {
+                      "id":  "file:src/ChairSide.Board/Services/DeterministicFixtureCatalog.cs",
+                      "label":  "src/ChairSide.Board/Services/DeterministicFixtureCatalog.cs",
+                      "type":  "File",
+                      "path":  "src/ChairSide.Board/Services/DeterministicFixtureCatalog.cs"
+                  },
+                  {
                       "id":  "file:src/ChairSide.Board/Services/DiagnosticLogger.cs",
                       "label":  "src/ChairSide.Board/Services/DiagnosticLogger.cs",
                       "type":  "File",
@@ -583,6 +595,12 @@
                       "label":  "tests/ChairSide.Board.Tests/DatabaseIsolationPolicyTests.cs",
                       "type":  "File",
                       "path":  "tests/ChairSide.Board.Tests/DatabaseIsolationPolicyTests.cs"
+                  },
+                  {
+                      "id":  "file:tests/ChairSide.Board.Tests/DeterministicFixtureBuilderTests.cs",
+                      "label":  "tests/ChairSide.Board.Tests/DeterministicFixtureBuilderTests.cs",
+                      "type":  "File",
+                      "path":  "tests/ChairSide.Board.Tests/DeterministicFixtureBuilderTests.cs"
                   },
                   {
                       "id":  "file:tests/ChairSide.Board.Tests/DurableFailureInjectionTests.cs",
@@ -1089,6 +1107,12 @@
                       "path":  "src/ChairSide.Board/Services/DeploymentEnvironmentPolicy.cs"
                   },
                   {
+                      "id":  "symbol:type:CleanCompletedCycleFixture",
+                      "label":  "CleanCompletedCycleFixture",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/DeterministicFixtureBuilder.cs"
+                  },
+                  {
                       "id":  "symbol:type:ClientErrorEntry",
                       "label":  "ClientErrorEntry",
                       "type":  "CodeType",
@@ -1239,6 +1263,30 @@
                       "path":  "src/ChairSide.Board/Services/DeploymentEnvironmentPolicy.cs"
                   },
                   {
+                      "id":  "symbol:type:DeterministicFixtureBuilder",
+                      "label":  "DeterministicFixtureBuilder",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/DeterministicFixtureBuilder.cs"
+                  },
+                  {
+                      "id":  "symbol:type:DeterministicFixtureBuilderTests",
+                      "label":  "DeterministicFixtureBuilderTests",
+                      "type":  "CodeType",
+                      "path":  "tests/ChairSide.Board.Tests/DeterministicFixtureBuilderTests.cs"
+                  },
+                  {
+                      "id":  "symbol:type:DeterministicFixtureCatalog",
+                      "label":  "DeterministicFixtureCatalog",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/DeterministicFixtureCatalog.cs"
+                  },
+                  {
+                      "id":  "symbol:type:DeterministicFixturePlan",
+                      "label":  "DeterministicFixturePlan",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/DeterministicFixtureBuilder.cs"
+                  },
+                  {
                       "id":  "symbol:type:DiagnosticLogger",
                       "label":  "DiagnosticLogger",
                       "type":  "CodeType",
@@ -1326,7 +1374,7 @@
                       "id":  "symbol:type:DoctorStyleProfile",
                       "label":  "DoctorStyleProfile",
                       "type":  "CodeType",
-                      "path":  "src/ChairSide.Board/Services/DemoBoardStore.cs"
+                      "path":  "src/ChairSide.Board/Services/DeterministicFixtureBuilder.cs"
                   },
                   {
                       "id":  "symbol:type:DoctorWorkingRoomLookupResult",
@@ -1401,6 +1449,12 @@
                       "path":  "src/ChairSide.Board/Services/RoomAssignmentContracts.cs"
                   },
                   {
+                      "id":  "symbol:type:ExplicitCompletedCycleFixture",
+                      "label":  "ExplicitCompletedCycleFixture",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/DeterministicFixtureBuilder.cs"
+                  },
+                  {
                       "id":  "symbol:type:FaultedReadyCancellationTests",
                       "label":  "FaultedReadyCancellationTests",
                       "type":  "CodeType",
@@ -1411,6 +1465,24 @@
                       "label":  "FileSystemReparsePointInspector",
                       "type":  "CodeType",
                       "path":  "src/ChairSide.Board/Services/IReparsePointInspector.cs"
+                  },
+                  {
+                      "id":  "symbol:type:FixtureHistoryKind",
+                      "label":  "FixtureHistoryKind",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/DeterministicFixtureCatalog.cs"
+                  },
+                  {
+                      "id":  "symbol:type:FixtureHistorySegment",
+                      "label":  "FixtureHistorySegment",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/DeterministicFixtureCatalog.cs"
+                  },
+                  {
+                      "id":  "symbol:type:FixtureProfileComposition",
+                      "label":  "FixtureProfileComposition",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/DeterministicFixtureCatalog.cs"
                   },
                   {
                       "id":  "symbol:type:GuardedDoctorArrivedPersistenceOutcome",
@@ -1482,7 +1554,7 @@
                       "id":  "symbol:type:LiveRoomFixture",
                       "label":  "LiveRoomFixture",
                       "type":  "CodeType",
-                      "path":  "src/ChairSide.Board/Services/DemoBoardStore.cs"
+                      "path":  "src/ChairSide.Board/Services/DeterministicFixtureCatalog.cs"
                   },
                   {
                       "id":  "symbol:type:LiveRoomSnapshot",
@@ -1537,6 +1609,12 @@
                       "label":  "MarkExceptionRequest",
                       "type":  "CodeType",
                       "path":  "src/ChairSide.Board/Program.cs"
+                  },
+                  {
+                      "id":  "symbol:type:MissingTimingCompletedCycleFixture",
+                      "label":  "MissingTimingCompletedCycleFixture",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/DeterministicFixtureBuilder.cs"
                   },
                   {
                       "id":  "symbol:type:NoopBoardHubContext",
@@ -2133,16 +2211,22 @@
                       "path":  "src/ChairSide.Board/Program.cs"
                   },
                   {
+                      "id":  "symbol:type:SyntheticCompletedCycleFixture",
+                      "label":  "SyntheticCompletedCycleFixture",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/DeterministicFixtureBuilder.cs"
+                  },
+                  {
                       "id":  "symbol:type:SyntheticFamily",
                       "label":  "SyntheticFamily",
                       "type":  "CodeType",
-                      "path":  "src/ChairSide.Board/Services/DemoBoardStore.cs"
+                      "path":  "src/ChairSide.Board/Services/DeterministicFixtureBuilder.cs"
                   },
                   {
                       "id":  "symbol:type:SyntheticJitter",
                       "label":  "SyntheticJitter",
                       "type":  "CodeType",
-                      "path":  "src/ChairSide.Board/Services/DemoBoardStore.cs"
+                      "path":  "src/ChairSide.Board/Services/DeterministicFixtureBuilder.cs"
                   },
                   {
                       "id":  "symbol:type:TerminationKinds",
@@ -2167,6 +2251,12 @@
                       "label":  "TestWorkspace",
                       "type":  "CodeType",
                       "path":  "tests/ChairSide.Board.Tests/TestSupport/TestWorkspace.cs"
+                  },
+                  {
+                      "id":  "symbol:type:TodayMarkerFixture",
+                      "label":  "TodayMarkerFixture",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/DeterministicFixtureBuilder.cs"
                   }
               ],
     "edges":  [
@@ -2572,22 +2662,12 @@
                   },
                   {
                       "from":  "file:src/ChairSide.Board/Services/DemoBoardStore.cs",
-                      "to":  "symbol:type:DoctorStyleProfile",
-                      "label":  "declares"
-                  },
-                  {
-                      "from":  "file:src/ChairSide.Board/Services/DemoBoardStore.cs",
                       "to":  "symbol:type:ExceptionReasons",
                       "label":  "declares"
                   },
                   {
                       "from":  "file:src/ChairSide.Board/Services/DemoBoardStore.cs",
                       "to":  "symbol:type:ExceptionReviewers",
-                      "label":  "declares"
-                  },
-                  {
-                      "from":  "file:src/ChairSide.Board/Services/DemoBoardStore.cs",
-                      "to":  "symbol:type:LiveRoomFixture",
                       "label":  "declares"
                   },
                   {
@@ -2667,16 +2747,6 @@
                   },
                   {
                       "from":  "file:src/ChairSide.Board/Services/DemoBoardStore.cs",
-                      "to":  "symbol:type:SyntheticFamily",
-                      "label":  "declares"
-                  },
-                  {
-                      "from":  "file:src/ChairSide.Board/Services/DemoBoardStore.cs",
-                      "to":  "symbol:type:SyntheticJitter",
-                      "label":  "declares"
-                  },
-                  {
-                      "from":  "file:src/ChairSide.Board/Services/DemoBoardStore.cs",
                       "to":  "symbol:type:TerminationKinds",
                       "label":  "declares"
                   },
@@ -2703,6 +2773,81 @@
                   {
                       "from":  "file:src/ChairSide.Board/Services/DeploymentEnvironmentPolicy.cs",
                       "to":  "symbol:type:DeploymentRole",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/DeterministicFixtureBuilder.cs",
+                      "to":  "symbol:type:CleanCompletedCycleFixture",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/DeterministicFixtureBuilder.cs",
+                      "to":  "symbol:type:DeterministicFixtureBuilder",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/DeterministicFixtureBuilder.cs",
+                      "to":  "symbol:type:DeterministicFixturePlan",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/DeterministicFixtureBuilder.cs",
+                      "to":  "symbol:type:DoctorStyleProfile",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/DeterministicFixtureBuilder.cs",
+                      "to":  "symbol:type:ExplicitCompletedCycleFixture",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/DeterministicFixtureBuilder.cs",
+                      "to":  "symbol:type:MissingTimingCompletedCycleFixture",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/DeterministicFixtureBuilder.cs",
+                      "to":  "symbol:type:SyntheticCompletedCycleFixture",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/DeterministicFixtureBuilder.cs",
+                      "to":  "symbol:type:SyntheticFamily",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/DeterministicFixtureBuilder.cs",
+                      "to":  "symbol:type:SyntheticJitter",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/DeterministicFixtureBuilder.cs",
+                      "to":  "symbol:type:TodayMarkerFixture",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/DeterministicFixtureCatalog.cs",
+                      "to":  "symbol:type:DeterministicFixtureCatalog",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/DeterministicFixtureCatalog.cs",
+                      "to":  "symbol:type:FixtureHistoryKind",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/DeterministicFixtureCatalog.cs",
+                      "to":  "symbol:type:FixtureHistorySegment",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/DeterministicFixtureCatalog.cs",
+                      "to":  "symbol:type:FixtureProfileComposition",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/DeterministicFixtureCatalog.cs",
+                      "to":  "symbol:type:LiveRoomFixture",
                       "label":  "declares"
                   },
                   {
@@ -3191,6 +3336,11 @@
                       "label":  "declares"
                   },
                   {
+                      "from":  "file:tests/ChairSide.Board.Tests/DeterministicFixtureBuilderTests.cs",
+                      "to":  "symbol:type:DeterministicFixtureBuilderTests",
+                      "label":  "declares"
+                  },
+                  {
                       "from":  "file:tests/ChairSide.Board.Tests/DurableFailureInjectionTests.cs",
                       "to":  "symbol:type:CycleSnapshot",
                       "label":  "declares"
@@ -3672,6 +3822,16 @@
                   },
                   {
                       "from":  "repo:chairside",
+                      "to":  "file:src/ChairSide.Board/Services/DeterministicFixtureBuilder.cs",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:src/ChairSide.Board/Services/DeterministicFixtureCatalog.cs",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
                       "to":  "file:src/ChairSide.Board/Services/DiagnosticLogger.cs",
                       "label":  "contains"
                   },
@@ -3863,6 +4023,11 @@
                   {
                       "from":  "repo:chairside",
                       "to":  "file:tests/ChairSide.Board.Tests/DatabaseIsolationPolicyTests.cs",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:tests/ChairSide.Board.Tests/DeterministicFixtureBuilderTests.cs",
                       "label":  "contains"
                   },
                   {

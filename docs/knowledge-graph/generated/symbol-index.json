@@ -1,7 +1,7 @@
 ﻿{
     "generatedStamp":  "deterministic",
     "root":  ".",
-    "fileCount":  122,
+    "fileCount":  125,
     "files":  [
                   {
                       "path":  ".github/pull_request_template.md",
@@ -1712,7 +1712,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/DemoBoardStore.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  213014,
+                      "sizeBytes":  182465,
                       "typeSymbols":  [
                                           "ExceptionReasons",
                                           "ReportingExceptionReasons",
@@ -1731,14 +1731,10 @@
                                           "AllocationVarianceSummary",
                                           "ProcedureCycleSummary",
                                           "DemoSeedPattern",
-                                          "DoctorStyleProfile",
-                                          "SyntheticFamily",
-                                          "SyntheticJitter",
                                           "SeedReportDataResult",
                                           "DoctorDailyAllocationPoint",
                                           "DoctorDailyAllocation",
                                           "MaintenanceResetResult",
-                                          "LiveRoomFixture",
                                           "StressFixtureResult",
                                           "RoomState",
                                           "RoomStates",
@@ -1789,9 +1785,9 @@
                                             "SeedSyntheticReportData",
                                             "ResetAndSeedLargeSyntheticReportData",
                                             "SeedLargeSyntheticReportData",
+                                            "ApplySyntheticPlan",
                                             "UpsertSyntheticCycle",
-                                            "ResetAndSeedStressFixture",
-                                            "SeedLiveRoomFixtures"
+                                            "ResetAndSeedStressFixture"
                                         ],
                       "routes":  [
 
@@ -1823,6 +1819,83 @@
                       "methodSymbols":  [
                                             "Resolve",
                                             "UnknownEnvironment"
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
+                      "path":  "src/ChairSide.Board/Services/DeterministicFixtureBuilder.cs",
+                      "kind":  "CSharp",
+                      "sizeBytes":  14187,
+                      "typeSymbols":  [
+                                          "DeterministicFixtureBuilder",
+                                          "DeterministicFixturePlan",
+                                          "SyntheticCompletedCycleFixture",
+                                          "ExplicitCompletedCycleFixture",
+                                          "CleanCompletedCycleFixture",
+                                          "MissingTimingCompletedCycleFixture",
+                                          "TodayMarkerFixture",
+                                          "DoctorStyleProfile",
+                                          "SyntheticFamily",
+                                          "SyntheticJitter"
+                                      ],
+                      "methodSymbols":  [
+                                            "BuildSmallReportingPlan",
+                                            "BuildLargeReportingPlan",
+                                            "BuildScenarioRichPlan",
+                                            "BuildScenarioEdgeCases",
+                                            "BuildHistory",
+                                            "BuildSyntheticCase",
+                                            "UtcToday",
+                                            "RoomForEdgeCase",
+                                            "TodayMarkerTimestamps",
+                                            "DeterministicSeed",
+                                            "SyntheticJitter",
+                                            "Next"
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
+                      "path":  "src/ChairSide.Board/Services/DeterministicFixtureCatalog.cs",
+                      "kind":  "CSharp",
+                      "sizeBytes":  7101,
+                      "typeSymbols":  [
+                                          "DeterministicFixtureCatalog",
+                                          "FixtureHistoryKind",
+                                          "FixtureHistorySegment",
+                                          "FixtureProfileComposition",
+                                          "LiveRoomFixture"
+                                      ],
+                      "methodSymbols":  [
+                                            "ComposeProfile",
+                                            "CasesForDayOffset"
                                         ],
                       "routes":  [
 
@@ -2136,7 +2209,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/ReportsSnapshotBuilder.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  41500,
+                      "sizeBytes":  41594,
                       "typeSymbols":  [
                                           "ReportsSnapshotBuilder"
                                       ],
@@ -2195,7 +2268,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/ReportsSnapshotComposition.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  8438,
+                      "sizeBytes":  8597,
                       "typeSymbols":  [
                                           "ReportsSnapshotComposition",
                                           "ReportPopulationSection",
@@ -3327,6 +3400,45 @@
                                    ]
                   },
                   {
+                      "path":  "tests/ChairSide.Board.Tests/DeterministicFixtureBuilderTests.cs",
+                      "kind":  "CSharp",
+                      "sizeBytes":  12553,
+                      "typeSymbols":  [
+                                          "DeterministicFixtureBuilderTests"
+                                      ],
+                      "methodSymbols":  [
+                                            "Catalog_preserves_every_fixed_live_fixture_row",
+                                            "Catalog_composes_all_seven_accepted_profiles_in_order",
+                                            "Small_reporting_builder_is_repeatable_and_preserves_golden_first_cycle",
+                                            "Missing_family_skips_the_slot_but_advances_global_rotation",
+                                            "Large_reporting_builder_clamps_to_both_accepted_volume_bounds",
+                                            "Builder_returns_empty_history_and_edges_when_no_active_doctors_exist",
+                                            "Builder_does_not_mutate_roster_sources",
+                                            "Near_midnight_today_marker_never_places_a_timestamp_in_the_future",
+                                            "Store_application_matches_every_pure_small_history_description",
+                                            "Store_skips_catalog_rooms_beyond_the_configured_room_count",
+                                            "CreateBuilder",
+                                            "Doctors",
+                                            "Procedures",
+                                            "Rows"
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
                       "path":  "tests/ChairSide.Board.Tests/DurableFailureInjectionTests.cs",
                       "kind":  "CSharp",
                       "sizeBytes":  28197,
@@ -3870,7 +3982,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/ReportsSnapshotBuilderTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  23760,
+                      "sizeBytes":  23956,
                       "typeSymbols":  [
                                           "ReportsSnapshotBuilderTests"
                                       ],
