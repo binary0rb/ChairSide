@@ -396,9 +396,10 @@ public sealed class SqliteBoardSchemaTests
         if (omitCreatedAt)
         {
             createSql = createSql.Replace(
-                "created_at TEXT NOT NULL,\n",
+                "created_at TEXT NOT NULL,",
                 "",
                 StringComparison.Ordinal);
+            Assert.DoesNotContain("created_at", createSql, StringComparison.Ordinal);
         }
 
         Execute(connection, "DROP TABLE completed_room_cycles;");
