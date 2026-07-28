@@ -1,7 +1,7 @@
 ﻿{
     "generatedStamp":  "deterministic",
     "root":  ".",
-    "fileCount":  127,
+    "fileCount":  139,
     "files":  [
                   {
                       "path":  ".github/pull_request_template.md",
@@ -2548,7 +2548,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/SqliteBoardRepository.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  112567,
+                      "sizeBytes":  112581,
                       "typeSymbols":  [
                                           "SqliteBoardRepository",
                                           "DoctorWorkingRoomRecord",
@@ -2615,7 +2615,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/SqliteBoardSchema.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  46102,
+                      "sizeBytes":  47105,
                       "typeSymbols":  [
                                           "SqliteBoardSchema",
                                           "SqliteBoardInitialization",
@@ -3160,9 +3160,181 @@
                                    ]
                   },
                   {
-                      "path":  "tests/ChairSide.Board.Tests/BoardStoreTests.cs",
+                      "path":  "tests/ChairSide.Board.Tests/BoardStoreAssignmentTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  432386,
+                      "sizeBytes":  77087,
+                      "typeSymbols":  [
+                                          "BoardStoreTests"
+                                      ],
+                      "methodSymbols":  [
+                                            "Production_database_path_inside_content_root_fails_fast",
+                                            "Production_fresh_database_starts_rooms_available_without_demo_activity",
+                                            "Development_fresh_database_seeds_demo_active_rooms",
+                                            "Default_rosters_load_current_doctors_and_procedures",
+                                            "Procedure_roster_exposes_allocation_behavior_and_default_expected_units",
+                                            "Procedure_allocation_behavior_classification_matches_known_and_variable_lists",
+                                            "Seating_without_units_applies_procedure_default_allocation",
+                                            "Seating_with_explicit_units_stores_final_allocation",
+                                            "Allocation_adjusted_flag_is_false_when_units_equal_default",
+                                            "Allocation_adjusted_flag_is_true_when_units_differ_from_default",
+                                            "Seating_with_zero_units_clamps_to_minimum_and_never_yields_zero_minutes",
+                                            "Seating_with_negative_units_clamps_to_minimum",
+                                            "Seating_with_units_above_maximum_clamps_to_maximum",
+                                            "Allocation_snapshot_carries_from_active_room_into_completed_cycle",
+                                            "Allocation_snapshot_survives_restart_for_active_rooms",
+                                            "Allocation_snapshot_survives_restart_for_completed_cycles",
+                                            "Sedation_variant_inherits_base_procedure_default_allocation",
+                                            "Inactive_doctors_and_procedures_are_not_selectable",
+                                            "Sedation_is_not_a_standalone_selectable_procedure",
+                                            "Eligible_procedure_seated_without_sedation_stays_a_base_procedure",
+                                            "Eligible_procedure_with_sedation_is_stored_and_displayed_as_a_variant",
+                                            "New_all_on_four_procedure_supports_sedation_modifier_and_resolves_label",
+                                            "New_all_on_four_sedation_variant_rolls_up_under_base_in_reports",
+                                            "Sedation_modifier_is_rejected_for_non_eligible_procedures",
+                                            "Sedation_modifier_can_be_added_and_removed_via_save_details",
+                                            "Sedation_cases_report_as_distinct_variants_from_base_procedure",
+                                            "Variant_summaries_carry_base_code_and_sedation_flag",
+                                            "Doctor_procedure_mix_groups_by_doctor_and_variant_with_shares",
+                                            "Doctor_procedure_mix_isolates_rows_and_denominators_per_doctor",
+                                            "Doctor_procedure_mix_excludes_incomplete_and_reporting_exception_cycles",
+                                            "Doctor_procedure_mix_skips_cycles_with_blank_doctor",
+                                            "Base_procedure_summaries_roll_up_variants_over_raw_cycles",
+                                            "Sedation_and_non_sedation_counts_partition_completed_cycles",
+                                            "Doctor_arrived_only_cycle_reports_finalized_waits_but_is_not_a_completed_cycle",
+                                            "Turnover_not_available_cycle_reports_doctor_in_room_but_not_completed_populations",
+                                            "Reporting_exception_completed_cycle_is_counted_but_excluded_from_included_partition",
+                                            "Legacy_standalone_sedation_completed_cycle_is_flagged_excluded_but_readable",
+                                            "Unknown_procedure_completed_cycle_is_flagged_as_unmapped_and_excluded",
+                                            "Extreme_duration_completed_cycle_is_flagged_and_excluded",
+                                            "Overnight_lifecycle_completed_cycle_is_flagged_independent_of_duration"
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
+                      "path":  "tests/ChairSide.Board.Tests/BoardStoreEndpointCompatibilityTests.cs",
+                      "kind":  "CSharp",
+                      "sizeBytes":  42912,
+                      "typeSymbols":  [
+                                          "BoardStoreTests"
+                                      ],
+                      "methodSymbols":  [
+                                            "Room_mutation_request_validation_rejects_invalid_assignment_fields",
+                                            "Begin_prestage_endpoint_captures_assignment_snapshot_and_rejects_invalid_states",
+                                            "Seat_room_endpoint_uses_minimal_prestaged_transition_and_preserves_snapshot",
+                                            "Procedure_alias_resolution_rejects_conflicts_and_accepts_single_or_matching_aliases",
+                                            "Procedure_alias_resolution_rejects_a_supplied_blank_alias_before_mutation",
+                                            "Seat_endpoint_treats_no_body_empty_body_and_empty_object_as_canonical_empty_actions",
+                                            "Seat_endpoint_accepts_canonical_null_assignment_and_rejects_flat_malformed_or_wrong_content_type",
+                                            "Seat_endpoint_rejects_every_flat_compatibility_property_without_mutation",
+                                            "Cancel_prestage_endpoint_parses_body_strictly",
+                                            "Cancel_seating_endpoint_parses_body_strictly_and_forwards_optional_reason",
+                                            "Prestaging_route_authorization_matrix_blocks_before_mutation_across_all_four_routes",
+                                            "Prestaging_mutation_endpoints_return_404_for_unconfigured_room",
+                                            "Begin_prestage_endpoint_returns_400_for_invalid_procedure_allocation",
+                                            "Cancel_prestage_endpoint_handles_reasons_and_lifecycle_guards",
+                                            "Cancel_seating_endpoint_forwards_optional_reason_and_keeps_reasonless_callers_compatible",
+                                            "Resolve_conflict_endpoint_writes_audit_entries_for_resolving_and_auto_completed_rooms",
+                                            "Resolve_conflict_endpoint_does_not_write_autocomplete_audit_for_stale_conflict"
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
+                      "path":  "tests/ChairSide.Board.Tests/BoardStoreFixtureTests.cs",
+                      "kind":  "CSharp",
+                      "sizeBytes":  48590,
+                      "typeSymbols":  [
+                                          "BoardStoreTests"
+                                      ],
+                      "methodSymbols":  [
+                                            "Synthetic_report_data_seeds_clean_included_cycles_within_target_shape",
+                                            "Synthetic_report_data_has_allocation_snapshots_and_no_legacy_or_standalone_sedation",
+                                            "Synthetic_report_data_covers_doctors_families_and_variance_distribution",
+                                            "Synthetic_report_data_produces_distinct_doctor_allocation_profiles",
+                                            "Synthetic_report_data_seeding_is_idempotent",
+                                            "Synthetic_report_data_populates_every_date_range_preset",
+                                            "Synthetic_report_data_is_clean_across_all_date_range_presets",
+                                            "Synthetic_report_data_summaries_grow_with_wider_date_ranges",
+                                            "Training_reset_clears_prior_completed_cycles_and_seeds_synthetic_data",
+                                            "Training_reset_clears_active_room_state",
+                                            "Training_reset_produces_zero_exceptions_and_calculable_allocation",
+                                            "Training_reset_is_idempotent_and_does_not_duplicate",
+                                            "Training_reset_persists_across_store_restart",
+                                            "Empty_beta_reset_clears_completed_cycles_and_leaves_no_synthetic_data",
+                                            "Empty_beta_reset_clears_active_room_state",
+                                            "Maintenance_resolve_returns_not_requested_without_flag",
+                                            "Maintenance_resolve_authorizes_matching_command_and_token",
+                                            "Maintenance_resolve_refuses_wrong_token",
+                                            "Maintenance_resolve_refuses_missing_token_and_unknown_command",
+                                            "Maintenance_resolve_authorizes_large_synthetic_command_with_default_count",
+                                            "Maintenance_resolve_parses_completed_cycles_argument",
+                                            "Maintenance_resolve_refuses_large_synthetic_command_with_wrong_token",
+                                            "Maintenance_resolve_refuses_out_of_range_or_non_numeric_completed_cycles",
+                                            "Maintenance_resolve_accepts_boundary_completed_cycles",
+                                            "Maintenance_policy_defaults_to_deny_for_unknown_commands",
+                                            "Large_synthetic_report_data_seeds_exactly_the_requested_completed_cycle_count",
+                                            "Large_synthetic_report_data_populates_sedation_procedure_mix_and_observed_load",
+                                            "Large_synthetic_report_data_stays_clean_with_full_timing_and_no_day_crossing",
+                                            "Large_synthetic_report_data_converges_without_duplicate_inflation_on_reseed",
+                                            "Large_synthetic_report_data_clamps_below_range_requests_to_the_minimum",
+                                            "Maintenance_resolve_authorizes_stress_fixture_command_with_valid_profile",
+                                            "Maintenance_resolve_refuses_stress_fixture_command_with_wrong_token",
+                                            "Maintenance_resolve_refuses_stress_fixture_command_without_profile",
+                                            "Maintenance_resolve_refuses_stress_fixture_command_with_unknown_profile",
+                                            "Maintenance_resolve_accepts_all_seven_stress_fixture_profiles",
+                                            "Maintenance_resolve_accepts_completed_cycles_for_reporting_volume_and_all_scenarios_profiles",
+                                            "Maintenance_resolve_authorizes_default_completed_cycles_when_omitted",
+                                            "Maintenance_resolve_refuses_completed_cycles_for_non_reporting_volume_non_all_scenarios_profiles",
+                                            "Live_board_stress_fills_all_twelve_rooms_with_every_primary_state_and_ready_urgency_present",
+                                            "Live_board_stress_in_progress_rows_do_not_count_as_completed_history"
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
+                      "path":  "tests/ChairSide.Board.Tests/BoardStoreLifecycleTests.cs",
+                      "kind":  "CSharp",
+                      "sizeBytes":  53541,
                       "typeSymbols":  [
                                           "BoardStoreTests"
                                       ],
@@ -3194,19 +3366,292 @@
                                             "Turnover_seconds_calculated_from_doctor_complete_to_room_available",
                                             "Room_status_preserves_seated_at_through_doctor_in_room_and_turnover",
                                             "Seated_room_does_not_escalate_to_aging_or_stale_regardless_of_elapsed_time",
-                                            "Ready_for_doctor_threshold_boundaries_resolve_deterministically",
-                                            "Production_database_path_inside_content_root_fails_fast",
-                                            "Production_fresh_database_starts_rooms_available_without_demo_activity",
-                                            "Development_fresh_database_seeds_demo_active_rooms",
-                                            "Default_rosters_load_current_doctors_and_procedures",
-                                            "Procedure_roster_exposes_allocation_behavior_and_default_expected_units",
-                                            "Procedure_allocation_behavior_classification_matches_known_and_variable_lists",
-                                            "Seating_without_units_applies_procedure_default_allocation",
-                                            "Seating_with_explicit_units_stores_final_allocation",
-                                            "Allocation_adjusted_flag_is_false_when_units_equal_default",
-                                            "Allocation_adjusted_flag_is_true_when_units_differ_from_default",
-                                            "Seating_with_zero_units_clamps_to_minimum_and_never_yields_zero_minutes",
-                                            "Seating_with_negative_units_clamps_to_minimum"
+                                            "Ready_for_doctor_threshold_boundaries_resolve_deterministically"
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
+                      "path":  "tests/ChairSide.Board.Tests/BoardStorePersistenceTests.cs",
+                      "kind":  "CSharp",
+                      "sizeBytes":  29659,
+                      "typeSymbols":  [
+                                          "BoardStoreTests"
+                                      ],
+                      "methodSymbols":  [
+                                            "Persisted_schema_contains_only_non_phi_operational_fields",
+                                            "DateTimeOffset_round_trip_preserves_cycle_dedup_key",
+                                            "Aborted_assignment_round_trips_full_snapshot_and_nullable_phase_timestamps",
+                                            "Terminating_the_same_episode_twice_is_idempotent",
+                                            "Distinct_episodes_in_same_room_at_same_timestamp_persist_separately",
+                                            "Terminate_incomplete_assignment_persists_record_and_reset_room_together",
+                                            "Save_completed_cycle_and_room_persists_both_and_propagates_id_on_insert_and_update",
+                                            "Legacy_database_without_prestage_columns_initializes_and_preserves_active_seated_row",
+                                            "Reset_room_clears_episode_id_and_prestage_started_at_along_with_every_other_field",
+                                            "Development_demo_room_constructions_use_episode_identity_only_for_canonical_ready_seed",
+                                            "SQLite_database_uses_wal_journal_mode",
+                                            "Completed_cycle_receives_nonzero_completed_cycle_id",
+                                            "Reports_expose_completed_cycle_id_for_normal_and_exception_cycles",
+                                            "Mark_exception_by_completed_cycle_id_succeeds",
+                                            "Mark_exception_by_legacy_room_and_seated_at_still_works",
+                                            "Completed_cycle_id_is_stable_across_store_reload",
+                                            "Legacy_completed_cycles_table_without_id_is_migrated_and_backfilled"
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
+                      "path":  "tests/ChairSide.Board.Tests/BoardStoreProcedureReportingTests.cs",
+                      "kind":  "CSharp",
+                      "sizeBytes":  11208,
+                      "typeSymbols":  [
+                                          "BoardStoreTests"
+                                      ],
+                      "methodSymbols":  [
+                                            "Procedure_summaries_group_normal_cycles_by_code_with_counts_and_labels",
+                                            "Procedure_summaries_compute_total_ready_and_doctor_time_metrics",
+                                            "Procedure_summaries_use_existing_occupied_and_available_wait_values",
+                                            "Procedure_summaries_exclude_exception_cycles",
+                                            "Procedure_summaries_exclude_reviewed_exception_cycles",
+                                            "Procedure_summaries_fall_back_to_code_when_label_is_blank",
+                                            "Procedure_summaries_are_additive_and_global_metrics_stay_combined"
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
+                      "path":  "tests/ChairSide.Board.Tests/BoardStoreReadinessTests.cs",
+                      "kind":  "CSharp",
+                      "sizeBytes":  13049,
+                      "typeSymbols":  [
+                                          "BoardStoreTests"
+                                      ],
+                      "methodSymbols":  [
+                                            "Ready_for_doctor_blocks_doctor_arrived_until_called",
+                                            "Aging_ready_urgency_allows_doctor_arrived_and_captures_threshold",
+                                            "Reports_split_prep_and_ready_to_doctor_seconds",
+                                            "Room_event_history_is_capped_to_most_recent_entries",
+                                            "Board_ui_demo_timer_defaults_to_development_only_and_training_cannot_enable_it",
+                                            "Board_snapshot_identifies_only_the_Training_environment",
+                                            "Client_Training_badge_is_snapshot_driven_shared_and_duplicate_safe",
+                                            "Zero_demo_elapsed_uses_current_time_regardless_of_demo_timer_visibility",
+                                            "Client_report_metrics_escape_labels_and_values",
+                                            "Client_room_token_prompt_uses_room_scoped_session_storage_and_header_only"
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
+                      "path":  "tests/ChairSide.Board.Tests/BoardStoreRecoveryTests.cs",
+                      "kind":  "CSharp",
+                      "sizeBytes":  75004,
+                      "typeSymbols":  [
+                                          "BoardStoreTests"
+                                      ],
+                      "methodSymbols":  [
+                                            "Normal_completed_cycles_appear_in_normal_reporting_metrics",
+                                            "Exception_cycles_are_excluded_from_normal_metrics_and_count",
+                                            "Exception_cycles_appear_in_exceptions_requiring_review_section",
+                                            "Exception_pending_review_status_survives_store_restart",
+                                            "Room_expiration_options_defaults_are_locked",
+                                            "Prestaging_before_max_duration_is_not_expired",
+                                            "Absent_assignment_prestaging_max_duration_expiration_preserves_truthful_abort_history",
+                                            "Prestaging_over_max_duration_persists_complete_abort_and_reset_across_reload",
+                                            "Prestaging_max_duration_expiration_is_idempotent_after_success",
+                                            "Prestaging_after_hours_sweep_uses_clinic_time_and_runs_once_per_clinic_day",
+                                            "Absent_assignment_prestaging_after_hours_expiration_preserves_truthful_abort_history",
+                                            "Manual_mark_as_exception_moves_cycle_from_normal_to_exceptions",
+                                            "Active_room_under_max_duration_is_not_expired",
+                                            "Active_room_over_max_duration_without_doctor_arrived_is_expired_as_ExceededMaxActiveDuration",
+                                            "Active_room_over_max_duration_with_doctor_arrived_is_expired_with_review_timing_suggestion",
+                                            "After_hours_sweep_expires_active_rooms_as_AfterHoursSweep",
+                                            "Legacy_seated_room_with_null_episode_and_prestage_expires_safely",
+                                            "Sweep_runs_once_per_clinic_day_and_does_not_create_duplicate_exceptions",
+                                            "Invalid_timezone_does_not_run_after_hours_sweep",
+                                            "Invalid_timezone_does_not_throw",
+                                            "Max_active_duration_expiration_still_works_with_invalid_timezone",
+                                            "After_hours_sweep_runs_with_valid_IANA_timezone",
+                                            "Available_rooms_are_not_affected_by_sweep_or_max_duration_check",
+                                            "Expired_active_cycles_do_not_manufacture_doctor_complete_at",
+                                            "After_hours_sweep_expires_arrived_room_as_review_required_exception_cycle",
+                                            "Pre_arrival_seated_room_over_max_duration_expires_into_aborted_history_not_throughput",
+                                            "Post_arrival_expiration_persists_review_required_exception_cycle_across_reload",
+                                            "Expired_exception_cycles_are_excluded_from_normal_metrics",
+                                            "Expired_exception_cycles_appear_in_exceptions_requiring_review",
+                                            "Persistence_restart_does_not_resurrect_expired_active_rooms",
+                                            "DoctorOccupiedWait_no_same_doctor_overlap",
+                                            "DoctorOccupiedWait_full_same_doctor_overlap",
+                                            "DoctorOccupiedWait_partial_same_doctor_overlap",
+                                            "DoctorOccupiedWait_different_doctor_does_not_block",
+                                            "DoctorOccupiedWait_same_cycle_does_not_self_block",
+                                            "DoctorOccupiedWait_exception_cycle_excluded_from_normal_metrics",
+                                            "DoctorOccupiedWait_exception_cycle_not_used_as_blocker_interval",
+                                            "DoctorOccupiedWait_aggregate_average_and_median_use_available_wait",
+                                            "DoctorArrived_succeeds_when_doctor_not_in_another_room",
+                                            "DoctorArrived_is_rejected_when_same_doctor_already_in_another_room"
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
+                      "path":  "tests/ChairSide.Board.Tests/BoardStoreReportingTests.cs",
+                      "kind":  "CSharp",
+                      "sizeBytes":  38702,
+                      "typeSymbols":  [
+                                          "BoardStoreTests"
+                                      ],
+                      "methodSymbols":  [
+                                            "Marked_exception_starts_pending_review",
+                                            "Confirm_exclusion_marks_reviewed_and_keeps_cycle_excluded",
+                                            "Confirm_exclusion_sets_reviewed_metadata",
+                                            "Reviewed_exception_stays_excluded_from_normal_metrics",
+                                            "Confirm_exclusion_missing_id_returns_not_found",
+                                            "Confirm_exclusion_on_non_exception_returns_not_an_exception",
+                                            "Confirm_exclusion_is_idempotent",
+                                            "Legacy_mark_exception_still_appears_in_pending_review_queue",
+                                            "Reports_without_date_range_include_all_completed_cycles",
+                                            "Date_range_includes_in_range_and_excludes_out_of_range_cycles",
+                                            "Date_range_end_day_is_inclusive_through_end_of_day",
+                                            "Date_filter_applies_before_allocation_and_hygiene_counts",
+                                            "Date_filter_affects_doctor_and_procedure_family_summaries",
+                                            "Reversed_date_range_is_normalized_and_invalid_dates_degrade_to_all_time",
+                                            "Doctor_daily_allocation_series_reflects_filtered_date_range",
+                                            "Doctor_daily_allocation_point_net_variance_can_be_negative",
+                                            "Doctor_daily_allocation_series_today_contains_only_todays_points",
+                                            "Doctor_daily_allocation_series_grows_with_wider_date_ranges",
+                                            "Doctor_daily_allocation_series_covers_all_four_seeded_doctors",
+                                            "Doctor_daily_allocation_point_aggregates_case_count_and_signed_net_variance",
+                                            "Doctor_daily_allocation_point_net_variance_rolls_up_to_report_total",
+                                            "Reports_expose_weekly_wait_trends_over_standard_completed_population",
+                                            "Reports_wait_trends_respect_date_range_filter",
+                                            "Reports_wait_trends_exclude_reporting_exception_cycles",
+                                            "Reports_expose_schedule_fit_over_standard_completed_population",
+                                            "Reports_schedule_fit_present_and_zero_when_no_completed_cycles",
+                                            "Reports_schedule_fit_respects_date_range_filter",
+                                            "Reports_observed_doctor_days_report_span_fields_for_included_completed_cycles",
+                                            "Reports_observed_doctor_days_bucket_active_room_minutes_by_concurrency"
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
+                      "path":  "tests/ChairSide.Board.Tests/BoardStoreSecurityAndDiagnosticsTests.cs",
+                      "kind":  "CSharp",
+                      "sizeBytes":  21609,
+                      "typeSymbols":  [
+                                          "BoardStoreTests"
+                                      ],
+                      "methodSymbols":  [
+                                            "Room_device_binding_disabled_allows_existing_mutation_behavior",
+                                            "Room_device_binding_enabled_rejects_missing_token",
+                                            "Room_device_binding_enabled_rejects_wrong_token",
+                                            "Room_device_binding_enabled_accepts_correct_room_token",
+                                            "Room_device_binding_room_one_token_does_not_work_for_room_two",
+                                            "Room_device_binding_enabled_fails_closed_when_room_has_no_configured_token",
+                                            "Read_only_board_state_still_works_without_room_token",
+                                            "Room_device_binding_guard_returns_expected_mutation_statuses",
+                                            "Room_device_binding_options_allow_disabled_config_without_room_tokens",
+                                            "Room_device_binding_options_require_all_configured_rooms_when_enabled",
+                                            "Room_device_binding_options_reject_blank_tokens_when_enabled",
+                                            "Room_device_binding_options_reject_duplicate_tokens_when_enabled",
+                                            "Room_device_binding_options_accept_complete_unique_room_tokens_when_enabled",
+                                            "Admin_access_disabled_allows_reports_behavior",
+                                            "Admin_access_enabled_rejects_missing_and_wrong_token",
+                                            "Admin_access_enabled_accepts_correct_token",
+                                            "Admin_access_rejects_query_string_token_and_accepts_header_token",
+                                            "Admin_access_token_comparison_rejects_prefix_and_extended_tokens",
+                                            "Room_device_token_comparison_rejects_prefix_and_extended_tokens",
+                                            "Admin_access_protects_reports_and_keeps_board_room_surfaces_open",
+                                            "Diagnostic_logger_appends_client_error_entry_to_log_file",
+                                            "Diagnostic_logger_appends_room_audit_entry_to_log_file",
+                                            "Diagnostic_logger_creates_log_directory_if_missing",
+                                            "Diagnostic_logger_multiple_entries_are_each_on_their_own_line",
+                                            "Client_error_rate_limiter_allows_up_to_limit_then_rejects",
+                                            "Client_error_rate_limiter_null_or_empty_ip_is_always_allowed",
+                                            "Diagnostic_logger_rotates_when_max_file_size_exceeded",
+                                            "Diagnostic_logger_rotation_failure_does_not_block_logging",
+                                            "Admin_access_options_allow_disabled_config_without_token",
+                                            "Admin_access_options_require_token_when_enabled",
+                                            "Admin_access_options_reject_sample_token_in_production",
+                                            "Backup_restore_scripts_and_documentation_are_present"
                                         ],
                       "routes":  [
 
@@ -4206,7 +4651,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/SqliteBoardSchemaTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  20098,
+                      "sizeBytes":  20658,
                       "typeSymbols":  [
                                           "SqliteBoardSchemaTests"
                                       ],
@@ -4229,6 +4674,46 @@
                                             "TableExists",
                                             "ReadNullableString",
                                             "ReadNullableInt64"
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
+                      "path":  "tests/ChairSide.Board.Tests/TestSupport/EndpointTestSupport.cs",
+                      "kind":  "CSharp",
+                      "sizeBytes":  7059,
+                      "typeSymbols":  [
+                                          "BoardStoreTests"
+                                      ],
+                      "methodSymbols":  [
+                                            "CreateBindingValidator",
+                                            "CreateAdminValidator",
+                                            "ValidateBindingOptions",
+                                            "ValidateAdminAccessOptions",
+                                            "CreateDiagnosticLogger",
+                                            "NewResolveConflictHttpContext",
+                                            "NewRoomMutationHttpContext",
+                                            "NewJsonBodyContext",
+                                            "ValidateDoctorRoster",
+                                            "ValidateProcedureRoster",
+                                            "FindRepositoryRoot",
+                                            "RequestWithHeader",
+                                            "RequestWithQueryToken",
+                                            "RequestWithAdminHeader",
+                                            "RequestWithAdminQueryToken"
                                         ],
                       "routes":  [
 
@@ -4312,6 +4797,37 @@
                                    ]
                   },
                   {
+                      "path":  "tests/ChairSide.Board.Tests/TestSupport/SqliteTestSupport.cs",
+                      "kind":  "CSharp",
+                      "sizeBytes":  6390,
+                      "typeSymbols":  [
+                                          "BoardStoreTests"
+                                      ],
+                      "methodSymbols":  [
+                                            "InsertLegacyCompletedCycleRow",
+                                            "ContainsBannedPhiTerm",
+                                            "GetColumnNames",
+                                            "ExecuteSql",
+                                            "OpenConnection",
+                                            "FormatDateTimeOffset"
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
                       "path":  "tests/ChairSide.Board.Tests/TestSupport/StoreContext.cs",
                       "kind":  "CSharp",
                       "sizeBytes":  4269,
@@ -4320,6 +4836,43 @@
                                       ],
                       "methodSymbols":  [
                                             "Create"
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
+                      "path":  "tests/ChairSide.Board.Tests/TestSupport/StoreScenarioTestSupport.cs",
+                      "kind":  "CSharp",
+                      "sizeBytes":  12312,
+                      "typeSymbols":  [
+                                          "BoardStoreTests"
+                                      ],
+                      "methodSymbols":  [
+                                            "DriveRoomToDoctorInRoom",
+                                            "RunProcedureCycle",
+                                            "Utc",
+                                            "DriveRoomToCancellationState",
+                                            "AssertSameRoomState",
+                                            "AssertSameAbortedAssignment",
+                                            "SeatViaPrestage",
+                                            "SaveCleanCycle",
+                                            "SaveObservedCycle",
+                                            "CompleteOneCycle",
+                                            "NewAbortedAssignment",
+                                            "InvokeResetRoom"
                                         ],
                       "routes":  [
 
