@@ -7,7 +7,7 @@ namespace ChairSide.Board.Tests;
 public sealed class ReportsSnapshotBuilderTests
 {
     [Fact]
-    public void Build_characterizes_all_reporting_populations_without_mutating_source_history()
+    public void Compose_characterizes_all_reporting_populations_without_mutating_source_history()
     {
         var standard = Cycle(
             id: 1,
@@ -89,10 +89,42 @@ public sealed class ReportsSnapshotBuilderTests
             SuggestedAction = "Review"
         };
 
-        var snapshot = CreateBuilder().Build(
+        var composition = CreateBuilder().Compose(
             [standard, sedationVariant, incomplete, reportingException, manualException],
             [abortedException],
             ReportDateRange.AllTime);
+        var snapshot = ReportsSnapshotAdapter.ToSnapshot(composition);
+
+        Assert.Equal(3, composition.Population.CompletedRoomCyclesCount);
+        Assert.Equal(2, composition.Population.IncludedCompletedCycleCount);
+        Assert.Equal(1, composition.Population.ExcludedCompletedCycleCount);
+        Assert.Equal(1, composition.Population.ExceptionCount);
+        Assert.Equal(3, composition.Population.RecentCompletedCycles.Count);
+
+        Assert.Null(composition.Window.RangeStartDate);
+        Assert.Null(composition.Window.RangeEndDate);
+        Assert.Equal("All time", composition.Window.RangeLabel);
+        Assert.Equal(4, composition.Window.TotalCompletedCycleCount);
+
+        Assert.Equal(1, composition.Timing.AgingEventCount);
+        Assert.Equal(1, composition.Timing.StaleEventCount);
+        Assert.Equal(2, Assert.Single(composition.Timing.Trends!.Buckets).CompletedCycleCount);
+
+        Assert.Equal(2, composition.Procedures.ProcedureSummaries.Count);
+        Assert.Equal(1, composition.Procedures.SedationCaseCount);
+        Assert.Equal(1, composition.Procedures.NonSedationCaseCount);
+        Assert.Single(composition.Procedures.BaseProcedureSummaries);
+
+        Assert.NotNull(composition.Allocation.AllocationVariance);
+        Assert.Single(composition.Allocation.DoctorDailyAllocationSeries!);
+        Assert.NotNull(composition.Allocation.ScheduleFit);
+
+        Assert.Single(composition.DoctorDetail.DoctorSummaries);
+        Assert.Single(composition.DoctorDetail.ObservedDoctorDays!);
+        Assert.Equal(2, composition.DoctorDetail.DoctorProcedureMix!.Count);
+
+        Assert.Single(composition.ReviewQueue.ExceptionCycles);
+        Assert.Equal(2, composition.ReviewQueue.ExceptionReviewRecords!.Count);
 
         Assert.Equal(3, snapshot.CompletedRoomCyclesCount);
         Assert.Equal(2, snapshot.IncludedCompletedCycleCount);
@@ -139,6 +171,158 @@ public sealed class ReportsSnapshotBuilderTests
         Assert.Null(standard.AllocationVarianceMinutes);
         Assert.Null(standard.DoctorOccupiedWaitSeconds);
         Assert.Null(standard.DoctorAvailableWaitSeconds);
+    }
+
+    [Fact]
+    public void Adapter_preserves_every_named_section_value_in_flat_contract()
+    {
+        var recentCompletedCycles = new List<CompletedRoomCycle>();
+        var exceptionCycles = new List<CompletedRoomCycle>();
+        var procedureSummaries = new List<ProcedureCycleSummary>();
+        var baseProcedureSummaries = new List<ProcedureCycleSummary>();
+        var allocationVariance = new AllocationVarianceSummary(1, 2, 3, 4, 5, 6, 7, 8, 9);
+        var doctorDailyAllocationSeries = new List<DoctorDailyAllocation>();
+        var scheduleFit = ScheduleFitReportBuilder.Build([]);
+        var doctorSummaries = new List<DoctorCycleSummary>();
+        var trends = new ReportTrendSnapshot("Sentinel", []);
+        var observedDoctorDays = new List<ObservedDoctorDay>();
+        var doctorProcedureMix = new List<DoctorProcedureMixRow>();
+        var exceptionReviewRecords = new List<ExceptionReviewRecord>();
+
+        var composition = new ReportsSnapshotComposition
+        {
+            Population = new ReportPopulationSection
+            {
+                CompletedRoomCyclesCount = 101,
+                RecentCompletedCycles = recentCompletedCycles,
+                IncludedCompletedCycleCount = 102,
+                ExcludedCompletedCycleCount = 103,
+                ExceptionCount = 104
+            },
+            Window = new ReportWindowSection
+            {
+                RangeStartDate = "start-sentinel",
+                RangeEndDate = "end-sentinel",
+                RangeLabel = "label-sentinel",
+                TotalCompletedCycleCount = 105
+            },
+            Timing = new ReportTimingSection
+            {
+                AverageSeatedToDoctorSeconds = 201,
+                MedianSeatedToDoctorSeconds = 202,
+                AveragePrepSeconds = 203,
+                MedianPrepSeconds = 204,
+                AverageReadyToDoctorSeconds = 205,
+                MedianReadyToDoctorSeconds = 206,
+                AverageDoctorInRoomSeconds = 207,
+                MedianDoctorInRoomSeconds = 208,
+                AverageTurnoverSeconds = 209,
+                MedianTurnoverSeconds = 210,
+                AgingEventCount = 106,
+                StaleEventCount = 107,
+                AverageDoctorOccupiedWaitSeconds = 211,
+                MedianDoctorOccupiedWaitSeconds = 212,
+                AverageDoctorAvailableWaitSeconds = 213,
+                MedianDoctorAvailableWaitSeconds = 214,
+                Trends = trends
+            },
+            Procedures = new ReportProcedureSection
+            {
+                ProcedureSummaries = procedureSummaries,
+                SedationCaseCount = 108,
+                NonSedationCaseCount = 109,
+                BaseProcedureSummaries = baseProcedureSummaries
+            },
+            Allocation = new ReportAllocationSection
+            {
+                AllocationVariance = allocationVariance,
+                DoctorDailyAllocationSeries = doctorDailyAllocationSeries,
+                ScheduleFit = scheduleFit
+            },
+            DoctorDetail = new ReportDoctorDetailSection
+            {
+                DoctorSummaries = doctorSummaries,
+                ObservedDoctorDays = observedDoctorDays,
+                DoctorProcedureMix = doctorProcedureMix
+            },
+            ReviewQueue = new ReportReviewQueueSection
+            {
+                ExceptionCycles = exceptionCycles,
+                ExceptionReviewRecords = exceptionReviewRecords
+            }
+        };
+        var snapshot = ReportsSnapshotAdapter.ToSnapshot(composition);
+
+        Assert.Equal(
+            composition.Population.CompletedRoomCyclesCount,
+            snapshot.CompletedRoomCyclesCount);
+        Assert.Equal(
+            composition.Timing.AverageSeatedToDoctorSeconds,
+            snapshot.AverageSeatedToDoctorSeconds);
+        Assert.Equal(
+            composition.Timing.MedianSeatedToDoctorSeconds,
+            snapshot.MedianSeatedToDoctorSeconds);
+        Assert.Equal(composition.Timing.AveragePrepSeconds, snapshot.AveragePrepSeconds);
+        Assert.Equal(composition.Timing.MedianPrepSeconds, snapshot.MedianPrepSeconds);
+        Assert.Equal(
+            composition.Timing.AverageReadyToDoctorSeconds,
+            snapshot.AverageReadyToDoctorSeconds);
+        Assert.Equal(
+            composition.Timing.MedianReadyToDoctorSeconds,
+            snapshot.MedianReadyToDoctorSeconds);
+        Assert.Equal(
+            composition.Timing.AverageDoctorInRoomSeconds,
+            snapshot.AverageDoctorInRoomSeconds);
+        Assert.Equal(
+            composition.Timing.MedianDoctorInRoomSeconds,
+            snapshot.MedianDoctorInRoomSeconds);
+        Assert.Equal(composition.Timing.AverageTurnoverSeconds, snapshot.AverageTurnoverSeconds);
+        Assert.Equal(composition.Timing.MedianTurnoverSeconds, snapshot.MedianTurnoverSeconds);
+        Assert.Equal(composition.Timing.AgingEventCount, snapshot.AgingEventCount);
+        Assert.Equal(composition.Timing.StaleEventCount, snapshot.StaleEventCount);
+        Assert.Equal(
+            composition.Timing.AverageDoctorOccupiedWaitSeconds,
+            snapshot.AverageDoctorOccupiedWaitSeconds);
+        Assert.Equal(
+            composition.Timing.MedianDoctorOccupiedWaitSeconds,
+            snapshot.MedianDoctorOccupiedWaitSeconds);
+        Assert.Equal(
+            composition.Timing.AverageDoctorAvailableWaitSeconds,
+            snapshot.AverageDoctorAvailableWaitSeconds);
+        Assert.Equal(
+            composition.Timing.MedianDoctorAvailableWaitSeconds,
+            snapshot.MedianDoctorAvailableWaitSeconds);
+        Assert.Same(composition.DoctorDetail.DoctorSummaries, snapshot.DoctorSummaries);
+        Assert.Same(composition.Population.RecentCompletedCycles, snapshot.RecentCompletedCycles);
+        Assert.Same(composition.ReviewQueue.ExceptionCycles, snapshot.ExceptionCycles);
+        Assert.Same(composition.Procedures.ProcedureSummaries, snapshot.ProcedureSummaries);
+        Assert.Equal(composition.Procedures.SedationCaseCount, snapshot.SedationCaseCount);
+        Assert.Equal(composition.Procedures.NonSedationCaseCount, snapshot.NonSedationCaseCount);
+        Assert.Same(composition.Procedures.BaseProcedureSummaries, snapshot.BaseProcedureSummaries);
+        Assert.Equal(
+            composition.Population.IncludedCompletedCycleCount,
+            snapshot.IncludedCompletedCycleCount);
+        Assert.Equal(
+            composition.Population.ExcludedCompletedCycleCount,
+            snapshot.ExcludedCompletedCycleCount);
+        Assert.Equal(composition.Population.ExceptionCount, snapshot.ExceptionCount);
+        Assert.Same(composition.Allocation.AllocationVariance, snapshot.AllocationVariance);
+        Assert.Equal(composition.Window.RangeStartDate, snapshot.RangeStartDate);
+        Assert.Equal(composition.Window.RangeEndDate, snapshot.RangeEndDate);
+        Assert.Equal(composition.Window.RangeLabel, snapshot.RangeLabel);
+        Assert.Equal(
+            composition.Window.TotalCompletedCycleCount,
+            snapshot.TotalCompletedCycleCount);
+        Assert.Same(
+            composition.Allocation.DoctorDailyAllocationSeries,
+            snapshot.DoctorDailyAllocationSeries);
+        Assert.Same(composition.Allocation.ScheduleFit, snapshot.ScheduleFit);
+        Assert.Same(composition.Timing.Trends, snapshot.Trends);
+        Assert.Same(composition.DoctorDetail.ObservedDoctorDays, snapshot.ObservedDoctorDays);
+        Assert.Same(composition.DoctorDetail.DoctorProcedureMix, snapshot.DoctorProcedureMix);
+        Assert.Same(
+            composition.ReviewQueue.ExceptionReviewRecords,
+            snapshot.ExceptionReviewRecords);
     }
 
     [Fact]
