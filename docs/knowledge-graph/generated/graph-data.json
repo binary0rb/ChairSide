@@ -567,10 +567,64 @@
                       "path":  "tests/ChairSide.Board.Tests/BoardReadyPresentationTests.cs"
                   },
                   {
-                      "id":  "file:tests/ChairSide.Board.Tests/BoardStoreTests.cs",
-                      "label":  "tests/ChairSide.Board.Tests/BoardStoreTests.cs",
+                      "id":  "file:tests/ChairSide.Board.Tests/BoardStoreAssignmentTests.cs",
+                      "label":  "tests/ChairSide.Board.Tests/BoardStoreAssignmentTests.cs",
                       "type":  "File",
-                      "path":  "tests/ChairSide.Board.Tests/BoardStoreTests.cs"
+                      "path":  "tests/ChairSide.Board.Tests/BoardStoreAssignmentTests.cs"
+                  },
+                  {
+                      "id":  "file:tests/ChairSide.Board.Tests/BoardStoreEndpointCompatibilityTests.cs",
+                      "label":  "tests/ChairSide.Board.Tests/BoardStoreEndpointCompatibilityTests.cs",
+                      "type":  "File",
+                      "path":  "tests/ChairSide.Board.Tests/BoardStoreEndpointCompatibilityTests.cs"
+                  },
+                  {
+                      "id":  "file:tests/ChairSide.Board.Tests/BoardStoreFixtureTests.cs",
+                      "label":  "tests/ChairSide.Board.Tests/BoardStoreFixtureTests.cs",
+                      "type":  "File",
+                      "path":  "tests/ChairSide.Board.Tests/BoardStoreFixtureTests.cs"
+                  },
+                  {
+                      "id":  "file:tests/ChairSide.Board.Tests/BoardStoreLifecycleTests.cs",
+                      "label":  "tests/ChairSide.Board.Tests/BoardStoreLifecycleTests.cs",
+                      "type":  "File",
+                      "path":  "tests/ChairSide.Board.Tests/BoardStoreLifecycleTests.cs"
+                  },
+                  {
+                      "id":  "file:tests/ChairSide.Board.Tests/BoardStorePersistenceTests.cs",
+                      "label":  "tests/ChairSide.Board.Tests/BoardStorePersistenceTests.cs",
+                      "type":  "File",
+                      "path":  "tests/ChairSide.Board.Tests/BoardStorePersistenceTests.cs"
+                  },
+                  {
+                      "id":  "file:tests/ChairSide.Board.Tests/BoardStoreProcedureReportingTests.cs",
+                      "label":  "tests/ChairSide.Board.Tests/BoardStoreProcedureReportingTests.cs",
+                      "type":  "File",
+                      "path":  "tests/ChairSide.Board.Tests/BoardStoreProcedureReportingTests.cs"
+                  },
+                  {
+                      "id":  "file:tests/ChairSide.Board.Tests/BoardStoreReadinessTests.cs",
+                      "label":  "tests/ChairSide.Board.Tests/BoardStoreReadinessTests.cs",
+                      "type":  "File",
+                      "path":  "tests/ChairSide.Board.Tests/BoardStoreReadinessTests.cs"
+                  },
+                  {
+                      "id":  "file:tests/ChairSide.Board.Tests/BoardStoreRecoveryTests.cs",
+                      "label":  "tests/ChairSide.Board.Tests/BoardStoreRecoveryTests.cs",
+                      "type":  "File",
+                      "path":  "tests/ChairSide.Board.Tests/BoardStoreRecoveryTests.cs"
+                  },
+                  {
+                      "id":  "file:tests/ChairSide.Board.Tests/BoardStoreReportingTests.cs",
+                      "label":  "tests/ChairSide.Board.Tests/BoardStoreReportingTests.cs",
+                      "type":  "File",
+                      "path":  "tests/ChairSide.Board.Tests/BoardStoreReportingTests.cs"
+                  },
+                  {
+                      "id":  "file:tests/ChairSide.Board.Tests/BoardStoreSecurityAndDiagnosticsTests.cs",
+                      "label":  "tests/ChairSide.Board.Tests/BoardStoreSecurityAndDiagnosticsTests.cs",
+                      "type":  "File",
+                      "path":  "tests/ChairSide.Board.Tests/BoardStoreSecurityAndDiagnosticsTests.cs"
                   },
                   {
                       "id":  "file:tests/ChairSide.Board.Tests/CanonicalAssignmentDomainValidationTests.cs",
@@ -711,6 +765,12 @@
                       "path":  "tests/ChairSide.Board.Tests/SqliteBoardSchemaTests.cs"
                   },
                   {
+                      "id":  "file:tests/ChairSide.Board.Tests/TestSupport/EndpointTestSupport.cs",
+                      "label":  "tests/ChairSide.Board.Tests/TestSupport/EndpointTestSupport.cs",
+                      "type":  "File",
+                      "path":  "tests/ChairSide.Board.Tests/TestSupport/EndpointTestSupport.cs"
+                  },
+                  {
                       "id":  "file:tests/ChairSide.Board.Tests/TestSupport/ManualTimeProvider.cs",
                       "label":  "tests/ChairSide.Board.Tests/TestSupport/ManualTimeProvider.cs",
                       "type":  "File",
@@ -723,10 +783,22 @@
                       "path":  "tests/ChairSide.Board.Tests/TestSupport/NoopBoardHubContext.cs"
                   },
                   {
+                      "id":  "file:tests/ChairSide.Board.Tests/TestSupport/SqliteTestSupport.cs",
+                      "label":  "tests/ChairSide.Board.Tests/TestSupport/SqliteTestSupport.cs",
+                      "type":  "File",
+                      "path":  "tests/ChairSide.Board.Tests/TestSupport/SqliteTestSupport.cs"
+                  },
+                  {
                       "id":  "file:tests/ChairSide.Board.Tests/TestSupport/StoreContext.cs",
                       "label":  "tests/ChairSide.Board.Tests/TestSupport/StoreContext.cs",
                       "type":  "File",
                       "path":  "tests/ChairSide.Board.Tests/TestSupport/StoreContext.cs"
+                  },
+                  {
+                      "id":  "file:tests/ChairSide.Board.Tests/TestSupport/StoreScenarioTestSupport.cs",
+                      "label":  "tests/ChairSide.Board.Tests/TestSupport/StoreScenarioTestSupport.cs",
+                      "type":  "File",
+                      "path":  "tests/ChairSide.Board.Tests/TestSupport/StoreScenarioTestSupport.cs"
                   },
                   {
                       "id":  "file:tests/ChairSide.Board.Tests/TestSupport/TestOptionsMonitor.cs",
@@ -1026,7 +1098,7 @@
                       "id":  "symbol:type:BoardStoreTests",
                       "label":  "BoardStoreTests",
                       "type":  "CodeType",
-                      "path":  "tests/ChairSide.Board.Tests/BoardStoreTests.cs"
+                      "path":  "tests/ChairSide.Board.Tests/BoardStoreAssignmentTests.cs"
                   },
                   {
                       "id":  "symbol:type:BoardThresholdOptions",
@@ -3336,7 +3408,52 @@
                       "label":  "declares"
                   },
                   {
-                      "from":  "file:tests/ChairSide.Board.Tests/BoardStoreTests.cs",
+                      "from":  "file:tests/ChairSide.Board.Tests/BoardStoreAssignmentTests.cs",
+                      "to":  "symbol:type:BoardStoreTests",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:tests/ChairSide.Board.Tests/BoardStoreEndpointCompatibilityTests.cs",
+                      "to":  "symbol:type:BoardStoreTests",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:tests/ChairSide.Board.Tests/BoardStoreFixtureTests.cs",
+                      "to":  "symbol:type:BoardStoreTests",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:tests/ChairSide.Board.Tests/BoardStoreLifecycleTests.cs",
+                      "to":  "symbol:type:BoardStoreTests",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:tests/ChairSide.Board.Tests/BoardStorePersistenceTests.cs",
+                      "to":  "symbol:type:BoardStoreTests",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:tests/ChairSide.Board.Tests/BoardStoreProcedureReportingTests.cs",
+                      "to":  "symbol:type:BoardStoreTests",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:tests/ChairSide.Board.Tests/BoardStoreReadinessTests.cs",
+                      "to":  "symbol:type:BoardStoreTests",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:tests/ChairSide.Board.Tests/BoardStoreRecoveryTests.cs",
+                      "to":  "symbol:type:BoardStoreTests",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:tests/ChairSide.Board.Tests/BoardStoreReportingTests.cs",
+                      "to":  "symbol:type:BoardStoreTests",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:tests/ChairSide.Board.Tests/BoardStoreSecurityAndDiagnosticsTests.cs",
                       "to":  "symbol:type:BoardStoreTests",
                       "label":  "declares"
                   },
@@ -3531,6 +3648,11 @@
                       "label":  "declares"
                   },
                   {
+                      "from":  "file:tests/ChairSide.Board.Tests/TestSupport/EndpointTestSupport.cs",
+                      "to":  "symbol:type:BoardStoreTests",
+                      "label":  "declares"
+                  },
+                  {
                       "from":  "file:tests/ChairSide.Board.Tests/TestSupport/ManualTimeProvider.cs",
                       "to":  "symbol:type:ManualTimeProvider",
                       "label":  "declares"
@@ -3556,8 +3678,18 @@
                       "label":  "declares"
                   },
                   {
+                      "from":  "file:tests/ChairSide.Board.Tests/TestSupport/SqliteTestSupport.cs",
+                      "to":  "symbol:type:BoardStoreTests",
+                      "label":  "declares"
+                  },
+                  {
                       "from":  "file:tests/ChairSide.Board.Tests/TestSupport/StoreContext.cs",
                       "to":  "symbol:type:StoreContext",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:tests/ChairSide.Board.Tests/TestSupport/StoreScenarioTestSupport.cs",
+                      "to":  "symbol:type:BoardStoreTests",
                       "label":  "declares"
                   },
                   {
@@ -4047,7 +4179,52 @@
                   },
                   {
                       "from":  "repo:chairside",
-                      "to":  "file:tests/ChairSide.Board.Tests/BoardStoreTests.cs",
+                      "to":  "file:tests/ChairSide.Board.Tests/BoardStoreAssignmentTests.cs",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:tests/ChairSide.Board.Tests/BoardStoreEndpointCompatibilityTests.cs",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:tests/ChairSide.Board.Tests/BoardStoreFixtureTests.cs",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:tests/ChairSide.Board.Tests/BoardStoreLifecycleTests.cs",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:tests/ChairSide.Board.Tests/BoardStorePersistenceTests.cs",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:tests/ChairSide.Board.Tests/BoardStoreProcedureReportingTests.cs",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:tests/ChairSide.Board.Tests/BoardStoreReadinessTests.cs",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:tests/ChairSide.Board.Tests/BoardStoreRecoveryTests.cs",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:tests/ChairSide.Board.Tests/BoardStoreReportingTests.cs",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:tests/ChairSide.Board.Tests/BoardStoreSecurityAndDiagnosticsTests.cs",
                       "label":  "contains"
                   },
                   {
@@ -4167,6 +4344,11 @@
                   },
                   {
                       "from":  "repo:chairside",
+                      "to":  "file:tests/ChairSide.Board.Tests/TestSupport/EndpointTestSupport.cs",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
                       "to":  "file:tests/ChairSide.Board.Tests/TestSupport/ManualTimeProvider.cs",
                       "label":  "contains"
                   },
@@ -4177,7 +4359,17 @@
                   },
                   {
                       "from":  "repo:chairside",
+                      "to":  "file:tests/ChairSide.Board.Tests/TestSupport/SqliteTestSupport.cs",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
                       "to":  "file:tests/ChairSide.Board.Tests/TestSupport/StoreContext.cs",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:tests/ChairSide.Board.Tests/TestSupport/StoreScenarioTestSupport.cs",
                       "label":  "contains"
                   },
                   {
