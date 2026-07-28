@@ -1,7 +1,7 @@
 ﻿{
     "generatedStamp":  "deterministic",
     "root":  ".",
-    "fileCount":  119,
+    "fileCount":  121,
     "files":  [
                   {
                       "path":  ".github/pull_request_template.md",
@@ -159,7 +159,7 @@
                   {
                       "path":  "docs/design/prestage-assignment-lifecycle.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  12968,
+                      "sizeBytes":  12986,
                       "typeSymbols":  [
 
                                       ],
@@ -325,7 +325,7 @@
                   {
                       "path":  "docs/knowledge/reports/observed-load.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  2781,
+                      "sizeBytes":  2785,
                       "typeSymbols":  [
 
                                       ],
@@ -356,7 +356,7 @@
                   {
                       "path":  "docs/knowledge/reports/procedure-mix.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  2921,
+                      "sizeBytes":  2925,
                       "typeSymbols":  [
 
                                       ],
@@ -417,7 +417,7 @@
                   {
                       "path":  "docs/knowledge/reports/sedation-as-modifier.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  3276,
+                      "sizeBytes":  3280,
                       "typeSymbols":  [
 
                                       ],
@@ -448,7 +448,7 @@
                   {
                       "path":  "docs/knowledge/tests/deterministic-stress-fixtures.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  3679,
+                      "sizeBytes":  3683,
                       "typeSymbols":  [
 
                                       ],
@@ -513,7 +513,7 @@
                   {
                       "path":  "docs/knowledge/workflow/room-lifecycle.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  9061,
+                      "sizeBytes":  9086,
                       "typeSymbols":  [
 
                                       ],
@@ -576,7 +576,7 @@
                   {
                       "path":  "docs/knowledge-graph/chairside.graph.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  12718,
+                      "sizeBytes":  12736,
                       "typeSymbols":  [
 
                                       ],
@@ -607,7 +607,7 @@
                   {
                       "path":  "docs/knowledge-graph/decisions.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  13515,
+                      "sizeBytes":  13535,
                       "typeSymbols":  [
 
                                       ],
@@ -756,7 +756,7 @@
                   {
                       "path":  "docs/ui-cohesion-audit.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  25125,
+                      "sizeBytes":  25136,
                       "typeSymbols":  [
 
                                       ],
@@ -1461,7 +1461,7 @@
                   {
                       "path":  "src/ChairSide.Board/Program.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  72420,
+                      "sizeBytes":  72422,
                       "typeSymbols":  [
                                           "BeginPrestageRequest",
                                           "CancelRoomAssignmentRequest",
@@ -1712,7 +1712,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/DemoBoardStore.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  247714,
+                      "sizeBytes":  212973,
                       "typeSymbols":  [
                                           "ExceptionReasons",
                                           "ReportingExceptionReasons",
@@ -2116,6 +2116,64 @@
                                             "TryToContract",
                                             "ValidateCanonicalValues",
                                             "ValidateCanonicalWrite"
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
+                      "path":  "src/ChairSide.Board/Services/ReportsSnapshotBuilder.cs",
+                      "kind":  "CSharp",
+                      "sizeBytes":  38480,
+                      "typeSymbols":  [
+                                          "ReportsSnapshotBuilder"
+                                      ],
+                      "methodSymbols":  [
+                                            "Build",
+                                            "CreateAnnotatedCompletedCycleSnapshot",
+                                            "BuildExceptionReviewRecords",
+                                            "AverageSeconds",
+                                            "MedianSeconds",
+                                            "BuildDoctorSummaries",
+                                            "BuildDoctorDailyAllocationSeries",
+                                            "BuildObservedDoctorDays",
+                                            "BuildObservedRoomConcurrency",
+                                            "ObservedLoadWholeMinutesBetween",
+                                            "BuildProcedureSummaries",
+                                            "BuildBaseProcedureSummaries",
+                                            "BuildDoctorProcedureMix",
+                                            "ResolveProcedureLabel",
+                                            "AnnotateReportingExceptions",
+                                            "HasExtremeDuration",
+                                            "CrossesCalendarDay",
+                                            "BuildDisplayProcedureLabel",
+                                            "AnnotateAllocationVariance",
+                                            "BuildAllocationVarianceSummary",
+                                            "AnnotateOccupiedWait",
+                                            "ComputeOverlapSeconds",
+                                            "ResolveDoctorDisplayName",
+                                            "FindProcedure",
+                                            "FindActiveProcedure",
+                                            "HasSedationModifier",
+                                            "StripSedationModifier",
+                                            "ComposeProcedureCode",
+                                            "IsSedationProcedureCode",
+                                            "ResolveBaseProcedureCode",
+                                            "ResolveProcedure",
+                                            "CopyCompletedCycle",
+                                            "CopyAbortedAssignment"
                                         ],
                       "routes":  [
 
@@ -3757,6 +3815,38 @@
                                             "CopyRoom",
                                             "AssertOperationFailsWithoutChanges",
                                             "InvokeReadyHandoffOperation"
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
+                      "path":  "tests/ChairSide.Board.Tests/ReportsSnapshotBuilderTests.cs",
+                      "kind":  "CSharp",
+                      "sizeBytes":  14022,
+                      "typeSymbols":  [
+                                          "ReportsSnapshotBuilderTests"
+                                      ],
+                      "methodSymbols":  [
+                                            "Build_characterizes_all_reporting_populations_without_mutating_source_history",
+                                            "Build_applies_completion_window_before_every_population_and_keeps_all_time_total",
+                                            "Reports_snapshot_web_json_property_contract_remains_unchanged",
+                                            "CreateBuilder",
+                                            "Cycle",
+                                            "SecondsBetween",
+                                            "Utc"
                                         ],
                       "routes":  [
 

@@ -399,6 +399,12 @@
                       "path":  "src/ChairSide.Board/Services/ReadyHandoffPersistenceRecords.cs"
                   },
                   {
+                      "id":  "file:src/ChairSide.Board/Services/ReportsSnapshotBuilder.cs",
+                      "label":  "src/ChairSide.Board/Services/ReportsSnapshotBuilder.cs",
+                      "type":  "File",
+                      "path":  "src/ChairSide.Board/Services/ReportsSnapshotBuilder.cs"
+                  },
+                  {
                       "id":  "file:src/ChairSide.Board/Services/ReportTrendSnapshot.cs",
                       "label":  "src/ChairSide.Board/Services/ReportTrendSnapshot.cs",
                       "type":  "File",
@@ -637,6 +643,12 @@
                       "label":  "tests/ChairSide.Board.Tests/ReadyHandoffPersistenceTests.cs",
                       "type":  "File",
                       "path":  "tests/ChairSide.Board.Tests/ReadyHandoffPersistenceTests.cs"
+                  },
+                  {
+                      "id":  "file:tests/ChairSide.Board.Tests/ReportsSnapshotBuilderTests.cs",
+                      "label":  "tests/ChairSide.Board.Tests/ReportsSnapshotBuilderTests.cs",
+                      "type":  "File",
+                      "path":  "tests/ChairSide.Board.Tests/ReportsSnapshotBuilderTests.cs"
                   },
                   {
                       "id":  "file:tests/ChairSide.Board.Tests/ReportTrendSnapshotTests.cs",
@@ -1779,6 +1791,18 @@
                       "path":  "src/ChairSide.Board/Services/DemoBoardStore.cs"
                   },
                   {
+                      "id":  "symbol:type:ReportsSnapshotBuilder",
+                      "label":  "ReportsSnapshotBuilder",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/ReportsSnapshotBuilder.cs"
+                  },
+                  {
+                      "id":  "symbol:type:ReportsSnapshotBuilderTests",
+                      "label":  "ReportsSnapshotBuilderTests",
+                      "type":  "CodeType",
+                      "path":  "tests/ChairSide.Board.Tests/ReportsSnapshotBuilderTests.cs"
+                  },
+                  {
                       "id":  "symbol:type:ReportTrendBucket",
                       "label":  "ReportTrendBucket",
                       "type":  "CodeType",
@@ -2852,6 +2876,11 @@
                       "label":  "declares"
                   },
                   {
+                      "from":  "file:src/ChairSide.Board/Services/ReportsSnapshotBuilder.cs",
+                      "to":  "symbol:type:ReportsSnapshotBuilder",
+                      "label":  "declares"
+                  },
+                  {
                       "from":  "file:src/ChairSide.Board/Services/ReportTrendSnapshot.cs",
                       "to":  "symbol:type:ReportTrendBucket",
                       "label":  "declares"
@@ -3174,6 +3203,11 @@
                   {
                       "from":  "file:tests/ChairSide.Board.Tests/ReadyHandoffPersistenceTests.cs",
                       "to":  "symbol:type:RoomSnapshot",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:tests/ChairSide.Board.Tests/ReportsSnapshotBuilderTests.cs",
+                      "to":  "symbol:type:ReportsSnapshotBuilderTests",
                       "label":  "declares"
                   },
                   {
@@ -3573,6 +3607,11 @@
                   },
                   {
                       "from":  "repo:chairside",
+                      "to":  "file:src/ChairSide.Board/Services/ReportsSnapshotBuilder.cs",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
                       "to":  "file:src/ChairSide.Board/Services/ReportTrendSnapshot.cs",
                       "label":  "contains"
                   },
@@ -3769,6 +3808,11 @@
                   {
                       "from":  "repo:chairside",
                       "to":  "file:tests/ChairSide.Board.Tests/ReadyHandoffPersistenceTests.cs",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:tests/ChairSide.Board.Tests/ReportsSnapshotBuilderTests.cs",
                       "label":  "contains"
                   },
                   {
