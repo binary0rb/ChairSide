@@ -405,6 +405,12 @@
                       "path":  "src/ChairSide.Board/Services/ReportsSnapshotBuilder.cs"
                   },
                   {
+                      "id":  "file:src/ChairSide.Board/Services/ReportsSnapshotComposition.cs",
+                      "label":  "src/ChairSide.Board/Services/ReportsSnapshotComposition.cs",
+                      "type":  "File",
+                      "path":  "src/ChairSide.Board/Services/ReportsSnapshotComposition.cs"
+                  },
+                  {
                       "id":  "file:src/ChairSide.Board/Services/ReportTrendSnapshot.cs",
                       "label":  "src/ChairSide.Board/Services/ReportTrendSnapshot.cs",
                       "type":  "File",
@@ -1779,16 +1785,52 @@
                       "path":  "tests/ChairSide.Board.Tests/DatabaseIsolationPolicyTests.cs"
                   },
                   {
+                      "id":  "symbol:type:ReportAllocationSection",
+                      "label":  "ReportAllocationSection",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/ReportsSnapshotComposition.cs"
+                  },
+                  {
+                      "id":  "symbol:type:ReportDoctorDetailSection",
+                      "label":  "ReportDoctorDetailSection",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/ReportsSnapshotComposition.cs"
+                  },
+                  {
                       "id":  "symbol:type:ReportingExceptionReasons",
                       "label":  "ReportingExceptionReasons",
                       "type":  "CodeType",
                       "path":  "src/ChairSide.Board/Services/DemoBoardStore.cs"
                   },
                   {
+                      "id":  "symbol:type:ReportPopulationSection",
+                      "label":  "ReportPopulationSection",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/ReportsSnapshotComposition.cs"
+                  },
+                  {
+                      "id":  "symbol:type:ReportProcedureSection",
+                      "label":  "ReportProcedureSection",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/ReportsSnapshotComposition.cs"
+                  },
+                  {
+                      "id":  "symbol:type:ReportReviewQueueSection",
+                      "label":  "ReportReviewQueueSection",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/ReportsSnapshotComposition.cs"
+                  },
+                  {
                       "id":  "symbol:type:ReportsSnapshot",
                       "label":  "ReportsSnapshot",
                       "type":  "CodeType",
                       "path":  "src/ChairSide.Board/Services/DemoBoardStore.cs"
+                  },
+                  {
+                      "id":  "symbol:type:ReportsSnapshotAdapter",
+                      "label":  "ReportsSnapshotAdapter",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/ReportsSnapshotComposition.cs"
                   },
                   {
                       "id":  "symbol:type:ReportsSnapshotBuilder",
@@ -1801,6 +1843,18 @@
                       "label":  "ReportsSnapshotBuilderTests",
                       "type":  "CodeType",
                       "path":  "tests/ChairSide.Board.Tests/ReportsSnapshotBuilderTests.cs"
+                  },
+                  {
+                      "id":  "symbol:type:ReportsSnapshotComposition",
+                      "label":  "ReportsSnapshotComposition",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/ReportsSnapshotComposition.cs"
+                  },
+                  {
+                      "id":  "symbol:type:ReportTimingSection",
+                      "label":  "ReportTimingSection",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/ReportsSnapshotComposition.cs"
                   },
                   {
                       "id":  "symbol:type:ReportTrendBucket",
@@ -1825,6 +1879,12 @@
                       "label":  "ReportTrendSnapshotTests",
                       "type":  "CodeType",
                       "path":  "tests/ChairSide.Board.Tests/ReportTrendSnapshotTests.cs"
+                  },
+                  {
+                      "id":  "symbol:type:ReportWindowSection",
+                      "label":  "ReportWindowSection",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/ReportsSnapshotComposition.cs"
                   },
                   {
                       "id":  "symbol:type:ResolveDoctorArrivalConflictRequest",
@@ -2881,6 +2941,51 @@
                       "label":  "declares"
                   },
                   {
+                      "from":  "file:src/ChairSide.Board/Services/ReportsSnapshotComposition.cs",
+                      "to":  "symbol:type:ReportAllocationSection",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/ReportsSnapshotComposition.cs",
+                      "to":  "symbol:type:ReportDoctorDetailSection",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/ReportsSnapshotComposition.cs",
+                      "to":  "symbol:type:ReportPopulationSection",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/ReportsSnapshotComposition.cs",
+                      "to":  "symbol:type:ReportProcedureSection",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/ReportsSnapshotComposition.cs",
+                      "to":  "symbol:type:ReportReviewQueueSection",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/ReportsSnapshotComposition.cs",
+                      "to":  "symbol:type:ReportsSnapshotAdapter",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/ReportsSnapshotComposition.cs",
+                      "to":  "symbol:type:ReportsSnapshotComposition",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/ReportsSnapshotComposition.cs",
+                      "to":  "symbol:type:ReportTimingSection",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/ReportsSnapshotComposition.cs",
+                      "to":  "symbol:type:ReportWindowSection",
+                      "label":  "declares"
+                  },
+                  {
                       "from":  "file:src/ChairSide.Board/Services/ReportTrendSnapshot.cs",
                       "to":  "symbol:type:ReportTrendBucket",
                       "label":  "declares"
@@ -3608,6 +3713,11 @@
                   {
                       "from":  "repo:chairside",
                       "to":  "file:src/ChairSide.Board/Services/ReportsSnapshotBuilder.cs",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:src/ChairSide.Board/Services/ReportsSnapshotComposition.cs",
                       "label":  "contains"
                   },
                   {

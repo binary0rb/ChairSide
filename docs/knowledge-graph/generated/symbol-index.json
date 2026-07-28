@@ -1,7 +1,7 @@
 ﻿{
     "generatedStamp":  "deterministic",
     "root":  ".",
-    "fileCount":  121,
+    "fileCount":  122,
     "files":  [
                   {
                       "path":  ".github/pull_request_template.md",
@@ -1712,7 +1712,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/DemoBoardStore.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  212973,
+                      "sizeBytes":  213014,
                       "typeSymbols":  [
                                           "ExceptionReasons",
                                           "ReportingExceptionReasons",
@@ -2136,12 +2136,13 @@
                   {
                       "path":  "src/ChairSide.Board/Services/ReportsSnapshotBuilder.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  38480,
+                      "sizeBytes":  41500,
                       "typeSymbols":  [
                                           "ReportsSnapshotBuilder"
                                       ],
                       "methodSymbols":  [
                                             "Build",
+                                            "Compose",
                                             "CreateAnnotatedCompletedCycleSnapshot",
                                             "BuildExceptionReviewRecords",
                                             "AverageSeconds",
@@ -2174,6 +2175,40 @@
                                             "ResolveProcedure",
                                             "CopyCompletedCycle",
                                             "CopyAbortedAssignment"
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
+                      "path":  "src/ChairSide.Board/Services/ReportsSnapshotComposition.cs",
+                      "kind":  "CSharp",
+                      "sizeBytes":  8438,
+                      "typeSymbols":  [
+                                          "ReportsSnapshotComposition",
+                                          "ReportPopulationSection",
+                                          "ReportWindowSection",
+                                          "ReportTimingSection",
+                                          "ReportProcedureSection",
+                                          "ReportAllocationSection",
+                                          "ReportDoctorDetailSection",
+                                          "ReportReviewQueueSection",
+                                          "ReportsSnapshotAdapter"
+                                      ],
+                      "methodSymbols":  [
+                                            "ToSnapshot"
                                         ],
                       "routes":  [
 
@@ -3835,12 +3870,13 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/ReportsSnapshotBuilderTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  14022,
+                      "sizeBytes":  23760,
                       "typeSymbols":  [
                                           "ReportsSnapshotBuilderTests"
                                       ],
                       "methodSymbols":  [
-                                            "Build_characterizes_all_reporting_populations_without_mutating_source_history",
+                                            "Compose_characterizes_all_reporting_populations_without_mutating_source_history",
+                                            "Adapter_preserves_every_named_section_value_in_flat_contract",
                                             "Build_applies_completion_window_before_every_population_and_keeps_all_time_total",
                                             "Reports_snapshot_web_json_property_contract_remains_unchanged",
                                             "CreateBuilder",
