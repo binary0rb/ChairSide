@@ -1,7 +1,7 @@
 ﻿{
     "generatedStamp":  "deterministic",
     "root":  ".",
-    "fileCount":  125,
+    "fileCount":  127,
     "files":  [
                   {
                       "path":  ".github/pull_request_template.md",
@@ -1712,7 +1712,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/DemoBoardStore.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  182465,
+                      "sizeBytes":  182693,
                       "typeSymbols":  [
                                           "ExceptionReasons",
                                           "ReportingExceptionReasons",
@@ -1839,7 +1839,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/DeterministicFixtureBuilder.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  14187,
+                      "sizeBytes":  14576,
                       "typeSymbols":  [
                                           "DeterministicFixtureBuilder",
                                           "DeterministicFixturePlan",
@@ -1885,7 +1885,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/DeterministicFixtureCatalog.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  7101,
+                      "sizeBytes":  7262,
                       "typeSymbols":  [
                                           "DeterministicFixtureCatalog",
                                           "FixtureHistoryKind",
@@ -2548,12 +2548,11 @@
                   {
                       "path":  "src/ChairSide.Board/Services/SqliteBoardRepository.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  157929,
+                      "sizeBytes":  112567,
                       "typeSymbols":  [
                                           "SqliteBoardRepository",
                                           "DoctorWorkingRoomRecord",
-                                          "DoctorWorkingRoomLookupResult",
-                                          "DatabaseInitializationTestHooks"
+                                          "DoctorWorkingRoomLookupResult"
                                       ],
                       "methodSymbols":  [
                                             "HasOperationalData",
@@ -2594,8 +2593,53 @@
                                             "UpdateReadyHandoffOutcomeGuarded",
                                             "TerminateReadyHandoff",
                                             "InsertAbortedAssignment",
+                                            "UpdateCanonicalRoom",
+                                            "CopyRoomForPersistence"
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
+                      "path":  "src/ChairSide.Board/Services/SqliteBoardSchema.cs",
+                      "kind":  "CSharp",
+                      "sizeBytes":  46102,
+                      "typeSymbols":  [
+                                          "SqliteBoardSchema",
+                                          "SqliteBoardInitialization",
+                                          "DatabaseInitializationTestHooks"
+                                      ],
+                      "methodSymbols":  [
+                                            "Initialize",
                                             "InitializeDevelopment",
-                                            "InitializeDeployed"
+                                            "InitializeDeployed",
+                                            "CreateCurrentSchema",
+                                            "InitializeSchemaAndMigrations",
+                                            "EnsureCompletedCycleIdColumn",
+                                            "MigrateNullableDoctorArrivedAt",
+                                            "MigrateAbortedAssignmentCanonicalSchema",
+                                            "CreateReadyHandoffIndexes",
+                                            "EnableWal",
+                                            "ApplyLosslessCanonicalBackfills",
+                                            "TableExists",
+                                            "GetColumnNames",
+                                            "Execute",
+                                            "TryAddColumn",
+                                            "IsDuplicateColumnError",
+                                            "OpenConnection",
+                                            "VerifyDirectoryWritable"
                                         ],
                       "routes":  [
 
@@ -3118,7 +3162,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/BoardStoreTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  434176,
+                      "sizeBytes":  432386,
                       "typeSymbols":  [
                                           "BoardStoreTests"
                                       ],
@@ -3402,7 +3446,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/DeterministicFixtureBuilderTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  12553,
+                      "sizeBytes":  12831,
                       "typeSymbols":  [
                                           "DeterministicFixtureBuilderTests"
                                       ],
@@ -4142,6 +4186,49 @@
                                             "Schedule_fit_totals_agree_with_allocation_variance_summary_for_standard_population",
                                             "Utc",
                                             "SeedCleanCycle"
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
+                      "path":  "tests/ChairSide.Board.Tests/SqliteBoardSchemaTests.cs",
+                      "kind":  "CSharp",
+                      "sizeBytes":  20098,
+                      "typeSymbols":  [
+                                          "SqliteBoardSchemaTests"
+                                      ],
+                      "methodSymbols":  [
+                                            "Repeated_initialization_preserves_schema_identity_indexes_and_operational_rows",
+                                            "Legacy_migration_applies_only_lossless_canonical_backfills_and_preserves_values",
+                                            "Nullable_doctor_arrived_at_rebuild_preserves_existing_rows",
+                                            "Rebuilding_migration_rolls_back_rename_create_and_copy_on_failure",
+                                            "Additive_column_migration_ignores_duplicate_column_errors",
+                                            "Additive_column_migration_throws_non_duplicate_errors_with_context",
+                                            "Initialization_hooks_preserve_environment_specific_sequence",
+                                            "CreateRepository",
+                                            "ReadDatabaseSnapshot",
+                                            "AssertCanonicalBackfill",
+                                            "CreateCompletedCycleTableWithRequiredDoctorArrived",
+                                            "InsertCompletedCycle",
+                                            "Open",
+                                            "OpenInMemory",
+                                            "Execute",
+                                            "TableExists",
+                                            "ReadNullableString",
+                                            "ReadNullableInt64"
                                         ],
                       "routes":  [
 

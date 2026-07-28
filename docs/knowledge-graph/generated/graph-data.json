@@ -477,6 +477,12 @@
                       "path":  "src/ChairSide.Board/Services/SqliteBoardRepository.cs"
                   },
                   {
+                      "id":  "file:src/ChairSide.Board/Services/SqliteBoardSchema.cs",
+                      "label":  "src/ChairSide.Board/Services/SqliteBoardSchema.cs",
+                      "type":  "File",
+                      "path":  "src/ChairSide.Board/Services/SqliteBoardSchema.cs"
+                  },
+                  {
                       "id":  "file:src/ChairSide.Board/wwwroot/assets/icons/README.md",
                       "label":  "src/ChairSide.Board/wwwroot/assets/icons/README.md",
                       "type":  "File",
@@ -697,6 +703,12 @@
                       "label":  "tests/ChairSide.Board.Tests/ScheduleFitReportTests.cs",
                       "type":  "File",
                       "path":  "tests/ChairSide.Board.Tests/ScheduleFitReportTests.cs"
+                  },
+                  {
+                      "id":  "file:tests/ChairSide.Board.Tests/SqliteBoardSchemaTests.cs",
+                      "label":  "tests/ChairSide.Board.Tests/SqliteBoardSchemaTests.cs",
+                      "type":  "File",
+                      "path":  "tests/ChairSide.Board.Tests/SqliteBoardSchemaTests.cs"
                   },
                   {
                       "id":  "file:tests/ChairSide.Board.Tests/TestSupport/ManualTimeProvider.cs",
@@ -1188,7 +1200,7 @@
                       "id":  "symbol:type:DatabaseInitializationTestHooks",
                       "label":  "DatabaseInitializationTestHooks",
                       "type":  "CodeType",
-                      "path":  "src/ChairSide.Board/Services/SqliteBoardRepository.cs"
+                      "path":  "src/ChairSide.Board/Services/SqliteBoardSchema.cs"
                   },
                   {
                       "id":  "symbol:type:DatabaseIsolationException",
@@ -2181,10 +2193,28 @@
                       "path":  "src/ChairSide.Board/Services/DemoBoardStore.cs"
                   },
                   {
+                      "id":  "symbol:type:SqliteBoardInitialization",
+                      "label":  "SqliteBoardInitialization",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/SqliteBoardSchema.cs"
+                  },
+                  {
                       "id":  "symbol:type:SqliteBoardRepository",
                       "label":  "SqliteBoardRepository",
                       "type":  "CodeType",
                       "path":  "src/ChairSide.Board/Services/SqliteBoardRepository.cs"
+                  },
+                  {
+                      "id":  "symbol:type:SqliteBoardSchema",
+                      "label":  "SqliteBoardSchema",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/SqliteBoardSchema.cs"
+                  },
+                  {
+                      "id":  "symbol:type:SqliteBoardSchemaTests",
+                      "label":  "SqliteBoardSchemaTests",
+                      "type":  "CodeType",
+                      "path":  "tests/ChairSide.Board.Tests/SqliteBoardSchemaTests.cs"
                   },
                   {
                       "id":  "symbol:type:StoreContext",
@@ -3262,11 +3292,6 @@
                   },
                   {
                       "from":  "file:src/ChairSide.Board/Services/SqliteBoardRepository.cs",
-                      "to":  "symbol:type:DatabaseInitializationTestHooks",
-                      "label":  "declares"
-                  },
-                  {
-                      "from":  "file:src/ChairSide.Board/Services/SqliteBoardRepository.cs",
                       "to":  "symbol:type:DoctorWorkingRoomLookupResult",
                       "label":  "declares"
                   },
@@ -3278,6 +3303,21 @@
                   {
                       "from":  "file:src/ChairSide.Board/Services/SqliteBoardRepository.cs",
                       "to":  "symbol:type:SqliteBoardRepository",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/SqliteBoardSchema.cs",
+                      "to":  "symbol:type:DatabaseInitializationTestHooks",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/SqliteBoardSchema.cs",
+                      "to":  "symbol:type:SqliteBoardInitialization",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/SqliteBoardSchema.cs",
+                      "to":  "symbol:type:SqliteBoardSchema",
                       "label":  "declares"
                   },
                   {
@@ -3483,6 +3523,11 @@
                   {
                       "from":  "file:tests/ChairSide.Board.Tests/ScheduleFitReportTests.cs",
                       "to":  "symbol:type:ScheduleFitReportTests",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:tests/ChairSide.Board.Tests/SqliteBoardSchemaTests.cs",
+                      "to":  "symbol:type:SqliteBoardSchemaTests",
                       "label":  "declares"
                   },
                   {
@@ -3927,6 +3972,11 @@
                   },
                   {
                       "from":  "repo:chairside",
+                      "to":  "file:src/ChairSide.Board/Services/SqliteBoardSchema.cs",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
                       "to":  "file:src/ChairSide.Board/wwwroot/assets/icons/README.md",
                       "label":  "contains"
                   },
@@ -4108,6 +4158,11 @@
                   {
                       "from":  "repo:chairside",
                       "to":  "file:tests/ChairSide.Board.Tests/ScheduleFitReportTests.cs",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:tests/ChairSide.Board.Tests/SqliteBoardSchemaTests.cs",
                       "label":  "contains"
                   },
                   {

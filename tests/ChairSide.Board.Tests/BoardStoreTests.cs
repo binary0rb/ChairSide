@@ -3021,33 +3021,6 @@ public sealed class BoardStoreTests
     }
 
     [Fact]
-    public void Additive_column_migration_ignores_duplicate_column_errors()
-    {
-        using var connection = new SqliteConnection("Data Source=:memory:");
-        connection.Open();
-        ExecuteSql(connection, "CREATE TABLE migration_test (id INTEGER PRIMARY KEY, existing_col TEXT NULL);");
-
-        InvokeTryAddColumn(connection, "ALTER TABLE migration_test ADD COLUMN existing_col TEXT NULL");
-
-        var columns = GetColumnNames(connection, "migration_test");
-        Assert.Contains("existing_col", columns);
-    }
-
-    [Fact]
-    public void Additive_column_migration_throws_non_duplicate_errors_with_context()
-    {
-        using var connection = new SqliteConnection("Data Source=:memory:");
-        connection.Open();
-        const string alterTableSql = "ALTER TABLE missing_table ADD COLUMN new_col TEXT NULL";
-
-        var ex = Assert.Throws<InvalidOperationException>(() => InvokeTryAddColumn(connection, alterTableSql));
-
-        Assert.Contains("SQLite migration failed", ex.Message);
-        Assert.Contains(alterTableSql, ex.Message);
-        Assert.IsType<SqliteException>(ex.InnerException);
-    }
-
-    [Fact]
     public void Room_device_binding_disabled_allows_existing_mutation_behavior()
     {
         using var workspace = TestWorkspace.Create();
@@ -8511,24 +8484,6 @@ public sealed class BoardStoreTests
             TerminationKind = TerminationKinds.StaffCanceled,
             CancellationReason = CancellationReasons.PatientCanceled
         };
-
-    private static void InvokeTryAddColumn(SqliteConnection connection, string alterTableSql)
-    {
-        var method = typeof(SqliteBoardRepository).GetMethod(
-            "TryAddColumn",
-            BindingFlags.NonPublic | BindingFlags.Static);
-        Assert.NotNull(method);
-
-        try
-        {
-            method.Invoke(null, [connection, alterTableSql]);
-        }
-        catch (TargetInvocationException ex) when (ex.InnerException is not null)
-        {
-            System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(ex.InnerException).Throw();
-            throw;
-        }
-    }
 
     private static void InvokeResetRoom(RoomState room)
     {
