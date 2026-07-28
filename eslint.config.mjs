@@ -4,11 +4,11 @@ import globals from "globals";
 
 export default defineConfig([
   {
-    files: ["src/ChairSide.Board/wwwroot/*.js"],
+    files: ["src/ChairSide.Board/wwwroot/**/*.js"],
     extends: [js.configs.recommended],
     languageOptions: {
       ecmaVersion: "latest",
-      sourceType: "script",
+      sourceType: "module",
       globals: {
         ...globals.browser,
         signalR: "readonly"

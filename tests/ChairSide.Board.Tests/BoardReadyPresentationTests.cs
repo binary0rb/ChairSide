@@ -200,8 +200,6 @@ public sealed class BoardReadyPresentationTests
         });
         Assert.Contains("/styles.css?v=20260722-primary-workflow-action-colors", genericRoom, StringComparison.Ordinal);
         Assert.Contains("/styles.css?v=20260722-primary-workflow-action-colors", roomOne, StringComparison.Ordinal);
-        Assert.Contains("/board.js?v=20260727-room-capabilities", genericRoom, StringComparison.Ordinal);
-        Assert.Contains("/board.js?v=20260727-room-capabilities", roomOne, StringComparison.Ordinal);
         Assert.Contains("function roomCapabilities(room)", boardScript, StringComparison.Ordinal);
         Assert.Contains("function setNextPrimaryAction(room)", boardScript, StringComparison.Ordinal);
         Assert.Contains("room?.capabilities?.canBeginPrestage === true", boardScript, StringComparison.Ordinal);
@@ -223,6 +221,45 @@ public sealed class BoardReadyPresentationTests
         Assert.Matches(
             "(?s)button:disabled\\s*\\{[^}]*opacity:\\s*0\\.55;",
             styles);
+    }
+
+    [Fact]
+    public void All_pages_use_the_ordered_native_module_bootstrap()
+    {
+        var root = FindRepositoryRoot();
+        var webRoot = Path.Combine(root, "src", "ChairSide.Board", "wwwroot");
+        var bootstrap = File.ReadAllText(Path.Combine(webRoot, "bootstrap.js"));
+        var pageNames = new[]
+        {
+            "doctor.html",
+            "index.html",
+            "master.html",
+            "reports.html",
+            "room-1.html",
+            "room.html",
+            "workshop.html"
+        };
+        const string moduleEntry =
+            "<script type=\"module\" src=\"/bootstrap.js?v=20260728-native-module-bootstrap\"></script>";
+
+        var signalRImport =
+            bootstrap.IndexOf("import \"./signalr-lite.js\";", StringComparison.Ordinal);
+        var boardImport =
+            bootstrap.IndexOf("import \"./board.js?v=20260727-room-capabilities\";", StringComparison.Ordinal);
+        Assert.True(signalRImport >= 0);
+        Assert.True(boardImport > signalRImport);
+
+        Assert.All(pageNames, pageName =>
+        {
+            var page = File.ReadAllText(Path.Combine(webRoot, pageName));
+            Assert.Equal(1, Regex.Matches(page, "<script\\b", RegexOptions.IgnoreCase).Count);
+            Assert.Contains(moduleEntry, page, StringComparison.Ordinal);
+            Assert.DoesNotContain("<script src=\"/signalr-lite.js\"></script>", page, StringComparison.Ordinal);
+            Assert.DoesNotContain(
+                "<script src=\"/board.js?v=20260727-room-capabilities\"></script>",
+                page,
+                StringComparison.Ordinal);
+        });
     }
 
     private static string StateKey(string html)

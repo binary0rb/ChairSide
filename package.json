@@ -1,7 +1,7 @@
 {
   "name": "chairside",
   "scripts": {
-    "lint": "eslint src/ChairSide.Board/wwwroot/*.js"
+    "lint": "eslint src/ChairSide.Board/wwwroot"
   },
   "private": true,
   "devDependencies": {

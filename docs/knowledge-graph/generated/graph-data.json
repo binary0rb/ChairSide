@@ -495,6 +495,12 @@
                       "path":  "src/ChairSide.Board/wwwroot/board.js"
                   },
                   {
+                      "id":  "file:src/ChairSide.Board/wwwroot/bootstrap.js",
+                      "label":  "src/ChairSide.Board/wwwroot/bootstrap.js",
+                      "type":  "File",
+                      "path":  "src/ChairSide.Board/wwwroot/bootstrap.js"
+                  },
+                  {
                       "id":  "file:src/ChairSide.Board/wwwroot/doctor.html",
                       "label":  "src/ChairSide.Board/wwwroot/doctor.html",
                       "type":  "File",
@@ -4115,6 +4121,11 @@
                   {
                       "from":  "repo:chairside",
                       "to":  "file:src/ChairSide.Board/wwwroot/board.js",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:src/ChairSide.Board/wwwroot/bootstrap.js",
                       "label":  "contains"
                   },
                   {

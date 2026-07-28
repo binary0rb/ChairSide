@@ -1,7 +1,7 @@
 ﻿{
     "generatedStamp":  "deterministic",
     "root":  ".",
-    "fileCount":  139,
+    "fileCount":  140,
     "files":  [
                   {
                       "path":  ".github/pull_request_template.md",
@@ -843,7 +843,7 @@
                   {
                       "path":  "eslint.config.mjs",
                       "kind":  "JavaScript",
-                      "sizeBytes":  501,
+                      "sizeBytes":  502,
                       "typeSymbols":  [
 
                                       ],
@@ -869,7 +869,7 @@
                   {
                       "path":  "package.json",
                       "kind":  "Json",
-                      "sizeBytes":  235,
+                      "sizeBytes":  229,
                       "typeSymbols":  [
 
                                       ],
@@ -2791,9 +2791,35 @@
                                    ]
                   },
                   {
+                      "path":  "src/ChairSide.Board/wwwroot/bootstrap.js",
+                      "kind":  "JavaScript",
+                      "sizeBytes":  78,
+                      "typeSymbols":  [
+
+                                      ],
+                      "methodSymbols":  [
+
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
                       "path":  "src/ChairSide.Board/wwwroot/doctor.html",
                       "kind":  "Html",
-                      "sizeBytes":  2810,
+                      "sizeBytes":  2787,
                       "typeSymbols":  [
 
                                       ],
@@ -2819,7 +2845,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/index.html",
                       "kind":  "Html",
-                      "sizeBytes":  2823,
+                      "sizeBytes":  2800,
                       "typeSymbols":  [
 
                                       ],
@@ -2845,7 +2871,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/master.html",
                       "kind":  "Html",
-                      "sizeBytes":  2823,
+                      "sizeBytes":  2800,
                       "typeSymbols":  [
 
                                       ],
@@ -2871,7 +2897,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/reports.html",
                       "kind":  "Html",
-                      "sizeBytes":  9891,
+                      "sizeBytes":  9868,
                       "typeSymbols":  [
 
                                       ],
@@ -2897,7 +2923,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/room.html",
                       "kind":  "Html",
-                      "sizeBytes":  6101,
+                      "sizeBytes":  6078,
                       "typeSymbols":  [
 
                                       ],
@@ -2923,7 +2949,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/room-1.html",
                       "kind":  "Html",
-                      "sizeBytes":  6122,
+                      "sizeBytes":  6099,
                       "typeSymbols":  [
 
                                       ],
@@ -3035,7 +3061,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/workshop.html",
                       "kind":  "Html",
-                      "sizeBytes":  11404,
+                      "sizeBytes":  11381,
                       "typeSymbols":  [
 
                                       ],
@@ -3129,7 +3155,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/BoardReadyPresentationTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  15229,
+                      "sizeBytes":  16641,
                       "typeSymbols":  [
                                           "BoardReadyPresentationTests"
                                       ],
@@ -3139,6 +3165,7 @@
                                             "Master_and_doctor_cards_share_canonical_assignment_and_ready_presentation",
                                             "Doctor_operational_header_and_room_panel_contracts_remain_in_place",
                                             "Primary_workflow_highlights_only_the_enabled_next_action",
+                                            "All_pages_use_the_ordered_native_module_bootstrap",
                                             "StateKey",
                                             "ElementIds",
                                             "FindRepositoryRoot"
