@@ -166,6 +166,9 @@ test("board owns behavior while context and state remain one-way modules", () =>
   assert.match(
     boardSource,
     /import \{ connectRealtime, registerBoardPolling \} from "\.\/realtime-polling\.js";/);
+  assert.match(
+    boardSource,
+    /import \{\s*registerConnectionStatusRefresh,\s*setConnectionStatus,\s*updateConnectionStatus\s*\} from "\.\/connection-status\.js";/);
   assert.doesNotMatch(boardSource, /\bconst app = \{/);
   assert.doesNotMatch(boardSource, /document\.body\.dataset\.view/);
   assert.doesNotMatch(pageContextSource, /\bimport\b/);
@@ -186,6 +189,6 @@ test("startup routing and awaited differences remain in board", () => {
   assert.match(boardSource, /if \(pageContext\.isWorkshop\) \{[\s\S]*?loadReports\(\);[\s\S]*?window\.setInterval\(loadReports, 60_000\);/);
   assert.match(boardSource, /registerBoardPolling\(loadBoard\);/);
   assert.match(boardSource, /app\.tickHandle = window\.setInterval\(render, 1000\);/);
-  assert.match(boardSource, /app\.statusHandle = window\.setInterval\(updateConnectionStatus, 1000\);/);
+  assert.match(boardSource, /registerConnectionStatusRefresh\(\);/);
   assert.match(boardSource, /\nboot\(\);\s*$/);
 });

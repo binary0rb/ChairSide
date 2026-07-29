@@ -1,7 +1,7 @@
 ﻿{
     "generatedStamp":  "deterministic",
     "root":  ".",
-    "fileCount":  150,
+    "fileCount":  152,
     "files":  [
                   {
                       "path":  ".github/pull_request_template.md",
@@ -869,7 +869,7 @@
                   {
                       "path":  "package.json",
                       "kind":  "Json",
-                      "sizeBytes":  572,
+                      "sizeBytes":  663,
                       "typeSymbols":  [
 
                                       ],
@@ -2714,7 +2714,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/board.js",
                       "kind":  "JavaScript",
-                      "sizeBytes":  180373,
+                      "sizeBytes":  177497,
                       "typeSymbols":  [
 
                                       ],
@@ -2748,11 +2748,6 @@
                                               "applySnapshot",
                                               "syncTrainingEnvironmentBadge",
                                               "boardNowMs",
-                                              "ensureConnectionStatusIndicator",
-                                              "formatSnapshotAge",
-                                              "getConnectionStatusDetails",
-                                              "setConnectionStatus",
-                                              "updateConnectionStatus",
                                               "renderLegend",
                                               "updateDoctorViewToggleLabel",
                                               "populateDoctorViewMenu",
@@ -2834,6 +2829,37 @@
                                        ],
                       "scriptFunctions":  [
 
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
+                      "path":  "src/ChairSide.Board/wwwroot/connection-status.js",
+                      "kind":  "JavaScript",
+                      "sizeBytes":  3223,
+                      "typeSymbols":  [
+
+                                      ],
+                      "methodSymbols":  [
+
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+                                              "setConnectionStatus",
+                                              "updateConnectionStatus",
+                                              "registerConnectionStatusRefresh",
+                                              "ensureConnectionStatusIndicator",
+                                              "formatSnapshotAge",
+                                              "getConnectionStatusDetails"
                                           ],
                       "headings":  [
 
@@ -5166,6 +5192,35 @@
                                    ]
                   },
                   {
+                      "path":  "tests/javascript/connection-status.test.mjs",
+                      "kind":  "JavaScript",
+                      "sizeBytes":  15508,
+                      "typeSymbols":  [
+
+                                      ],
+                      "methodSymbols":  [
+
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+                                              "initialApp",
+                                              "importModule",
+                                              "createFakeDom",
+                                              "expectedDetails"
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
                       "path":  "tests/javascript/leaf-utilities.test.mjs",
                       "kind":  "JavaScript",
                       "sizeBytes":  3480,
@@ -5194,7 +5249,7 @@
                   {
                       "path":  "tests/javascript/page-context-state.test.mjs",
                       "kind":  "JavaScript",
-                      "sizeBytes":  6770,
+                      "sizeBytes":  6917,
                       "typeSymbols":  [
 
                                       ],
