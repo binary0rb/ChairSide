@@ -8,8 +8,12 @@ const moduleUrl = new URL(
 const boardUrl = new URL(
   "../../src/ChairSide.Board/wwwroot/board.js",
   import.meta.url);
+const roomWorkflowUrl = new URL(
+  "../../src/ChairSide.Board/wwwroot/room-workflow.js",
+  import.meta.url);
 const moduleSource = await readFile(moduleUrl, "utf8");
 const boardSource = await readFile(boardUrl, "utf8");
+const roomWorkflowSource = await readFile(roomWorkflowUrl, "utf8");
 let moduleSequence = 0;
 
 class FakeEventTarget {
@@ -254,7 +258,7 @@ test("tile press replaces pending work and cleans up on cancel, blur, Escape, an
   assert.equal(activations.length, 0);
 });
 
-test("board retains page and domain decisions while common mechanics own only private interaction state", () => {
+test("workflow retains room decisions while common mechanics own only private interaction state", () => {
   assert.match(
     moduleSource,
     /^import \{ app \} from "\.\/application-state\.js";/);
@@ -274,17 +278,17 @@ test("board retains page and domain decisions while common mechanics own only pr
     boardSource,
     /function wireDoctorCockpitPressGuard\(\) \{[\s\S]*?selector: "\[data-report-doctor-tab\]"[\s\S]*?renderDoctorView\(\);/);
   assert.match(
-    boardSource,
-    /wireTileGroup\(doctorTiles,[\s\S]*?app\.selectedDoctorId = button\.dataset\.doctorId;[\s\S]*?wireTileGroup\(procedureTiles,[\s\S]*?app\.selectedProcedureId = button\.dataset\.procedureId;[\s\S]*?app\.sedationOn = false;[\s\S]*?app\.expectedUnitsConfirmed = false;/);
+    roomWorkflowSource,
+    /wireTileGroup\(doctorTiles,[\s\S]*?draft\.selectedDoctorId = button\.dataset\.doctorId;[\s\S]*?wireTileGroup\(procedureTiles,[\s\S]*?draft\.selectedProcedureId = button\.dataset\.procedureId;[\s\S]*?draft\.sedationOn = false;[\s\S]*?draft\.expectedUnitsConfirmed = false;/);
   assert.match(
-    boardSource,
+    roomWorkflowSource,
     /wireTilePressCleanup\(\(\) => \{[\s\S]*?discardAssignmentDraft\(\);[\s\S]*?setRoomActionStatus\("Changes discarded\.", "pending"\);/);
   assert.doesNotMatch(
     boardSource,
     /\b(pendingTilePress|tilePressFailsafe|reportPressFailsafe|TILE_PRESS_FAILSAFE_MS|clearTilePress|completeTilePress)\b/);
   assert.match(
-    boardSource,
-    /if \(!app\.tilePressActive\) \{[\s\S]*?syncRoomSelection\(room\);[\s\S]*?renderSelectionTiles\(room\);/);
+    roomWorkflowSource,
+    /if \(!isTilePressActive\(\)\) \{[\s\S]*?syncRoomSelection\(room\);[\s\S]*?renderSelectionTiles\(room\);/);
   assert.equal(
     (boardSource.match(/if \(app\.reportPressActive\)/g) || []).length,
     3);

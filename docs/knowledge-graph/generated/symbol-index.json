@@ -1,7 +1,7 @@
 ﻿{
     "generatedStamp":  "deterministic",
     "root":  ".",
-    "fileCount":  158,
+    "fileCount":  160,
     "files":  [
                   {
                       "path":  ".github/pull_request_template.md",
@@ -513,7 +513,7 @@
                   {
                       "path":  "docs/knowledge/workflow/room-lifecycle.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  9086,
+                      "sizeBytes":  9274,
                       "typeSymbols":  [
 
                                       ],
@@ -869,7 +869,7 @@
                   {
                       "path":  "package.json",
                       "kind":  "Json",
-                      "sizeBytes":  923,
+                      "sizeBytes":  1003,
                       "typeSymbols":  [
 
                                       ],
@@ -2660,7 +2660,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/application-state.js",
                       "kind":  "JavaScript",
-                      "sizeBytes":  2668,
+                      "sizeBytes":  1973,
                       "typeSymbols":  [
 
                                       ],
@@ -2714,7 +2714,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/board.js",
                       "kind":  "JavaScript",
-                      "sizeBytes":  163583,
+                      "sizeBytes":  123438,
                       "typeSymbols":  [
 
                                       ],
@@ -3205,7 +3205,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/room-card.js",
                       "kind":  "JavaScript",
-                      "sizeBytes":  10555,
+                      "sizeBytes":  10846,
                       "typeSymbols":  [
 
                                       ],
@@ -3235,6 +3235,74 @@
                                               "roomTimerLabel",
                                               "elapsedSeconds",
                                               "formatElapsed"
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
+                      "path":  "src/ChairSide.Board/wwwroot/room-workflow.js",
+                      "kind":  "JavaScript",
+                      "sizeBytes":  39809,
+                      "typeSymbols":  [
+
+                                      ],
+                      "methodSymbols":  [
+
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+                                              "createRoomWorkflow",
+                                              "getCurrentRoom",
+                                              "isConfiguredRoom",
+                                              "roomCapabilities",
+                                              "canEditAssignment",
+                                              "setRoomControlsEnabled",
+                                              "setNextPrimaryAction",
+                                              "syncRoomSelection",
+                                              "canonicalAssignmentFromRoom",
+                                              "canonicalAssignmentSignature",
+                                              "draftAssignmentShape",
+                                              "draftAssignmentSignature",
+                                              "isAssignmentDraftDirty",
+                                              "discardAssignmentDraft",
+                                              "canonicalAssignmentRequest",
+                                              "focusFirstUnresolvedAssignmentControl",
+                                              "renderAssignmentGuidance",
+                                              "renderSelectionTiles",
+                                              "clampExpectedUnits",
+                                              "isVariableProcedure",
+                                              "selectedProcedureDefaultUnits",
+                                              "syncExpectedUnits",
+                                              "renderAllocationSelector",
+                                              "adjustExpectedUnits",
+                                              "renderDoctorTiles",
+                                              "renderProcedureTiles",
+                                              "procedureAccentStyle",
+                                              "selectedProcedureIsSedationEligible",
+                                              "renderSedationToggle",
+                                              "isLegacyActiveRoom",
+                                              "setInnerHtmlIfChanged",
+                                              "render",
+                                              "wire",
+                                              "wireSelectionTiles",
+                                              "sendCanonicalRoomAction",
+                                              "sendSaveDetails",
+                                              "sendSeatRoom",
+                                              "sendReadyForDoctor",
+                                              "sendCanonicalMutation",
+                                              "applyRoomMutationResult",
+                                              "handleDoctorArrivalConflict",
+                                              "sendRoomAction",
+                                              "setRoomActionStatus"
                                           ],
                       "headings":  [
 
@@ -3450,7 +3518,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/BoardReadyPresentationTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  16815,
+                      "sizeBytes":  17113,
                       "typeSymbols":  [
                                           "BoardReadyPresentationTests"
                                       ],
@@ -4867,7 +4935,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/RoomPanelPrestagingWorkflowTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  8668,
+                      "sizeBytes":  9148,
                       "typeSymbols":  [
                                           "RoomPanelPrestagingWorkflowTests"
                                       ],
@@ -5298,7 +5366,7 @@
                   {
                       "path":  "tests/javascript/common-interactions.test.mjs",
                       "kind":  "JavaScript",
-                      "sizeBytes":  10236,
+                      "sizeBytes":  10421,
                       "typeSymbols":  [
 
                                       ],
@@ -5383,7 +5451,7 @@
                   {
                       "path":  "tests/javascript/page-context-state.test.mjs",
                       "kind":  "JavaScript",
-                      "sizeBytes":  6890,
+                      "sizeBytes":  6564,
                       "typeSymbols":  [
 
                                       ],
@@ -5439,7 +5507,7 @@
                   {
                       "path":  "tests/javascript/request-utils.test.mjs",
                       "kind":  "JavaScript",
-                      "sizeBytes":  5737,
+                      "sizeBytes":  5927,
                       "typeSymbols":  [
 
                                       ],
@@ -5465,7 +5533,7 @@
                   {
                       "path":  "tests/javascript/room-card.test.mjs",
                       "kind":  "JavaScript",
-                      "sizeBytes":  5030,
+                      "sizeBytes":  5164,
                       "typeSymbols":  [
 
                                       ],
@@ -5483,6 +5551,40 @@
                                        ],
                       "scriptFunctions":  [
                                               "readyRoom"
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
+                      "path":  "tests/javascript/room-workflow.test.mjs",
+                      "kind":  "JavaScript",
+                      "sizeBytes":  18185,
+                      "typeSymbols":  [
+
+                                      ],
+                      "methodSymbols":  [
+
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+                                              "wireTileGroup",
+                                              "wireTilePressCleanup",
+                                              "mutationHeaders",
+                                              "readErrorMessage",
+                                              "dataUrl",
+                                              "assignment",
+                                              "room",
+                                              "createHarness",
+                                              "selected"
                                           ],
                       "headings":  [
 

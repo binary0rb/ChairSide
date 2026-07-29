@@ -88,6 +88,7 @@ public sealed class RoomPanelPrestagingWorkflowTests
         var generic = File.ReadAllText(Path.Combine(root, "src", "ChairSide.Board", "wwwroot", "room.html"));
         var roomOne = File.ReadAllText(Path.Combine(root, "src", "ChairSide.Board", "wwwroot", "room-1.html"));
         var boardScript = File.ReadAllText(Path.Combine(root, "src", "ChairSide.Board", "wwwroot", "board.js"));
+        var roomWorkflowScript = File.ReadAllText(Path.Combine(root, "src", "ChairSide.Board", "wwwroot", "room-workflow.js"));
         var requiredIds = new[]
         {
             "beginPrestageButton", "saveDetailsButton", "discardChangesButton", "withdrawReadyButton",
@@ -100,20 +101,23 @@ public sealed class RoomPanelPrestagingWorkflowTests
         Assert.DoesNotContain("Update Assignment", generic, StringComparison.Ordinal);
         Assert.DoesNotContain("Update Assignment", roomOne, StringComparison.Ordinal);
         Assert.DoesNotContain("assignmentEditMode", boardScript, StringComparison.Ordinal);
-        Assert.Contains("if (procedureChanged) {", boardScript, StringComparison.Ordinal);
-        Assert.Contains("app.sedationOn = false;", boardScript, StringComparison.Ordinal);
-        Assert.Contains("app.expectedUnitsConfirmed = false;", boardScript, StringComparison.Ordinal);
-        Assert.Contains("discardAssignmentDraft();", boardScript, StringComparison.Ordinal);
-        Assert.Contains("isAssignmentDraftDirty", boardScript, StringComparison.Ordinal);
-        Assert.Contains("sedationChoice: procedure?.sedationEligible && app.sedationOn ? \"yes\" : null", boardScript, StringComparison.Ordinal);
-        Assert.Contains("room?.assignment?.sedation?.state === \"EligibleYes\"", boardScript, StringComparison.Ordinal);
-        Assert.Contains("function isLegacyActiveRoom(room)", boardScript, StringComparison.Ordinal);
+        Assert.DoesNotContain("assignmentEditMode", roomWorkflowScript, StringComparison.Ordinal);
+        Assert.Contains("if (procedureChanged) {", roomWorkflowScript, StringComparison.Ordinal);
+        Assert.Contains("draft.sedationOn = false;", roomWorkflowScript, StringComparison.Ordinal);
+        Assert.Contains("draft.expectedUnitsConfirmed = false;", roomWorkflowScript, StringComparison.Ordinal);
+        Assert.Contains("discardAssignmentDraft();", roomWorkflowScript, StringComparison.Ordinal);
+        Assert.Contains("isAssignmentDraftDirty", roomWorkflowScript, StringComparison.Ordinal);
+        Assert.Contains("sedationChoice: selectedProcedure?.sedationEligible && draft.sedationOn ? \"yes\" : null", roomWorkflowScript, StringComparison.Ordinal);
+        Assert.Contains("room?.assignment?.sedation?.state === \"EligibleYes\"", roomWorkflowScript, StringComparison.Ordinal);
+        Assert.Contains("function isLegacyActiveRoom(room)", roomWorkflowScript, StringComparison.Ordinal);
         Assert.Contains(
             "setDisabled(document.getElementById(\"readyForDoctorButton\"), !capabilities.canReady);",
-            boardScript,
+            roomWorkflowScript,
             StringComparison.Ordinal);
-        Assert.Contains("function focusFirstUnresolvedAssignmentControl()", boardScript, StringComparison.Ordinal);
-        Assert.Contains("focusFirstUnresolvedAssignmentControl();", boardScript, StringComparison.Ordinal);
+        Assert.Contains("function focusFirstUnresolvedAssignmentControl()", roomWorkflowScript, StringComparison.Ordinal);
+        Assert.Contains("focusFirstUnresolvedAssignmentControl();", roomWorkflowScript, StringComparison.Ordinal);
+        Assert.Contains("roomWorkflow.render(room);", boardScript, StringComparison.Ordinal);
+        Assert.Contains("roomWorkflow.wire();", boardScript, StringComparison.Ordinal);
     }
 
     private static PrestagingLifecycleMutationResult ReadyWithSuppliedAssignment(

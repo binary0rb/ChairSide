@@ -65,7 +65,8 @@ Room lifecycle mutation remains room-local and device-token guarded. Doctors are
 - `src/ChairSide.Board/Services/PrestagingLifecycleApiContracts.cs`
 - `src/ChairSide.Board/Services/SqliteBoardRepository.cs`
 - `src/ChairSide.Board/Services/RoomAssignmentContracts.cs` - `RoomCapabilitiesEvaluator` and assignment contracts.
-- `src/ChairSide.Board/wwwroot/board.js` - `roomCapabilities`, `setRoomControlsEnabled`, `setNextPrimaryAction`, and browser-local draft guards.
+- `src/ChairSide.Board/wwwroot/room-workflow.js` - Room Panel draft state, capability-driven controls, lifecycle transport, mutation reconciliation, and browser-local draft guards.
+- `src/ChairSide.Board/wwwroot/board.js` - Room Panel composition, snapshot ownership, and the callback that applies one successful local room mutation.
 - `tests/ChairSide.Board.Tests/PrestagingLifecycleTransitionTests.cs`
 - `tests/ChairSide.Board.Tests/PrestagingLifecycleApiContractTests.cs`
 - `tests/ChairSide.Board.Tests/PrestagingLifecycleEndpointTests.cs`

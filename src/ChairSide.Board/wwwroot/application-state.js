@@ -30,20 +30,6 @@ export const app = {
   roomToken: pageContext.roomToken,
   roomTokenPromptVisible: false,
   doctorId: pageContext.doctorId,
-  selectedDoctorId: null,
-  selectedProcedureId: null,
-  sedationOn: false,
-  // Expected allocation (1 unit = 10 minutes). Kept in app (not the DOM) so a SignalR/poll
-  // re-render never discards an in-progress staff adjustment. expectedUnitsManual tracks whether
-  // staff have changed units since selecting the current procedure: a procedure change always
-  // re-seeds from the new default, but a sedation change only re-seeds when not manually adjusted.
-  expectedUnits: null,
-  expectedUnitsManual: false,
-  expectedUnitsConfirmed: false,
-  expectedUnitsProcedureCode: null,
-  expectedUnitsSedation: false,
-  persistedAssignmentSignature: "",
-  selectionContext: null,
   // True while a pointer is pressed on a doctor/procedure tile. The 1s room poll
   // defers re-syncing and re-rendering the selection tiles while this is set so a
   // slow press is never interrupted by a mid-press DOM swap.

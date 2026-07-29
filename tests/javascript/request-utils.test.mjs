@@ -8,8 +8,12 @@ const requestUtilsUrl = new URL(
 const boardUrl = new URL(
   "../../src/ChairSide.Board/wwwroot/board.js",
   import.meta.url);
+const roomWorkflowUrl = new URL(
+  "../../src/ChairSide.Board/wwwroot/room-workflow.js",
+  import.meta.url);
 const requestUtilsSource = await readFile(requestUtilsUrl, "utf8");
 const boardSource = await readFile(boardUrl, "utf8");
+const roomWorkflowSource = await readFile(roomWorkflowUrl, "utf8");
 const storedValues = new Map();
 
 globalThis.sessionStorage = {
@@ -148,8 +152,8 @@ test("request primitives own no endpoint or UI orchestration", () => {
     boardSource,
     /function (adminRequestHeaders|mutationHeaders|readErrorMessage)\b/);
   assert.match(boardSource, /async function loadReports\(\)/);
-  assert.match(boardSource, /async function sendCanonicalMutation\(/);
-  assert.match(boardSource, /async function sendRoomAction\(/);
-  assert.match(boardSource, /async function handleDoctorArrivalConflict\(/);
+  assert.match(roomWorkflowSource, /async function sendCanonicalMutation\(/);
+  assert.match(roomWorkflowSource, /async function sendRoomAction\(/);
+  assert.match(roomWorkflowSource, /async function handleDoctorArrivalConflict\(/);
   assert.match(boardSource, /function renderReportsAccessPrompt\(/);
 });
