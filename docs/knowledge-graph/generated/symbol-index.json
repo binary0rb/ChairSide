@@ -1,7 +1,7 @@
 ﻿{
     "generatedStamp":  "deterministic",
     "root":  ".",
-    "fileCount":  146,
+    "fileCount":  148,
     "files":  [
                   {
                       "path":  ".github/pull_request_template.md",
@@ -869,7 +869,7 @@
                   {
                       "path":  "package.json",
                       "kind":  "Json",
-                      "sizeBytes":  404,
+                      "sizeBytes":  484,
                       "typeSymbols":  [
 
                                       ],
@@ -2660,7 +2660,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/application-state.js",
                       "kind":  "JavaScript",
-                      "sizeBytes":  2609,
+                      "sizeBytes":  2668,
                       "typeSymbols":  [
 
                                       ],
@@ -2714,7 +2714,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/board.js",
                       "kind":  "JavaScript",
-                      "sizeBytes":  183412,
+                      "sizeBytes":  182328,
                       "typeSymbols":  [
 
                                       ],
@@ -2979,7 +2979,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/page-context.js",
                       "kind":  "JavaScript",
-                      "sizeBytes":  1164,
+                      "sizeBytes":  1206,
                       "typeSymbols":  [
 
                                       ],
@@ -3023,6 +3023,37 @@
                                        ],
                       "scriptFunctions":  [
 
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
+                      "path":  "src/ChairSide.Board/wwwroot/request-utils.js",
+                      "kind":  "JavaScript",
+                      "sizeBytes":  1481,
+                      "typeSymbols":  [
+
+                                      ],
+                      "methodSymbols":  [
+
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+                                              "readAdminToken",
+                                              "storeAdminToken",
+                                              "clearAdminToken",
+                                              "adminRequestHeaders",
+                                              "mutationHeaders",
+                                              "readErrorMessage"
                                           ],
                       "headings":  [
 
@@ -3596,7 +3627,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/BoardStoreReadinessTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  13055,
+                      "sizeBytes":  13547,
                       "typeSymbols":  [
                                           "BoardStoreTests"
                                       ],
@@ -5137,7 +5168,33 @@
                   {
                       "path":  "tests/javascript/page-context-state.test.mjs",
                       "kind":  "JavaScript",
-                      "sizeBytes":  6360,
+                      "sizeBytes":  6545,
+                      "typeSymbols":  [
+
+                                      ],
+                      "methodSymbols":  [
+
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
+                      "path":  "tests/javascript/request-utils.test.mjs",
+                      "kind":  "JavaScript",
+                      "sizeBytes":  5582,
                       "typeSymbols":  [
 
                                       ],
