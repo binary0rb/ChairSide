@@ -1,7 +1,7 @@
 ﻿{
     "generatedStamp":  "deterministic",
     "root":  ".",
-    "fileCount":  143,
+    "fileCount":  146,
     "files":  [
                   {
                       "path":  ".github/pull_request_template.md",
@@ -869,7 +869,7 @@
                   {
                       "path":  "package.json",
                       "kind":  "Json",
-                      "sizeBytes":  309,
+                      "sizeBytes":  404,
                       "typeSymbols":  [
 
                                       ],
@@ -2658,6 +2658,32 @@
                                    ]
                   },
                   {
+                      "path":  "src/ChairSide.Board/wwwroot/application-state.js",
+                      "kind":  "JavaScript",
+                      "sizeBytes":  2609,
+                      "typeSymbols":  [
+
+                                      ],
+                      "methodSymbols":  [
+
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
                       "path":  "src/ChairSide.Board/wwwroot/assets/icons/README.md",
                       "kind":  "Markdown",
                       "sizeBytes":  1715,
@@ -2688,7 +2714,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/board.js",
                       "kind":  "JavaScript",
-                      "sizeBytes":  186706,
+                      "sizeBytes":  183412,
                       "typeSymbols":  [
 
                                       ],
@@ -2705,8 +2731,6 @@
 
                                        ],
                       "scriptFunctions":  [
-                                              "getRoomNumber",
-                                              "getRoomToken",
                                               "loadVersionBadge",
                                               "boot",
                                               "loadBoard",
@@ -2784,7 +2808,9 @@
                                               "initialsFromDoctorName",
                                               "doctorInitials",
                                               "formatAbsoluteMinutes",
-                                              "formatSignedMinutes"
+                                              "formatSignedMinutes",
+                                              "renderDoctorAllocationRow",
+                                              "renderProcedureAllocation"
                                           ],
                       "headings":  [
 
@@ -2845,7 +2871,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/dom-utils.js",
                       "kind":  "JavaScript",
-                      "sizeBytes":  501,
+                      "sizeBytes":  525,
                       "typeSymbols":  [
 
                                       ],
@@ -2874,7 +2900,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/format-utils.js",
                       "kind":  "JavaScript",
-                      "sizeBytes":  519,
+                      "sizeBytes":  538,
                       "typeSymbols":  [
 
                                       ],
@@ -2945,6 +2971,32 @@
                                        ],
                       "scriptFunctions":  [
 
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
+                      "path":  "src/ChairSide.Board/wwwroot/page-context.js",
+                      "kind":  "JavaScript",
+                      "sizeBytes":  1164,
+                      "typeSymbols":  [
+
+                                      ],
+                      "methodSymbols":  [
+
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+                                              "derivePageContext"
                                           ],
                       "headings":  [
 
@@ -3245,7 +3297,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/BoardStoreAssignmentTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  77498,
+                      "sizeBytes":  77517,
                       "typeSymbols":  [
                                           "BoardStoreTests"
                                       ],
@@ -3544,7 +3596,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/BoardStoreReadinessTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  13049,
+                      "sizeBytes":  13055,
                       "typeSymbols":  [
                                           "BoardStoreTests"
                                       ],
@@ -4628,7 +4680,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/RoomPanelPrestagingWorkflowTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  8664,
+                      "sizeBytes":  8668,
                       "typeSymbols":  [
                                           "RoomPanelPrestagingWorkflowTests"
                                       ],
@@ -5059,7 +5111,33 @@
                   {
                       "path":  "tests/javascript/leaf-utilities.test.mjs",
                       "kind":  "JavaScript",
-                      "sizeBytes":  3387,
+                      "sizeBytes":  3480,
+                      "typeSymbols":  [
+
+                                      ],
+                      "methodSymbols":  [
+
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
+                      "path":  "tests/javascript/page-context-state.test.mjs",
+                      "kind":  "JavaScript",
+                      "sizeBytes":  6360,
                       "typeSymbols":  [
 
                                       ],

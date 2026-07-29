@@ -86,14 +86,16 @@ This file is mechanical output from `tools/knowledge-graph/New-ChairSideKnowledg
 | `src/ChairSide.Board/Services/ScheduleFitReport.cs` | CSharp | types: ScheduleFitReport, ScheduleFitReportBuilder<br>methods: Build | - |
 | `src/ChairSide.Board/Services/SqliteBoardRepository.cs` | CSharp | types: SqliteBoardRepository, DoctorWorkingRoomRecord, DoctorWorkingRoomLookupResult<br>methods: HasOperationalData, LoadRooms, EnsureConfiguredRooms, ResetMaintenanceState, SaveRooms, SaveRoom, LoadCompletedCycles, SaveCompletedCycle | - |
 | `src/ChairSide.Board/Services/SqliteBoardSchema.cs` | CSharp | types: SqliteBoardSchema, SqliteBoardInitialization, DatabaseInitializationTestHooks<br>methods: Initialize, InitializeDevelopment, InitializeDeployed, CreateCurrentSchema, InitializeSchemaAndMigrations, EnsureCompletedCycleIdColumn, MigrateNullableDoctorArrivedAt, MigrateAbortedAssignmentCanonicalSchema | - |
+| `src/ChairSide.Board/wwwroot/application-state.js` | JavaScript | - | - |
 | `src/ChairSide.Board/wwwroot/assets/icons/README.md` | Markdown | headings: Procedure icons, Tabler Icons license (MIT), Note | - |
-| `src/ChairSide.Board/wwwroot/board.js` | JavaScript | functions: getRoomNumber, getRoomToken, loadVersionBadge, boot, loadBoard, loadReports, initDateRange, reportsRequestUrl | - |
+| `src/ChairSide.Board/wwwroot/board.js` | JavaScript | functions: loadVersionBadge, boot, loadBoard, loadReports, initDateRange, reportsRequestUrl, utcDateString, computePresetRange | - |
 | `src/ChairSide.Board/wwwroot/bootstrap.js` | JavaScript | - | - |
 | `src/ChairSide.Board/wwwroot/doctor.html` | Html | - | - |
 | `src/ChairSide.Board/wwwroot/dom-utils.js` | JavaScript | functions: escapeHtml, escapeAttribute, setDisabled, setHidden | - |
 | `src/ChairSide.Board/wwwroot/format-utils.js` | JavaScript | functions: formatDuration, formatDateTime | - |
 | `src/ChairSide.Board/wwwroot/index.html` | Html | - | - |
 | `src/ChairSide.Board/wwwroot/master.html` | Html | - | - |
+| `src/ChairSide.Board/wwwroot/page-context.js` | JavaScript | functions: derivePageContext | - |
 | `src/ChairSide.Board/wwwroot/reports.html` | Html | - | - |
 | `src/ChairSide.Board/wwwroot/room.html` | Html | - | - |
 | `src/ChairSide.Board/wwwroot/room-1.html` | Html | - | - |
@@ -146,6 +148,7 @@ This file is mechanical output from `tools/knowledge-graph/New-ChairSideKnowledg
 | `tests/ChairSide.Board.Tests/TestSupport/TestWebHostEnvironment.cs` | CSharp | types: TestWebHostEnvironment | - |
 | `tests/ChairSide.Board.Tests/TestSupport/TestWorkspace.cs` | CSharp | types: TestWorkspace<br>methods: Create, ProductionDatabasePath, TrainingDatabasePath, DatabaseIsolationLayout, Dispose | - |
 | `tests/javascript/leaf-utilities.test.mjs` | JavaScript | - | - |
+| `tests/javascript/page-context-state.test.mjs` | JavaScript | - | - |
 | `tests/knowledge-graph/New-ChairSideKnowledgeGraph.Tests.ps1` | PowerShell | - | - |
 | `tests/scripts/Reset-ChairSideTrainingData.Tests.ps1` | PowerShell | - | - |
 | `tools/knowledge-graph/New-ChairSideKnowledgeGraph.ps1` | PowerShell | - | - |

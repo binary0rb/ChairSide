@@ -483,6 +483,12 @@
                       "path":  "src/ChairSide.Board/Services/SqliteBoardSchema.cs"
                   },
                   {
+                      "id":  "file:src/ChairSide.Board/wwwroot/application-state.js",
+                      "label":  "src/ChairSide.Board/wwwroot/application-state.js",
+                      "type":  "File",
+                      "path":  "src/ChairSide.Board/wwwroot/application-state.js"
+                  },
+                  {
                       "id":  "file:src/ChairSide.Board/wwwroot/assets/icons/README.md",
                       "label":  "src/ChairSide.Board/wwwroot/assets/icons/README.md",
                       "type":  "File",
@@ -529,6 +535,12 @@
                       "label":  "src/ChairSide.Board/wwwroot/master.html",
                       "type":  "File",
                       "path":  "src/ChairSide.Board/wwwroot/master.html"
+                  },
+                  {
+                      "id":  "file:src/ChairSide.Board/wwwroot/page-context.js",
+                      "label":  "src/ChairSide.Board/wwwroot/page-context.js",
+                      "type":  "File",
+                      "path":  "src/ChairSide.Board/wwwroot/page-context.js"
                   },
                   {
                       "id":  "file:src/ChairSide.Board/wwwroot/reports.html",
@@ -841,6 +853,12 @@
                       "label":  "tests/javascript/leaf-utilities.test.mjs",
                       "type":  "File",
                       "path":  "tests/javascript/leaf-utilities.test.mjs"
+                  },
+                  {
+                      "id":  "file:tests/javascript/page-context-state.test.mjs",
+                      "label":  "tests/javascript/page-context-state.test.mjs",
+                      "type":  "File",
+                      "path":  "tests/javascript/page-context-state.test.mjs"
                   },
                   {
                       "id":  "file:tests/knowledge-graph/New-ChairSideKnowledgeGraph.Tests.ps1",
@@ -4133,6 +4151,11 @@
                   },
                   {
                       "from":  "repo:chairside",
+                      "to":  "file:src/ChairSide.Board/wwwroot/application-state.js",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
                       "to":  "file:src/ChairSide.Board/wwwroot/assets/icons/README.md",
                       "label":  "contains"
                   },
@@ -4169,6 +4192,11 @@
                   {
                       "from":  "repo:chairside",
                       "to":  "file:src/ChairSide.Board/wwwroot/master.html",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:src/ChairSide.Board/wwwroot/page-context.js",
                       "label":  "contains"
                   },
                   {
@@ -4429,6 +4457,11 @@
                   {
                       "from":  "repo:chairside",
                       "to":  "file:tests/javascript/leaf-utilities.test.mjs",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:tests/javascript/page-context-state.test.mjs",
                       "label":  "contains"
                   },
                   {
