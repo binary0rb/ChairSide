@@ -543,6 +543,12 @@
                       "path":  "src/ChairSide.Board/wwwroot/page-context.js"
                   },
                   {
+                      "id":  "file:src/ChairSide.Board/wwwroot/realtime-polling.js",
+                      "label":  "src/ChairSide.Board/wwwroot/realtime-polling.js",
+                      "type":  "File",
+                      "path":  "src/ChairSide.Board/wwwroot/realtime-polling.js"
+                  },
+                  {
                       "id":  "file:src/ChairSide.Board/wwwroot/reports.html",
                       "label":  "src/ChairSide.Board/wwwroot/reports.html",
                       "type":  "File",
@@ -865,6 +871,12 @@
                       "label":  "tests/javascript/page-context-state.test.mjs",
                       "type":  "File",
                       "path":  "tests/javascript/page-context-state.test.mjs"
+                  },
+                  {
+                      "id":  "file:tests/javascript/realtime-polling.test.mjs",
+                      "label":  "tests/javascript/realtime-polling.test.mjs",
+                      "type":  "File",
+                      "path":  "tests/javascript/realtime-polling.test.mjs"
                   },
                   {
                       "id":  "file:tests/javascript/request-utils.test.mjs",
@@ -4213,6 +4225,11 @@
                   },
                   {
                       "from":  "repo:chairside",
+                      "to":  "file:src/ChairSide.Board/wwwroot/realtime-polling.js",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
                       "to":  "file:src/ChairSide.Board/wwwroot/reports.html",
                       "label":  "contains"
                   },
@@ -4479,6 +4496,11 @@
                   {
                       "from":  "repo:chairside",
                       "to":  "file:tests/javascript/page-context-state.test.mjs",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:tests/javascript/realtime-polling.test.mjs",
                       "label":  "contains"
                   },
                   {

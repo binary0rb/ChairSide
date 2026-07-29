@@ -1,7 +1,7 @@
 ﻿{
     "generatedStamp":  "deterministic",
     "root":  ".",
-    "fileCount":  148,
+    "fileCount":  150,
     "files":  [
                   {
                       "path":  ".github/pull_request_template.md",
@@ -869,7 +869,7 @@
                   {
                       "path":  "package.json",
                       "kind":  "Json",
-                      "sizeBytes":  484,
+                      "sizeBytes":  572,
                       "typeSymbols":  [
 
                                       ],
@@ -2714,7 +2714,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/board.js",
                       "kind":  "JavaScript",
-                      "sizeBytes":  182328,
+                      "sizeBytes":  180373,
                       "typeSymbols":  [
 
                                       ],
@@ -2744,9 +2744,6 @@
                                               "syncDateRangeControls",
                                               "wireDateRange",
                                               "renderReportWindow",
-                                              "connectRealtime",
-                                              "markRealtimeDegraded",
-                                              "scheduleRealtimeRetry",
                                               "render",
                                               "applySnapshot",
                                               "syncTrainingEnvironmentBadge",
@@ -2997,6 +2994,35 @@
                                        ],
                       "scriptFunctions":  [
                                               "derivePageContext"
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
+                      "path":  "src/ChairSide.Board/wwwroot/realtime-polling.js",
+                      "kind":  "JavaScript",
+                      "sizeBytes":  2613,
+                      "typeSymbols":  [
+
+                                      ],
+                      "methodSymbols":  [
+
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+                                              "connectRealtime",
+                                              "registerBoardPolling",
+                                              "markRealtimeDegraded",
+                                              "scheduleRealtimeRetry"
                                           ],
                       "headings":  [
 
@@ -5168,7 +5194,7 @@
                   {
                       "path":  "tests/javascript/page-context-state.test.mjs",
                       "kind":  "JavaScript",
-                      "sizeBytes":  6545,
+                      "sizeBytes":  6770,
                       "typeSymbols":  [
 
                                       ],
@@ -5186,6 +5212,36 @@
                                        ],
                       "scriptFunctions":  [
 
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
+                      "path":  "tests/javascript/realtime-polling.test.mjs",
+                      "kind":  "JavaScript",
+                      "sizeBytes":  14168,
+                      "typeSymbols":  [
+
+                                      ],
+                      "methodSymbols":  [
+
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+                                              "initialApp",
+                                              "importModule",
+                                              "connectionHarness",
+                                              "callbackHarness",
+                                              "flushPromises"
                                           ],
                       "headings":  [
 

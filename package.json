@@ -4,7 +4,8 @@
     "lint": "eslint src/ChairSide.Board/wwwroot",
     "test:leaf-utilities": "node --test tests/javascript/leaf-utilities.test.mjs",
     "test:page-context-state": "node --test tests/javascript/page-context-state.test.mjs",
-    "test:request-utils": "node --test tests/javascript/request-utils.test.mjs"
+    "test:request-utils": "node --test tests/javascript/request-utils.test.mjs",
+    "test:realtime-polling": "node --test tests/javascript/realtime-polling.test.mjs"
   },
   "private": true,
   "devDependencies": {
