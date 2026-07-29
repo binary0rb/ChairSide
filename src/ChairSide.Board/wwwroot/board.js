@@ -7,7 +7,7 @@ import {
 import {
   wirePressInterruptionGuard
 } from "./common-interactions.js";
-import { escapeAttribute, escapeHtml } from "./dom-utils.js";
+import { escapeAttribute, escapeHtml, renderHelpIcon } from "./dom-utils.js";
 import { formatDateTime, formatDuration } from "./format-utils.js";
 import { pageContext } from "./page-context.js";
 import { connectRealtime, registerBoardPolling } from "./realtime-polling.js";
@@ -22,6 +22,7 @@ import {
   registerGeneralRender,
   registerReportRefresh
 } from "./runtime-scheduling.js";
+import { createWorkshop } from "./workshop.js";
 
 const staffLoungeRoomNumber = 99;
 const trendMinimumComparisonCases = 3;
@@ -66,6 +67,10 @@ const roomWorkflow = createRoomWorkflow({
     stripSedationModifier
   }
 });
+
+const workshop = pageContext.isWorkshop
+  ? createWorkshop({ getReports: () => app.reports })
+  : null;
 
 async function loadVersionBadge() {
   try {
@@ -120,7 +125,7 @@ async function boot() {
     app.dateRange = { preset: "last30", start: last30.start, end: last30.end };
     loadReports();
     registerReportRefresh(loadReports);
-    wireWorkshopPresetSelection();
+    workshop.wire();
   }
 
   wireDoctorViewMenu();
@@ -384,7 +389,7 @@ function render() {
   }
 
   if (pageContext.isWorkshop) {
-    renderWorkshop();
+    workshop.render();
   }
 }
 
@@ -2377,193 +2382,6 @@ async function handleConfirmExclusionClick(button) {
   }
 }
 
-// Workshop "Current Reality": a gentle, plain-English summary of recent schedule fit, read from the
-// same /api/reports payload (scheduleFit) the Reports page consumes. View-gated - only ever called
-// for the Workshop view, and it only writes into its own #workshopCurrentReality container.
-function renderWorkshop() {
-  const target = document.getElementById("workshopCurrentReality");
-  if (!target) {
-    return;
-  }
-
-  // Unavailable: reports failed to load, or internal admin access is required (no reports payload).
-  // The Reports access prompt is reports-page-only; Workshop shows a calm fallback and recovers on
-  // the next 60s refresh.
-  if (!app.reports) {
-    target.innerHTML = `<p class="workshop-note">Current Reality couldn't load right now.</p>`;
-    return;
-  }
-
-  const fit = app.reports.scheduleFit;
-  const rangeLabel = app.reports.rangeLabel || "the selected window";
-
-  // Empty: no completed cases carrying expected allocation in this window, so there is nothing to
-  // summarize. Framed gently, never as a problem.
-  if (!fit || !fit.overall || (fit.scheduleFitCycleCount || 0) === 0) {
-    target.innerHTML = `
-      <p class="workshop-reality-window">${escapeHtml(rangeLabel)}</p>
-      <p class="workshop-note">No completed cases with expected allocation in this window yet, so there's nothing to summarize.</p>
-    `;
-    return;
-  }
-
-  const overall = fit.overall;
-  const utilization = formatUtilizationPercent(overall.utilizationRatio);
-  const stats = [
-    ["Cases analyzed", `${fit.scheduleFitCycleCount} of ${fit.includedCycleCount}`],
-    ["Expected blocks", formatBlocks(overall.totalExpectedBlocks)],
-    ["Actual case-flow blocks", formatBlocks(overall.totalActualBlocks), "Observed case-flow time converted into schedule-sized blocks for easier comparison."],
-    ["Schedule debt", formatWholeMinutes(overall.totalDebtMinutes), "Time cases ran over expected allocation. Useful for planning, not blame."],
-    ["Raw slack observed", formatWholeMinutes(overall.totalSlackMinutes), "Time cases ran under expected allocation. It is observed slack, not automatically reusable capacity."],
-    ["Utilization vs expected", utilization, "How observed case-flow time compares with expected allocated time for the selected range."]
-  ];
-
-  const tiles = stats.map(([label, value, helpText]) => `
-    <div class="workshop-stat">
-      <span class="workshop-stat-label">${escapeHtml(label)}${helpText ? renderHelpIcon(helpText) : ""}</span>
-      <strong class="workshop-stat-value">${escapeHtml(value)}</strong>
-    </div>
-  `).join("");
-
-  target.innerHTML = `
-    <p class="workshop-reality-window">${escapeHtml(rangeLabel)}</p>
-    <div class="workshop-reality-grid">${tiles}</div>
-    <p class="workshop-reality-explainer">
-      Across these cases, measured case flow ran about ${escapeHtml(utilization)}.
-      &ldquo;Schedule debt&rdquo; is time cases ran over their expected allocation; &ldquo;raw slack
-      observed&rdquo; is time they ran under &mdash; raw slack is an observation here, not capacity
-      that can automatically be reclaimed.
-    </p>
-  `;
-}
-
-// Minutes as a whole number (e.g. "45 min"). Non-finite input degrades to an em dash.
-function formatWholeMinutes(value) {
-  return Number.isFinite(value) ? `${Math.round(value)} min` : "—";
-}
-
-// Blocks to one decimal (e.g. "8.0 blocks"). Non-finite input degrades to an em dash.
-function formatBlocks(value) {
-  return Number.isFinite(value) ? `${(Math.round(value * 10) / 10).toFixed(1)} blocks` : "—";
-}
-
-// Utilization ratio (measured / expected) as a whole percent (e.g. "112% of expected"). Null or
-// non-finite ratio degrades to an em dash.
-function formatUtilizationPercent(ratio) {
-  return Number.isFinite(ratio) ? `${Math.round(ratio * 100)}% of expected` : "—";
-}
-
-// ---------------------------------------------------------------------------
-// Workshop projection preset selection (progressive enhancement, planned/explanatory only).
-// The five preset cards are static HTML and stay useful with no JS. This only ADDS selection:
-// clicking or keyboard-activating a card reveals that preset's hidden detail copy in the shared
-// #workshopPresetDetail panel, with a Planned badge and a fixed disclaimer. It never runs a
-// projection, mutates state, calls an API, or writes outside the Workshop preset panel. Wired
-// only from the Workshop boot branch, so these listeners never exist on other pages.
-// ---------------------------------------------------------------------------
-function wireWorkshopPresetSelection() {
-  // Cards are static and never re-rendered, but delegated listeners keep this consistent with the
-  // rest of board.js and robust to any future re-render. Scoped by the data-preset-id selector.
-  document.addEventListener("click", handleWorkshopPresetActivate);
-  document.addEventListener("keydown", handleWorkshopPresetKeydown);
-}
-
-function handleWorkshopPresetActivate(event) {
-  if (!(event.target instanceof Element)) {
-    return;
-  }
-  const card = event.target.closest('.workshop-card[data-preset-id]');
-  if (!card) {
-    return;
-  }
-  selectWorkshopPreset(card);
-}
-
-function handleWorkshopPresetKeydown(event) {
-  if (event.key !== "Enter" && event.key !== " " && event.key !== "Spacebar") {
-    return;
-  }
-  if (!(event.target instanceof Element)) {
-    return;
-  }
-  // Only the focused card itself activates (it carries role="button" and tabindex).
-  const card = event.target.closest('.workshop-card[data-preset-id]');
-  if (!card || card !== event.target) {
-    return;
-  }
-  event.preventDefault(); // Space must not scroll the page; Enter must not double-fire.
-  selectWorkshopPreset(card);
-}
-
-function selectWorkshopPreset(card) {
-  const cards = document.querySelectorAll('.workshop-card[data-preset-id]');
-  cards.forEach(item => {
-    const selected = item === card;
-    item.classList.toggle("is-selected", selected);
-    item.setAttribute("aria-pressed", selected ? "true" : "false");
-  });
-
-  const panel = document.getElementById("workshopPresetDetail");
-  if (!panel) {
-    return;
-  }
-
-  const title = card.querySelector(".workshop-card-head h4")?.textContent?.trim() || "Preset";
-  const detail = readPresetSource(card, ".workshop-preset-detail-source");
-  // The only preset-specific projection content. The four readiness buckets below are
-  // preset-agnostic UI copy, so they stay inline rather than in a per-preset definition map.
-  const assumption = readPresetSource(card, ".workshop-preset-assumption-source");
-
-  panel.innerHTML = `
-    <header class="workshop-preset-detail-head">
-      <h4 class="workshop-preset-detail-title">${escapeHtml(title)}</h4>
-      <span class="workshop-status">Planned</span>
-    </header>
-    <p class="workshop-preset-detail-text">${escapeHtml(detail)}</p>
-    ${renderProjectionReadiness(assumption)}
-    <p class="workshop-preset-detail-disclaimer">Planned: selecting this preset shows this explanation only. It does not run a projection, change the schedule, or alter any live data.</p>
-  `;
-}
-
-// Reads and normalizes the whitespace of a hidden source block inside a preset card.
-function readPresetSource(card, selector) {
-  const source = card.querySelector(selector);
-  return source ? source.textContent.trim().replace(/\s+/g, " ") : "";
-}
-
-// Projection readiness scaffold: the four-part honesty separation the design principle requires.
-// Display-only and computes nothing - it explains what a scenario would need and is explicit that
-// no output is produced. The first three buckets are fixed UI copy; the "assumptions" bucket adds
-// the selected preset's one assumption line. Raw slack observed is never treated as recoverable
-// capacity here, and there is no run/apply/generate affordance.
-function renderProjectionReadiness(assumption) {
-  const presetAssumption = assumption
-    ? `<p class="workshop-readiness-assumption">${escapeHtml(assumption)}</p>`
-    : "";
-
-  return `
-    <div class="workshop-readiness" aria-label="Projection readiness">
-      <section class="workshop-readiness-bucket">
-        <h5 class="workshop-readiness-heading">Observed today</h5>
-        <p>ChairSide can show completed-case schedule-fit data for the selected report window: expected blocks, actual case-flow blocks, schedule debt, raw slack observed, and utilization versus expected allocation.</p>
-      </section>
-      <section class="workshop-readiness-bucket">
-        <h5 class="workshop-readiness-heading">Assumptions a projection would require</h5>
-        <p>A real scenario would need explicit assumptions before any output could be trusted: future demand, room/staff availability, turnover and sedation-recovery constraints, slack contiguity, and a chosen policy for whether any observed slack is usable.</p>
-        ${presetAssumption}
-      </section>
-      <section class="workshop-readiness-bucket">
-        <h5 class="workshop-readiness-heading">Scenario output &mdash; not computed yet</h5>
-        <p>This preset does not compute an outcome yet. Selecting it only explains the lens and the assumptions a future scenario would need.</p>
-      </section>
-      <section class="workshop-readiness-bucket">
-        <h5 class="workshop-readiness-heading">What ChairSide cannot know</h5>
-        <p>ChairSide cannot know whether observed slack was contiguous, bookable, staffed, clinically appropriate, or desirable to reuse. The team would need to decide those assumptions before any scenario output could be meaningful.</p>
-      </section>
-    </div>
-  `;
-}
-
 function renderReportsAccessPrompt(statusCode) {
   const headline = document.getElementById("reportHeadline");
   if (!headline) {
@@ -2922,18 +2740,6 @@ function renderProcedureIcon(procedure) {
 
 function renderEmptyIcon() {
   return `<svg ${tablerIconAttrs}><path d="M5 12h14"/></svg>`;
-}
-
-// Reusable inline help bubble: a small "?" badge that reveals a short explanation on hover or
-// keyboard focus. aria-label carries the full text so screen readers announce it on focus without
-// needing a separate aria-describedby wire-up.
-function renderHelpIcon(helpText, placement) {
-  const text = escapeHtml(helpText);
-  const modifier = placement === "corner" ? " help-icon--corner" : "";
-  return `<span class="help-icon${modifier}" tabindex="0" aria-label="Help: ${text}">
-    <span aria-hidden="true">?</span>
-    <span class="help-icon-bubble" aria-hidden="true">${text}</span>
-  </span>`;
 }
 
 function hasSedationModifier(code) {

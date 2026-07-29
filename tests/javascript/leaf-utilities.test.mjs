@@ -11,6 +11,7 @@ const formatUtils = await import(`data:text/javascript;base64,${Buffer.from(form
 const {
   escapeAttribute,
   escapeHtml,
+  renderHelpIcon,
   setDisabled,
   setHidden
 } = domUtils;
@@ -48,6 +49,18 @@ test("DOM setters update supplied controls and ignore missing controls", () => {
   assert.doesNotThrow(() => setHidden(undefined, true));
 });
 
+test("help renderer preserves markup, accessibility text, placement, and escaping", () => {
+  assert.equal(
+    renderHelpIcon(`Use "planned" <time> & care.`),
+    `<span class="help-icon" tabindex="0" aria-label="Help: Use &quot;planned&quot; &lt;time&gt; &amp; care.">
+    <span aria-hidden="true">?</span>
+    <span class="help-icon-bubble" aria-hidden="true">Use &quot;planned&quot; &lt;time&gt; &amp; care.</span>
+  </span>`);
+  assert.match(
+    renderHelpIcon("Corner help", "corner"),
+    /class="help-icon help-icon--corner"/);
+});
+
 test("duration formatting preserves rounding, clamping, and fallback output", () => {
   assert.equal(formatDuration(undefined), "00:00");
   assert.equal(formatDuration("not-a-number"), "00:00");
@@ -78,13 +91,13 @@ test("board owns call sites while leaf utilities remain one-way dependencies", a
     "utf8");
   assert.match(
     board,
-    /import \{ escapeAttribute, escapeHtml, setDisabled, setHidden \} from "\.\/dom-utils\.js";/);
+    /import \{ escapeAttribute, escapeHtml, renderHelpIcon \} from "\.\/dom-utils\.js";/);
   assert.match(
     board,
     /import \{ formatDateTime, formatDuration \} from "\.\/format-utils\.js";/);
   assert.doesNotMatch(
     board,
-    /function (escapeHtml|escapeAttribute|setDisabled|setHidden|formatDuration|formatDateTime)\b/);
+    /function (escapeHtml|escapeAttribute|renderHelpIcon|setDisabled|setHidden|formatDuration|formatDateTime)\b/);
 
   for (const utilitySource of [domUtilsSource, formatUtilsSource]) {
     assert.doesNotMatch(utilitySource, /\bimport\b/);

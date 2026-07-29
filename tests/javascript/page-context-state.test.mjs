@@ -176,7 +176,12 @@ test("startup routing and awaited differences remain in board", () => {
   assert.match(boardSource, /await loadBoard\(\);/);
   assert.match(boardSource, /if \(pageContext\.isReports\) \{[\s\S]*?await loadReports\(\);/);
   assert.match(boardSource, /if \(pageContext\.isDoctor\) \{[\s\S]*?loadReports\(\);[\s\S]*?registerReportRefresh\(loadReports\);/);
-  assert.match(boardSource, /if \(pageContext\.isWorkshop\) \{[\s\S]*?loadReports\(\);[\s\S]*?registerReportRefresh\(loadReports\);/);
+  assert.match(
+    boardSource,
+    /const workshop = pageContext\.isWorkshop\s*\? createWorkshop\(\{ getReports: \(\) => app\.reports \}\)\s*: null;/);
+  assert.match(
+    boardSource,
+    /if \(pageContext\.isWorkshop\) \{[\s\S]*?loadReports\(\);[\s\S]*?registerReportRefresh\(loadReports\);[\s\S]*?workshop\.wire\(\);/);
   assert.match(boardSource, /registerBoardPolling\(loadBoard\);/);
   assert.match(boardSource, /registerGeneralRender\(render\);/);
   assert.match(boardSource, /registerConnectionStatusRefresh\(\);/);
