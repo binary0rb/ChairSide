@@ -258,12 +258,18 @@ public sealed partial class BoardStoreTests
     {
         var root = FindRepositoryRoot();
         var boardScript = File.ReadAllText(Path.Combine(root, "src", "ChairSide.Board", "wwwroot", "board.js"));
+        var requestUtilities = File.ReadAllText(Path.Combine(root, "src", "ChairSide.Board", "wwwroot", "request-utils.js"));
 
         Assert.Contains("chairside-room-token-${roomNumber}", boardScript);
 	 Assert.Contains("function roomTokenStorageKey(roomNumber = pageContext.roomNumber)", boardScript);
         Assert.Contains("sessionStorage.setItem(roomTokenStorageKey(), token)", boardScript);
         Assert.Contains("sessionStorage.removeItem(roomTokenStorageKey())", boardScript);
-        Assert.Contains("headers[\"X-ChairSide-Room-Token\"] = app.roomToken", boardScript);
+        Assert.Contains("import {", boardScript);
+        Assert.Contains("mutationHeaders,", boardScript);
+        Assert.Contains("} from \"./request-utils.js\";", boardScript);
+        Assert.Contains("export function mutationHeaders(baseHeaders = {})", requestUtilities);
+        Assert.Contains("headers[roomTokenHeaderName] = app.roomToken", requestUtilities);
+        Assert.Contains("const roomTokenHeaderName = \"X-ChairSide-Room-Token\"", requestUtilities);
         Assert.Contains("Room access token required", boardScript);
         Assert.DoesNotContain("roomToken=", boardScript);
     }

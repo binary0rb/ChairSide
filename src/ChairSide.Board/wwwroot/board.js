@@ -2,15 +2,18 @@ import { app } from "./application-state.js";
 import { escapeAttribute, escapeHtml, setDisabled, setHidden } from "./dom-utils.js";
 import { formatDateTime, formatDuration } from "./format-utils.js";
 import { pageContext } from "./page-context.js";
+import {
+  adminRequestHeaders,
+  clearAdminToken,
+  mutationHeaders,
+  readErrorMessage,
+  storeAdminToken
+} from "./request-utils.js";
 
 const stateNames = ["empty", "seated", "aging", "stale", "ready-for-doctor", "doctor-in-room", "turnover"];
 const staffLoungeRoomNumber = 99;
 const trendMinimumComparisonCases = 3;
 const trendAboutSameThresholdSeconds = 60;
-const adminAccess = {
-  storageKey: "chairside-admin-token",
-  headerName: "X-ChairSide-Admin-Token"
-};
 
 async function loadVersionBadge() {
   try {
@@ -121,7 +124,7 @@ async function loadReports() {
 
     if (response.status === 401 || response.status === 403) {
       if (response.status === 403) {
-        sessionStorage.removeItem(adminAccess.storageKey);
+        clearAdminToken();
       }
 
       app.reports = null;
@@ -2861,19 +2864,14 @@ function wireReportsAccessPrompt() {
       return;
     }
 
-    sessionStorage.setItem(adminAccess.storageKey, token);
+    storeAdminToken(token);
     loadReports();
   });
 
   clearButton?.addEventListener("click", () => {
-    sessionStorage.removeItem(adminAccess.storageKey);
+    clearAdminToken();
     renderReportsAccessPrompt(401);
   });
-}
-
-function adminRequestHeaders() {
-  const token = sessionStorage.getItem(adminAccess.storageKey);
-  return token ? { [adminAccess.headerName]: token } : {};
 }
 
 function renderMetric(label, value, helpText) {
@@ -4602,37 +4600,6 @@ async function sendRoomAction(roomNumber, action, label) {
   }
 
   return response.json();
-}
-
-function mutationHeaders(baseHeaders = {}) {
-  const headers = { ...baseHeaders };
-  if (app.roomToken) {
-    headers["X-ChairSide-Room-Token"] = app.roomToken;
-  }
-
-  return headers;
-}
-
-async function readErrorMessage(response, fallback) {
-  const text = await response.text();
-  if (!text) {
-    return fallback;
-  }
-  try {
-    const error = JSON.parse(text);
-    const labels = {
-      doctorId: "doctor",
-      procedureCode: "procedure",
-      sedationChoice: "sedation",
-      confirmedExpectedAllocationUnits: "allocation confirmation"
-    };
-    const unresolved = (error.unresolvedFields || []).map(field => labels[field] || field);
-    return unresolved.length
-      ? `${error.message || fallback} Still needed: ${unresolved.join(", ")}.`
-      : error.message || fallback;
-  } catch {
-    return text;
-  }
 }
 
 function setRoomActionStatus(message, tone) {

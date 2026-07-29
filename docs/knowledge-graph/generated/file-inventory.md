@@ -97,6 +97,7 @@ This file is mechanical output from `tools/knowledge-graph/New-ChairSideKnowledg
 | `src/ChairSide.Board/wwwroot/master.html` | Html | - | - |
 | `src/ChairSide.Board/wwwroot/page-context.js` | JavaScript | functions: derivePageContext | - |
 | `src/ChairSide.Board/wwwroot/reports.html` | Html | - | - |
+| `src/ChairSide.Board/wwwroot/request-utils.js` | JavaScript | functions: readAdminToken, storeAdminToken, clearAdminToken, adminRequestHeaders, mutationHeaders, readErrorMessage | - |
 | `src/ChairSide.Board/wwwroot/room.html` | Html | - | - |
 | `src/ChairSide.Board/wwwroot/room-1.html` | Html | - | - |
 | `src/ChairSide.Board/wwwroot/signalr-lite.js` | JavaScript | functions: toWebSocketUrl | - |
@@ -149,6 +150,7 @@ This file is mechanical output from `tools/knowledge-graph/New-ChairSideKnowledg
 | `tests/ChairSide.Board.Tests/TestSupport/TestWorkspace.cs` | CSharp | types: TestWorkspace<br>methods: Create, ProductionDatabasePath, TrainingDatabasePath, DatabaseIsolationLayout, Dispose | - |
 | `tests/javascript/leaf-utilities.test.mjs` | JavaScript | - | - |
 | `tests/javascript/page-context-state.test.mjs` | JavaScript | - | - |
+| `tests/javascript/request-utils.test.mjs` | JavaScript | - | - |
 | `tests/knowledge-graph/New-ChairSideKnowledgeGraph.Tests.ps1` | PowerShell | - | - |
 | `tests/scripts/Reset-ChairSideTrainingData.Tests.ps1` | PowerShell | - | - |
 | `tools/knowledge-graph/New-ChairSideKnowledgeGraph.ps1` | PowerShell | - | - |
