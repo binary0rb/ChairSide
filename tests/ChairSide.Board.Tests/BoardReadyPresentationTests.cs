@@ -128,21 +128,22 @@ public sealed class BoardReadyPresentationTests
     {
         var root = FindRepositoryRoot();
         var boardScript = File.ReadAllText(Path.Combine(root, "src", "ChairSide.Board", "wwwroot", "board.js"));
+        var roomCardScript = File.ReadAllText(Path.Combine(root, "src", "ChairSide.Board", "wwwroot", "room-card.js"));
         var styles = File.ReadAllText(Path.Combine(root, "src", "ChairSide.Board", "wwwroot", "styles.css"));
         var master = File.ReadAllText(Path.Combine(root, "src", "ChairSide.Board", "wwwroot", "master.html"));
         var index = File.ReadAllText(Path.Combine(root, "src", "ChairSide.Board", "wwwroot", "index.html"));
 
-        Assert.Contains("const presentation = roomPresentationState(room);", boardScript, StringComparison.Ordinal);
-        Assert.Contains("return { primaryState: \"ready-for-doctor\", readyUrgency };", boardScript, StringComparison.Ordinal);
-        Assert.Contains("class=\"ready-status-stack\"", boardScript, StringComparison.Ordinal);
-        Assert.Contains("<span class=\"ready-primary-badge\">READY</span>", boardScript, StringComparison.Ordinal);
-        Assert.Contains("const assignment = room?.assignment || null;", boardScript, StringComparison.Ordinal);
+        Assert.Contains("const presentation = roomPresentationState(room);", roomCardScript, StringComparison.Ordinal);
+        Assert.Contains("return { primaryState: \"ready-for-doctor\", readyUrgency };", roomCardScript, StringComparison.Ordinal);
+        Assert.Contains("class=\"ready-status-stack\"", roomCardScript, StringComparison.Ordinal);
+        Assert.Contains("<span class=\"ready-primary-badge\">READY</span>", roomCardScript, StringComparison.Ordinal);
+        Assert.Contains("const assignment = room?.assignment || null;", roomCardScript, StringComparison.Ordinal);
         Assert.Contains("roomAssignedDoctorId(room) === doctor.id", boardScript, StringComparison.Ordinal);
         Assert.DoesNotContain("room.assignedDoctor === doctor.id", boardScript, StringComparison.Ordinal);
-        Assert.Contains("Assignment pending", boardScript, StringComparison.Ordinal);
-        Assert.Contains("Doctor pending", boardScript, StringComparison.Ordinal);
-        Assert.Contains("Procedure pending", boardScript, StringComparison.Ordinal);
-        Assert.Contains("Allocation pending", boardScript, StringComparison.Ordinal);
+        Assert.Contains("Assignment pending", roomCardScript, StringComparison.Ordinal);
+        Assert.Contains("Doctor pending", roomCardScript, StringComparison.Ordinal);
+        Assert.Contains("Procedure pending", roomCardScript, StringComparison.Ordinal);
+        Assert.Contains("Allocation pending", roomCardScript, StringComparison.Ordinal);
         Assert.Contains("Aging: Ready wait &gt;", boardScript, StringComparison.Ordinal);
         Assert.Contains("Stale: Ready wait &gt;", boardScript, StringComparison.Ordinal);
         Assert.Contains(".room-tile.ready-for-doctor.urgency-aging", styles, StringComparison.Ordinal);

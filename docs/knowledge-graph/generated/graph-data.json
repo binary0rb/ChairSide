@@ -585,6 +585,12 @@
                       "path":  "src/ChairSide.Board/wwwroot/room-1.html"
                   },
                   {
+                      "id":  "file:src/ChairSide.Board/wwwroot/room-card.js",
+                      "label":  "src/ChairSide.Board/wwwroot/room-card.js",
+                      "type":  "File",
+                      "path":  "src/ChairSide.Board/wwwroot/room-card.js"
+                  },
+                  {
                       "id":  "file:src/ChairSide.Board/wwwroot/runtime-scheduling.js",
                       "label":  "src/ChairSide.Board/wwwroot/runtime-scheduling.js",
                       "type":  "File",
@@ -913,6 +919,12 @@
                       "label":  "tests/javascript/request-utils.test.mjs",
                       "type":  "File",
                       "path":  "tests/javascript/request-utils.test.mjs"
+                  },
+                  {
+                      "id":  "file:tests/javascript/room-card.test.mjs",
+                      "label":  "tests/javascript/room-card.test.mjs",
+                      "type":  "File",
+                      "path":  "tests/javascript/room-card.test.mjs"
                   },
                   {
                       "id":  "file:tests/javascript/runtime-scheduling.test.mjs",
@@ -4296,6 +4308,11 @@
                   },
                   {
                       "from":  "repo:chairside",
+                      "to":  "file:src/ChairSide.Board/wwwroot/room-card.js",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
                       "to":  "file:src/ChairSide.Board/wwwroot/runtime-scheduling.js",
                       "label":  "contains"
                   },
@@ -4567,6 +4584,11 @@
                   {
                       "from":  "repo:chairside",
                       "to":  "file:tests/javascript/request-utils.test.mjs",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:tests/javascript/room-card.test.mjs",
                       "label":  "contains"
                   },
                   {
