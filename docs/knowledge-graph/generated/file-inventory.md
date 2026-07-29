@@ -93,7 +93,7 @@ This file is mechanical output from `tools/knowledge-graph/New-ChairSideKnowledg
 | `src/ChairSide.Board/wwwroot/common-interactions.js` | JavaScript | functions: clearReportPress, wirePressInterruptionGuard, clearTilePress, completeTilePress, wireTileGroup, wireTilePressCleanup | - |
 | `src/ChairSide.Board/wwwroot/connection-status.js` | JavaScript | functions: setConnectionStatus, updateConnectionStatus, registerConnectionStatusRefresh, ensureConnectionStatusIndicator, formatSnapshotAge, getConnectionStatusDetails | - |
 | `src/ChairSide.Board/wwwroot/doctor.html` | Html | - | - |
-| `src/ChairSide.Board/wwwroot/dom-utils.js` | JavaScript | functions: escapeHtml, escapeAttribute, setDisabled, setHidden | - |
+| `src/ChairSide.Board/wwwroot/dom-utils.js` | JavaScript | functions: escapeHtml, escapeAttribute, renderHelpIcon, setDisabled, setHidden | - |
 | `src/ChairSide.Board/wwwroot/format-utils.js` | JavaScript | functions: formatDuration, formatDateTime | - |
 | `src/ChairSide.Board/wwwroot/index.html` | Html | - | - |
 | `src/ChairSide.Board/wwwroot/master.html` | Html | - | - |
@@ -109,6 +109,7 @@ This file is mechanical output from `tools/knowledge-graph/New-ChairSideKnowledg
 | `src/ChairSide.Board/wwwroot/signalr-lite.js` | JavaScript | functions: toWebSocketUrl | - |
 | `src/ChairSide.Board/wwwroot/styles.css` | Css | css vars: --bg, --ink, --muted, --line, --panel, --empty, --active-doctor, --neutral-100 | - |
 | `src/ChairSide.Board/wwwroot/workshop.html` | Html | - | - |
+| `src/ChairSide.Board/wwwroot/workshop.js` | JavaScript | functions: createWorkshop, render, wire, handlePresetActivate, handlePresetKeydown, selectPreset, readPresetSource, renderProjectionReadiness | - |
 | `tests/ChairSide.Board.Tests/AfterHoursReviewEndpointTests.cs` | CSharp | types: AfterHoursReviewEndpointTests<br>methods: Aborted_and_completed_confirm_exclusion_routes_share_admin_protection, Aborted_confirm_exclusion_is_durable_idempotent_and_source_disambiguated, Review_ui_routes_numeric_ids_by_explicit_source_type, SweepOptions, ActivateReady, CreateDiagnosticLogger, AdminRequest, StatusCode | - |
 | `tests/ChairSide.Board.Tests/AfterHoursSweepRetryTests.cs` | CSharp | types: AfterHoursSweepRetryTests<br>methods: Failure_after_an_earlier_room_commits_retries_remaining_rooms_same_day_then_stops, Restart_after_partial_completion_processes_only_rooms_still_active, Every_after_hours_leftover_is_reviewable_without_fabricating_lifecycle_facts, SweepOptions, ActivateSeated, ActivateReady, InstallRoomTwoResetFailure, DropTrigger | - |
 | `tests/ChairSide.Board.Tests/BoardReadyPresentationTests.cs` | CSharp | types: BoardReadyPresentationTests<br>methods: Canonical_room_reads_keep_prestaging_and_seated_distinct_without_fabricating_assignment, Ready_remains_primary_while_withdrawal_and_arrival_clear_urgency_and_keep_assignment, Master_and_doctor_cards_share_canonical_assignment_and_ready_presentation, Doctor_operational_header_and_room_panel_contracts_remain_in_place, Primary_workflow_highlights_only_the_enabled_next_action, All_pages_use_the_ordered_native_module_bootstrap, StateKey, ElementIds | - |
@@ -163,6 +164,7 @@ This file is mechanical output from `tools/knowledge-graph/New-ChairSideKnowledg
 | `tests/javascript/room-card.test.mjs` | JavaScript | functions: readyRoom | - |
 | `tests/javascript/room-workflow.test.mjs` | JavaScript | functions: wireTileGroup, wireTilePressCleanup, mutationHeaders, readErrorMessage, dataUrl, assignment, room, createHarness | - |
 | `tests/javascript/runtime-scheduling.test.mjs` | JavaScript | functions: importModule | - |
+| `tests/javascript/workshop.test.mjs` | JavaScript | functions: createHarness, activateWithKey | - |
 | `tests/knowledge-graph/New-ChairSideKnowledgeGraph.Tests.ps1` | PowerShell | - | - |
 | `tests/scripts/Reset-ChairSideTrainingData.Tests.ps1` | PowerShell | - | - |
 | `tools/knowledge-graph/New-ChairSideKnowledgeGraph.ps1` | PowerShell | - | - |

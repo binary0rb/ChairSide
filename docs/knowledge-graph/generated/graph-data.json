@@ -621,6 +621,12 @@
                       "path":  "src/ChairSide.Board/wwwroot/workshop.html"
                   },
                   {
+                      "id":  "file:src/ChairSide.Board/wwwroot/workshop.js",
+                      "label":  "src/ChairSide.Board/wwwroot/workshop.js",
+                      "type":  "File",
+                      "path":  "src/ChairSide.Board/wwwroot/workshop.js"
+                  },
+                  {
                       "id":  "file:tests/ChairSide.Board.Tests/AfterHoursReviewEndpointTests.cs",
                       "label":  "tests/ChairSide.Board.Tests/AfterHoursReviewEndpointTests.cs",
                       "type":  "File",
@@ -943,6 +949,12 @@
                       "label":  "tests/javascript/runtime-scheduling.test.mjs",
                       "type":  "File",
                       "path":  "tests/javascript/runtime-scheduling.test.mjs"
+                  },
+                  {
+                      "id":  "file:tests/javascript/workshop.test.mjs",
+                      "label":  "tests/javascript/workshop.test.mjs",
+                      "type":  "File",
+                      "path":  "tests/javascript/workshop.test.mjs"
                   },
                   {
                       "id":  "file:tests/knowledge-graph/New-ChairSideKnowledgeGraph.Tests.ps1",
@@ -4350,6 +4362,11 @@
                   },
                   {
                       "from":  "repo:chairside",
+                      "to":  "file:src/ChairSide.Board/wwwroot/workshop.js",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
                       "to":  "file:tests/ChairSide.Board.Tests/AfterHoursReviewEndpointTests.cs",
                       "label":  "contains"
                   },
@@ -4616,6 +4633,11 @@
                   {
                       "from":  "repo:chairside",
                       "to":  "file:tests/javascript/runtime-scheduling.test.mjs",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:tests/javascript/workshop.test.mjs",
                       "label":  "contains"
                   },
                   {

@@ -65,7 +65,7 @@ test("boot preserves registration placement, ordering, page routing, and double-
     /if \(pageContext\.isDoctor\) \{[\s\S]*?loadReports\(\);\s*registerReportRefresh\(loadReports\);\s*wireDoctorCockpitActions\(\);/);
   assert.match(
     boardSource,
-    /if \(pageContext\.isWorkshop\) \{[\s\S]*?loadReports\(\);\s*registerReportRefresh\(loadReports\);\s*wireWorkshopPresetSelection\(\);/);
+    /if \(pageContext\.isWorkshop\) \{[\s\S]*?loadReports\(\);\s*registerReportRefresh\(loadReports\);\s*workshop\.wire\(\);/);
   assert.match(
     boardSource,
     /connectRealtime\([\s\S]*?\);\s*registerBoardPolling\(loadBoard\);\s*registerGeneralRender\(render\);\s*registerConnectionStatusRefresh\(\);\s*updateConnectionStatus\(\);/);

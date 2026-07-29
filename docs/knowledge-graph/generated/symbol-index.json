@@ -1,7 +1,7 @@
 ﻿{
     "generatedStamp":  "deterministic",
     "root":  ".",
-    "fileCount":  160,
+    "fileCount":  162,
     "files":  [
                   {
                       "path":  ".github/pull_request_template.md",
@@ -513,7 +513,7 @@
                   {
                       "path":  "docs/knowledge/workflow/room-lifecycle.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  9274,
+                      "sizeBytes":  9276,
                       "typeSymbols":  [
 
                                       ],
@@ -869,7 +869,7 @@
                   {
                       "path":  "package.json",
                       "kind":  "Json",
-                      "sizeBytes":  1003,
+                      "sizeBytes":  1077,
                       "typeSymbols":  [
 
                                       ],
@@ -2660,7 +2660,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/application-state.js",
                       "kind":  "JavaScript",
-                      "sizeBytes":  1973,
+                      "sizeBytes":  1977,
                       "typeSymbols":  [
 
                                       ],
@@ -2714,7 +2714,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/board.js",
                       "kind":  "JavaScript",
-                      "sizeBytes":  123438,
+                      "sizeBytes":  113335,
                       "typeSymbols":  [
 
                                       ],
@@ -2933,7 +2933,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/dom-utils.js",
                       "kind":  "JavaScript",
-                      "sizeBytes":  525,
+                      "sizeBytes":  1132,
                       "typeSymbols":  [
 
                                       ],
@@ -2952,6 +2952,7 @@
                       "scriptFunctions":  [
                                               "escapeHtml",
                                               "escapeAttribute",
+                                              "renderHelpIcon",
                                               "setDisabled",
                                               "setHidden"
                                           ],
@@ -3243,7 +3244,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/room-workflow.js",
                       "kind":  "JavaScript",
-                      "sizeBytes":  39809,
+                      "sizeBytes":  40893,
                       "typeSymbols":  [
 
                                       ],
@@ -3448,6 +3449,42 @@
                                    ]
                   },
                   {
+                      "path":  "src/ChairSide.Board/wwwroot/workshop.js",
+                      "kind":  "JavaScript",
+                      "sizeBytes":  8870,
+                      "typeSymbols":  [
+
+                                      ],
+                      "methodSymbols":  [
+
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+                                              "createWorkshop",
+                                              "render",
+                                              "wire",
+                                              "handlePresetActivate",
+                                              "handlePresetKeydown",
+                                              "selectPreset",
+                                              "readPresetSource",
+                                              "renderProjectionReadiness",
+                                              "formatWholeMinutes",
+                                              "formatBlocks",
+                                              "formatUtilizationPercent"
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
                       "path":  "tests/ChairSide.Board.Tests/AfterHoursReviewEndpointTests.cs",
                       "kind":  "CSharp",
                       "sizeBytes":  8548,
@@ -3518,7 +3555,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/BoardReadyPresentationTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  17113,
+                      "sizeBytes":  17135,
                       "typeSymbols":  [
                                           "BoardReadyPresentationTests"
                                       ],
@@ -4935,7 +4972,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/RoomPanelPrestagingWorkflowTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  9148,
+                      "sizeBytes":  9172,
                       "typeSymbols":  [
                                           "RoomPanelPrestagingWorkflowTests"
                                       ],
@@ -5366,7 +5403,7 @@
                   {
                       "path":  "tests/javascript/common-interactions.test.mjs",
                       "kind":  "JavaScript",
-                      "sizeBytes":  10421,
+                      "sizeBytes":  10439,
                       "typeSymbols":  [
 
                                       ],
@@ -5425,7 +5462,7 @@
                   {
                       "path":  "tests/javascript/leaf-utilities.test.mjs",
                       "kind":  "JavaScript",
-                      "sizeBytes":  3480,
+                      "sizeBytes":  4034,
                       "typeSymbols":  [
 
                                       ],
@@ -5451,7 +5488,7 @@
                   {
                       "path":  "tests/javascript/page-context-state.test.mjs",
                       "kind":  "JavaScript",
-                      "sizeBytes":  6564,
+                      "sizeBytes":  6757,
                       "typeSymbols":  [
 
                                       ],
@@ -5507,7 +5544,7 @@
                   {
                       "path":  "tests/javascript/request-utils.test.mjs",
                       "kind":  "JavaScript",
-                      "sizeBytes":  5927,
+                      "sizeBytes":  5939,
                       "typeSymbols":  [
 
                                       ],
@@ -5559,7 +5596,7 @@
                   {
                       "path":  "tests/javascript/room-workflow.test.mjs",
                       "kind":  "JavaScript",
-                      "sizeBytes":  18185,
+                      "sizeBytes":  18731,
                       "typeSymbols":  [
 
                                       ],
@@ -5593,7 +5630,7 @@
                   {
                       "path":  "tests/javascript/runtime-scheduling.test.mjs",
                       "kind":  "JavaScript",
-                      "sizeBytes":  3442,
+                      "sizeBytes":  3426,
                       "typeSymbols":  [
 
                                       ],
@@ -5611,6 +5648,33 @@
                                        ],
                       "scriptFunctions":  [
                                               "importModule"
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
+                      "path":  "tests/javascript/workshop.test.mjs",
+                      "kind":  "JavaScript",
+                      "sizeBytes":  10365,
+                      "typeSymbols":  [
+
+                                      ],
+                      "methodSymbols":  [
+
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+                                              "createHarness",
+                                              "activateWithKey"
                                           ],
                       "headings":  [
 
