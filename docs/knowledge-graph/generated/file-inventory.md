@@ -90,6 +90,7 @@ This file is mechanical output from `tools/knowledge-graph/New-ChairSideKnowledg
 | `src/ChairSide.Board/wwwroot/assets/icons/README.md` | Markdown | headings: Procedure icons, Tabler Icons license (MIT), Note | - |
 | `src/ChairSide.Board/wwwroot/board.js` | JavaScript | functions: loadVersionBadge, boot, loadBoard, loadReports, initDateRange, reportsRequestUrl, utcDateString, computePresetRange | - |
 | `src/ChairSide.Board/wwwroot/bootstrap.js` | JavaScript | - | - |
+| `src/ChairSide.Board/wwwroot/connection-status.js` | JavaScript | functions: setConnectionStatus, updateConnectionStatus, registerConnectionStatusRefresh, ensureConnectionStatusIndicator, formatSnapshotAge, getConnectionStatusDetails | - |
 | `src/ChairSide.Board/wwwroot/doctor.html` | Html | - | - |
 | `src/ChairSide.Board/wwwroot/dom-utils.js` | JavaScript | functions: escapeHtml, escapeAttribute, setDisabled, setHidden | - |
 | `src/ChairSide.Board/wwwroot/format-utils.js` | JavaScript | functions: formatDuration, formatDateTime | - |
@@ -149,6 +150,7 @@ This file is mechanical output from `tools/knowledge-graph/New-ChairSideKnowledg
 | `tests/ChairSide.Board.Tests/TestSupport/TestOptionsMonitor.cs` | CSharp | types: TestOptionsMonitor<br>methods: Get, OnChange | - |
 | `tests/ChairSide.Board.Tests/TestSupport/TestWebHostEnvironment.cs` | CSharp | types: TestWebHostEnvironment | - |
 | `tests/ChairSide.Board.Tests/TestSupport/TestWorkspace.cs` | CSharp | types: TestWorkspace<br>methods: Create, ProductionDatabasePath, TrainingDatabasePath, DatabaseIsolationLayout, Dispose | - |
+| `tests/javascript/connection-status.test.mjs` | JavaScript | functions: initialApp, importModule, createFakeDom, expectedDetails | - |
 | `tests/javascript/leaf-utilities.test.mjs` | JavaScript | - | - |
 | `tests/javascript/page-context-state.test.mjs` | JavaScript | - | - |
 | `tests/javascript/realtime-polling.test.mjs` | JavaScript | functions: initialApp, importModule, connectionHarness, callbackHarness, flushPromises | - |

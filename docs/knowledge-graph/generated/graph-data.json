@@ -507,6 +507,12 @@
                       "path":  "src/ChairSide.Board/wwwroot/bootstrap.js"
                   },
                   {
+                      "id":  "file:src/ChairSide.Board/wwwroot/connection-status.js",
+                      "label":  "src/ChairSide.Board/wwwroot/connection-status.js",
+                      "type":  "File",
+                      "path":  "src/ChairSide.Board/wwwroot/connection-status.js"
+                  },
+                  {
                       "id":  "file:src/ChairSide.Board/wwwroot/doctor.html",
                       "label":  "src/ChairSide.Board/wwwroot/doctor.html",
                       "type":  "File",
@@ -859,6 +865,12 @@
                       "label":  "tests/ChairSide.Board.Tests/TestSupport/TestWorkspace.cs",
                       "type":  "File",
                       "path":  "tests/ChairSide.Board.Tests/TestSupport/TestWorkspace.cs"
+                  },
+                  {
+                      "id":  "file:tests/javascript/connection-status.test.mjs",
+                      "label":  "tests/javascript/connection-status.test.mjs",
+                      "type":  "File",
+                      "path":  "tests/javascript/connection-status.test.mjs"
                   },
                   {
                       "id":  "file:tests/javascript/leaf-utilities.test.mjs",
@@ -4195,6 +4207,11 @@
                   },
                   {
                       "from":  "repo:chairside",
+                      "to":  "file:src/ChairSide.Board/wwwroot/connection-status.js",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
                       "to":  "file:src/ChairSide.Board/wwwroot/doctor.html",
                       "label":  "contains"
                   },
@@ -4486,6 +4503,11 @@
                   {
                       "from":  "repo:chairside",
                       "to":  "file:tests/ChairSide.Board.Tests/TestSupport/TestWorkspace.cs",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:tests/javascript/connection-status.test.mjs",
                       "label":  "contains"
                   },
                   {

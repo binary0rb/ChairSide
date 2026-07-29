@@ -2,6 +2,7 @@
   "name": "chairside",
   "scripts": {
     "lint": "eslint src/ChairSide.Board/wwwroot",
+    "test:connection-status": "node --test tests/javascript/connection-status.test.mjs",
     "test:leaf-utilities": "node --test tests/javascript/leaf-utilities.test.mjs",
     "test:page-context-state": "node --test tests/javascript/page-context-state.test.mjs",
     "test:request-utils": "node --test tests/javascript/request-utils.test.mjs",
