@@ -2,6 +2,7 @@ import { app } from "./application-state.js";
 import { escapeAttribute, escapeHtml, setDisabled, setHidden } from "./dom-utils.js";
 import { formatDateTime, formatDuration } from "./format-utils.js";
 import { pageContext } from "./page-context.js";
+import { connectRealtime, registerBoardPolling } from "./realtime-polling.js";
 import {
   adminRequestHeaders,
   clearAdminToken,
@@ -72,8 +73,15 @@ async function boot() {
   }
 
   wireDoctorViewMenu();
-  connectRealtime();
-  app.pollHandle = window.setInterval(loadBoard, 5000);
+  connectRealtime({
+    applySnapshot,
+    refreshReportsAfterBoardUpdate: pageContext.isReports ? loadReports : null,
+    render,
+    refreshConnectionStatus: updateConnectionStatus,
+    setConnectionStatus,
+    loadBoard
+  });
+  registerBoardPolling(loadBoard);
   app.tickHandle = window.setInterval(render, 1000);
   app.statusHandle = window.setInterval(updateConnectionStatus, 1000);
   updateConnectionStatus();
@@ -297,95 +305,6 @@ function renderReportWindow(r) {
 
   const shown = r ? (r.completedRoomCyclesCount ?? 0) : 0;
   el.textContent = `Showing completed cases from ${label} (${shown} of ${total} all-time)`;
-}
-
-function connectRealtime() {
-  if (!window.signalR) {
-    markRealtimeDegraded();
-    updateConnectionStatus();
-    return;
-  }
-
-  if (app.hubReady || app.connection?.state === "Connected" || app.connection?.state === "Connecting" || app.connection?.state === "Reconnecting") {
-    return;
-  }
-
-  const connection = new signalR.HubConnectionBuilder()
-    .withUrl("/boardHub")
-    .withAutomaticReconnect()
-    .build();
-
-  app.connection = connection;
-
-  connection.on("boardUpdated", async snapshot => {
-    applySnapshot(snapshot);
-    if (pageContext.isReports) {
-      await loadReports().catch(error => {
-        console.warn("[ChairSide] Reports refresh after board update failed.", error);
-      });
-    }
-    render();
-    updateConnectionStatus();
-  });
-
-  if (typeof connection.onreconnecting === "function") {
-    connection.onreconnecting(() => {
-      markRealtimeDegraded();
-      updateConnectionStatus();
-    });
-  }
-
-  if (typeof connection.onreconnected === "function") {
-    connection.onreconnected(() => {
-      app.hubReady = true;
-      app.realtimeDegraded = false;
-      app.realtimeLostAt = 0;
-      setConnectionStatus("live");
-      loadBoard();
-    });
-  }
-
-  if (typeof connection.onclose === "function") {
-    connection.onclose(() => {
-      markRealtimeDegraded();
-      updateConnectionStatus();
-    });
-  }
-
-  connection.start()
-    .then(() => {
-      app.hubReady = true;
-      app.realtimeDegraded = false;
-      app.realtimeLostAt = 0;
-      setConnectionStatus("live");
-    })
-    .catch(error => {
-      console.warn("[ChairSide] SignalR connection failed; polling fallback remains active.", error);
-      markRealtimeDegraded();
-      updateConnectionStatus();
-      scheduleRealtimeRetry();
-    });
-}
-
-function markRealtimeDegraded() {
-  app.hubReady = false;
-  app.realtimeDegraded = true;
-  if (!app.realtimeLostAt) {
-    app.realtimeLostAt = Date.now();
-  }
-}
-
-function scheduleRealtimeRetry() {
-  if (app.realtimeRetryHandle) {
-    return;
-  }
-
-  app.realtimeRetryHandle = window.setTimeout(() => {
-    app.realtimeRetryHandle = null;
-    if (!app.hubReady) {
-      connectRealtime();
-    }
-  }, 5000);
 }
 
 function render() {

@@ -163,6 +163,9 @@ test("board owns behavior while context and state remain one-way modules", () =>
   assert.match(
     boardSource,
     /import \{ pageContext \} from "\.\/page-context\.js";/);
+  assert.match(
+    boardSource,
+    /import \{ connectRealtime, registerBoardPolling \} from "\.\/realtime-polling\.js";/);
   assert.doesNotMatch(boardSource, /\bconst app = \{/);
   assert.doesNotMatch(boardSource, /document\.body\.dataset\.view/);
   assert.doesNotMatch(pageContextSource, /\bimport\b/);
@@ -174,11 +177,14 @@ test("board owns behavior while context and state remain one-way modules", () =>
 });
 
 test("startup routing and awaited differences remain in board", () => {
+  assert.match(
+    boardSource,
+    /if \(app\.pollHandle \|\| app\.tickHandle \|\| app\.statusHandle\) \{[\s\S]*?return;\s*\}/);
   assert.match(boardSource, /await loadBoard\(\);/);
   assert.match(boardSource, /if \(pageContext\.isReports\) \{[\s\S]*?await loadReports\(\);/);
   assert.match(boardSource, /if \(pageContext\.isDoctor\) \{[\s\S]*?loadReports\(\);[\s\S]*?window\.setInterval\(loadReports, 60_000\);/);
   assert.match(boardSource, /if \(pageContext\.isWorkshop\) \{[\s\S]*?loadReports\(\);[\s\S]*?window\.setInterval\(loadReports, 60_000\);/);
-  assert.match(boardSource, /app\.pollHandle = window\.setInterval\(loadBoard, 5000\);/);
+  assert.match(boardSource, /registerBoardPolling\(loadBoard\);/);
   assert.match(boardSource, /app\.tickHandle = window\.setInterval\(render, 1000\);/);
   assert.match(boardSource, /app\.statusHandle = window\.setInterval\(updateConnectionStatus, 1000\);/);
   assert.match(boardSource, /\nboot\(\);\s*$/);

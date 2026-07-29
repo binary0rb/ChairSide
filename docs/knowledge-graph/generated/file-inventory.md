@@ -96,6 +96,7 @@ This file is mechanical output from `tools/knowledge-graph/New-ChairSideKnowledg
 | `src/ChairSide.Board/wwwroot/index.html` | Html | - | - |
 | `src/ChairSide.Board/wwwroot/master.html` | Html | - | - |
 | `src/ChairSide.Board/wwwroot/page-context.js` | JavaScript | functions: derivePageContext | - |
+| `src/ChairSide.Board/wwwroot/realtime-polling.js` | JavaScript | functions: connectRealtime, registerBoardPolling, markRealtimeDegraded, scheduleRealtimeRetry | - |
 | `src/ChairSide.Board/wwwroot/reports.html` | Html | - | - |
 | `src/ChairSide.Board/wwwroot/request-utils.js` | JavaScript | functions: readAdminToken, storeAdminToken, clearAdminToken, adminRequestHeaders, mutationHeaders, readErrorMessage | - |
 | `src/ChairSide.Board/wwwroot/room.html` | Html | - | - |
@@ -150,6 +151,7 @@ This file is mechanical output from `tools/knowledge-graph/New-ChairSideKnowledg
 | `tests/ChairSide.Board.Tests/TestSupport/TestWorkspace.cs` | CSharp | types: TestWorkspace<br>methods: Create, ProductionDatabasePath, TrainingDatabasePath, DatabaseIsolationLayout, Dispose | - |
 | `tests/javascript/leaf-utilities.test.mjs` | JavaScript | - | - |
 | `tests/javascript/page-context-state.test.mjs` | JavaScript | - | - |
+| `tests/javascript/realtime-polling.test.mjs` | JavaScript | functions: initialApp, importModule, connectionHarness, callbackHarness, flushPromises | - |
 | `tests/javascript/request-utils.test.mjs` | JavaScript | - | - |
 | `tests/knowledge-graph/New-ChairSideKnowledgeGraph.Tests.ps1` | PowerShell | - | - |
 | `tests/scripts/Reset-ChairSideTrainingData.Tests.ps1` | PowerShell | - | - |
