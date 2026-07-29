@@ -108,7 +108,10 @@ public sealed class RoomPanelPrestagingWorkflowTests
         Assert.Contains("sedationChoice: procedure?.sedationEligible && app.sedationOn ? \"yes\" : null", boardScript, StringComparison.Ordinal);
         Assert.Contains("room?.assignment?.sedation?.state === \"EligibleYes\"", boardScript, StringComparison.Ordinal);
         Assert.Contains("function isLegacyActiveRoom(room)", boardScript, StringComparison.Ordinal);
-        Assert.Contains("setDisabled(\"readyForDoctorButton\", !capabilities.canReady);", boardScript, StringComparison.Ordinal);
+        Assert.Contains(
+            "setDisabled(document.getElementById(\"readyForDoctorButton\"), !capabilities.canReady);",
+            boardScript,
+            StringComparison.Ordinal);
         Assert.Contains("function focusFirstUnresolvedAssignmentControl()", boardScript, StringComparison.Ordinal);
         Assert.Contains("focusFirstUnresolvedAssignmentControl();", boardScript, StringComparison.Ordinal);
     }

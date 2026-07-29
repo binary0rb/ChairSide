@@ -90,6 +90,8 @@ This file is mechanical output from `tools/knowledge-graph/New-ChairSideKnowledg
 | `src/ChairSide.Board/wwwroot/board.js` | JavaScript | functions: getRoomNumber, getRoomToken, loadVersionBadge, boot, loadBoard, loadReports, initDateRange, reportsRequestUrl | - |
 | `src/ChairSide.Board/wwwroot/bootstrap.js` | JavaScript | - | - |
 | `src/ChairSide.Board/wwwroot/doctor.html` | Html | - | - |
+| `src/ChairSide.Board/wwwroot/dom-utils.js` | JavaScript | functions: escapeHtml, escapeAttribute, setDisabled, setHidden | - |
+| `src/ChairSide.Board/wwwroot/format-utils.js` | JavaScript | functions: formatDuration, formatDateTime | - |
 | `src/ChairSide.Board/wwwroot/index.html` | Html | - | - |
 | `src/ChairSide.Board/wwwroot/master.html` | Html | - | - |
 | `src/ChairSide.Board/wwwroot/reports.html` | Html | - | - |
@@ -143,6 +145,7 @@ This file is mechanical output from `tools/knowledge-graph/New-ChairSideKnowledg
 | `tests/ChairSide.Board.Tests/TestSupport/TestOptionsMonitor.cs` | CSharp | types: TestOptionsMonitor<br>methods: Get, OnChange | - |
 | `tests/ChairSide.Board.Tests/TestSupport/TestWebHostEnvironment.cs` | CSharp | types: TestWebHostEnvironment | - |
 | `tests/ChairSide.Board.Tests/TestSupport/TestWorkspace.cs` | CSharp | types: TestWorkspace<br>methods: Create, ProductionDatabasePath, TrainingDatabasePath, DatabaseIsolationLayout, Dispose | - |
+| `tests/javascript/leaf-utilities.test.mjs` | JavaScript | - | - |
 | `tests/knowledge-graph/New-ChairSideKnowledgeGraph.Tests.ps1` | PowerShell | - | - |
 | `tests/scripts/Reset-ChairSideTrainingData.Tests.ps1` | PowerShell | - | - |
 | `tools/knowledge-graph/New-ChairSideKnowledgeGraph.ps1` | PowerShell | - | - |

@@ -1,7 +1,7 @@
 ﻿{
     "generatedStamp":  "deterministic",
     "root":  ".",
-    "fileCount":  140,
+    "fileCount":  143,
     "files":  [
                   {
                       "path":  ".github/pull_request_template.md",
@@ -843,7 +843,7 @@
                   {
                       "path":  "eslint.config.mjs",
                       "kind":  "JavaScript",
-                      "sizeBytes":  502,
+                      "sizeBytes":  504,
                       "typeSymbols":  [
 
                                       ],
@@ -869,7 +869,7 @@
                   {
                       "path":  "package.json",
                       "kind":  "Json",
-                      "sizeBytes":  229,
+                      "sizeBytes":  309,
                       "typeSymbols":  [
 
                                       ],
@@ -2688,7 +2688,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/board.js",
                       "kind":  "JavaScript",
-                      "sizeBytes":  187306,
+                      "sizeBytes":  186706,
                       "typeSymbols":  [
 
                                       ],
@@ -2793,7 +2793,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/bootstrap.js",
                       "kind":  "JavaScript",
-                      "sizeBytes":  78,
+                      "sizeBytes":  80,
                       "typeSymbols":  [
 
                                       ],
@@ -2819,7 +2819,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/doctor.html",
                       "kind":  "Html",
-                      "sizeBytes":  2787,
+                      "sizeBytes":  2790,
                       "typeSymbols":  [
 
                                       ],
@@ -2843,9 +2843,65 @@
                                    ]
                   },
                   {
+                      "path":  "src/ChairSide.Board/wwwroot/dom-utils.js",
+                      "kind":  "JavaScript",
+                      "sizeBytes":  501,
+                      "typeSymbols":  [
+
+                                      ],
+                      "methodSymbols":  [
+
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+                                              "escapeHtml",
+                                              "escapeAttribute",
+                                              "setDisabled",
+                                              "setHidden"
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
+                      "path":  "src/ChairSide.Board/wwwroot/format-utils.js",
+                      "kind":  "JavaScript",
+                      "sizeBytes":  519,
+                      "typeSymbols":  [
+
+                                      ],
+                      "methodSymbols":  [
+
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+                                              "formatDuration",
+                                              "formatDateTime"
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
                       "path":  "src/ChairSide.Board/wwwroot/index.html",
                       "kind":  "Html",
-                      "sizeBytes":  2800,
+                      "sizeBytes":  2803,
                       "typeSymbols":  [
 
                                       ],
@@ -2871,7 +2927,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/master.html",
                       "kind":  "Html",
-                      "sizeBytes":  2800,
+                      "sizeBytes":  2803,
                       "typeSymbols":  [
 
                                       ],
@@ -2897,7 +2953,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/reports.html",
                       "kind":  "Html",
-                      "sizeBytes":  9868,
+                      "sizeBytes":  9871,
                       "typeSymbols":  [
 
                                       ],
@@ -2923,7 +2979,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/room.html",
                       "kind":  "Html",
-                      "sizeBytes":  6078,
+                      "sizeBytes":  6081,
                       "typeSymbols":  [
 
                                       ],
@@ -2949,7 +3005,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/room-1.html",
                       "kind":  "Html",
-                      "sizeBytes":  6099,
+                      "sizeBytes":  6102,
                       "typeSymbols":  [
 
                                       ],
@@ -3061,7 +3117,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/workshop.html",
                       "kind":  "Html",
-                      "sizeBytes":  11381,
+                      "sizeBytes":  11384,
                       "typeSymbols":  [
 
                                       ],
@@ -3155,7 +3211,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/BoardReadyPresentationTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  16641,
+                      "sizeBytes":  16684,
                       "typeSymbols":  [
                                           "BoardReadyPresentationTests"
                                       ],
@@ -3189,7 +3245,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/BoardStoreAssignmentTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  77087,
+                      "sizeBytes":  77498,
                       "typeSymbols":  [
                                           "BoardStoreTests"
                                       ],
@@ -4572,7 +4628,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/RoomPanelPrestagingWorkflowTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  8603,
+                      "sizeBytes":  8664,
                       "typeSymbols":  [
                                           "RoomPanelPrestagingWorkflowTests"
                                       ],
@@ -4983,6 +5039,32 @@
                                             "TrainingDatabasePath",
                                             "DatabaseIsolationLayout",
                                             "Dispose"
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
+                      "path":  "tests/javascript/leaf-utilities.test.mjs",
+                      "kind":  "JavaScript",
+                      "sizeBytes":  3387,
+                      "typeSymbols":  [
+
+                                      ],
+                      "methodSymbols":  [
+
                                         ],
                       "routes":  [
 

@@ -507,6 +507,18 @@
                       "path":  "src/ChairSide.Board/wwwroot/doctor.html"
                   },
                   {
+                      "id":  "file:src/ChairSide.Board/wwwroot/dom-utils.js",
+                      "label":  "src/ChairSide.Board/wwwroot/dom-utils.js",
+                      "type":  "File",
+                      "path":  "src/ChairSide.Board/wwwroot/dom-utils.js"
+                  },
+                  {
+                      "id":  "file:src/ChairSide.Board/wwwroot/format-utils.js",
+                      "label":  "src/ChairSide.Board/wwwroot/format-utils.js",
+                      "type":  "File",
+                      "path":  "src/ChairSide.Board/wwwroot/format-utils.js"
+                  },
+                  {
                       "id":  "file:src/ChairSide.Board/wwwroot/index.html",
                       "label":  "src/ChairSide.Board/wwwroot/index.html",
                       "type":  "File",
@@ -823,6 +835,12 @@
                       "label":  "tests/ChairSide.Board.Tests/TestSupport/TestWorkspace.cs",
                       "type":  "File",
                       "path":  "tests/ChairSide.Board.Tests/TestSupport/TestWorkspace.cs"
+                  },
+                  {
+                      "id":  "file:tests/javascript/leaf-utilities.test.mjs",
+                      "label":  "tests/javascript/leaf-utilities.test.mjs",
+                      "type":  "File",
+                      "path":  "tests/javascript/leaf-utilities.test.mjs"
                   },
                   {
                       "id":  "file:tests/knowledge-graph/New-ChairSideKnowledgeGraph.Tests.ps1",
@@ -4135,6 +4153,16 @@
                   },
                   {
                       "from":  "repo:chairside",
+                      "to":  "file:src/ChairSide.Board/wwwroot/dom-utils.js",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:src/ChairSide.Board/wwwroot/format-utils.js",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
                       "to":  "file:src/ChairSide.Board/wwwroot/index.html",
                       "label":  "contains"
                   },
@@ -4396,6 +4424,11 @@
                   {
                       "from":  "repo:chairside",
                       "to":  "file:tests/ChairSide.Board.Tests/TestSupport/TestWorkspace.cs",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:tests/javascript/leaf-utilities.test.mjs",
                       "label":  "contains"
                   },
                   {

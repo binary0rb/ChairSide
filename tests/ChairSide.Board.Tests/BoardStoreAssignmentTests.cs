@@ -1490,8 +1490,18 @@ public sealed partial class BoardStoreTests
             "ChairSide.Board",
             "wwwroot",
             "board.js"));
+        var domUtilities = File.ReadAllText(Path.Combine(
+            FindRepositoryRoot(),
+            "src",
+            "ChairSide.Board",
+            "wwwroot",
+            "dom-utils.js"));
 
-        Assert.Contains("function escapeHtml", boardJs);
+        Assert.Contains(
+            "import { escapeAttribute, escapeHtml, setDisabled, setHidden } from \"./dom-utils.js\";",
+            boardJs);
+        Assert.Contains("export function escapeHtml", domUtilities);
+        Assert.DoesNotContain("function escapeHtml", boardJs);
         Assert.Contains("${escapeHtml(doctor.name)}", boardJs);
         Assert.Contains("${escapeHtml(procedure.code)}", boardJs);
         Assert.Contains("${escapeHtml(procedure.label)}", boardJs);

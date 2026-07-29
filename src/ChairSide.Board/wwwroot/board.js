@@ -1,3 +1,6 @@
+import { escapeAttribute, escapeHtml, setDisabled, setHidden } from "./dom-utils.js";
+import { formatDateTime, formatDuration } from "./format-utils.js";
+
 const app = {
   snapshot: null,
   reports: null,
@@ -3330,21 +3333,21 @@ function setRoomControlsEnabled(room) {
   const isDirty = capabilities.canEditAssignment && isAssignmentDraftDirty(room);
   const canCancel = capabilities.canCancelPrestage || capabilities.canCancelSeating;
 
-  setDisabled("demoElapsedSelect", !capabilities.canBeginPrestage || !isDemoTimerEnabled());
-  setDisabled("beginPrestageButton", !capabilities.canBeginPrestage);
-  setDisabled("seatButton", !capabilities.canSeat);
-  setDisabled("readyForDoctorButton", !capabilities.canReady);
-  setDisabled("saveDetailsButton", !capabilities.canSaveDetails || !isDirty);
-  setDisabled("discardChangesButton", !isDirty);
-  setDisabled("withdrawReadyButton", !capabilities.canWithdrawReady);
-  setDisabled("cancelSeatingButton", !canCancel);
-  setDisabled("doctorArrivedButton", !capabilities.canDoctorArrive);
-  setDisabled("doctorCompleteButton", !capabilities.canDoctorComplete);
-  setDisabled("roomAvailableButton", !capabilities.canRoomAvailable);
-  setHidden("saveDetailsButton", !isDirty);
-  setHidden("discardChangesButton", !isDirty);
-  setHidden("withdrawReadyButton", !capabilities.canWithdrawReady);
-  setHidden("cancelSeatingButton", !canCancel);
+  setDisabled(document.getElementById("demoElapsedSelect"), !capabilities.canBeginPrestage || !isDemoTimerEnabled());
+  setDisabled(document.getElementById("beginPrestageButton"), !capabilities.canBeginPrestage);
+  setDisabled(document.getElementById("seatButton"), !capabilities.canSeat);
+  setDisabled(document.getElementById("readyForDoctorButton"), !capabilities.canReady);
+  setDisabled(document.getElementById("saveDetailsButton"), !capabilities.canSaveDetails || !isDirty);
+  setDisabled(document.getElementById("discardChangesButton"), !isDirty);
+  setDisabled(document.getElementById("withdrawReadyButton"), !capabilities.canWithdrawReady);
+  setDisabled(document.getElementById("cancelSeatingButton"), !canCancel);
+  setDisabled(document.getElementById("doctorArrivedButton"), !capabilities.canDoctorArrive);
+  setDisabled(document.getElementById("doctorCompleteButton"), !capabilities.canDoctorComplete);
+  setDisabled(document.getElementById("roomAvailableButton"), !capabilities.canRoomAvailable);
+  setHidden(document.getElementById("saveDetailsButton"), !isDirty);
+  setHidden(document.getElementById("discardChangesButton"), !isDirty);
+  setHidden(document.getElementById("withdrawReadyButton"), !capabilities.canWithdrawReady);
+  setHidden(document.getElementById("cancelSeatingButton"), !canCancel);
   setNextPrimaryAction(room);
 }
 
@@ -3381,20 +3384,6 @@ function setNextPrimaryAction(room) {
   ].forEach(id => {
     document.getElementById(id)?.classList.toggle("is-next-action", id === nextActionId);
   });
-}
-
-function setDisabled(id, isDisabled) {
-  const control = document.getElementById(id);
-  if (control) {
-    control.disabled = isDisabled;
-  }
-}
-
-function setHidden(id, isHidden) {
-  const control = document.getElementById(id);
-  if (control) {
-    control.hidden = isHidden;
-  }
 }
 
 function procedureFromCode(procedureCode) {
@@ -3508,19 +3497,6 @@ function renderProcedureIcon(procedure) {
 
 function renderEmptyIcon() {
   return `<svg ${tablerIconAttrs}><path d="M5 12h14"/></svg>`;
-}
-
-function escapeHtml(value) {
-  return String(value ?? "")
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#39;");
-}
-
-function escapeAttribute(value) {
-  return escapeHtml(value);
 }
 
 // Reusable inline help bubble: a small "?" badge that reveals a short explanation on hover or
@@ -4752,26 +4728,6 @@ function formatElapsed(seatedAt) {
   const minutes = Math.floor(totalSeconds / 60);
   const seconds = totalSeconds % 60;
   return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
-}
-
-function formatDuration(totalSeconds) {
-  const rounded = Math.max(0, Math.round(Number(totalSeconds) || 0));
-  const minutes = Math.floor(rounded / 60);
-  const seconds = rounded % 60;
-  return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
-}
-
-function formatDateTime(value) {
-  if (!value) {
-    return "--";
-  }
-
-  return new Intl.DateTimeFormat(undefined, {
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit"
-  }).format(new Date(value));
 }
 
 // ---------------------------------------------------------------------------

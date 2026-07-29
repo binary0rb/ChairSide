@@ -1,7 +1,8 @@
 {
   "name": "chairside",
   "scripts": {
-    "lint": "eslint src/ChairSide.Board/wwwroot"
+    "lint": "eslint src/ChairSide.Board/wwwroot",
+    "test:leaf-utilities": "node --test tests/javascript/leaf-utilities.test.mjs"
   },
   "private": true,
   "devDependencies": {
