@@ -1,7 +1,7 @@
 ﻿{
     "generatedStamp":  "deterministic",
     "root":  ".",
-    "fileCount":  152,
+    "fileCount":  156,
     "files":  [
                   {
                       "path":  ".github/pull_request_template.md",
@@ -869,7 +869,7 @@
                   {
                       "path":  "package.json",
                       "kind":  "Json",
-                      "sizeBytes":  663,
+                      "sizeBytes":  846,
                       "typeSymbols":  [
 
                                       ],
@@ -2714,7 +2714,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/board.js",
                       "kind":  "JavaScript",
-                      "sizeBytes":  177497,
+                      "sizeBytes":  172940,
                       "typeSymbols":  [
 
                                       ],
@@ -2802,7 +2802,15 @@
                                               "formatAbsoluteMinutes",
                                               "formatSignedMinutes",
                                               "renderDoctorAllocationRow",
-                                              "renderProcedureAllocation"
+                                              "renderProcedureAllocation",
+                                              "renderProcedureAllocationRow",
+                                              "describeAllocation",
+                                              "formatAverageVariancePerCase",
+                                              "varianceClass",
+                                              "renderVarianceBadge",
+                                              "renderAverageVarianceBadge",
+                                              "renderReportFilterBar",
+                                              "syncReportFilterButtons"
                                           ],
                       "headings":  [
 
@@ -2835,9 +2843,40 @@
                                    ]
                   },
                   {
+                      "path":  "src/ChairSide.Board/wwwroot/common-interactions.js",
+                      "kind":  "JavaScript",
+                      "sizeBytes":  2750,
+                      "typeSymbols":  [
+
+                                      ],
+                      "methodSymbols":  [
+
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+                                              "clearReportPress",
+                                              "wirePressInterruptionGuard",
+                                              "clearTilePress",
+                                              "completeTilePress",
+                                              "wireTileGroup",
+                                              "wireTilePressCleanup"
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
                       "path":  "src/ChairSide.Board/wwwroot/connection-status.js",
                       "kind":  "JavaScript",
-                      "sizeBytes":  3223,
+                      "sizeBytes":  3318,
                       "typeSymbols":  [
 
                                       ],
@@ -3028,7 +3067,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/realtime-polling.js",
                       "kind":  "JavaScript",
-                      "sizeBytes":  2613,
+                      "sizeBytes":  2713,
                       "typeSymbols":  [
 
                                       ],
@@ -3083,7 +3122,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/request-utils.js",
                       "kind":  "JavaScript",
-                      "sizeBytes":  1481,
+                      "sizeBytes":  1538,
                       "typeSymbols":  [
 
                                       ],
@@ -3158,6 +3197,33 @@
                                        ],
                       "scriptFunctions":  [
 
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
+                      "path":  "src/ChairSide.Board/wwwroot/runtime-scheduling.js",
+                      "kind":  "JavaScript",
+                      "sizeBytes":  382,
+                      "typeSymbols":  [
+
+                                      ],
+                      "methodSymbols":  [
+
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+                                              "registerReportRefresh",
+                                              "registerGeneralRender"
                                           ],
                       "headings":  [
 
@@ -3679,7 +3745,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/BoardStoreReadinessTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  13547,
+                      "sizeBytes":  13563,
                       "typeSymbols":  [
                                           "BoardStoreTests"
                                       ],
@@ -5192,9 +5258,39 @@
                                    ]
                   },
                   {
+                      "path":  "tests/javascript/common-interactions.test.mjs",
+                      "kind":  "JavaScript",
+                      "sizeBytes":  9942,
+                      "typeSymbols":  [
+
+                                      ],
+                      "methodSymbols":  [
+
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+                                              "createTimerHarness",
+                                              "closestTarget",
+                                              "tile",
+                                              "importModule",
+                                              "createHarness"
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
                       "path":  "tests/javascript/connection-status.test.mjs",
                       "kind":  "JavaScript",
-                      "sizeBytes":  15508,
+                      "sizeBytes":  15950,
                       "typeSymbols":  [
 
                                       ],
@@ -5249,7 +5345,7 @@
                   {
                       "path":  "tests/javascript/page-context-state.test.mjs",
                       "kind":  "JavaScript",
-                      "sizeBytes":  6917,
+                      "sizeBytes":  6886,
                       "typeSymbols":  [
 
                                       ],
@@ -5275,7 +5371,7 @@
                   {
                       "path":  "tests/javascript/realtime-polling.test.mjs",
                       "kind":  "JavaScript",
-                      "sizeBytes":  14168,
+                      "sizeBytes":  14660,
                       "typeSymbols":  [
 
                                       ],
@@ -5305,7 +5401,7 @@
                   {
                       "path":  "tests/javascript/request-utils.test.mjs",
                       "kind":  "JavaScript",
-                      "sizeBytes":  5582,
+                      "sizeBytes":  5737,
                       "typeSymbols":  [
 
                                       ],
@@ -5323,6 +5419,32 @@
                                        ],
                       "scriptFunctions":  [
 
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
+                      "path":  "tests/javascript/runtime-scheduling.test.mjs",
+                      "kind":  "JavaScript",
+                      "sizeBytes":  3356,
+                      "typeSymbols":  [
+
+                                      ],
+                      "methodSymbols":  [
+
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+                                              "importModule"
                                           ],
                       "headings":  [
 
