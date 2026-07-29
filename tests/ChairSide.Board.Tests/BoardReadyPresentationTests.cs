@@ -185,6 +185,7 @@ public sealed class BoardReadyPresentationTests
     {
         var root = FindRepositoryRoot();
         var boardScript = File.ReadAllText(Path.Combine(root, "src", "ChairSide.Board", "wwwroot", "board.js"));
+        var roomWorkflowScript = File.ReadAllText(Path.Combine(root, "src", "ChairSide.Board", "wwwroot", "room-workflow.js"));
         var styles = File.ReadAllText(Path.Combine(root, "src", "ChairSide.Board", "wwwroot", "styles.css"));
         var genericRoom = File.ReadAllText(Path.Combine(root, "src", "ChairSide.Board", "wwwroot", "room.html"));
         var roomOne = File.ReadAllText(Path.Combine(root, "src", "ChairSide.Board", "wwwroot", "room-1.html"));
@@ -201,20 +202,21 @@ public sealed class BoardReadyPresentationTests
         });
         Assert.Contains("/styles.css?v=20260722-primary-workflow-action-colors", genericRoom, StringComparison.Ordinal);
         Assert.Contains("/styles.css?v=20260722-primary-workflow-action-colors", roomOne, StringComparison.Ordinal);
-        Assert.Contains("function roomCapabilities(room)", boardScript, StringComparison.Ordinal);
-        Assert.Contains("function setNextPrimaryAction(room)", boardScript, StringComparison.Ordinal);
-        Assert.Contains("room?.capabilities?.canBeginPrestage === true", boardScript, StringComparison.Ordinal);
-        Assert.Contains("room?.capabilities?.canDoctorComplete === true", boardScript, StringComparison.Ordinal);
-        Assert.Contains("draft.confirmedValue !== null", boardScript, StringComparison.Ordinal);
-        Assert.Contains("document.getElementById(id)?.classList.toggle(\"is-next-action\", id === nextActionId);", boardScript, StringComparison.Ordinal);
+        Assert.Contains("createRoomWorkflow", boardScript, StringComparison.Ordinal);
+        Assert.Contains("function roomCapabilities(room)", roomWorkflowScript, StringComparison.Ordinal);
+        Assert.Contains("function setNextPrimaryAction(room)", roomWorkflowScript, StringComparison.Ordinal);
+        Assert.Contains("room?.capabilities?.canBeginPrestage === true", roomWorkflowScript, StringComparison.Ordinal);
+        Assert.Contains("room?.capabilities?.canDoctorComplete === true", roomWorkflowScript, StringComparison.Ordinal);
+        Assert.Contains("assignmentDraft.confirmedValue !== null", roomWorkflowScript, StringComparison.Ordinal);
+        Assert.Contains("document.getElementById(id)?.classList.toggle(\"is-next-action\", id === nextActionId);", roomWorkflowScript, StringComparison.Ordinal);
         Assert.All(primaryActionIds, id =>
-            Assert.Contains($"nextActionId = \"{id}\";", boardScript, StringComparison.Ordinal));
-        Assert.DoesNotContain("activeSeatedStates", boardScript, StringComparison.Ordinal);
-        Assert.DoesNotContain("cancelableStates", boardScript, StringComparison.Ordinal);
-        Assert.DoesNotContain("doctorArrivedStates", boardScript, StringComparison.Ordinal);
+            Assert.Contains($"nextActionId = \"{id}\";", roomWorkflowScript, StringComparison.Ordinal));
+        Assert.DoesNotContain("activeSeatedStates", roomWorkflowScript, StringComparison.Ordinal);
+        Assert.DoesNotContain("cancelableStates", roomWorkflowScript, StringComparison.Ordinal);
+        Assert.DoesNotContain("doctorArrivedStates", roomWorkflowScript, StringComparison.Ordinal);
         Assert.Contains(
             "const action = capabilities.canCancelPrestage ? \"cancel-prestage\" : \"cancel-seating\";",
-            boardScript,
+            roomWorkflowScript,
             StringComparison.Ordinal);
         Assert.Matches(
             "(?s)\\.primary-action-grid \\.is-next-action:not\\(:disabled\\)\\s*\\{[^}]*border-color:\\s*#15803d;[^}]*background:\\s*#15803d;[^}]*color:\\s*#ffffff;",

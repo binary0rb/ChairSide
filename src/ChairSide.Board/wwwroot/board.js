@@ -5,20 +5,17 @@ import {
   updateConnectionStatus
 } from "./connection-status.js";
 import {
-  wirePressInterruptionGuard,
-  wireTileGroup,
-  wireTilePressCleanup
+  wirePressInterruptionGuard
 } from "./common-interactions.js";
-import { escapeAttribute, escapeHtml, setDisabled, setHidden } from "./dom-utils.js";
+import { escapeAttribute, escapeHtml } from "./dom-utils.js";
 import { formatDateTime, formatDuration } from "./format-utils.js";
 import { pageContext } from "./page-context.js";
 import { connectRealtime, registerBoardPolling } from "./realtime-polling.js";
 import { createRoomCardPresentation } from "./room-card.js";
+import { createRoomWorkflow } from "./room-workflow.js";
 import {
   adminRequestHeaders,
   clearAdminToken,
-  mutationHeaders,
-  readErrorMessage,
   storeAdminToken
 } from "./request-utils.js";
 import {
@@ -46,6 +43,24 @@ const {
     formatCode: formatProcedureCode,
     hasSedationModifier,
     renderEmptyIcon,
+    renderIcon: renderProcedureIcon,
+    resolveAccent: resolveProcedureAccent,
+    stripSedationModifier
+  }
+});
+
+const roomWorkflow = createRoomWorkflow({
+  getSnapshot: () => app.snapshot,
+  getRoomNumber: () => app.roomNumber,
+  getRoomId,
+  normalizeState,
+  isTilePressActive: () => app.tilePressActive,
+  isDemoTimerEnabled,
+  applyRoomMutation: applyRoomMutationToSnapshot,
+  showRoomTokenPrompt,
+  procedure: {
+    fromCode: procedureFromCode,
+    hasSedationModifier,
     renderIcon: renderProcedureIcon,
     resolveAccent: resolveProcedureAccent,
     stripSedationModifier
@@ -122,8 +137,8 @@ async function boot() {
   registerConnectionStatusRefresh();
   updateConnectionStatus();
 
-  if (pageContext.isRoom) {
-    wireRoomPanel();
+  if (pageContext.isRoom && !isStaffLoungeRoom()) {
+    roomWorkflow.wire();
   }
   loadVersionBadge();
 }
@@ -587,18 +602,10 @@ function renderRoomPanel() {
 
   title.textContent = `Room ${app.roomNumber}`;
   status.innerHTML = room ? renderRoomTile(room, true) : renderInvalidRoomMessage();
-  // While the user is actively pressing a tile, do not re-sync selection from the
-  // polled room state or rebuild the tiles. The press completes on pointerup; the
-  // next tick (<=1s later) resumes normal syncing.
-  if (!app.tilePressActive) {
-    syncRoomSelection(room);
-    renderSelectionTiles(room);
-  }
-  renderAssignmentGuidance(room);
+  roomWorkflow.render(room);
   renderRoomTokenPrompt();
   applyDemoTimerVisibility();
   populateDemoTimerSelect();
-  setRoomControlsEnabled(room);
 }
 
 function isStaffLoungeRoom() {
@@ -2633,7 +2640,7 @@ function wireRoomTokenPrompt() {
     saveRoomToken(token);
     app.roomTokenPromptVisible = false;
     renderRoomTokenPrompt();
-    setRoomActionStatus("Room token saved. Try the action again.", "success");
+    roomWorkflow.setStatus("Room token saved. Try the action again.", "success");
   });
 
   clearButton?.addEventListener("click", () => {
@@ -2641,7 +2648,7 @@ function wireRoomTokenPrompt() {
     app.roomToken = "";
     app.roomTokenPromptVisible = true;
     renderRoomTokenPrompt();
-    setRoomActionStatus("Room token cleared.", "pending");
+    roomWorkflow.setStatus("Room token cleared.", "pending");
   });
 }
 
@@ -2653,7 +2660,7 @@ function showRoomTokenPrompt(statusCode) {
 
   app.roomTokenPromptVisible = true;
   renderRoomTokenPrompt();
-  setRoomActionStatus(
+  roomWorkflow.setStatus(
     statusCode === 403
       ? "Room token was rejected. Enter the current room access token."
       : "Room access token required.",
@@ -2804,80 +2811,6 @@ function renderInvalidRoomMessage() {
   `;
 }
 
-function roomCapabilities(room) {
-  return {
-    canBeginPrestage: room?.capabilities?.canBeginPrestage === true,
-    canEditAssignment: room?.capabilities?.canEditAssignment === true,
-    canSaveDetails: room?.capabilities?.canSaveDetails === true,
-    canSeat: room?.capabilities?.canSeat === true,
-    canCancelPrestage: room?.capabilities?.canCancelPrestage === true,
-    canCancelSeating: room?.capabilities?.canCancelSeating === true,
-    canReady: room?.capabilities?.canReady === true,
-    canWithdrawReady: room?.capabilities?.canWithdrawReady === true,
-    canDoctorArrive: room?.capabilities?.canDoctorArrive === true,
-    canDoctorComplete: room?.capabilities?.canDoctorComplete === true,
-    canRoomAvailable: room?.capabilities?.canRoomAvailable === true
-  };
-}
-
-function setRoomControlsEnabled(room) {
-  const capabilities = roomCapabilities(room);
-  const isDirty = capabilities.canEditAssignment && isAssignmentDraftDirty(room);
-  const canCancel = capabilities.canCancelPrestage || capabilities.canCancelSeating;
-
-  setDisabled(document.getElementById("demoElapsedSelect"), !capabilities.canBeginPrestage || !isDemoTimerEnabled());
-  setDisabled(document.getElementById("beginPrestageButton"), !capabilities.canBeginPrestage);
-  setDisabled(document.getElementById("seatButton"), !capabilities.canSeat);
-  setDisabled(document.getElementById("readyForDoctorButton"), !capabilities.canReady);
-  setDisabled(document.getElementById("saveDetailsButton"), !capabilities.canSaveDetails || !isDirty);
-  setDisabled(document.getElementById("discardChangesButton"), !isDirty);
-  setDisabled(document.getElementById("withdrawReadyButton"), !capabilities.canWithdrawReady);
-  setDisabled(document.getElementById("cancelSeatingButton"), !canCancel);
-  setDisabled(document.getElementById("doctorArrivedButton"), !capabilities.canDoctorArrive);
-  setDisabled(document.getElementById("doctorCompleteButton"), !capabilities.canDoctorComplete);
-  setDisabled(document.getElementById("roomAvailableButton"), !capabilities.canRoomAvailable);
-  setHidden(document.getElementById("saveDetailsButton"), !isDirty);
-  setHidden(document.getElementById("discardChangesButton"), !isDirty);
-  setHidden(document.getElementById("withdrawReadyButton"), !capabilities.canWithdrawReady);
-  setHidden(document.getElementById("cancelSeatingButton"), !canCancel);
-  setNextPrimaryAction(room);
-}
-
-function setNextPrimaryAction(room) {
-  const capabilities = roomCapabilities(room);
-  const draft = draftAssignmentShape();
-  const draftCanBecomeReady = Boolean(
-    draft.doctorId
-    && draft.procedureCode
-    && draft.confirmedValue !== null);
-  let nextActionId = null;
-
-  if (capabilities.canBeginPrestage) {
-    nextActionId = "beginPrestageButton";
-  } else if (capabilities.canSeat) {
-    nextActionId = "seatButton";
-  } else if (capabilities.canReady && draftCanBecomeReady) {
-    nextActionId = "readyForDoctorButton";
-  } else if (capabilities.canDoctorArrive) {
-    nextActionId = "doctorArrivedButton";
-  } else if (capabilities.canDoctorComplete) {
-    nextActionId = "doctorCompleteButton";
-  } else if (capabilities.canRoomAvailable) {
-    nextActionId = "roomAvailableButton";
-  }
-
-  [
-    "beginPrestageButton",
-    "seatButton",
-    "readyForDoctorButton",
-    "doctorArrivedButton",
-    "doctorCompleteButton",
-    "roomAvailableButton"
-  ].forEach(id => {
-    document.getElementById(id)?.classList.toggle("is-next-action", id === nextActionId);
-  });
-}
-
 function procedureFromCode(procedureCode) {
   if (!procedureCode || !app.snapshot) {
     return null;
@@ -3003,198 +2936,6 @@ function renderHelpIcon(helpText, placement) {
   </span>`;
 }
 
-function syncRoomSelection(room) {
-  const assignment = canonicalAssignmentFromRoom(room);
-  const signature = canonicalAssignmentSignature(assignment);
-  const context = room
-    ? `${getRoomId(room)}:${room.episodeId || room.prestageStartedAt || "available"}:${signature}`
-    : `invalid:${app.roomNumber}`;
-  if (app.selectionContext === context) {
-    return;
-  }
-
-  app.selectionContext = context;
-  app.persistedAssignmentSignature = signature;
-  app.selectedDoctorId = assignment?.doctorId || null;
-  app.selectedProcedureId = assignment?.procedureCode || null;
-  app.sedationOn = assignment?.sedation?.state === "EligibleYes";
-  const allocation = assignment?.expectedAllocation;
-  app.expectedUnits = allocation?.confirmedValue ?? allocation?.suggestedValue ?? null;
-  app.expectedUnitsConfirmed = allocation?.state === "ConfirmedSuggestedValue"
-    || allocation?.state === "ConfirmedAdjustedValue";
-  app.expectedUnitsManual = allocation?.state === "ConfirmedAdjustedValue";
-  app.expectedUnitsProcedureCode = app.selectedProcedureId;
-  app.expectedUnitsSedation = app.sedationOn;
-}
-
-function canonicalAssignmentFromRoom(room) {
-  if (room?.assignment) {
-    return room.assignment;
-  }
-  if (!room?.assignedDoctor && !room?.procedureCode) {
-    return null;
-  }
-
-  // Pre-canonical active rows can carry truthful display fields without the durable state needed
-  // for a canonical handoff. Restore only those known values for read-only presentation; never
-  // invent allocation confirmation or treat the row as editable/Ready-capable.
-  const procedureCode = stripSedationModifier(room?.procedureCode) || null;
-  const procedure = procedureFromCode(procedureCode);
-  const sedationState = !procedure
-    ? "UnavailableNoProcedure"
-    : procedure.sedationEligible
-      ? (hasSedationModifier(room?.procedureCode) ? "EligibleYes" : "EligibleUnresolved")
-      : "UnavailableProcedureIneligible";
-  return {
-    doctorId: room?.assignedDoctor || null,
-    procedureCode,
-    sedation: { state: sedationState },
-    expectedAllocation: { state: "Unknown", suggestedValue: null, confirmedValue: null },
-    completeness: "Partial"
-  };
-}
-
-function canonicalAssignmentSignature(assignment) {
-  if (!assignment) {
-    return "unavailable";
-  }
-
-  return JSON.stringify({
-    doctorId: assignment.doctorId || null,
-    procedureCode: assignment.procedureCode || null,
-    sedationState: assignment.sedation?.state || null,
-    allocationState: assignment.expectedAllocation?.state || null,
-    suggestedValue: assignment.expectedAllocation?.suggestedValue ?? null,
-    confirmedValue: assignment.expectedAllocation?.confirmedValue ?? null
-  });
-}
-
-function draftAssignmentShape() {
-  const procedure = procedureFromCode(app.selectedProcedureId);
-  const procedureCode = procedure?.code || null;
-  const suggestedValue = procedureCode ? selectedProcedureDefaultUnits() : null;
-  const confirmedValue = procedureCode && app.expectedUnitsConfirmed
-    ? clampExpectedUnits(app.expectedUnits ?? suggestedValue)
-    : null;
-  let sedationState = "UnavailableNoProcedure";
-  if (procedure) {
-    sedationState = procedure.sedationEligible
-      ? (app.sedationOn ? "EligibleYes" : "EligibleNo")
-      : "UnavailableProcedureIneligible";
-  }
-  let allocationState = "Unknown";
-  if (procedureCode) {
-    allocationState = confirmedValue === null
-      ? "Suggested"
-      : confirmedValue === suggestedValue
-        ? "ConfirmedSuggestedValue"
-        : "ConfirmedAdjustedValue";
-  }
-
-  return {
-    doctorId: app.selectedDoctorId || null,
-    procedureCode,
-    sedationState,
-    allocationState,
-    suggestedValue,
-    confirmedValue
-  };
-}
-
-function draftAssignmentSignature() {
-  return JSON.stringify(draftAssignmentShape());
-}
-
-function isAssignmentDraftDirty(room = getCurrentRoom()) {
-  return canEditAssignment(room) && draftAssignmentSignature() !== app.persistedAssignmentSignature;
-}
-
-function discardAssignmentDraft() {
-  app.selectionContext = null;
-  syncRoomSelection(getCurrentRoom());
-  renderSelectionTiles(getCurrentRoom());
-  renderAssignmentGuidance(getCurrentRoom());
-  setRoomControlsEnabled(getCurrentRoom());
-}
-
-function canonicalAssignmentRequest() {
-  const procedure = procedureFromCode(app.selectedProcedureId);
-  return {
-    doctorId: app.selectedDoctorId || null,
-    procedureCode: procedure?.code || null,
-    sedationChoice: procedure?.sedationEligible && app.sedationOn ? "yes" : null,
-    confirmedExpectedAllocationUnits: procedure && app.expectedUnitsConfirmed
-      ? clampExpectedUnits(app.expectedUnits ?? selectedProcedureDefaultUnits())
-      : null
-  };
-}
-
-function focusFirstUnresolvedAssignmentControl() {
-  const draft = draftAssignmentShape();
-  const target = !draft.doctorId
-    ? document.querySelector("#doctorTiles [data-doctor-id]:not(:disabled)")
-    : !draft.procedureCode
-      ? document.querySelector("#procedureTiles [data-procedure-id]:not(:disabled)")
-      : draft.confirmedValue === null
-        ? document.getElementById("allocationConfirm")
-        : null;
-
-  target?.focus();
-}
-
-function renderAssignmentGuidance(room) {
-  const target = document.getElementById("assignmentGuidance");
-  if (!target || !room) {
-    return;
-  }
-  const faults = room.integrityFaults || [];
-  if (faults.length) {
-    target.textContent = "Assignment integrity requires review before this room can progress.";
-    target.dataset.tone = "error";
-    return;
-  }
-  const state = normalizeState(room);
-  if (isLegacyActiveRoom(room)) {
-    target.textContent = "This pre-canonical room remains visible but cannot issue a canonical handoff. Cancel seating, then begin a new Prestaging episode.";
-    target.dataset.tone = "error";
-    return;
-  }
-  if (state === "empty") {
-    target.textContent = "Begin Prestage to start room preparation. Assignment details can follow.";
-    target.dataset.tone = "neutral";
-    return;
-  }
-  const capabilities = roomCapabilities(room);
-  if (room.assignmentLocked || capabilities.canWithdrawReady || state === "doctor-in-room" || state === "turnover") {
-    target.textContent = capabilities.canWithdrawReady
-      ? "Assignment locked for the active Ready handoff. Withdraw Ready to make a correction."
-      : "Assignment locked.";
-    target.dataset.tone = "neutral";
-    return;
-  }
-  const draft = draftAssignmentShape();
-  if (!draft.doctorId && !draft.procedureCode) {
-    target.textContent = state === "seated"
-      ? "Assignment pending. Complete details before Ready for Doctor."
-      : "Assignment pending. Details may be added now or after seating.";
-    target.dataset.tone = "neutral";
-    return;
-  }
-  const unresolved = [];
-  if (!draft.doctorId) unresolved.push("doctor");
-  if (!draft.procedureCode) unresolved.push("procedure");
-  if (draft.procedureCode && draft.confirmedValue === null) unresolved.push("allocation confirmation");
-  if (unresolved.length) {
-    target.textContent = `Details pending: ${unresolved.join(", ")}.`;
-    target.dataset.tone = "neutral";
-    return;
-  }
-  target.textContent = isAssignmentDraftDirty(room)
-    ? "Details ready. Save them now or continue with the next lifecycle action."
-    : "Assignment details complete.";
-  target.dataset.tone = "success";
-}
-
 function hasSedationModifier(code) {
   return /\+SED$/i.test(String(code || ""));
 }
@@ -3263,323 +3004,6 @@ function procedureAccentStyle(code) {
   return accent ? `--procedure-accent: ${accent}` : "";
 }
 
-function renderSelectionTiles(room) {
-  renderDoctorTiles(room);
-  renderProcedureTiles(room);
-  renderSedationToggle(room);
-  renderAllocationSelector(room);
-}
-
-// Expected allocation bounds (1 unit = 10 minutes). Mirrors the server-side clamp in
-// DemoBoardStore so a value never disagrees between the stepper and the stored snapshot.
-const EXPECTED_UNITS_MIN = 1;
-const EXPECTED_UNITS_MAX = 24;
-const MINUTES_PER_UNIT = 10;
-
-function clampExpectedUnits(units) {
-  const value = Math.round(Number(units));
-  if (!Number.isFinite(value)) {
-    return EXPECTED_UNITS_MIN;
-  }
-
-  return Math.min(EXPECTED_UNITS_MAX, Math.max(EXPECTED_UNITS_MIN, value));
-}
-
-function isVariableProcedure(procedure) {
-  return String(procedure?.allocationBehavior || "").toLowerCase() === "variable";
-}
-
-// Default expected units for the currently selected procedure, clamped and defended against
-// missing roster metadata (falls back to the minimum).
-function selectedProcedureDefaultUnits() {
-  const procedure = procedureFromCode(app.selectedProcedureId);
-  const raw = Number(procedure?.defaultExpectedUnits);
-  return clampExpectedUnits(Number.isFinite(raw) && raw > 0 ? raw : EXPECTED_UNITS_MIN);
-}
-
-// Re-seeds app.expectedUnits from the selected procedure default when the procedure changes
-// (always) or when sedation changes and units have not been manually adjusted. A manual
-// adjustment otherwise survives live re-renders.
-function syncExpectedUnits() {
-  const procedureCode = app.selectedProcedureId || null;
-  if (!procedureCode) {
-    app.expectedUnits = null;
-    app.expectedUnitsManual = false;
-    app.expectedUnitsProcedureCode = null;
-    app.expectedUnitsSedation = false;
-    return;
-  }
-
-  const procedureChanged = procedureCode !== app.expectedUnitsProcedureCode;
-  const sedationChanged = app.sedationOn !== app.expectedUnitsSedation;
-
-  if (app.expectedUnits === null || procedureChanged) {
-    app.expectedUnits = selectedProcedureDefaultUnits();
-    app.expectedUnitsManual = false;
-    if (procedureChanged) {
-      app.expectedUnitsConfirmed = false;
-    }
-  } else if (sedationChanged && !app.expectedUnitsManual) {
-    app.expectedUnits = selectedProcedureDefaultUnits();
-  }
-
-  app.expectedUnitsProcedureCode = procedureCode;
-  app.expectedUnitsSedation = app.sedationOn;
-}
-
-// Renders the expected allocation suggestion/confirmation. It stays editable throughout
-// Prestaging and Seated / In Prep, then becomes read-only at the Ready handoff boundary.
-function renderAllocationSelector(room) {
-  const section = document.getElementById("allocationSection");
-  if (!section) {
-    return;
-  }
-
-  syncExpectedUnits();
-
-  const editing = canEditAssignment(room);
-  if (editing && !app.selectedProcedureId) {
-    section.hidden = true;
-    section.classList.remove("allocation-variable");
-    return;
-  }
-  let units;
-  if (editing) {
-    units = app.expectedUnits ?? selectedProcedureDefaultUnits();
-  } else {
-    const persisted = Number(room?.assignment?.expectedAllocation?.confirmedValue
-      ?? room?.assignment?.expectedAllocation?.suggestedValue);
-    units = Number.isFinite(persisted) && persisted > 0 ? persisted : null;
-  }
-
-  if (units === null) {
-    section.hidden = true;
-    section.classList.remove("allocation-variable");
-    return;
-  }
-
-  section.hidden = false;
-  const minutes = units * MINUTES_PER_UNIT;
-
-  const unitsEl = document.getElementById("allocationUnits");
-  const minutesEl = document.getElementById("allocationMinutes");
-  const hintEl = document.getElementById("allocationHint");
-  const minusBtn = document.getElementById("allocationMinus");
-  const plusBtn = document.getElementById("allocationPlus");
-
-  if (unitsEl) {
-    unitsEl.textContent = `${units} ${units === 1 ? "unit" : "units"}`;
-  }
-
-  if (minutesEl) {
-    minutesEl.textContent = `${minutes} min`;
-  }
-
-  const variable = isVariableProcedure(procedureFromCode(app.selectedProcedureId));
-  section.classList.toggle("allocation-variable", editing && variable);
-
-  if (hintEl) {
-    hintEl.textContent = !editing
-      ? "Confirmed for the locked assignment."
-      : app.expectedUnitsConfirmed
-        ? "Allocation confirmed. Adjusting the units keeps the new value confirmed."
-      : variable
-        ? `Suggested: ${units} ${units === 1 ? "unit" : "units"}. Confirm or adjust.`
-        : `Suggested: ${units} ${units === 1 ? "unit" : "units"}. Confirm to continue.`;
-  }
-
-  if (minusBtn) {
-    minusBtn.disabled = !editing || units <= EXPECTED_UNITS_MIN;
-  }
-
-  if (plusBtn) {
-    plusBtn.disabled = !editing || units >= EXPECTED_UNITS_MAX;
-  }
-
-  const confirm = document.getElementById("allocationConfirm");
-  if (confirm) {
-    confirm.hidden = !editing || app.expectedUnitsConfirmed;
-    confirm.disabled = !editing || app.expectedUnitsConfirmed;
-  }
-}
-
-// Adjusts expected units by delta while the assignment is editable, marking the value as manually set so a later
-// live re-render does not snap it back to the procedure default.
-function adjustExpectedUnits(delta) {
-  if (!canEditAssignment(getCurrentRoom())) {
-    return;
-  }
-
-  const base = app.expectedUnits ?? selectedProcedureDefaultUnits();
-  const next = clampExpectedUnits(base + delta);
-  if (next === app.expectedUnits) {
-    return;
-  }
-
-  app.expectedUnits = next;
-  app.expectedUnitsManual = true;
-  app.expectedUnitsConfirmed = true;
-  renderSelectionTiles(getCurrentRoom());
-  renderAssignmentGuidance(getCurrentRoom());
-  setRoomControlsEnabled(getCurrentRoom());
-}
-
-function renderDoctorTiles(room) {
-  const target = document.getElementById("doctorTiles");
-  if (!target) {
-    return;
-  }
-
-  const isEnabled = canEditAssignment(room);
-  const doctors = app.snapshot.doctors;
-  const signature = `doctor|${isEnabled}|${app.selectedDoctorId || ""}|`
-    + doctors.map(doctor => `${doctor.id}:${doctor.color}:${doctor.name}`).join(";");
-  setInnerHtmlIfChanged(target, doctors.map(doctor => `
-    <button
-      class="selection-tile doctor-tile ${doctor.id === app.selectedDoctorId ? "selected" : ""}"
-      style="--doctor-color: ${escapeAttribute(doctor.color)}"
-      type="button"
-      role="radio"
-      aria-checked="${doctor.id === app.selectedDoctorId}"
-      data-doctor-id="${escapeAttribute(doctor.id)}"
-      ${isEnabled ? "" : "disabled"}>
-      <span class="doctor-color-swatch"></span>
-      <span class="selection-copy">
-        <strong>${escapeHtml(doctor.name)}</strong>
-      </span>
-      ${doctor.id === app.selectedDoctorId ? `<span class="selected-indicator" aria-hidden="true">&#10003;</span>` : ""}
-    </button>
-  `).join(""), signature);
-}
-
-function renderProcedureTiles(room) {
-  const target = document.getElementById("procedureTiles");
-  if (!target) {
-    return;
-  }
-
-  const isEnabled = canEditAssignment(room);
-  // Sedation is never a standalone procedure tile; it is applied via the sedation
-  // toggle on eligible primary procedures. Filter it out defensively even if a roster
-  // were misconfigured to mark it active.
-  const procedures = app.snapshot.procedures.filter(procedure => !isSedationCode(procedure.code));
-  const signature = `procedure|${isEnabled}|${app.selectedProcedureId || ""}|`
-    + procedures.map(procedure => `${procedure.code}:${procedure.label}:${procedure.icon}:${resolveProcedureAccent(procedure.code)}`).join(";");
-  setInnerHtmlIfChanged(target, procedures.map(procedure => `
-    <button
-      class="selection-tile procedure-tile ${procedure.code === app.selectedProcedureId ? "selected" : ""}"
-      style="${procedureAccentStyle(procedure.code)}"
-      type="button"
-      role="radio"
-      aria-checked="${procedure.code === app.selectedProcedureId}"
-      data-procedure-id="${escapeAttribute(procedure.code)}"
-      ${isEnabled ? "" : "disabled"}>
-      ${renderProcedureIcon(procedure)}
-      <span class="selection-copy">
-        <strong>${escapeHtml(procedure.code)}</strong>
-        <small>${escapeHtml(procedure.label)}</small>
-      </span>
-      ${procedure.code === app.selectedProcedureId ? `<span class="selected-indicator" aria-hidden="true">&#10003;</span>` : ""}
-    </button>
-  `).join(""), signature);
-}
-
-function isSedationCode(code) {
-  return String(code || "").toUpperCase() === "SED";
-}
-
-function selectedProcedureIsSedationEligible() {
-  const procedure = procedureFromCode(app.selectedProcedureId);
-  return Boolean(procedure && procedure.sedationEligible);
-}
-
-// Renders the sedation modifier toggle. It is interactable throughout Prestaging and Seated,
-// and only for a sedation-eligible primary procedure; it defaults
-// Off and only turns on when staff explicitly tap it. When the assignment is locked it
-// shows the room's actual sedation status as read-only case metadata.
-function renderSedationToggle(room) {
-  const toggle = document.getElementById("sedationToggle");
-  if (!toggle) {
-    return;
-  }
-
-  const canEdit = canEditAssignment(room);
-  const eligible = selectedProcedureIsSedationEligible();
-  const stateName = room ? normalizeState(room) : "empty";
-  const assignmentLocked = room?.assignmentLocked === true
-    || (Boolean(room) && !canEdit && stateName !== "empty");
-  let interactable;
-  let isOn;
-
-  if (canEdit) {
-    // Seating / editing: the toggle reflects the in-progress choice and is tappable only
-    // for eligible procedures.
-    interactable = eligible;
-    if (!eligible) {
-      app.sedationOn = false;
-    }
-    isOn = eligible && app.sedationOn;
-  } else {
-    // Locked: prefer the canonical read contract. The mutation envelope intentionally returns
-    // the base procedure code, so the legacy +SED display decoration is only a fallback.
-    interactable = false;
-    isOn = room?.assignment?.sedation?.state === "EligibleYes"
-      || hasSedationModifier(room?.procedureCode);
-  }
-
-  toggle.disabled = !interactable;
-  toggle.classList.toggle("selected", isOn);
-  toggle.setAttribute("aria-checked", String(isOn));
-
-  const state = toggle.querySelector(".sedation-state");
-  if (state) {
-    state.textContent = isOn ? "On" : "Off";
-  }
-
-  const hint = toggle.querySelector(".sedation-hint");
-  if (hint) {
-    hint.textContent = assignmentLocked
-      ? "Locked with the Ready handoff"
-      : isLegacyActiveRoom(room)
-        ? "Legacy assignment is read-only until the room is restarted."
-      : !canEdit
-        ? "Available after Begin Prestage and an eligible procedure."
-      : eligible
-        ? "Optional modifier. Leave off when sedation is not used."
-        : "Not available for this procedure";
-  }
-}
-
-// True when the doctor / procedure / sedation selection controls are live. They remain
-// directly editable in Prestaging and Seated / In Prep and lock at Ready.
-function canEditAssignment(room) {
-  return roomCapabilities(room).canEditAssignment;
-}
-
-function isLegacyActiveRoom(room) {
-  return Boolean(room)
-    && (normalizeState(room) === "prestaging" || normalizeState(room) === "seated")
-    && !room.episodeId;
-}
-
-// Only writes innerHTML when the logical content actually changed. The room panel
-// re-renders on a 1s tick; rebuilding the selection tiles every tick would replace the
-// button under a slow press, so the native click (which needs pointerdown + pointerup on
-// the same node) never fires.
-//
-// We compare a caller-supplied signature instead of re-reading target.innerHTML: the
-// browser normalizes serialized markup (the "&#10003;" checkmark entity becomes "✓",
-// boolean attributes like "disabled" gain ="" ), so a string compare against innerHTML
-// would never match and would rewrite the tiles on every tick.
-function setInnerHtmlIfChanged(target, html, signature) {
-  if (target.dataset.renderKey === signature) {
-    return;
-  }
-
-  target.dataset.renderKey = signature;
-  target.innerHTML = html;
-}
-
 function populateDemoTimerSelect() {
   const demoElapsedSelect = document.getElementById("demoElapsedSelect");
   if (!demoElapsedSelect || demoElapsedSelect.options.length || !isDemoTimerEnabled()) {
@@ -3637,373 +3061,7 @@ function thresholdMinutes(value) {
   return (hours * 60) + minutes + (seconds / 60);
 }
 
-function wireRoomPanel() {
-  if (isStaffLoungeRoom()) {
-    return;
-  }
-
-  const beginPrestageButton = document.getElementById("beginPrestageButton");
-  const seatButton = document.getElementById("seatButton");
-  const readyForDoctorButton = document.getElementById("readyForDoctorButton");
-  const saveDetailsButton = document.getElementById("saveDetailsButton");
-  const discardChangesButton = document.getElementById("discardChangesButton");
-  const withdrawReadyButton = document.getElementById("withdrawReadyButton");
-  const cancelSeatingButton = document.getElementById("cancelSeatingButton");
-  const doctorArrivedButton = document.getElementById("doctorArrivedButton");
-  const doctorCompleteButton = document.getElementById("doctorCompleteButton");
-  const roomAvailableButton = document.getElementById("roomAvailableButton");
-
-  if (!beginPrestageButton || !seatButton || !readyForDoctorButton || !saveDetailsButton || !discardChangesButton || !withdrawReadyButton || !cancelSeatingButton || !doctorArrivedButton || !doctorCompleteButton || !roomAvailableButton) {
-    console.error("[ChairSide] Room panel buttons were not found.", {
-      beginPrestageButton,
-      seatButton,
-      readyForDoctorButton,
-      saveDetailsButton,
-      discardChangesButton,
-      withdrawReadyButton,
-      cancelSeatingButton,
-      doctorArrivedButton,
-      doctorCompleteButton,
-      roomAvailableButton
-    });
-    return;
-  }
-
-  console.log("[ChairSide] Room panel click handlers bound.", { roomNumber: app.roomNumber });
-  wireSelectionTiles();
-
-  beginPrestageButton.addEventListener("click", async () => {
-    if (!roomCapabilities(getCurrentRoom()).canBeginPrestage) {
-      setRoomActionStatus("Begin Prestage is only available when the room is available.", "error");
-      return;
-    }
-    setRoomActionStatus("Starting room preparation...", "pending");
-    try {
-      const result = await sendCanonicalRoomAction("prestage", {});
-      applyRoomMutationResult(result);
-      setRoomActionStatus("Prestaging started. Assignment details can be added now or after seating.", "success");
-    } catch (error) {
-      setRoomActionStatus(error.message || "Failed to begin Prestaging.", "error");
-    }
-  });
-
-  saveDetailsButton.addEventListener("click", async () => {
-    if (!canEditAssignment(getCurrentRoom()) || !isAssignmentDraftDirty()) {
-      return;
-    }
-    setRoomActionStatus("Saving details...", "pending");
-    try {
-      const result = await sendSaveDetails(canonicalAssignmentRequest());
-      applyRoomMutationResult(result);
-      setRoomActionStatus("Details saved.", "success");
-    } catch (error) {
-      setRoomActionStatus(error.message || "Failed to save details.", "error");
-    }
-  });
-
-  discardChangesButton.addEventListener("click", () => {
-    discardAssignmentDraft();
-    setRoomActionStatus("Changes discarded.", "pending");
-  });
-
-  seatButton.addEventListener("click", async () => {
-    if (!isConfiguredRoom(app.roomNumber)) {
-      setRoomActionStatus("This room is not configured.", "error");
-      return;
-    }
-
-    if (!roomCapabilities(getCurrentRoom()).canSeat) {
-      setRoomActionStatus("Seat Room is only available after Prestaging begins.", "error");
-      return;
-    }
-    setRoomActionStatus("Seating room...", "pending");
-
-    try {
-      const result = await sendSeatRoom(canonicalAssignmentRequest());
-      applyRoomMutationResult(result);
-      setRoomActionStatus("Room seated.", "success");
-    } catch (error) {
-      setRoomActionStatus(error.message || "Failed to seat room.", "error");
-    }
-  });
-
-  readyForDoctorButton.addEventListener("click", async () => {
-    if (!isConfiguredRoom(app.roomNumber)) {
-      setRoomActionStatus("This room is not configured.", "error");
-      return;
-    }
-
-    if (!roomCapabilities(getCurrentRoom()).canReady) {
-      setRoomActionStatus("Ready for Doctor is only available while the room is in prep (Patient Seated).", "error");
-      return;
-    }
-
-    console.log("[ChairSide] Ready for Doctor clicked.", { roomNumber: app.roomNumber });
-    setRoomActionStatus("Marking ready for doctor...", "pending");
-
-    try {
-      const result = await sendReadyForDoctor(canonicalAssignmentRequest());
-      applyRoomMutationResult(result);
-      setRoomActionStatus("Ready for doctor.", "success");
-    } catch (error) {
-      console.error("[ChairSide] Ready for Doctor failed.", { roomNumber: app.roomNumber, error });
-      setRoomActionStatus(error.message || "Failed to mark ready for doctor.", "error");
-      focusFirstUnresolvedAssignmentControl();
-    }
-  });
-
-  withdrawReadyButton.addEventListener("click", async () => {
-    if (!roomCapabilities(getCurrentRoom()).canWithdrawReady) {
-      setRoomActionStatus("Withdraw Ready is only available before Doctor Arrived.", "error");
-      return;
-    }
-    setRoomActionStatus("Withdrawing the active handoff...", "pending");
-    try {
-      const result = await sendCanonicalRoomAction("withdraw-ready", {});
-      applyRoomMutationResult(result);
-      setRoomActionStatus("Ready withdrawn. Details are editable again.", "success");
-    } catch (error) {
-      setRoomActionStatus(error.message || "Failed to withdraw Ready.", "error");
-    }
-  });
-
-  cancelSeatingButton.addEventListener("click", async () => {
-    if (!isConfiguredRoom(app.roomNumber)) {
-      setRoomActionStatus("This room is not configured.", "error");
-      return;
-    }
-
-    const capabilities = roomCapabilities(getCurrentRoom());
-    if (!capabilities.canCancelPrestage && !capabilities.canCancelSeating) {
-      setRoomActionStatus("Cancel Seating is only available before Doctor Arrived.", "error");
-      return;
-    }
-
-    const isConfirmed = window.confirm(`Cancel seating for Room ${app.roomNumber}? This will return the room to available without creating a report entry.`);
-    if (!isConfirmed) {
-      setRoomActionStatus("Cancel seating aborted.", "pending");
-      return;
-    }
-
-    console.log("[ChairSide] Cancel Seating clicked.", { roomNumber: app.roomNumber });
-    setRoomActionStatus("Canceling seating...", "pending");
-
-    try {
-      const action = capabilities.canCancelPrestage ? "cancel-prestage" : "cancel-seating";
-      const result = await sendRoomAction(app.roomNumber, action, "Cancel Seating");
-      applyRoomMutationResult(result);
-      console.log("[ChairSide] Cancel Seating succeeded.", { roomNumber: app.roomNumber });
-      setRoomActionStatus("Seating canceled. Room available.", "success");
-    } catch (error) {
-      console.error("[ChairSide] Cancel Seating failed.", { roomNumber: app.roomNumber, error });
-      setRoomActionStatus(error.message || "Failed to cancel seating.", "error");
-    }
-  });
-
-  doctorArrivedButton.addEventListener("click", async () => {
-    if (!isConfiguredRoom(app.roomNumber)) {
-      setRoomActionStatus("This room is not configured.", "error");
-      return;
-    }
-
-    if (!roomCapabilities(getCurrentRoom()).canDoctorArrive) {
-      setRoomActionStatus("Doctor Arrived is only available after Ready for Doctor.", "error");
-      return;
-    }
-
-    console.log("[ChairSide] Doctor Arrived clicked.", { roomNumber: app.roomNumber });
-    setRoomActionStatus("Marking doctor arrived...", "pending");
-
-    try {
-      const response = await fetch(`/api/rooms/${app.roomNumber}/doctor-arrived`, {
-        method: "POST",
-        headers: mutationHeaders()
-      });
-
-      if (response.ok) {
-        applyRoomMutationResult(await response.json());
-        console.log("[ChairSide] Doctor Arrived succeeded.", { roomNumber: app.roomNumber });
-        setRoomActionStatus("Doctor arrived.", "success");
-        return;
-      }
-
-      // The same doctor is already checked into another room. Offer to move them.
-      if (response.status === 409) {
-        await handleDoctorArrivalConflict(response);
-        return;
-      }
-
-      if (response.status === 401 || response.status === 403) {
-        showRoomTokenPrompt(response.status);
-      }
-
-      throw new Error(await readErrorMessage(response, `Doctor Arrived failed with HTTP ${response.status}.`));
-    } catch (error) {
-      console.error("[ChairSide] Doctor Arrived failed.", { roomNumber: app.roomNumber, error });
-      setRoomActionStatus(error.message || "Failed to mark doctor arrived.", "error");
-    }
-  });
-
-  doctorCompleteButton.addEventListener("click", async () => {
-    if (!isConfiguredRoom(app.roomNumber)) {
-      setRoomActionStatus("This room is not configured.", "error");
-      return;
-    }
-
-    if (!roomCapabilities(getCurrentRoom()).canDoctorComplete) {
-      setRoomActionStatus("Doctor Complete is only available when the doctor is in the room.", "error");
-      return;
-    }
-
-    console.log("[ChairSide] Doctor Complete clicked.", { roomNumber: app.roomNumber });
-    setRoomActionStatus("Marking doctor complete...", "pending");
-
-    try {
-      const result = await sendRoomAction(app.roomNumber, "doctor-complete", "Doctor Complete");
-      applyRoomMutationResult(result);
-      console.log("[ChairSide] Doctor Complete succeeded.", { roomNumber: app.roomNumber });
-      setRoomActionStatus("Doctor complete. Turnover started.", "success");
-    } catch (error) {
-      console.error("[ChairSide] Doctor Complete failed.", { roomNumber: app.roomNumber, error });
-      setRoomActionStatus(error.message || "Failed to mark doctor complete.", "error");
-    }
-  });
-
-  roomAvailableButton.addEventListener("click", async () => {
-    if (!isConfiguredRoom(app.roomNumber)) {
-      setRoomActionStatus("This room is not configured.", "error");
-      return;
-    }
-
-    if (!roomCapabilities(getCurrentRoom()).canRoomAvailable) {
-      setRoomActionStatus("Room Available is only available during turnover.", "error");
-      return;
-    }
-
-    console.log("[ChairSide] Room Available clicked.", { roomNumber: app.roomNumber });
-    setRoomActionStatus("Marking room available...", "pending");
-
-    try {
-      const result = await sendRoomAction(app.roomNumber, "available", "Room Available");
-      applyRoomMutationResult(result);
-      console.log("[ChairSide] Room Available succeeded.", { roomNumber: app.roomNumber });
-      setRoomActionStatus("Room available.", "success");
-    } catch (error) {
-      console.error("[ChairSide] Room Available failed.", { roomNumber: app.roomNumber, error });
-      setRoomActionStatus(error.message || "Failed to mark room available.", "error");
-    }
-  });
-}
-
-function wireSelectionTiles() {
-  const doctorTiles = document.getElementById("doctorTiles");
-  const procedureTiles = document.getElementById("procedureTiles");
-
-  wireTileGroup(doctorTiles, "[data-doctor-id]", "doctorId", button => {
-    app.selectedDoctorId = button.dataset.doctorId;
-    renderSelectionTiles(getCurrentRoom());
-    renderAssignmentGuidance(getCurrentRoom());
-    setRoomControlsEnabled(getCurrentRoom());
-  });
-
-  wireTileGroup(procedureTiles, "[data-procedure-id]", "procedureId", button => {
-    const procedureChanged = app.selectedProcedureId !== button.dataset.procedureId;
-    app.selectedProcedureId = button.dataset.procedureId;
-    if (procedureChanged) {
-      app.sedationOn = false;
-      app.expectedUnitsConfirmed = false;
-    }
-    renderSelectionTiles(getCurrentRoom());
-    renderAssignmentGuidance(getCurrentRoom());
-    setRoomControlsEnabled(getCurrentRoom());
-  });
-
-  wireTilePressCleanup(() => {
-    if (isAssignmentDraftDirty()) {
-      discardAssignmentDraft();
-      setRoomActionStatus("Changes discarded.", "pending");
-    }
-  });
-
-  const sedationToggle = document.getElementById("sedationToggle");
-  sedationToggle?.addEventListener("click", () => {
-    if (sedationToggle.disabled || !selectedProcedureIsSedationEligible()) {
-      return;
-    }
-
-    app.sedationOn = !app.sedationOn;
-    renderSelectionTiles(getCurrentRoom());
-    renderAssignmentGuidance(getCurrentRoom());
-    setRoomControlsEnabled(getCurrentRoom());
-  });
-
-  document.getElementById("allocationMinus")?.addEventListener("click", () => adjustExpectedUnits(-1));
-  document.getElementById("allocationPlus")?.addEventListener("click", () => adjustExpectedUnits(1));
-  document.getElementById("allocationConfirm")?.addEventListener("click", () => {
-    if (!canEditAssignment(getCurrentRoom()) || !app.selectedProcedureId) {
-      return;
-    }
-    app.expectedUnits = app.expectedUnits ?? selectedProcedureDefaultUnits();
-    app.expectedUnitsConfirmed = true;
-    renderSelectionTiles(getCurrentRoom());
-    renderAssignmentGuidance(getCurrentRoom());
-    setRoomControlsEnabled(getCurrentRoom());
-  });
-}
-
-function isConfiguredRoom(roomNumber) {
-  return app.snapshot.rooms.some(room => getRoomId(room) === roomNumber);
-}
-
-function getCurrentRoom() {
-  return app.snapshot?.rooms.find(room => getRoomId(room) === app.roomNumber) || null;
-}
-
-async function sendCanonicalRoomAction(action, body) {
-  return sendCanonicalMutation(`/api/rooms/${app.roomNumber}/${action}`, "POST", body, action);
-}
-
-async function sendSaveDetails(assignment) {
-  return sendCanonicalMutation(
-    `/api/rooms/${app.roomNumber}/assignment-details`,
-    "PUT",
-    assignment,
-    "save details");
-}
-
-async function sendSeatRoom(assignment) {
-  return sendCanonicalMutation(
-    `/api/rooms/${app.roomNumber}/seat`,
-    "POST",
-    { assignment },
-    "seat room");
-}
-
-async function sendReadyForDoctor(assignment) {
-  return sendCanonicalMutation(
-    `/api/rooms/${app.roomNumber}/ready-for-doctor`,
-    "POST",
-    { assignment },
-    "ready for doctor");
-}
-
-async function sendCanonicalMutation(url, method, body, label) {
-  const response = await fetch(url, {
-    method,
-    headers: mutationHeaders({ "Content-Type": "application/json" }),
-    body: JSON.stringify(body)
-  });
-  if (!response.ok) {
-    if (response.status === 401 || response.status === 403) {
-      showRoomTokenPrompt(response.status);
-    }
-    throw new Error(await readErrorMessage(response, `${label} failed with HTTP ${response.status}.`));
-  }
-  return response.json();
-}
-
-function applyRoomMutationResult(result) {
-  const room = result?.room || result;
+function applyRoomMutationToSnapshot(room) {
   if (!room || !app.snapshot?.rooms) {
     return;
   }
@@ -4013,90 +3071,9 @@ function applyRoomMutationResult(result) {
     return;
   }
   app.snapshot.rooms[index] = room;
-  app.selectionContext = null;
   app.lastSnapshotAt = Date.now();
   renderRoomPanel();
 }
-
-// Handles a 409 from the doctor-arrived endpoint: confirms with the user, then asks the server
-// to complete the conflicting room and arrive the current room. The server revalidates the
-// conflict, so a stale confirmation fails safely with a clear message.
-async function handleDoctorArrivalConflict(response) {
-  let conflict;
-  try {
-    conflict = await response.json();
-  } catch {
-    conflict = null;
-  }
-
-  if (!conflict || !conflict.conflictingRoomId) {
-    setRoomActionStatus("Doctor is already marked in another room. Refresh and try again.", "error");
-    return;
-  }
-
-  const doctorName = conflict.doctorDisplayName || "The doctor";
-  const oldRoom = conflict.conflictingRoomId;
-  const newRoom = app.roomNumber;
-  const confirmed = confirm(`${doctorName} is already marked in Room ${oldRoom}. Mark Doctor Complete for Room ${oldRoom} and move them to Room ${newRoom}?`);
-  if (!confirmed) {
-    setRoomActionStatus("Doctor Arrived canceled.", "error");
-    return;
-  }
-
-  setRoomActionStatus("Moving doctor...", "pending");
-  try {
-    const resolveResponse = await fetch(`/api/rooms/${newRoom}/doctor-arrived/resolve-conflict`, {
-      method: "POST",
-      headers: mutationHeaders({ "Content-Type": "application/json" }),
-      body: JSON.stringify({ conflictingRoomId: oldRoom })
-    });
-
-    if (resolveResponse.ok) {
-      setRoomActionStatus("Doctor moved. Previous room marked Doctor Complete.", "success");
-      return;
-    }
-
-    if (resolveResponse.status === 401 || resolveResponse.status === 403) {
-      showRoomTokenPrompt(resolveResponse.status);
-    }
-
-    // 409 here means the conflict changed underneath us; the board will refresh via live updates.
-    throw new Error(await readErrorMessage(resolveResponse, `Move failed with HTTP ${resolveResponse.status}.`));
-  } catch (error) {
-    console.error("[ChairSide] Resolve doctor conflict failed.", { roomNumber: newRoom, error });
-    setRoomActionStatus(error.message || "Could not move the doctor. Refresh and try again.", "error");
-  }
-}
-
-async function sendRoomAction(roomNumber, action, label) {
-  const payload = { roomNumber, action };
-  console.log(`[ChairSide] Sending ${label} payload.`, payload);
-  const response = await fetch(`/api/rooms/${roomNumber}/${action}`, {
-    method: "POST",
-    headers: mutationHeaders()
-  });
-
-  if (!response.ok) {
-    if (response.status === 401 || response.status === 403) {
-      showRoomTokenPrompt(response.status);
-    }
-
-    throw new Error(await readErrorMessage(response, `${label} failed with HTTP ${response.status}.`));
-  }
-
-  return response.json();
-}
-
-function setRoomActionStatus(message, tone) {
-  const target = document.getElementById("roomActionStatus");
-  if (!target) {
-    return;
-  }
-
-  target.textContent = message;
-  target.dataset.tone = tone;
-}
-
 // ---------------------------------------------------------------------------
 // Client-side diagnostic error capture.
 // Posts technical details to /api/client-errors.
