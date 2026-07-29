@@ -185,10 +185,10 @@ test("startup routing and awaited differences remain in board", () => {
     /if \(app\.pollHandle \|\| app\.tickHandle \|\| app\.statusHandle\) \{[\s\S]*?return;\s*\}/);
   assert.match(boardSource, /await loadBoard\(\);/);
   assert.match(boardSource, /if \(pageContext\.isReports\) \{[\s\S]*?await loadReports\(\);/);
-  assert.match(boardSource, /if \(pageContext\.isDoctor\) \{[\s\S]*?loadReports\(\);[\s\S]*?window\.setInterval\(loadReports, 60_000\);/);
-  assert.match(boardSource, /if \(pageContext\.isWorkshop\) \{[\s\S]*?loadReports\(\);[\s\S]*?window\.setInterval\(loadReports, 60_000\);/);
+  assert.match(boardSource, /if \(pageContext\.isDoctor\) \{[\s\S]*?loadReports\(\);[\s\S]*?registerReportRefresh\(loadReports\);/);
+  assert.match(boardSource, /if \(pageContext\.isWorkshop\) \{[\s\S]*?loadReports\(\);[\s\S]*?registerReportRefresh\(loadReports\);/);
   assert.match(boardSource, /registerBoardPolling\(loadBoard\);/);
-  assert.match(boardSource, /app\.tickHandle = window\.setInterval\(render, 1000\);/);
+  assert.match(boardSource, /registerGeneralRender\(render\);/);
   assert.match(boardSource, /registerConnectionStatusRefresh\(\);/);
   assert.match(boardSource, /\nboot\(\);\s*$/);
 });

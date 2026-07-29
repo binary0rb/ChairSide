@@ -2,11 +2,13 @@
   "name": "chairside",
   "scripts": {
     "lint": "eslint src/ChairSide.Board/wwwroot",
+    "test:common-interactions": "node --test tests/javascript/common-interactions.test.mjs",
     "test:connection-status": "node --test tests/javascript/connection-status.test.mjs",
     "test:leaf-utilities": "node --test tests/javascript/leaf-utilities.test.mjs",
     "test:page-context-state": "node --test tests/javascript/page-context-state.test.mjs",
     "test:request-utils": "node --test tests/javascript/request-utils.test.mjs",
-    "test:realtime-polling": "node --test tests/javascript/realtime-polling.test.mjs"
+    "test:realtime-polling": "node --test tests/javascript/realtime-polling.test.mjs",
+    "test:runtime-scheduling": "node --test tests/javascript/runtime-scheduling.test.mjs"
   },
   "private": true,
   "devDependencies": {

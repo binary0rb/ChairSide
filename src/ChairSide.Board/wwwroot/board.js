@@ -4,6 +4,11 @@ import {
   setConnectionStatus,
   updateConnectionStatus
 } from "./connection-status.js";
+import {
+  wirePressInterruptionGuard,
+  wireTileGroup,
+  wireTilePressCleanup
+} from "./common-interactions.js";
 import { escapeAttribute, escapeHtml, setDisabled, setHidden } from "./dom-utils.js";
 import { formatDateTime, formatDuration } from "./format-utils.js";
 import { pageContext } from "./page-context.js";
@@ -15,6 +20,10 @@ import {
   readErrorMessage,
   storeAdminToken
 } from "./request-utils.js";
+import {
+  registerGeneralRender,
+  registerReportRefresh
+} from "./runtime-scheduling.js";
 
 const stateNames = ["empty", "seated", "aging", "stale", "ready-for-doctor", "doctor-in-room", "turnover"];
 const staffLoungeRoomNumber = 99;
@@ -61,7 +70,7 @@ async function boot() {
     const mtd = computePresetRange("mtd");
     app.dateRange = { preset: "mtd", start: mtd.start, end: mtd.end };
     loadReports();
-    window.setInterval(loadReports, 60_000);
+    registerReportRefresh(loadReports);
     wireDoctorCockpitActions();
     wireDoctorCockpitPressGuard();
   }
@@ -73,7 +82,7 @@ async function boot() {
     const last30 = computePresetRange("last30");
     app.dateRange = { preset: "last30", start: last30.start, end: last30.end };
     loadReports();
-    window.setInterval(loadReports, 60_000);
+    registerReportRefresh(loadReports);
     wireWorkshopPresetSelection();
   }
 
@@ -87,7 +96,7 @@ async function boot() {
     loadBoard
   });
   registerBoardPolling(loadBoard);
-  app.tickHandle = window.setInterval(render, 1000);
+  registerGeneralRender(render);
   registerConnectionStatusRefresh();
   updateConnectionStatus();
 
@@ -2190,37 +2199,15 @@ function wireReportPressGuard() {
     return;
   }
 
-  shell.addEventListener("pointerdown", event => {
-    if (!event.target.closest("[data-report-doctor-id], [data-report-doctor-tab], .report-table button")) {
-      return;
+  wirePressInterruptionGuard({
+    pressTarget: shell,
+    selector: "[data-report-doctor-id], [data-report-doctor-tab], .report-table button",
+    onCatchUp: () => {
+      if (app.reports) {
+        renderReports();
+      }
     }
-    app.reportPressActive = true;
-    clearTimeout(reportPressFailsafe);
-    reportPressFailsafe = window.setTimeout(() => {
-      app.reportPressActive = false;
-      reportPressFailsafe = null;
-    }, 3000);
   });
-
-  // On pointerup/cancel, lift the guard and immediately run a catch-up render so any
-  // data that arrived during the press is shown without waiting for the next 1-second tick.
-  // This catch-up fires before the click event, so the click's own renderReports() call
-  // (triggered by handleReportsActionClick) still runs after with the freshly updated
-  // app state (e.g. new reportDoctorId) and is not blocked.
-  const clearPress = () => {
-    clearTimeout(reportPressFailsafe);
-    reportPressFailsafe = null;
-    if (!app.reportPressActive) {
-      return;
-    }
-    app.reportPressActive = false;
-    if (app.reports) {
-      renderReports();
-    }
-  };
-
-  document.addEventListener("pointerup", clearPress);
-  document.addEventListener("pointercancel", clearPress);
 }
 
 function wireDoctorCockpitActions() {
@@ -2241,32 +2228,15 @@ function wireDoctorCockpitActions() {
 // Delegated on document (the tabs live in the report-details region, not a single cockpit
 // wrapper) and filtered to tab elements, which only exist on this page.
 function wireDoctorCockpitPressGuard() {
-  document.addEventListener("pointerdown", event => {
-    if (!event.target.closest("[data-report-doctor-tab]")) {
-      return;
+  wirePressInterruptionGuard({
+    pressTarget: document,
+    selector: "[data-report-doctor-tab]",
+    onCatchUp: () => {
+      if (app.reports) {
+        renderDoctorView();
+      }
     }
-    app.reportPressActive = true;
-    clearTimeout(reportPressFailsafe);
-    reportPressFailsafe = window.setTimeout(() => {
-      app.reportPressActive = false;
-      reportPressFailsafe = null;
-    }, 3000);
   });
-
-  const clearPress = () => {
-    clearTimeout(reportPressFailsafe);
-    reportPressFailsafe = null;
-    if (!app.reportPressActive) {
-      return;
-    }
-    app.reportPressActive = false;
-    if (app.reports) {
-      renderDoctorView();
-    }
-  };
-
-  document.addEventListener("pointerup", clearPress);
-  document.addEventListener("pointercancel", clearPress);
 }
 
 async function handleReportsActionClick(event) {
@@ -4164,79 +4134,6 @@ function wireRoomPanel() {
   });
 }
 
-// Tracks the logical tile currently being pressed: { selector, idKey, id, activate }.
-// Stored by id (not element reference) so a re-render that swaps the DOM node mid-press
-// can't strand the interaction. Only one pointer press is tracked at a time.
-let pendingTilePress = null;
-let tilePressFailsafe = null;
-let reportPressFailsafe = null;
-// Upper bound on the interaction lock. A deliberate slow press is ~1-2s; this is well
-// clear of that but short enough that a missing pointerup/cancel can never freeze tile
-// rendering indefinitely.
-const TILE_PRESS_FAILSAFE_MS = 4000;
-
-// Releases the interaction lock so the normal render/poll cycle resumes. Idempotent and
-// safe to call from any resume trigger (pointerup, pointercancel, blur, Escape, fail-safe).
-// Note: polling/fetching is never paused; only re-rendering the pressed tile is deferred.
-function clearTilePress() {
-  pendingTilePress = null;
-  app.tilePressActive = false;
-  if (tilePressFailsafe !== null) {
-    clearTimeout(tilePressFailsafe);
-    tilePressFailsafe = null;
-  }
-}
-
-// Resolves a press on pointerup wherever the pointer is released, so a slow press that
-// drifts slightly still completes if it lands on the same logical tile.
-function completeTilePress(event) {
-  const press = pendingTilePress;
-  clearTilePress();
-  if (!press) {
-    return;
-  }
-
-  const button = event.target?.closest?.(press.selector);
-  if (!button || button.disabled || button.dataset[press.idKey] !== press.id) {
-    return;
-  }
-
-  press.activate(button);
-}
-
-function wireTileGroup(container, selector, idKey, activate) {
-  if (!container) {
-    return;
-  }
-
-  container.addEventListener("pointerdown", event => {
-    const button = event.target.closest(selector);
-    if (!button || button.disabled) {
-      return;
-    }
-    pendingTilePress = { selector, idKey, id: button.dataset[idKey], activate };
-    app.tilePressActive = true;
-    if (tilePressFailsafe !== null) {
-      clearTimeout(tilePressFailsafe);
-    }
-    tilePressFailsafe = window.setTimeout(clearTilePress, TILE_PRESS_FAILSAFE_MS);
-  });
-
-  // Keyboard activation (Enter / Space) dispatches a click with detail === 0 and no
-  // pointer sequence. Pointer-driven clicks (detail >= 1) are already handled on
-  // pointerup, so we ignore them here to avoid double-firing.
-  container.addEventListener("click", event => {
-    if (event.detail !== 0) {
-      return;
-    }
-    const button = event.target.closest(selector);
-    if (!button || button.disabled) {
-      return;
-    }
-    activate(button);
-  });
-}
-
 function wireSelectionTiles() {
   const doctorTiles = document.getElementById("doctorTiles");
   const procedureTiles = document.getElementById("procedureTiles");
@@ -4260,20 +4157,10 @@ function wireSelectionTiles() {
     setRoomControlsEnabled(getCurrentRoom());
   });
 
-  // Resolve / clean up the press at the document level so a release outside the
-  // originating tile (or container) never leaves rendering deferred. pointerup applies
-  // the selection when released on the same logical tile; every other path just releases
-  // the lock and lets normal rendering resume.
-  document.addEventListener("pointerup", completeTilePress);
-  document.addEventListener("pointercancel", clearTilePress);
-  window.addEventListener("blur", clearTilePress);
-  document.addEventListener("keydown", event => {
-    if (event.key === "Escape") {
-      clearTilePress();
-      if (isAssignmentDraftDirty()) {
-        discardAssignmentDraft();
-        setRoomActionStatus("Changes discarded.", "pending");
-      }
+  wireTilePressCleanup(() => {
+    if (isAssignmentDraftDirty()) {
+      discardAssignmentDraft();
+      setRoomActionStatus("Changes discarded.", "pending");
     }
   });
 

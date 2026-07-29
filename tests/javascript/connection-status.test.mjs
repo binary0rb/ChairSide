@@ -451,7 +451,7 @@ test("module ownership, call sites, and dependency direction remain narrow and o
     /connectRealtime\(\{\s*applySnapshot,\s*refreshReportsAfterBoardUpdate: pageContext\.isReports \? loadReports : null,\s*render,\s*refreshConnectionStatus: updateConnectionStatus,\s*setConnectionStatus,\s*loadBoard\s*\}\);/);
   assert.match(
     boardSource,
-    /registerBoardPolling\(loadBoard\);\s*app\.tickHandle = window\.setInterval\(render, 1000\);\s*registerConnectionStatusRefresh\(\);\s*updateConnectionStatus\(\);/);
+    /registerBoardPolling\(loadBoard\);\s*registerGeneralRender\(render\);\s*registerConnectionStatusRefresh\(\);\s*updateConnectionStatus\(\);/);
   assert.match(
     boardSource,
     /applySnapshot\(await response\.json\(\)\);\s*app\.lastPollAt = Date\.now\(\);\s*render\(\);\s*updateConnectionStatus\(\);/);

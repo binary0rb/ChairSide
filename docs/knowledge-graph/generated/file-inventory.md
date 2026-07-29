@@ -90,6 +90,7 @@ This file is mechanical output from `tools/knowledge-graph/New-ChairSideKnowledg
 | `src/ChairSide.Board/wwwroot/assets/icons/README.md` | Markdown | headings: Procedure icons, Tabler Icons license (MIT), Note | - |
 | `src/ChairSide.Board/wwwroot/board.js` | JavaScript | functions: loadVersionBadge, boot, loadBoard, loadReports, initDateRange, reportsRequestUrl, utcDateString, computePresetRange | - |
 | `src/ChairSide.Board/wwwroot/bootstrap.js` | JavaScript | - | - |
+| `src/ChairSide.Board/wwwroot/common-interactions.js` | JavaScript | functions: clearReportPress, wirePressInterruptionGuard, clearTilePress, completeTilePress, wireTileGroup, wireTilePressCleanup | - |
 | `src/ChairSide.Board/wwwroot/connection-status.js` | JavaScript | functions: setConnectionStatus, updateConnectionStatus, registerConnectionStatusRefresh, ensureConnectionStatusIndicator, formatSnapshotAge, getConnectionStatusDetails | - |
 | `src/ChairSide.Board/wwwroot/doctor.html` | Html | - | - |
 | `src/ChairSide.Board/wwwroot/dom-utils.js` | JavaScript | functions: escapeHtml, escapeAttribute, setDisabled, setHidden | - |
@@ -102,6 +103,7 @@ This file is mechanical output from `tools/knowledge-graph/New-ChairSideKnowledg
 | `src/ChairSide.Board/wwwroot/request-utils.js` | JavaScript | functions: readAdminToken, storeAdminToken, clearAdminToken, adminRequestHeaders, mutationHeaders, readErrorMessage | - |
 | `src/ChairSide.Board/wwwroot/room.html` | Html | - | - |
 | `src/ChairSide.Board/wwwroot/room-1.html` | Html | - | - |
+| `src/ChairSide.Board/wwwroot/runtime-scheduling.js` | JavaScript | functions: registerReportRefresh, registerGeneralRender | - |
 | `src/ChairSide.Board/wwwroot/signalr-lite.js` | JavaScript | functions: toWebSocketUrl | - |
 | `src/ChairSide.Board/wwwroot/styles.css` | Css | css vars: --bg, --ink, --muted, --line, --panel, --empty, --active-doctor, --neutral-100 | - |
 | `src/ChairSide.Board/wwwroot/workshop.html` | Html | - | - |
@@ -150,11 +152,13 @@ This file is mechanical output from `tools/knowledge-graph/New-ChairSideKnowledg
 | `tests/ChairSide.Board.Tests/TestSupport/TestOptionsMonitor.cs` | CSharp | types: TestOptionsMonitor<br>methods: Get, OnChange | - |
 | `tests/ChairSide.Board.Tests/TestSupport/TestWebHostEnvironment.cs` | CSharp | types: TestWebHostEnvironment | - |
 | `tests/ChairSide.Board.Tests/TestSupport/TestWorkspace.cs` | CSharp | types: TestWorkspace<br>methods: Create, ProductionDatabasePath, TrainingDatabasePath, DatabaseIsolationLayout, Dispose | - |
+| `tests/javascript/common-interactions.test.mjs` | JavaScript | functions: createTimerHarness, closestTarget, tile, importModule, createHarness | - |
 | `tests/javascript/connection-status.test.mjs` | JavaScript | functions: initialApp, importModule, createFakeDom, expectedDetails | - |
 | `tests/javascript/leaf-utilities.test.mjs` | JavaScript | - | - |
 | `tests/javascript/page-context-state.test.mjs` | JavaScript | - | - |
 | `tests/javascript/realtime-polling.test.mjs` | JavaScript | functions: initialApp, importModule, connectionHarness, callbackHarness, flushPromises | - |
 | `tests/javascript/request-utils.test.mjs` | JavaScript | - | - |
+| `tests/javascript/runtime-scheduling.test.mjs` | JavaScript | functions: importModule | - |
 | `tests/knowledge-graph/New-ChairSideKnowledgeGraph.Tests.ps1` | PowerShell | - | - |
 | `tests/scripts/Reset-ChairSideTrainingData.Tests.ps1` | PowerShell | - | - |
 | `tools/knowledge-graph/New-ChairSideKnowledgeGraph.ps1` | PowerShell | - | - |
