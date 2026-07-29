@@ -1,64 +1,7 @@
+import { app } from "./application-state.js";
 import { escapeAttribute, escapeHtml, setDisabled, setHidden } from "./dom-utils.js";
 import { formatDateTime, formatDuration } from "./format-utils.js";
-
-const app = {
-  snapshot: null,
-  reports: null,
-  connection: null,
-  hubReady: false,
-  tickHandle: null,
-  pollHandle: null,
-  statusHandle: null,
-  realtimeRetryHandle: null,
-  lastSnapshotAt: 0,
-  lastPollAt: 0,
-  serverOffsetMs: 0,
-  connectionStatus: "stale",
-  realtimeDegraded: false,
-  realtimeLostAt: 0,
-  pollInFlight: false,
-  reportsInFlight: false,
-  // Hybrid reports filter state. Kept in app (not the DOM) so a SignalR/poll re-render
-  // never resets the user's selected filters. sedation: all | sedation | non-sedation.
-  // grouping: base | variant.
-  reportFilters: { sedation: "all", grouping: "base" },
-  reportDoctorId: null,
-  reportDoctorTab: "overview",
-  // Report date window. Drives the backend completed-cycle filter, so changing it reloads from the
-  // API. start/end are ISO yyyy-MM-dd (null = unbounded). Default preset is Last 7 days.
-  dateRange: { preset: "last7", start: null, end: null },
-  roomNumber: getRoomNumber(),
-  roomToken: getRoomToken(),
-  roomTokenPromptVisible: false,
-  doctorId: new URLSearchParams(location.search).get("doctorId")
-    || new URLSearchParams(location.search).get("doctor"),
-  selectedDoctorId: null,
-  selectedProcedureId: null,
-  sedationOn: false,
-  // Expected allocation (1 unit = 10 minutes). Kept in app (not the DOM) so a SignalR/poll
-  // re-render never discards an in-progress staff adjustment. expectedUnitsManual tracks whether
-  // staff have changed units since selecting the current procedure: a procedure change always
-  // re-seeds from the new default, but a sedation change only re-seeds when not manually adjusted.
-  expectedUnits: null,
-  expectedUnitsManual: false,
-  expectedUnitsConfirmed: false,
-  expectedUnitsProcedureCode: null,
-  expectedUnitsSedation: false,
-  persistedAssignmentSignature: "",
-  selectionContext: null,
-  // True while a pointer is pressed on a doctor/procedure tile. The 1s room poll
-  // defers re-syncing and re-rendering the selection tiles while this is set so a
-  // slow press is never interrupted by a mid-press DOM swap.
-  tilePressActive: false,
-  // True while a pointer is pressed on an interactive reports-page element (doctor card,
-  // tab button, or table action button). Defers innerHTML writes for those regions so a
-  // mid-press DOM swap cannot drop the click. Mirrors the tilePressActive pattern.
-  reportPressActive: false,
-  // Monotonically incremented each time loadReports() stores a new payload. Used as the
-  // data-identity component of render tokens so guarded renders can skip innerHTML writes
-  // on 1-second ticks where app.reports hasn't changed.
-  reportsVersion: 0
-};
+import { pageContext } from "./page-context.js";
 
 const stateNames = ["empty", "seated", "aging", "stale", "ready-for-doctor", "doctor-in-room", "turnover"];
 const staffLoungeRoomNumber = 99;
@@ -68,22 +11,6 @@ const adminAccess = {
   storageKey: "chairside-admin-token",
   headerName: "X-ChairSide-Admin-Token"
 };
-
-function getRoomNumber() {
-  const query = new URLSearchParams(location.search);
-  const requestedRoom = document.body.dataset.roomNumber || query.get("roomId") || query.get("room") || "1";
-  const roomNumber = Number(requestedRoom);
-
-  return Number.isInteger(roomNumber) ? roomNumber : 0;
-}
-
-function getRoomToken() {
-  if (document.body.dataset.view !== "room") {
-    return "";
-  }
-
-  return document.querySelector("meta[name='chairside-room-token']")?.content || getStoredRoomToken();
-}
 
 async function loadVersionBadge() {
   try {
@@ -110,7 +37,7 @@ async function boot() {
   }
 
   await loadBoard();
-  if (document.body.dataset.view === "reports") {
+  if (pageContext.isReports) {
     initDateRange();
     await loadReports();
     wireReportsActions();
@@ -119,7 +46,7 @@ async function boot() {
     wireReportPressGuard();
   }
 
-  if (document.body.dataset.view === "doctor") {
+  if (pageContext.isDoctor) {
     // Use month-to-date for the cockpit so metrics reflect the current calendar month.
     // app.dateRange is set before loadReports() so reportsRequestUrl() picks up the right from/to.
     const mtd = computePresetRange("mtd");
@@ -130,7 +57,7 @@ async function boot() {
     wireDoctorCockpitPressGuard();
   }
 
-  if (document.body.dataset.view === "workshop") {
+  if (pageContext.isWorkshop) {
     // Current Reality summarizes a recent, stable window. last30 is current enough to read as
     // "now" while carrying enough completed cases to be meaningful. app.dateRange is set before
     // loadReports() so reportsRequestUrl() bounds the completed-cycle population to that window.
@@ -148,7 +75,7 @@ async function boot() {
   app.statusHandle = window.setInterval(updateConnectionStatus, 1000);
   updateConnectionStatus();
 
-  if (document.body.dataset.view === "room") {
+  if (pageContext.isRoom) {
     wireRoomPanel();
   }
   loadVersionBadge();
@@ -389,7 +316,7 @@ function connectRealtime() {
 
   connection.on("boardUpdated", async snapshot => {
     applySnapshot(snapshot);
-    if (document.body.dataset.view === "reports") {
+    if (pageContext.isReports) {
       await loadReports().catch(error => {
         console.warn("[ChairSide] Reports refresh after board update failed.", error);
       });
@@ -463,28 +390,27 @@ function render() {
     return;
   }
 
-  const view = document.body.dataset.view;
   updateConnectionStatus();
   renderLegend();
   populateDoctorViewMenu();
 
-  if (view === "master") {
+  if (pageContext.isMaster) {
     renderMaster();
   }
 
-  if (view === "room") {
+  if (pageContext.isRoom) {
     renderRoomPanel();
   }
 
-  if (view === "doctor") {
+  if (pageContext.isDoctor) {
     renderDoctorView();
   }
 
-  if (view === "reports") {
+  if (pageContext.isReports) {
     renderReports();
   }
 
-  if (view === "workshop") {
+  if (pageContext.isWorkshop) {
     renderWorkshop();
   }
 }
@@ -661,7 +587,7 @@ function updateDoctorViewToggleLabel() {
     return;
   }
 
-  if (document.body.dataset.view === "doctor" && app.doctorId && app.snapshot) {
+  if (pageContext.isDoctor && app.doctorId && app.snapshot) {
     const doctor = app.snapshot.doctors.find(item => item.id === app.doctorId);
     if (doctor) {
       label.textContent = `Doctor View: ${doctor.name}`;
@@ -681,7 +607,7 @@ function populateDoctorViewMenu() {
     return;
   }
 
-  const currentDoctorId = document.body.dataset.view === "doctor" ? app.doctorId : null;
+  const currentDoctorId = pageContext.isDoctor ? app.doctorId : null;
   menu.innerHTML = app.snapshot.doctors.map(doctor => {
     const isCurrent = doctor.id === currentDoctorId;
     return `<a class="nav-menu-item${isCurrent ? " is-current" : ""}" role="menuitem" tabindex="-1"`
@@ -805,7 +731,7 @@ function renderRoomPanel() {
 }
 
 function isStaffLoungeRoom() {
-  return document.body.dataset.view === "room" && app.roomNumber === staffLoungeRoomNumber;
+  return pageContext.isRoom && app.roomNumber === staffLoungeRoomNumber;
 }
 
 function renderStaffLoungePanel() {
@@ -2902,12 +2828,12 @@ function showRoomTokenPrompt(statusCode) {
     "error");
 }
 
-function roomTokenStorageKey(roomNumber = getRoomNumber()) {
+function roomTokenStorageKey(roomNumber = pageContext.roomNumber) {
   return `chairside-room-token-${roomNumber}`;
 }
 
 function getStoredRoomToken() {
-  if (document.body.dataset.view !== "room") {
+  if (!pageContext.isRoom) {
     return "";
   }
 
