@@ -103,6 +103,7 @@ This file is mechanical output from `tools/knowledge-graph/New-ChairSideKnowledg
 | `src/ChairSide.Board/wwwroot/request-utils.js` | JavaScript | functions: readAdminToken, storeAdminToken, clearAdminToken, adminRequestHeaders, mutationHeaders, readErrorMessage | - |
 | `src/ChairSide.Board/wwwroot/room.html` | Html | - | - |
 | `src/ChairSide.Board/wwwroot/room-1.html` | Html | - | - |
+| `src/ChairSide.Board/wwwroot/room-card.js` | JavaScript | functions: createRoomCardPresentation, renderRoomTile, roomPresentationState, renderRoomStatusBadge, roomAssignedDoctorId, roomDisplayAssignment, roomAssignmentSummary, cardDoctorName | - |
 | `src/ChairSide.Board/wwwroot/runtime-scheduling.js` | JavaScript | functions: registerReportRefresh, registerGeneralRender | - |
 | `src/ChairSide.Board/wwwroot/signalr-lite.js` | JavaScript | functions: toWebSocketUrl | - |
 | `src/ChairSide.Board/wwwroot/styles.css` | Css | css vars: --bg, --ink, --muted, --line, --panel, --empty, --active-doctor, --neutral-100 | - |
@@ -158,6 +159,7 @@ This file is mechanical output from `tools/knowledge-graph/New-ChairSideKnowledg
 | `tests/javascript/page-context-state.test.mjs` | JavaScript | - | - |
 | `tests/javascript/realtime-polling.test.mjs` | JavaScript | functions: initialApp, importModule, connectionHarness, callbackHarness, flushPromises | - |
 | `tests/javascript/request-utils.test.mjs` | JavaScript | - | - |
+| `tests/javascript/room-card.test.mjs` | JavaScript | functions: readyRoom | - |
 | `tests/javascript/runtime-scheduling.test.mjs` | JavaScript | functions: importModule | - |
 | `tests/knowledge-graph/New-ChairSideKnowledgeGraph.Tests.ps1` | PowerShell | - | - |
 | `tests/scripts/Reset-ChairSideTrainingData.Tests.ps1` | PowerShell | - | - |

@@ -1,7 +1,7 @@
 ﻿{
     "generatedStamp":  "deterministic",
     "root":  ".",
-    "fileCount":  156,
+    "fileCount":  158,
     "files":  [
                   {
                       "path":  ".github/pull_request_template.md",
@@ -869,7 +869,7 @@
                   {
                       "path":  "package.json",
                       "kind":  "Json",
-                      "sizeBytes":  846,
+                      "sizeBytes":  923,
                       "typeSymbols":  [
 
                                       ],
@@ -2714,7 +2714,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/board.js",
                       "kind":  "JavaScript",
-                      "sizeBytes":  172940,
+                      "sizeBytes":  163583,
                       "typeSymbols":  [
 
                                       ],
@@ -2845,7 +2845,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/common-interactions.js",
                       "kind":  "JavaScript",
-                      "sizeBytes":  2750,
+                      "sizeBytes":  2863,
                       "typeSymbols":  [
 
                                       ],
@@ -3203,9 +3203,47 @@
                                    ]
                   },
                   {
+                      "path":  "src/ChairSide.Board/wwwroot/room-card.js",
+                      "kind":  "JavaScript",
+                      "sizeBytes":  10555,
+                      "typeSymbols":  [
+
+                                      ],
+                      "methodSymbols":  [
+
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+                                              "createRoomCardPresentation",
+                                              "renderRoomTile",
+                                              "roomPresentationState",
+                                              "renderRoomStatusBadge",
+                                              "roomAssignedDoctorId",
+                                              "roomDisplayAssignment",
+                                              "roomAssignmentSummary",
+                                              "cardDoctorName",
+                                              "normalizeState",
+                                              "stateBadge",
+                                              "roomTimerLabel",
+                                              "elapsedSeconds",
+                                              "formatElapsed"
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
                       "path":  "src/ChairSide.Board/wwwroot/runtime-scheduling.js",
                       "kind":  "JavaScript",
-                      "sizeBytes":  382,
+                      "sizeBytes":  394,
                       "typeSymbols":  [
 
                                       ],
@@ -3412,7 +3450,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/BoardReadyPresentationTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  16684,
+                      "sizeBytes":  16815,
                       "typeSymbols":  [
                                           "BoardReadyPresentationTests"
                                       ],
@@ -5260,7 +5298,7 @@
                   {
                       "path":  "tests/javascript/common-interactions.test.mjs",
                       "kind":  "JavaScript",
-                      "sizeBytes":  9942,
+                      "sizeBytes":  10236,
                       "typeSymbols":  [
 
                                       ],
@@ -5290,7 +5328,7 @@
                   {
                       "path":  "tests/javascript/connection-status.test.mjs",
                       "kind":  "JavaScript",
-                      "sizeBytes":  15950,
+                      "sizeBytes":  15953,
                       "typeSymbols":  [
 
                                       ],
@@ -5345,7 +5383,7 @@
                   {
                       "path":  "tests/javascript/page-context-state.test.mjs",
                       "kind":  "JavaScript",
-                      "sizeBytes":  6886,
+                      "sizeBytes":  6890,
                       "typeSymbols":  [
 
                                       ],
@@ -5425,9 +5463,35 @@
                                    ]
                   },
                   {
+                      "path":  "tests/javascript/room-card.test.mjs",
+                      "kind":  "JavaScript",
+                      "sizeBytes":  5030,
+                      "typeSymbols":  [
+
+                                      ],
+                      "methodSymbols":  [
+
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+                                              "readyRoom"
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
                       "path":  "tests/javascript/runtime-scheduling.test.mjs",
                       "kind":  "JavaScript",
-                      "sizeBytes":  3356,
+                      "sizeBytes":  3442,
                       "typeSymbols":  [
 
                                       ],

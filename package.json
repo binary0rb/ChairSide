@@ -8,6 +8,7 @@
     "test:page-context-state": "node --test tests/javascript/page-context-state.test.mjs",
     "test:request-utils": "node --test tests/javascript/request-utils.test.mjs",
     "test:realtime-polling": "node --test tests/javascript/realtime-polling.test.mjs",
+    "test:room-card": "node --test tests/javascript/room-card.test.mjs",
     "test:runtime-scheduling": "node --test tests/javascript/runtime-scheduling.test.mjs"
   },
   "private": true,
