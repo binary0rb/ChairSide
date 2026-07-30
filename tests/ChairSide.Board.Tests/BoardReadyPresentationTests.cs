@@ -157,6 +157,68 @@ public sealed class BoardReadyPresentationTests
     }
 
     [Fact]
+    public void Operational_urgency_animations_share_page_keyframes_without_changing_context_contracts()
+    {
+        var root = FindRepositoryRoot();
+        var styles = File.ReadAllText(Path.Combine(root, "src", "ChairSide.Board", "wwwroot", "styles.css"));
+        var legacyPageKeyframes = new[]
+        {
+            "masterAgingBorderPulse",
+            "masterStaleBorderPulse",
+            "doctorAgingBorderPulse",
+            "doctorStaleBorderPulse",
+            "roomAgingBorderPulse",
+            "roomStaleBorderPulse"
+        };
+
+        Assert.Single(Regex.Matches(styles, @"@keyframes\s+operationalAgingBorderPulse\b"));
+        Assert.Single(Regex.Matches(styles, @"@keyframes\s+operationalStaleBorderPulse\b"));
+        Assert.Equal(
+            2,
+            Regex.Matches(styles, @"@keyframes\s+operational(?:Aging|Stale)BorderPulse\b").Count);
+        Assert.All(legacyPageKeyframes, name =>
+            Assert.DoesNotContain(name, styles, StringComparison.Ordinal));
+
+        Assert.Matches(
+            @"(?s)body\[data-view=""master""\] \.room-tile\.ready-for-doctor\.urgency-aging,\s*"
+            + @"body\[data-view=""doctor""\] \.doctor-list \.room-tile\.ready-for-doctor\.urgency-aging\s*"
+            + @"\{[^}]*--operational-aging-border-peak:\s*#facc15;[^}]*"
+            + @"animation:\s*operationalAgingBorderPulse 4\.5s ease-in-out infinite;",
+            styles);
+        Assert.Matches(
+            @"(?s)body\[data-view=""master""\] \.room-tile\.ready-for-doctor\.urgency-stale,\s*"
+            + @"body\[data-view=""doctor""\] \.doctor-list \.room-tile\.ready-for-doctor\.urgency-stale\s*"
+            + @"\{[^}]*animation:\s*operationalStaleBorderPulse 3s ease-in-out infinite;",
+            styles);
+        Assert.Matches(
+            @"(?s)body\[data-view=""room""\] \.panel-status \.room-tile\.large\.ready-for-doctor\.urgency-aging\s*"
+            + @"\{[^}]*--operational-aging-border-peak:\s*#f59e0b;[^}]*"
+            + @"animation:\s*operationalAgingBorderPulse 4s ease-in-out infinite;",
+            styles);
+        Assert.Matches(
+            @"(?s)body\[data-view=""room""\] \.panel-status \.room-tile\.large\.ready-for-doctor\.urgency-stale\s*"
+            + @"\{[^}]*animation:\s*operationalStaleBorderPulse 2\.75s ease-in-out infinite;",
+            styles);
+
+        Assert.Contains("@keyframes agingBorderPulse", styles, StringComparison.Ordinal);
+        Assert.Contains("@keyframes staleBorderPulse", styles, StringComparison.Ordinal);
+        Assert.Contains("@keyframes agingDotPulse", styles, StringComparison.Ordinal);
+        Assert.Contains("@keyframes staleDotPulse", styles, StringComparison.Ordinal);
+        Assert.Matches(
+            @"(?s)@keyframes\s+agingBorderPulse\b.*?box-shadow:.*?"
+            + @"@keyframes\s+staleBorderPulse\b.*?box-shadow:",
+            styles);
+
+        var reducedMotion = Regex.Match(
+            styles,
+            @"(?ms)@media \(prefers-reduced-motion: reduce\)\s*\{(?<body>.*?)^\}");
+        Assert.True(reducedMotion.Success);
+        Assert.DoesNotContain("urgency-", reducedMotion.Groups["body"].Value, StringComparison.Ordinal);
+        Assert.DoesNotContain("operationalAgingBorderPulse", reducedMotion.Groups["body"].Value, StringComparison.Ordinal);
+        Assert.DoesNotContain("operationalStaleBorderPulse", reducedMotion.Groups["body"].Value, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Doctor_operational_header_and_room_panel_contracts_remain_in_place()
     {
         var root = FindRepositoryRoot();

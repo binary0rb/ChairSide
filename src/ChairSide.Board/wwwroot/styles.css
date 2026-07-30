@@ -3025,18 +3025,22 @@ button:disabled {
    Room panel, doctor view, and reports keep the global rules above.
    ------------------------------------------------------------------ */
 
-@keyframes masterAgingBorderPulse {
+/* Shared border-only urgency pulses for the three operational room-card contexts.
+   The generic room-tile fallback above intentionally keeps its shadow-bearing
+   keyframes, while the room panel supplies its distinct Aging peak directly on
+   the scoped consumer. */
+@keyframes operationalAgingBorderPulse {
   0%,
   100% {
     border-color: #fde68a;
   }
 
   50% {
-    border-color: #facc15;
+    border-color: var(--operational-aging-border-peak);
   }
 }
 
-@keyframes masterStaleBorderPulse {
+@keyframes operationalStaleBorderPulse {
   0%,
   100% {
     border-color: #fecaca;
@@ -3103,12 +3107,15 @@ body[data-view="master"] .room-tile.ready-for-doctor.urgency-stale {
   box-shadow: none;
 }
 
-body[data-view="master"] .room-tile.ready-for-doctor.urgency-aging {
-  animation: masterAgingBorderPulse 4.5s ease-in-out infinite;
+body[data-view="master"] .room-tile.ready-for-doctor.urgency-aging,
+body[data-view="doctor"] .doctor-list .room-tile.ready-for-doctor.urgency-aging {
+  --operational-aging-border-peak: #facc15;
+  animation: operationalAgingBorderPulse 4.5s ease-in-out infinite;
 }
 
-body[data-view="master"] .room-tile.ready-for-doctor.urgency-stale {
-  animation: masterStaleBorderPulse 3s ease-in-out infinite;
+body[data-view="master"] .room-tile.ready-for-doctor.urgency-stale,
+body[data-view="doctor"] .doctor-list .room-tile.ready-for-doctor.urgency-stale {
+  animation: operationalStaleBorderPulse 3s ease-in-out infinite;
 }
 
 body[data-view="master"] .room-topline {
@@ -3238,28 +3245,6 @@ body[data-view="master"] .room-tile-link:active .room-tile {
    Doctor view visual polish — scoped to body[data-view="doctor"].
    ------------------------------------------------------------------ */
 
-@keyframes doctorAgingBorderPulse {
-  0%,
-  100% {
-    border-color: #fde68a;
-  }
-
-  50% {
-    border-color: #facc15;
-  }
-}
-
-@keyframes doctorStaleBorderPulse {
-  0%,
-  100% {
-    border-color: #fecaca;
-  }
-
-  50% {
-    border-color: #ef4444;
-  }
-}
-
 body[data-view="doctor"] .app-header.compact {
   padding-top: 14px;
   padding-bottom: 8px;
@@ -3294,14 +3279,6 @@ body[data-view="doctor"] .doctor-list .room-tile.ready-for-doctor.urgency-aging,
 body[data-view="doctor"] .doctor-list .room-tile.ready-for-doctor.urgency-stale {
   border-width: 5px;
   box-shadow: none;
-}
-
-body[data-view="doctor"] .doctor-list .room-tile.ready-for-doctor.urgency-aging {
-  animation: doctorAgingBorderPulse 4.5s ease-in-out infinite;
-}
-
-body[data-view="doctor"] .doctor-list .room-tile.ready-for-doctor.urgency-stale {
-  animation: doctorStaleBorderPulse 3s ease-in-out infinite;
 }
 
 body[data-view="doctor"] .doctor-list .room-topline {
@@ -3547,28 +3524,6 @@ body[data-view="doctor"] .report-empty-note {
    Room panel visual polish — scoped to body[data-view="room"].
    ------------------------------------------------------------------ */
 
-@keyframes roomAgingBorderPulse {
-  0%,
-  100% {
-    border-color: #fde68a;
-  }
-
-  50% {
-    border-color: #f59e0b;
-  }
-}
-
-@keyframes roomStaleBorderPulse {
-  0%,
-  100% {
-    border-color: #fecaca;
-  }
-
-  50% {
-    border-color: #ef4444;
-  }
-}
-
 body[data-view="room"] .app-header.compact {
   padding-top: 14px;
   padding-bottom: 8px;
@@ -3596,11 +3551,12 @@ body[data-view="room"] .panel-status .room-tile.large.ready-for-doctor.urgency-s
 }
 
 body[data-view="room"] .panel-status .room-tile.large.ready-for-doctor.urgency-aging {
-  animation: roomAgingBorderPulse 4s ease-in-out infinite;
+  --operational-aging-border-peak: #f59e0b;
+  animation: operationalAgingBorderPulse 4s ease-in-out infinite;
 }
 
 body[data-view="room"] .panel-status .room-tile.large.ready-for-doctor.urgency-stale {
-  animation: roomStaleBorderPulse 2.75s ease-in-out infinite;
+  animation: operationalStaleBorderPulse 2.75s ease-in-out infinite;
 }
 
 body[data-view="room"] .panel-status .room-tile.large .room-topline {

@@ -869,7 +869,7 @@
                   {
                       "path":  "package.json",
                       "kind":  "Json",
-                      "sizeBytes":  1223,
+                      "sizeBytes":  1228,
                       "typeSymbols":  [
 
                                       ],
@@ -2660,7 +2660,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/application-state.js",
                       "kind":  "JavaScript",
-                      "sizeBytes":  791,
+                      "sizeBytes":  800,
                       "typeSymbols":  [
 
                                       ],
@@ -2714,7 +2714,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/board.js",
                       "kind":  "JavaScript",
-                      "sizeBytes":  34618,
+                      "sizeBytes":  35637,
                       "typeSymbols":  [
 
                                       ],
@@ -2816,7 +2816,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/common-interactions.js",
                       "kind":  "JavaScript",
-                      "sizeBytes":  2933,
+                      "sizeBytes":  2968,
                       "typeSymbols":  [
 
                                       ],
@@ -3068,7 +3068,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/report-data.js",
                       "kind":  "JavaScript",
-                      "sizeBytes":  3641,
+                      "sizeBytes":  3803,
                       "typeSymbols":  [
 
                                       ],
@@ -3137,7 +3137,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/reports.js",
                       "kind":  "JavaScript",
-                      "sizeBytes":  74900,
+                      "sizeBytes":  76812,
                       "typeSymbols":  [
 
                                       ],
@@ -3484,7 +3484,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/styles.css",
                       "kind":  "Css",
-                      "sizeBytes":  92882,
+                      "sizeBytes":  92584,
                       "typeSymbols":  [
 
                                       ],
@@ -3532,7 +3532,8 @@
                                            "--border-thin",
                                            "--border-thick",
                                            "--shadow-soft",
-                                           "--shadow-elevated"
+                                           "--shadow-elevated",
+                                           "--operational-aging-border-peak"
                                        ],
                       "scriptFunctions":  [
 
@@ -3606,7 +3607,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/AfterHoursReviewEndpointTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  8549,
+                      "sizeBytes":  8560,
                       "typeSymbols":  [
                                           "AfterHoursReviewEndpointTests"
                                       ],
@@ -3674,7 +3675,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/BoardReadyPresentationTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  17135,
+                      "sizeBytes":  20538,
                       "typeSymbols":  [
                                           "BoardReadyPresentationTests"
                                       ],
@@ -3682,6 +3683,7 @@
                                             "Canonical_room_reads_keep_prestaging_and_seated_distinct_without_fabricating_assignment",
                                             "Ready_remains_primary_while_withdrawal_and_arrival_clear_urgency_and_keep_assignment",
                                             "Master_and_doctor_cards_share_canonical_assignment_and_ready_presentation",
+                                            "Operational_urgency_animations_share_page_keyframes_without_changing_context_contracts",
                                             "Doctor_operational_header_and_room_panel_contracts_remain_in_place",
                                             "Primary_workflow_highlights_only_the_enabled_next_action",
                                             "All_pages_use_the_ordered_native_module_bootstrap",
@@ -5522,7 +5524,7 @@
                   {
                       "path":  "tests/javascript/common-interactions.test.mjs",
                       "kind":  "JavaScript",
-                      "sizeBytes":  10733,
+                      "sizeBytes":  10771,
                       "typeSymbols":  [
 
                                       ],
@@ -5552,7 +5554,7 @@
                   {
                       "path":  "tests/javascript/connection-status.test.mjs",
                       "kind":  "JavaScript",
-                      "sizeBytes":  15959,
+                      "sizeBytes":  15960,
                       "typeSymbols":  [
 
                                       ],
@@ -5581,7 +5583,7 @@
                   {
                       "path":  "tests/javascript/leaf-utilities.test.mjs",
                       "kind":  "JavaScript",
-                      "sizeBytes":  4422,
+                      "sizeBytes":  4444,
                       "typeSymbols":  [
 
                                       ],
@@ -5607,7 +5609,7 @@
                   {
                       "path":  "tests/javascript/page-context-state.test.mjs",
                       "kind":  "JavaScript",
-                      "sizeBytes":  6522,
+                      "sizeBytes":  6535,
                       "typeSymbols":  [
 
                                       ],
@@ -5633,7 +5635,7 @@
                   {
                       "path":  "tests/javascript/realtime-polling.test.mjs",
                       "kind":  "JavaScript",
-                      "sizeBytes":  14666,
+                      "sizeBytes":  14667,
                       "typeSymbols":  [
 
                                       ],
@@ -5663,7 +5665,7 @@
                   {
                       "path":  "tests/javascript/report-data.test.mjs",
                       "kind":  "JavaScript",
-                      "sizeBytes":  7086,
+                      "sizeBytes":  7309,
                       "typeSymbols":  [
 
                                       ],
@@ -5690,7 +5692,7 @@
                   {
                       "path":  "tests/javascript/reports.test.mjs",
                       "kind":  "JavaScript",
-                      "sizeBytes":  18635,
+                      "sizeBytes":  19228,
                       "typeSymbols":  [
 
                                       ],
@@ -5725,7 +5727,7 @@
                   {
                       "path":  "tests/javascript/request-utils.test.mjs",
                       "kind":  "JavaScript",
-                      "sizeBytes":  6384,
+                      "sizeBytes":  6402,
                       "typeSymbols":  [
 
                                       ],
@@ -5811,7 +5813,7 @@
                   {
                       "path":  "tests/javascript/runtime-scheduling.test.mjs",
                       "kind":  "JavaScript",
-                      "sizeBytes":  3440,
+                      "sizeBytes":  3442,
                       "typeSymbols":  [
 
                                       ],
@@ -5837,7 +5839,7 @@
                   {
                       "path":  "tests/javascript/workshop.test.mjs",
                       "kind":  "JavaScript",
-                      "sizeBytes":  10681,
+                      "sizeBytes":  10683,
                       "typeSymbols":  [
 
                                       ],
