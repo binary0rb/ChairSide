@@ -3484,7 +3484,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/styles.css",
                       "kind":  "Css",
-                      "sizeBytes":  92584,
+                      "sizeBytes":  89676,
                       "typeSymbols":  [
 
                                       ],
@@ -3675,7 +3675,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/BoardReadyPresentationTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  20538,
+                      "sizeBytes":  25621,
                       "typeSymbols":  [
                                           "BoardReadyPresentationTests"
                                       ],
@@ -3684,11 +3684,13 @@
                                             "Ready_remains_primary_while_withdrawal_and_arrival_clear_urgency_and_keep_assignment",
                                             "Master_and_doctor_cards_share_canonical_assignment_and_ready_presentation",
                                             "Operational_urgency_animations_share_page_keyframes_without_changing_context_contracts",
+                                            "Reports_and_doctor_cockpit_share_only_the_selected_doctor_foundation",
                                             "Doctor_operational_header_and_room_panel_contracts_remain_in_place",
                                             "Primary_workflow_highlights_only_the_enabled_next_action",
                                             "All_pages_use_the_ordered_native_module_bootstrap",
                                             "StateKey",
                                             "ElementIds",
+                                            "CountSelectorOccurrences",
                                             "FindRepositoryRoot"
                                         ],
                       "routes":  [
