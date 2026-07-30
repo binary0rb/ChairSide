@@ -6,7 +6,10 @@ import {
 export function createReportData(adapter = {}) {
   let reports = null;
   let reportsInFlight = false;
+  let reportsInFlightPromise = null;
+  let guaranteedReloadBatch = null;
   let reportsVersion = 0;
+  let lastSuccessfulLoad = null;
   let dateRange = { preset: "last7", start: null, end: null };
 
   function getReports() {
@@ -17,8 +20,16 @@ export function createReportData(adapter = {}) {
     return reportsVersion;
   }
 
+  function getLastSuccessfulLoad() {
+    return lastSuccessfulLoad;
+  }
+
   function getDateRange() {
     return dateRange;
+  }
+
+  function getRangeSignature(range = dateRange) {
+    return createReportRequestContext(range).rangeSignature;
   }
 
   function setDateRange(nextRange) {
@@ -42,14 +53,11 @@ export function createReportData(adapter = {}) {
     dateRange = { preset, start: resolved.start, end: resolved.end };
   }
 
-  async function load() {
-    if (reportsInFlight) {
-      return;
-    }
-
+  function startLoad() {
+    const requestContext = createReportRequestContext(dateRange);
     reportsInFlight = true;
-    try {
-      const response = await request(reportsRequestUrl(), {
+    const operation = (async () => {
+      const response = await request(reportsRequestUrl(requestContext), {
         cache: "no-store",
         headers: currentAdminHeaders()
       });
@@ -70,28 +78,81 @@ export function createReportData(adapter = {}) {
 
       reports = await response.json();
       reportsVersion++;
+      lastSuccessfulLoad = Object.freeze({
+        payload: reports,
+        version: reportsVersion,
+        requestContext
+      });
       adapter.onDataChanged?.();
-    } finally {
+      return lastSuccessfulLoad;
+    })();
+
+    reportsInFlightPromise = operation;
+    return operation.finally(() => {
       reportsInFlight = false;
+      if (reportsInFlightPromise === operation) {
+        reportsInFlightPromise = null;
+      }
+    });
+  }
+
+  async function load() {
+    if (reportsInFlight) {
+      return;
     }
+
+    return startLoad();
   }
 
   async function reload() {
     return load();
   }
 
-  function reportsRequestUrl() {
-    const range = dateRange;
-    if (!range || range.preset === "all") {
-      return "/api/reports";
+  function reloadAfterCurrent() {
+    if (guaranteedReloadBatch && !guaranteedReloadBatch.started) {
+      return guaranteedReloadBatch.promise;
     }
 
+    const predecessor = guaranteedReloadBatch?.promise || Promise.resolve();
+    const batch = {
+      started: false,
+      promise: null
+    };
+
+    batch.promise = (async () => {
+      try {
+        await predecessor;
+      } catch {
+        // The requested fresh read must still run after a failed predecessor.
+      }
+
+      batch.started = true;
+      while (reportsInFlightPromise) {
+        try {
+          await reportsInFlightPromise;
+        } catch {
+          // A failed ordinary load still counts as settled for sequencing.
+        }
+      }
+
+      return startLoad();
+    })().finally(() => {
+      if (guaranteedReloadBatch === batch) {
+        guaranteedReloadBatch = null;
+      }
+    });
+
+    guaranteedReloadBatch = batch;
+    return batch.promise;
+  }
+
+  function reportsRequestUrl(requestContext) {
     const params = new URLSearchParams();
-    if (range.start) {
-      params.set("from", range.start);
+    if (requestContext.from) {
+      params.set("from", requestContext.from);
     }
-    if (range.end) {
-      params.set("to", range.end);
+    if (requestContext.to) {
+      params.set("to", requestContext.to);
     }
 
     const query = params.toString();
@@ -125,16 +186,30 @@ export function createReportData(adapter = {}) {
 
   return {
     getDateRange,
+    getLastSuccessfulLoad,
+    getRangeSignature,
     getReports,
     getVersion,
     load,
     reload,
+    reloadAfterCurrent,
     setDateRange,
     useLastSevenDays,
     useLastThirtyDays,
     useMonthToDate,
     usePreset
   };
+}
+
+function createReportRequestContext(range) {
+  const allTime = range?.preset === "all";
+  const from = allTime ? null : range?.start || null;
+  const to = allTime ? null : range?.end || null;
+  return Object.freeze({
+    from,
+    to,
+    rangeSignature: JSON.stringify([from, to])
+  });
 }
 
 function utcDateString(date) {

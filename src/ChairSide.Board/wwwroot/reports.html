@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>ChairSide Board - Reports</title>
-  <link rel="stylesheet" href="/styles.css?v=20260630-deploy-visibility-polish">
+  <link rel="stylesheet" href="/styles.css?v=20260730-inline-report-feedback">
 </head>
 <body data-view="reports">
   <header class="app-header compact">
@@ -32,7 +32,7 @@
     </nav>
   </header>
 
-  <main class="reports-shell">
+  <main class="reports-shell" id="reportsMain" tabindex="-1">
     <!-- Headline band: curated cards when data exists, friendly empty-state when not,
          or the reports access prompt when the token is missing/rejected. -->
     <p class="layer-pill layer-pill--population report-layer-label">Report Population</p>
@@ -115,6 +115,22 @@
       <summary>All metrics</summary>
       <section class="report-summary" id="reportSummary" aria-label="Room flow summary"></section>
     </details>
+
+    <div class="report-action-feedback"
+         id="reportActionFeedback"
+         tabindex="-1"
+         hidden>
+      <div class="report-action-feedback__polite"
+           id="reportActionStatusPolite"
+           role="status"
+           aria-live="polite"
+           aria-atomic="false"></div>
+      <div class="report-action-feedback__assertive"
+           id="reportActionStatusAssertive"
+           role="alert"
+           aria-live="assertive"
+           aria-atomic="false"></div>
+    </div>
 
     <details class="report-disclosure report-detail" id="reportDetail">
       <summary>Detail &amp; audit</summary>
