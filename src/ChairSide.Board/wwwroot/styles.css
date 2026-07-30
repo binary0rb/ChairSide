@@ -1915,7 +1915,8 @@ body[data-view="reports"] .insight-metrics dd {
   font-variant-numeric: tabular-nums;
 }
 
-body[data-view="reports"] .report-empty-note {
+body[data-view="reports"] .report-empty-note,
+body[data-view="doctor"] .report-empty-note {
   margin: 0;
   padding: 16px;
   color: var(--muted);
@@ -1955,7 +1956,8 @@ body[data-view="reports"] .doctor-report-dashboard-head p {
   line-height: 1.4;
 }
 
-body[data-view="reports"] .selected-doctor-panel {
+body[data-view="reports"] .selected-doctor-panel,
+body[data-view="doctor"] .selected-doctor-panel {
   display: grid;
   gap: 16px;
   padding: 18px;
@@ -1966,28 +1968,32 @@ body[data-view="reports"] .selected-doctor-panel {
   box-shadow: var(--shadow-elevated);
 }
 
-body[data-view="reports"] .selected-doctor-head {
+body[data-view="reports"] .selected-doctor-head,
+body[data-view="doctor"] .selected-doctor-head {
   display: grid;
   grid-template-columns: auto 1fr;
   gap: 14px;
   align-items: center;
 }
 
-body[data-view="reports"] .selected-doctor-head h2 {
+body[data-view="reports"] .selected-doctor-head h2,
+body[data-view="doctor"] .selected-doctor-head h2 {
   margin: 0 0 4px;
   color: #0f172a;
   font-size: 21px;
   letter-spacing: 0;
 }
 
-body[data-view="reports"] .selected-doctor-head p {
+body[data-view="reports"] .selected-doctor-head p,
+body[data-view="doctor"] .selected-doctor-head p {
   margin: 0;
   color: #334155;
   font-size: 14px;
   line-height: 1.45;
 }
 
-body[data-view="reports"] .selected-doctor-tabs {
+body[data-view="reports"] .selected-doctor-tabs,
+body[data-view="doctor"] .selected-doctor-tabs {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
@@ -1995,7 +2001,8 @@ body[data-view="reports"] .selected-doctor-tabs {
   border-bottom: 1px solid #e2e8f0;
 }
 
-body[data-view="reports"] .selected-doctor-tab {
+body[data-view="reports"] .selected-doctor-tab,
+body[data-view="doctor"] .selected-doctor-tab {
   width: auto;
   min-height: 40px;
   padding: 0 14px;
@@ -2007,25 +2014,29 @@ body[data-view="reports"] .selected-doctor-tab {
   font-weight: 850;
 }
 
-body[data-view="reports"] .selected-doctor-tab.is-active {
+body[data-view="reports"] .selected-doctor-tab.is-active,
+body[data-view="doctor"] .selected-doctor-tab.is-active {
   border-color: color-mix(in srgb, var(--doctor-color) 30%, #cbd5e1);
   background: color-mix(in srgb, var(--doctor-color) 10%, #ffffff);
   color: #0f172a;
   box-shadow: inset 0 -2px 0 var(--doctor-color);
 }
 
-body[data-view="reports"] .selected-doctor-tab-panel {
+body[data-view="reports"] .selected-doctor-tab-panel,
+body[data-view="doctor"] .selected-doctor-tab-panel {
   min-width: 0;
 }
 
-body[data-view="reports"] .selected-doctor-overview {
+body[data-view="reports"] .selected-doctor-overview,
+body[data-view="doctor"] .selected-doctor-overview {
   display: grid;
   grid-template-columns: minmax(240px, 1fr) minmax(360px, 1.3fr);
   gap: 16px;
   align-items: stretch;
 }
 
-body[data-view="reports"] .selected-doctor-summary {
+body[data-view="reports"] .selected-doctor-summary,
+body[data-view="doctor"] .selected-doctor-summary {
   display: grid;
   align-content: start;
   gap: 8px;
@@ -2035,27 +2046,31 @@ body[data-view="reports"] .selected-doctor-summary {
   background: var(--neutral-100);
 }
 
-body[data-view="reports"] .selected-doctor-summary h3 {
+body[data-view="reports"] .selected-doctor-summary h3,
+body[data-view="doctor"] .selected-doctor-summary h3 {
   margin: 0;
   color: var(--neutral-900);
   font-size: 17px;
   letter-spacing: 0;
 }
 
-body[data-view="reports"] .selected-doctor-summary p {
+body[data-view="reports"] .selected-doctor-summary p,
+body[data-view="doctor"] .selected-doctor-summary p {
   margin: 0;
   color: var(--neutral-700);
   line-height: 1.45;
 }
 
-body[data-view="reports"] .selected-doctor-kpis {
+body[data-view="reports"] .selected-doctor-kpis,
+body[data-view="doctor"] .selected-doctor-kpis {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 10px;
   margin: 0;
 }
 
-body[data-view="reports"] .selected-doctor-kpis > div {
+body[data-view="reports"] .selected-doctor-kpis > div,
+body[data-view="doctor"] .selected-doctor-kpis > div {
   display: grid;
   gap: 6px;
   padding: 14px;
@@ -2064,13 +2079,15 @@ body[data-view="reports"] .selected-doctor-kpis > div {
   background: #ffffff;
 }
 
-body[data-view="reports"] .selected-doctor-kpis dt {
+body[data-view="reports"] .selected-doctor-kpis dt,
+body[data-view="doctor"] .selected-doctor-kpis dt {
   color: #64748b;
   font-size: 12px;
   font-weight: 850;
 }
 
-body[data-view="reports"] .selected-doctor-kpis dd {
+body[data-view="reports"] .selected-doctor-kpis dd,
+body[data-view="doctor"] .selected-doctor-kpis dd {
   margin: 0;
   color: #0f172a;
   font-size: 18px;
@@ -2078,7 +2095,8 @@ body[data-view="reports"] .selected-doctor-kpis dd {
   font-variant-numeric: tabular-nums;
 }
 
-body[data-view="reports"] .selected-doctor-audit {
+body[data-view="reports"] .selected-doctor-audit,
+body[data-view="doctor"] .selected-doctor-audit {
   display: grid;
   gap: 10px;
   overflow-x: auto;
@@ -2890,8 +2908,7 @@ button:disabled {
     min-height: auto;
   }
 
-  body[data-view="reports"] .selected-doctor-overview,
-  body[data-view="doctor"] .selected-doctor-overview {
+  body[data-view="reports"] .selected-doctor-overview {
     grid-template-columns: 1fr;
   }
 
@@ -2947,8 +2964,7 @@ button:disabled {
     grid-template-columns: 1fr;
   }
 
-  body[data-view="reports"] .selected-doctor-kpis,
-  body[data-view="doctor"] .selected-doctor-kpis {
+  body[data-view="reports"] .selected-doctor-kpis {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
@@ -3364,13 +3380,6 @@ body[data-view="doctor"] .doctor-list .room-timer span {
   opacity: 0.82;
 }
 
-/* ---------------------------------------------------------------------------
-   Doctor cockpit — selected-doctor panel, tabs, and tab content.
-   These rules mirror the body[data-view="reports"] equivalents so the reused
-   renderSelectedDoctorPanel output looks identical on both pages. The reports
-   rules are left untouched; this block applies only to the doctor view.
-   --------------------------------------------------------------------------- */
-
 /* Reliable hiding: both regions set their own display, which would otherwise defeat the hidden
    attribute (same gotcha the reports page handles). Mirrors the reports-page [hidden] overrides. */
 body[data-view="doctor"] .doctor-report-snapshot[hidden],
@@ -3379,145 +3388,9 @@ body[data-view="doctor"] .selected-doctor-panel[hidden] {
 }
 
 body[data-view="doctor"] .selected-doctor-panel {
-  display: grid;
-  gap: 16px;
-  padding: 18px;
-  border: 1px solid color-mix(in srgb, var(--doctor-color) 34%, var(--line));
-  border-top: 4px solid var(--doctor-color);
-  border-radius: 14px;
-  background: #ffffff;
-  box-shadow: var(--shadow-elevated);
   /* Prevent grid-item min-width:auto from propagating the Case Audit table's
      intrinsic minimum width up through the .doctor-cockpit grid track. */
   min-width: 0;
-}
-
-body[data-view="doctor"] .selected-doctor-head {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  gap: 14px;
-  align-items: center;
-}
-
-body[data-view="doctor"] .selected-doctor-head h2 {
-  margin: 0 0 4px;
-  color: #0f172a;
-  font-size: 21px;
-  letter-spacing: 0;
-}
-
-body[data-view="doctor"] .selected-doctor-head p {
-  margin: 0;
-  color: #334155;
-  font-size: 14px;
-  line-height: 1.45;
-}
-
-body[data-view="doctor"] .selected-doctor-tabs {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  padding-bottom: 10px;
-  border-bottom: 1px solid #e2e8f0;
-}
-
-body[data-view="doctor"] .selected-doctor-tab {
-  width: auto;
-  min-height: 40px;
-  padding: 0 14px;
-  border: 1px solid transparent;
-  border-radius: 8px;
-  background: transparent;
-  color: #334155;
-  font-size: 14px;
-  font-weight: 850;
-}
-
-body[data-view="doctor"] .selected-doctor-tab.is-active {
-  border-color: color-mix(in srgb, var(--doctor-color) 30%, #cbd5e1);
-  background: color-mix(in srgb, var(--doctor-color) 10%, #ffffff);
-  color: #0f172a;
-  box-shadow: inset 0 -2px 0 var(--doctor-color);
-}
-
-body[data-view="doctor"] .selected-doctor-tab-panel {
-  /* Stops the grid item from growing to the table's intrinsic minimum width,
-     which combined with overflow-x:auto on .selected-doctor-audit creates
-     a local scroll container instead of a page-level one. */
-  min-width: 0;
-}
-
-body[data-view="doctor"] .selected-doctor-overview {
-  display: grid;
-  grid-template-columns: minmax(240px, 1fr) minmax(360px, 1.3fr);
-  gap: 16px;
-  align-items: stretch;
-}
-
-body[data-view="doctor"] .selected-doctor-summary {
-  display: grid;
-  align-content: start;
-  gap: 8px;
-  padding: 16px;
-  border: var(--border-thin) solid var(--neutral-200);
-  border-radius: var(--radius-panel);
-  background: var(--neutral-100);
-}
-
-body[data-view="doctor"] .selected-doctor-summary h3 {
-  margin: 0;
-  color: var(--neutral-900);
-  font-size: 17px;
-  letter-spacing: 0;
-}
-
-body[data-view="doctor"] .selected-doctor-summary p {
-  margin: 0;
-  color: var(--neutral-700);
-  line-height: 1.45;
-}
-
-body[data-view="doctor"] .selected-doctor-kpis {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 10px;
-  margin: 0;
-}
-
-body[data-view="doctor"] .selected-doctor-kpis > div {
-  display: grid;
-  gap: 6px;
-  padding: 14px;
-  border: 1px solid #e2e8f0;
-  border-radius: 12px;
-  background: #ffffff;
-}
-
-body[data-view="doctor"] .selected-doctor-kpis dt {
-  color: #64748b;
-  font-size: 12px;
-  font-weight: 850;
-}
-
-body[data-view="doctor"] .selected-doctor-kpis dd {
-  margin: 0;
-  color: #0f172a;
-  font-size: 18px;
-  font-weight: 900;
-  font-variant-numeric: tabular-nums;
-}
-
-body[data-view="doctor"] .selected-doctor-audit {
-  display: grid;
-  gap: 10px;
-  overflow-x: auto;
-}
-
-body[data-view="doctor"] .report-empty-note {
-  margin: 0;
-  padding: 16px;
-  color: var(--muted);
-  font-weight: 700;
 }
 
 /* ------------------------------------------------------------------

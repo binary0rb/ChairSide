@@ -219,6 +219,115 @@ public sealed class BoardReadyPresentationTests
     }
 
     [Fact]
+    public void Reports_and_doctor_cockpit_share_only_the_selected_doctor_foundation()
+    {
+        var root = FindRepositoryRoot();
+        var styles = File.ReadAllText(Path.Combine(root, "src", "ChairSide.Board", "wwwroot", "styles.css"));
+        var sharedSuffixes = new[]
+        {
+            ".selected-doctor-panel",
+            ".selected-doctor-head",
+            ".selected-doctor-head h2",
+            ".selected-doctor-head p",
+            ".selected-doctor-tabs",
+            ".selected-doctor-tab",
+            ".selected-doctor-tab.is-active",
+            ".selected-doctor-tab-panel",
+            ".selected-doctor-overview",
+            ".selected-doctor-summary",
+            ".selected-doctor-summary h3",
+            ".selected-doctor-summary p",
+            ".selected-doctor-kpis",
+            ".selected-doctor-kpis > div",
+            ".selected-doctor-kpis dt",
+            ".selected-doctor-kpis dd",
+            ".selected-doctor-audit",
+            ".report-empty-note"
+        };
+
+        Assert.All(sharedSuffixes, suffix =>
+        {
+            var reportsSelector = $"""body[data-view="reports"] {suffix}""";
+            var doctorSelector = $"""body[data-view="doctor"] {suffix}""";
+            Assert.Single(Regex.Matches(
+                styles,
+                $@"(?ms)^[ \t]*{Regex.Escape(reportsSelector)}\s*,\s*"
+                + $@"^[ \t]*{Regex.Escape(doctorSelector)}\s*\{{"));
+        });
+
+        var selectorsWithAdditionalContextRules = new Dictionary<string, (int Reports, int Doctor)>
+        {
+            [".selected-doctor-panel"] = (1, 2),
+            [".selected-doctor-overview"] = (2, 1),
+            [".selected-doctor-kpis"] = (2, 1)
+        };
+        Assert.All(sharedSuffixes, suffix =>
+        {
+            var expected = selectorsWithAdditionalContextRules.GetValueOrDefault(suffix, (1, 1));
+            Assert.Equal(
+                expected.Item1,
+                CountSelectorOccurrences(styles, $"""body[data-view="reports"] {suffix}"""));
+            Assert.Equal(
+                expected.Item2,
+                CountSelectorOccurrences(styles, $"""body[data-view="doctor"] {suffix}"""));
+        });
+
+        Assert.Matches(
+            @"(?s)body\[data-view=""doctor""\] \.selected-doctor-panel\s*\{"
+            + @"[^}]*min-width:\s*0;",
+            styles);
+        Assert.Matches(
+            @"(?s)body\[data-view=""reports""\] \.doctor-report-dashboard\[hidden\],\s*"
+            + @"body\[data-view=""reports""\] \.selected-doctor-panel\[hidden\]\s*"
+            + @"\{[^}]*display:\s*none;",
+            styles);
+        Assert.Matches(
+            @"(?s)body\[data-view=""doctor""\] \.doctor-report-snapshot\[hidden\],\s*"
+            + @"body\[data-view=""doctor""\] \.selected-doctor-panel\[hidden\]\s*"
+            + @"\{[^}]*display:\s*none;",
+            styles);
+        Assert.DoesNotMatch(
+            @"(?s)body\[data-view=""reports""\] \.doctor-report-dashboard\[hidden\][^{]*"
+            + @"body\[data-view=""doctor""\] \.doctor-report-snapshot\[hidden\]",
+            styles);
+
+        Assert.Matches(
+            @"(?s)body\[data-view=""reports""\] \.selected-doctor-tab\.is-active,\s*"
+            + @"body\[data-view=""doctor""\] \.selected-doctor-tab\.is-active\s*"
+            + @"\{[^}]*box-shadow:\s*inset 0 -2px 0 var\(--doctor-color\);",
+            styles);
+        Assert.Matches(@"(?s)button\s*\{[^}]*cursor:\s*pointer;", styles);
+        Assert.DoesNotMatch(
+            @"(?s)\.selected-doctor-tab(?::focus-visible)?[^{]*\{[^}]*(?:outline:\s*(?:0|none)|outline-width:\s*0)",
+            styles);
+
+        Assert.Contains("--neutral-100: #f8fafc;", styles, StringComparison.Ordinal);
+        Assert.Contains("--neutral-200: #e2e8f0;", styles, StringComparison.Ordinal);
+        Assert.Contains("--neutral-700: #334155;", styles, StringComparison.Ordinal);
+        Assert.Contains("--neutral-900: #0f172a;", styles, StringComparison.Ordinal);
+        Assert.Contains("--radius-panel: 12px;", styles, StringComparison.Ordinal);
+        Assert.Contains("--border-thin: 1px;", styles, StringComparison.Ordinal);
+        Assert.Contains("--shadow-elevated: 0 10px 26px rgba(23, 32, 51, 0.08);", styles, StringComparison.Ordinal);
+
+        var distinctFamilies = new[]
+        {
+            ".metric-card",
+            ".workshop-card",
+            ".doctor-report-card",
+            ".report-disclosure",
+            ".access-card",
+            ".report-access-panel",
+            ".room-tile"
+        };
+        Assert.All(distinctFamilies, family =>
+            Assert.DoesNotMatch(
+                $@"(?ms)^[^{{}}]*{Regex.Escape(family)}[^{{}}]*,\s*"
+                + @"body\[data-view=""(?:reports|doctor)""\] \.selected-doctor",
+                styles));
+        Assert.DoesNotMatch(@"(?m)^[ \t]*\.card(?:\s|[,{.#:>])", styles);
+    }
+
+    [Fact]
     public void Doctor_operational_header_and_room_panel_contracts_remain_in_place()
     {
         var root = FindRepositoryRoot();
@@ -339,6 +448,9 @@ public sealed class BoardReadyPresentationTests
             .Select(match => match.Groups[1].Value)
             .OrderBy(value => value, StringComparer.Ordinal)
             .ToArray();
+
+    private static int CountSelectorOccurrences(string styles, string selector) =>
+        Regex.Matches(styles, Regex.Escape(selector) + @"(?=\s*(?:,|\{))").Count;
 
     private static string FindRepositoryRoot()
     {
