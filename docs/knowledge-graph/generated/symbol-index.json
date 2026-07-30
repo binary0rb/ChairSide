@@ -1,7 +1,7 @@
 ﻿{
     "generatedStamp":  "deterministic",
     "root":  ".",
-    "fileCount":  162,
+    "fileCount":  166,
     "files":  [
                   {
                       "path":  ".github/pull_request_template.md",
@@ -869,7 +869,7 @@
                   {
                       "path":  "package.json",
                       "kind":  "Json",
-                      "sizeBytes":  1077,
+                      "sizeBytes":  1223,
                       "typeSymbols":  [
 
                                       ],
@@ -2660,7 +2660,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/application-state.js",
                       "kind":  "JavaScript",
-                      "sizeBytes":  1977,
+                      "sizeBytes":  791,
                       "typeSymbols":  [
 
                                       ],
@@ -2714,7 +2714,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/board.js",
                       "kind":  "JavaScript",
-                      "sizeBytes":  113335,
+                      "sizeBytes":  34618,
                       "typeSymbols":  [
 
                                       ],
@@ -2734,16 +2734,6 @@
                                               "loadVersionBadge",
                                               "boot",
                                               "loadBoard",
-                                              "loadReports",
-                                              "initDateRange",
-                                              "reportsRequestUrl",
-                                              "utcDateString",
-                                              "computePresetRange",
-                                              "selectDateRangePreset",
-                                              "applyCustomDateRange",
-                                              "syncDateRangeControls",
-                                              "wireDateRange",
-                                              "renderReportWindow",
                                               "render",
                                               "applySnapshot",
                                               "syncTrainingEnvironmentBadge",
@@ -2759,58 +2749,39 @@
                                               "wireStaffLoungePanel",
                                               "renderDoctorView",
                                               "setDoctorRoomCount",
-                                              "renderDoctorCockpit",
-                                              "renderReports",
-                                              "renderReportHeadline",
-                                              "renderHeadlineCard",
-                                              "renderReportTrendCards",
-                                              "renderWaitTrendCard",
-                                              "renderTurnoverTrendCard",
-                                              "renderTrendCard",
-                                              "trendBucketsWithCases",
-                                              "describeTrendComparison",
-                                              "formatTrendMinutes",
-                                              "formatTrendBucketRange",
-                                              "parseReportDateOnly",
-                                              "formatReportDateOnly",
-                                              "renderDoctorReportDashboard",
-                                              "syncSelectedReportDoctor",
-                                              "renderAllocationReports",
-                                              "renderAllocationBalanceCard",
-                                              "renderDataQualityCard",
-                                              "renderDoctorAllocation",
-                                              "aggregateAllocationByDoctor",
-                                              "renderDoctorCardBody",
-                                              "renderDoctorAllocationCard",
-                                              "renderDoctorSparkline",
-                                              "doctorAllocationSummary",
-                                              "mainPressurePoint",
-                                              "renderSelectedDoctorPanel",
-                                              "renderDoctorReportTabButton",
-                                              "renderSelectedDoctorTabContent",
-                                              "renderSelectedDoctorEmptyState",
-                                              "renderSelectedDoctorOverview",
-                                              "observedLoadNumber",
-                                              "renderSelectedDoctorFlow",
-                                              "formatObservedDayDate",
-                                              "describePeakActiveLoad",
-                                              "renderSelectedDoctorProcedures",
-                                              "formatProcedureShare",
-                                              "renderSelectedDoctorAudit",
+                                              "renderRoomTokenPrompt",
+                                              "wireRoomTokenPrompt",
+                                              "showRoomTokenPrompt",
+                                              "roomTokenStorageKey",
+                                              "getStoredRoomToken",
+                                              "saveRoomToken",
+                                              "clearStoredRoomToken",
                                               "initialsFromDoctorName",
                                               "doctorInitials",
-                                              "formatAbsoluteMinutes",
-                                              "formatSignedMinutes",
-                                              "renderDoctorAllocationRow",
-                                              "renderProcedureAllocation",
-                                              "renderProcedureAllocationRow",
-                                              "describeAllocation",
-                                              "formatAverageVariancePerCase",
-                                              "varianceClass",
-                                              "renderVarianceBadge",
-                                              "renderAverageVarianceBadge",
-                                              "renderReportFilterBar",
-                                              "syncReportFilterButtons"
+                                              "reportDoctorIdentity",
+                                              "doctorName",
+                                              "getRoomId",
+                                              "getRoomCount",
+                                              "renderInvalidRoomMessage",
+                                              "procedureFromCode",
+                                              "renderProcedureBadge",
+                                              "renderProcedureIcon",
+                                              "renderEmptyIcon",
+                                              "hasSedationModifier",
+                                              "stripSedationModifier",
+                                              "formatProcedureCode",
+                                              "resolveProcedureAccent",
+                                              "procedureAccentStyle",
+                                              "populateDemoTimerSelect",
+                                              "applyDemoTimerVisibility",
+                                              "isDemoTimerEnabled",
+                                              "getAgingMinutes",
+                                              "getStaleMinutes",
+                                              "thresholdMinutes",
+                                              "applyRoomMutationToSnapshot",
+                                              "wireClientErrorCapture",
+                                              "reportError",
+                                              "buildPayload"
                                           ],
                       "headings":  [
 
@@ -2845,7 +2816,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/common-interactions.js",
                       "kind":  "JavaScript",
-                      "sizeBytes":  2863,
+                      "sizeBytes":  2933,
                       "typeSymbols":  [
 
                                       ],
@@ -2933,7 +2904,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/dom-utils.js",
                       "kind":  "JavaScript",
-                      "sizeBytes":  1132,
+                      "sizeBytes":  1149,
                       "typeSymbols":  [
 
                                       ],
@@ -3095,6 +3066,49 @@
                                    ]
                   },
                   {
+                      "path":  "src/ChairSide.Board/wwwroot/report-data.js",
+                      "kind":  "JavaScript",
+                      "sizeBytes":  3641,
+                      "typeSymbols":  [
+
+                                      ],
+                      "methodSymbols":  [
+
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+                                              "createReportData",
+                                              "getReports",
+                                              "getVersion",
+                                              "getDateRange",
+                                              "setDateRange",
+                                              "useLastSevenDays",
+                                              "useMonthToDate",
+                                              "useLastThirtyDays",
+                                              "usePreset",
+                                              "load",
+                                              "reload",
+                                              "reportsRequestUrl",
+                                              "request",
+                                              "currentAdminHeaders",
+                                              "clearRejectedToken",
+                                              "currentDate",
+                                              "utcDateString",
+                                              "computePresetRange"
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
                       "path":  "src/ChairSide.Board/wwwroot/reports.html",
                       "kind":  "Html",
                       "sizeBytes":  9871,
@@ -3115,6 +3129,111 @@
                                        ],
                       "scriptFunctions":  [
 
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
+                      "path":  "src/ChairSide.Board/wwwroot/reports.js",
+                      "kind":  "JavaScript",
+                      "sizeBytes":  74900,
+                      "typeSymbols":  [
+
+                                      ],
+                      "methodSymbols":  [
+
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+                                              "createReports",
+                                              "selectDateRangePreset",
+                                              "applyCustomDateRange",
+                                              "syncDateRangeControls",
+                                              "wireDateRange",
+                                              "renderReportWindow",
+                                              "renderDoctorCockpit",
+                                              "renderReports",
+                                              "renderReportHeadline",
+                                              "renderHeadlineCard",
+                                              "renderReportTrendCards",
+                                              "renderWaitTrendCard",
+                                              "renderTurnoverTrendCard",
+                                              "renderTrendCard",
+                                              "trendBucketsWithCases",
+                                              "describeTrendComparison",
+                                              "formatTrendMinutes",
+                                              "formatTrendBucketRange",
+                                              "parseReportDateOnly",
+                                              "formatReportDateOnly",
+                                              "renderDoctorReportDashboard",
+                                              "syncSelectedReportDoctor",
+                                              "renderAllocationReports",
+                                              "renderAllocationBalanceCard",
+                                              "renderDataQualityCard",
+                                              "renderDoctorAllocation",
+                                              "aggregateAllocationByDoctor",
+                                              "renderDoctorCardBody",
+                                              "renderDoctorAllocationCard",
+                                              "renderDoctorSparkline",
+                                              "doctorAllocationSummary",
+                                              "mainPressurePoint",
+                                              "renderSelectedDoctorPanel",
+                                              "renderDoctorReportTabButton",
+                                              "renderSelectedDoctorTabContent",
+                                              "renderSelectedDoctorEmptyState",
+                                              "renderSelectedDoctorOverview",
+                                              "observedLoadNumber",
+                                              "renderSelectedDoctorFlow",
+                                              "formatObservedDayDate",
+                                              "describePeakActiveLoad",
+                                              "renderSelectedDoctorProcedures",
+                                              "formatProcedureShare",
+                                              "renderSelectedDoctorAudit",
+                                              "formatAbsoluteMinutes",
+                                              "formatSignedMinutes",
+                                              "renderDoctorAllocationRow",
+                                              "renderProcedureAllocation",
+                                              "renderProcedureAllocationRow",
+                                              "describeAllocation",
+                                              "formatAverageVariancePerCase",
+                                              "varianceClass",
+                                              "renderVarianceBadge",
+                                              "renderAverageVarianceBadge",
+                                              "renderReportFilterBar",
+                                              "syncReportFilterButtons",
+                                              "getInsightSummaries",
+                                              "insightsHeadingText",
+                                              "renderGroupedInsights",
+                                              "renderInsightCard",
+                                              "renderFullMetrics",
+                                              "renderCompletedCycles",
+                                              "formatAllocationMinutes",
+                                              "formatDurationMinutes",
+                                              "formatApproxDurationMinutes",
+                                              "formatAllocationVariance",
+                                              "revealReportDisclosures",
+                                              "isSedationProcedureCodeClient",
+                                              "filterCyclesBySedation",
+                                              "filterSummariesBySedation",
+                                              "noMatchMessage",
+                                              "renderProcedureSummaries",
+                                              "renderProcedureSummaryRow",
+                                              "renderExceptionCycles",
+                                              "renderExceptionRow",
+                                              "wireReportsActions",
+                                              "handleReportsCardKeydown",
+                                              "wireReportFilters",
+                                              "wireReportPressGuard",
+                                              "wireDoctorCockpitActions"
                                           ],
                       "headings":  [
 
@@ -3451,7 +3570,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/workshop.js",
                       "kind":  "JavaScript",
-                      "sizeBytes":  8870,
+                      "sizeBytes":  9058,
                       "typeSymbols":  [
 
                                       ],
@@ -3487,7 +3606,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/AfterHoursReviewEndpointTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  8548,
+                      "sizeBytes":  8549,
                       "typeSymbols":  [
                                           "AfterHoursReviewEndpointTests"
                                       ],
@@ -5403,7 +5522,7 @@
                   {
                       "path":  "tests/javascript/common-interactions.test.mjs",
                       "kind":  "JavaScript",
-                      "sizeBytes":  10439,
+                      "sizeBytes":  10733,
                       "typeSymbols":  [
 
                                       ],
@@ -5433,7 +5552,7 @@
                   {
                       "path":  "tests/javascript/connection-status.test.mjs",
                       "kind":  "JavaScript",
-                      "sizeBytes":  15953,
+                      "sizeBytes":  15959,
                       "typeSymbols":  [
 
                                       ],
@@ -5462,7 +5581,7 @@
                   {
                       "path":  "tests/javascript/leaf-utilities.test.mjs",
                       "kind":  "JavaScript",
-                      "sizeBytes":  4034,
+                      "sizeBytes":  4422,
                       "typeSymbols":  [
 
                                       ],
@@ -5488,7 +5607,7 @@
                   {
                       "path":  "tests/javascript/page-context-state.test.mjs",
                       "kind":  "JavaScript",
-                      "sizeBytes":  6757,
+                      "sizeBytes":  6522,
                       "typeSymbols":  [
 
                                       ],
@@ -5514,7 +5633,7 @@
                   {
                       "path":  "tests/javascript/realtime-polling.test.mjs",
                       "kind":  "JavaScript",
-                      "sizeBytes":  14660,
+                      "sizeBytes":  14666,
                       "typeSymbols":  [
 
                                       ],
@@ -5542,9 +5661,71 @@
                                    ]
                   },
                   {
+                      "path":  "tests/javascript/report-data.test.mjs",
+                      "kind":  "JavaScript",
+                      "sizeBytes":  7086,
+                      "typeSymbols":  [
+
+                                      ],
+                      "methodSymbols":  [
+
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+                                              "response",
+                                              "createHarness"
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
+                      "path":  "tests/javascript/reports.test.mjs",
+                      "kind":  "JavaScript",
+                      "sizeBytes":  18635,
+                      "typeSymbols":  [
+
+                                      ],
+                      "methodSymbols":  [
+
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+                                              "wirePressInterruptionGuard",
+                                              "adminRequestHeaders",
+                                              "clearAdminToken",
+                                              "storeAdminToken",
+                                              "targetFor",
+                                              "allocation",
+                                              "reportPayload",
+                                              "createFilterChip",
+                                              "createHarness",
+                                              "selectedCard"
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
                       "path":  "tests/javascript/request-utils.test.mjs",
                       "kind":  "JavaScript",
-                      "sizeBytes":  5939,
+                      "sizeBytes":  6384,
                       "typeSymbols":  [
 
                                       ],
@@ -5630,7 +5811,7 @@
                   {
                       "path":  "tests/javascript/runtime-scheduling.test.mjs",
                       "kind":  "JavaScript",
-                      "sizeBytes":  3426,
+                      "sizeBytes":  3440,
                       "typeSymbols":  [
 
                                       ],
@@ -5656,7 +5837,7 @@
                   {
                       "path":  "tests/javascript/workshop.test.mjs",
                       "kind":  "JavaScript",
-                      "sizeBytes":  10365,
+                      "sizeBytes":  10681,
                       "typeSymbols":  [
 
                                       ],

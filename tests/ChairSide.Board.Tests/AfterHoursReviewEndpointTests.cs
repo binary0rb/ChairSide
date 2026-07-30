@@ -120,17 +120,17 @@ public sealed class AfterHoursReviewEndpointTests
     [Fact]
     public void Review_ui_routes_numeric_ids_by_explicit_source_type()
     {
-        var boardJs = File.ReadAllText(Path.Combine(
+        var reportsJs = File.ReadAllText(Path.Combine(
             FindRepositoryRoot(),
             "src",
             "ChairSide.Board",
             "wwwroot",
-            "board.js"));
+            "reports.js"));
 
-        Assert.Contains("data-review-source", boardJs, StringComparison.Ordinal);
-        Assert.Contains("sourceType === \"AbortedAssignment\"", boardJs, StringComparison.Ordinal);
-        Assert.Contains("aborted-assignments/${reviewRecordId}", boardJs, StringComparison.Ordinal);
-        Assert.Contains("cycles/${reviewRecordId}", boardJs, StringComparison.Ordinal);
+        Assert.Contains("data-review-source", reportsJs, StringComparison.Ordinal);
+        Assert.Contains("sourceType === \"AbortedAssignment\"", reportsJs, StringComparison.Ordinal);
+        Assert.Contains("aborted-assignments/${reviewRecordId}", reportsJs, StringComparison.Ordinal);
+        Assert.Contains("cycles/${reviewRecordId}", reportsJs, StringComparison.Ordinal);
     }
 
     private static RoomExpirationOptions SweepOptions() =>

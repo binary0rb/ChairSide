@@ -486,7 +486,7 @@ test("module ownership and dependency direction stay narrow and one-way", () => 
     /import \{ connectRealtime, registerBoardPolling \} from "\.\/realtime-polling\.js";/);
   assert.match(
     boardSource,
-    /connectRealtime\(\{\s*applySnapshot,\s*refreshReportsAfterBoardUpdate: pageContext\.isReports \? loadReports : null,\s*render,\s*refreshConnectionStatus: updateConnectionStatus,\s*setConnectionStatus,\s*loadBoard\s*\}\);/);
+    /connectRealtime\(\{\s*applySnapshot,\s*refreshReportsAfterBoardUpdate: pageContext\.isReports \? reportData\.reload : null,\s*render,\s*refreshConnectionStatus: updateConnectionStatus,\s*setConnectionStatus,\s*loadBoard\s*\}\);/);
   assert.match(boardSource, /registerBoardPolling\(loadBoard\);/);
   assert.doesNotMatch(boardSource, /function (connectRealtime|markRealtimeDegraded|scheduleRealtimeRetry)\b/);
 });

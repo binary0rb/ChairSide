@@ -448,7 +448,7 @@ test("module ownership, call sites, and dependency direction remain narrow and o
   assert.doesNotMatch(realtimeSource, /connection-status\.js/);
   assert.match(
     boardSource,
-    /connectRealtime\(\{\s*applySnapshot,\s*refreshReportsAfterBoardUpdate: pageContext\.isReports \? loadReports : null,\s*render,\s*refreshConnectionStatus: updateConnectionStatus,\s*setConnectionStatus,\s*loadBoard\s*\}\);/);
+    /connectRealtime\(\{\s*applySnapshot,\s*refreshReportsAfterBoardUpdate: pageContext\.isReports \? reportData\.reload : null,\s*render,\s*refreshConnectionStatus: updateConnectionStatus,\s*setConnectionStatus,\s*loadBoard\s*\}\);/);
   assert.match(
     boardSource,
     /registerBoardPolling\(loadBoard\);\s*registerGeneralRender\(render\);\s*registerConnectionStatusRefresh\(\);\s*updateConnectionStatus\(\);/);

@@ -85,19 +85,28 @@ test("date-time formatting preserves fallback and locale-aware output", () => {
   assert.equal(formatDateTime(value), expected);
 });
 
-test("board owns call sites while leaf utilities remain one-way dependencies", async () => {
+test("callers import leaf utilities while their dependency direction remains one-way", async () => {
   const board = await readFile(
     new URL("../../src/ChairSide.Board/wwwroot/board.js", import.meta.url),
     "utf8");
+  const reports = await readFile(
+    new URL("../../src/ChairSide.Board/wwwroot/reports.js", import.meta.url),
+    "utf8");
   assert.match(
     board,
+    /import \{ escapeAttribute, escapeHtml \} from "\.\/dom-utils\.js";/);
+  assert.match(
+    reports,
     /import \{ escapeAttribute, escapeHtml, renderHelpIcon \} from "\.\/dom-utils\.js";/);
   assert.match(
-    board,
+    reports,
     /import \{ formatDateTime, formatDuration \} from "\.\/format-utils\.js";/);
   assert.doesNotMatch(
     board,
     /function (escapeHtml|escapeAttribute|renderHelpIcon|setDisabled|setHidden|formatDuration|formatDateTime)\b/);
+  assert.doesNotMatch(
+    reports,
+    /function (escapeHtml|escapeAttribute|renderHelpIcon|setDisabled|setHidden|formatDateTime)\b/);
 
   for (const utilitySource of [domUtilsSource, formatUtilsSource]) {
     assert.doesNotMatch(utilitySource, /\bimport\b/);

@@ -62,10 +62,10 @@ test("boot preserves registration placement, ordering, page routing, and double-
     /if \(app\.pollHandle \|\| app\.tickHandle \|\| app\.statusHandle\) \{[\s\S]*?return;\s*\}/);
   assert.match(
     boardSource,
-    /if \(pageContext\.isDoctor\) \{[\s\S]*?loadReports\(\);\s*registerReportRefresh\(loadReports\);\s*wireDoctorCockpitActions\(\);/);
+    /if \(pageContext\.isDoctor\) \{[\s\S]*?reportData\.load\(\);\s*registerReportRefresh\(reportData\.reload\);\s*reports\.wire\(\);/);
   assert.match(
     boardSource,
-    /if \(pageContext\.isWorkshop\) \{[\s\S]*?loadReports\(\);\s*registerReportRefresh\(loadReports\);\s*workshop\.wire\(\);/);
+    /if \(pageContext\.isWorkshop\) \{[\s\S]*?reportData\.load\(\);\s*registerReportRefresh\(reportData\.reload\);\s*workshop\.wire\(\);/);
   assert.match(
     boardSource,
     /connectRealtime\([\s\S]*?\);\s*registerBoardPolling\(loadBoard\);\s*registerGeneralRender\(render\);\s*registerConnectionStatusRefresh\(\);\s*updateConnectionStatus\(\);/);

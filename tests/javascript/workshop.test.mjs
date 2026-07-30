@@ -284,13 +284,13 @@ test("module ownership, adapter direction, and board delegation remain narrow", 
   assert.match(boardSource, /import \{ createWorkshop \} from "\.\/workshop\.js";/);
   assert.match(
     boardSource,
-    /const workshop = pageContext\.isWorkshop\s*\? createWorkshop\(\{ getReports: \(\) => app\.reports \}\)\s*: null;/);
+    /const workshop = pageContext\.isWorkshop\s*\? createWorkshop\(\{ getReports: reportData\.getReports \}\)\s*: null;/);
   assert.match(
     boardSource,
     /if \(pageContext\.isWorkshop\) \{[\s\S]*?workshop\.render\(\);[\s\S]*?\}/);
   assert.match(
     boardSource,
-    /if \(pageContext\.isWorkshop\) \{[\s\S]*?loadReports\(\);\s*registerReportRefresh\(loadReports\);\s*workshop\.wire\(\);/);
+    /if \(pageContext\.isWorkshop\) \{[\s\S]*?reportData\.load\(\);\s*registerReportRefresh\(reportData\.reload\);\s*workshop\.wire\(\);/);
   assert.doesNotMatch(
     boardSource,
     /function (renderWorkshop|wireWorkshopPresetSelection|selectWorkshopPreset|renderProjectionReadiness|formatWholeMinutes|formatBlocks|formatUtilizationPercent)\b/);

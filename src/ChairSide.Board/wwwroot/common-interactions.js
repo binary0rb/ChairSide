@@ -7,20 +7,26 @@ let reportPressFailsafe = null;
 let pendingTilePress = null;
 let tilePressFailsafe = null;
 
-function clearReportPress(onCatchUp) {
+function clearReportPress({
+  isPressActive,
+  setPressActive,
+  onCatchUp
+}) {
   window.clearTimeout(reportPressFailsafe);
   reportPressFailsafe = null;
-  if (!app.reportPressActive) {
+  if (!isPressActive()) {
     return;
   }
 
-  app.reportPressActive = false;
+  setPressActive(false);
   onCatchUp();
 }
 
 export function wirePressInterruptionGuard({
   pressTarget,
   selector,
+  isPressActive,
+  setPressActive,
   onCatchUp
 }) {
   pressTarget.addEventListener("pointerdown", event => {
@@ -28,15 +34,19 @@ export function wirePressInterruptionGuard({
       return;
     }
 
-    app.reportPressActive = true;
+    setPressActive(true);
     window.clearTimeout(reportPressFailsafe);
     reportPressFailsafe = window.setTimeout(() => {
-      app.reportPressActive = false;
+      setPressActive(false);
       reportPressFailsafe = null;
     }, REPORT_PRESS_FAILSAFE_MS);
   });
 
-  const releasePress = () => clearReportPress(onCatchUp);
+  const releasePress = () => clearReportPress({
+    isPressActive,
+    setPressActive,
+    onCatchUp
+  });
   document.addEventListener("pointerup", releasePress);
   document.addEventListener("pointercancel", releasePress);
 }
