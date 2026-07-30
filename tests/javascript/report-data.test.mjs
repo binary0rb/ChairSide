@@ -23,6 +23,16 @@ function response(status, payload = null) {
   };
 }
 
+function deferred() {
+  let resolve;
+  let reject;
+  const promise = new Promise((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
+    reject = rejectPromise;
+  });
+  return { promise, reject, resolve };
+}
+
 function createHarness({
   fetch = async () => response(200, { marker: "reports" })
 } = {}) {
@@ -126,6 +136,64 @@ test("report GET preserves URL, admin headers, no-store cache, payload replaceme
   assert.equal(harness.controller.getVersion(), 2);
 });
 
+test("request context represents effective server bounds independently of preset labels", async () => {
+  let marker = 0;
+  const harness = createHarness({
+    fetch: async () => response(200, { marker: ++marker })
+  });
+  const loadRange = async range => {
+    harness.controller.setDateRange(range);
+    return harness.controller.load();
+  };
+
+  const custom = await loadRange({
+    preset: "custom",
+    start: "2026-07-01",
+    end: "2026-07-07"
+  });
+  const preset = await loadRange({
+    preset: "last7",
+    start: "2026-07-01",
+    end: "2026-07-07"
+  });
+  assert.equal(harness.calls[0].url, "/api/reports?from=2026-07-01&to=2026-07-07");
+  assert.equal(harness.calls[1].url, harness.calls[0].url);
+  assert.deepEqual(preset.requestContext, custom.requestContext);
+  assert.deepEqual(custom.requestContext, {
+    from: "2026-07-01",
+    to: "2026-07-07",
+    rangeSignature: "[\"2026-07-01\",\"2026-07-07\"]"
+  });
+
+  const different = await loadRange({
+    preset: "custom",
+    start: "2026-07-02",
+    end: "2026-07-07"
+  });
+  assert.notEqual(
+    different.requestContext.rangeSignature,
+    custom.requestContext.rangeSignature);
+
+  const allTime = await loadRange({
+    preset: "all",
+    start: null,
+    end: null
+  });
+  const allTimeWithIgnoredBounds = await loadRange({
+    preset: "all",
+    start: "2026-01-01",
+    end: "2026-07-30"
+  });
+  assert.equal(harness.calls[3].url, "/api/reports");
+  assert.equal(harness.calls[4].url, "/api/reports");
+  assert.deepEqual(allTimeWithIgnoredBounds.requestContext, allTime.requestContext);
+  assert.deepEqual(allTime.requestContext, {
+    from: null,
+    to: null,
+    rangeSignature: "[null,null]"
+  });
+});
+
 test("in-flight suppression shares one request and completion permits the next load", async () => {
   let resolveRequest;
   const deferred = new Promise(resolve => {
@@ -193,6 +261,168 @@ test("generic failure releases in-flight state without replacing data or version
   assert.equal(attempts, 2);
   assert.deepEqual(harness.controller.getReports(), { marker: "recovered" });
   assert.equal(harness.controller.getVersion(), 1);
+});
+
+test("guaranteed fresh reload starts one GET when no request is active", async () => {
+  const harness = createHarness({
+    fetch: async () => response(200, { marker: "fresh" })
+  });
+
+  harness.controller.setDateRange({
+    preset: "custom",
+    start: "2026-07-01",
+    end: "2026-07-15"
+  });
+  const result = await harness.controller.reloadAfterCurrent();
+
+  assert.equal(harness.calls.length, 1);
+  assert.deepEqual(harness.controller.getReports(), { marker: "fresh" });
+  assert.equal(harness.controller.getVersion(), 1);
+  assert.deepEqual(result, {
+    payload: { marker: "fresh" },
+    version: 1,
+    requestContext: {
+      from: "2026-07-01",
+      to: "2026-07-15",
+      rangeSignature: "[\"2026-07-01\",\"2026-07-15\"]"
+    }
+  });
+  assert.equal(harness.controller.getLastSuccessfulLoad(), result);
+});
+
+test("guaranteed fresh reload waits for an active GET and resolves from a second GET", async () => {
+  const active = deferred();
+  const fresh = deferred();
+  let attempt = 0;
+  const harness = createHarness({
+    fetch: async () => {
+      attempt += 1;
+      return attempt === 1 ? active.promise : fresh.promise;
+    }
+  });
+
+  const ordinary = harness.controller.load();
+  const guaranteed = harness.controller.reloadAfterCurrent();
+  assert.equal(harness.calls.length, 1);
+
+  active.resolve(response(200, { marker: "active" }));
+  await ordinary;
+  await Promise.resolve();
+  assert.equal(harness.calls.length, 2);
+  assert.deepEqual(harness.controller.getReports(), { marker: "active" });
+  assert.equal(harness.controller.getVersion(), 1);
+
+  let guaranteedSettled = false;
+  guaranteed.finally(() => {
+    guaranteedSettled = true;
+  });
+  await Promise.resolve();
+  assert.equal(guaranteedSettled, false);
+
+  fresh.resolve(response(200, { marker: "fresh" }));
+  const guaranteedResult = await guaranteed;
+  assert.equal(guaranteedSettled, true);
+  assert.deepEqual(harness.controller.getReports(), { marker: "fresh" });
+  assert.equal(harness.controller.getVersion(), 2);
+  assert.equal(guaranteedResult.requestContext.rangeSignature, "[null,null]");
+});
+
+test("a failed active GET does not prevent the guaranteed fresh GET", async () => {
+  const active = deferred();
+  let attempt = 0;
+  const harness = createHarness({
+    fetch: async () => {
+      attempt += 1;
+      return attempt === 1
+        ? active.promise
+        : response(200, { marker: "fresh-after-failure" });
+    }
+  });
+
+  harness.controller.setDateRange({
+    preset: "custom",
+    start: "2026-07-20",
+    end: "2026-07-20"
+  });
+  const ordinary = harness.controller.load();
+  harness.controller.setDateRange({
+    preset: "custom",
+    start: "2026-07-21",
+    end: "2026-07-21"
+  });
+  const guaranteed = harness.controller.reloadAfterCurrent();
+  active.resolve(response(500));
+  await assert.rejects(ordinary, /HTTP 500/);
+  const result = await guaranteed;
+
+  assert.equal(harness.calls.length, 2);
+  assert.equal(
+    harness.calls[0].url,
+    "/api/reports?from=2026-07-20&to=2026-07-20");
+  assert.equal(
+    harness.calls[1].url,
+    "/api/reports?from=2026-07-21&to=2026-07-21");
+  assert.deepEqual(
+    harness.controller.getReports(),
+    { marker: "fresh-after-failure" });
+  assert.equal(harness.controller.getVersion(), 1);
+  assert.equal(
+    result.requestContext.rangeSignature,
+    "[\"2026-07-21\",\"2026-07-21\"]");
+});
+
+test("guaranteed fresh reload propagates its own failure without replacing payload or version", async () => {
+  let attempt = 0;
+  const harness = createHarness({
+    fetch: async () => {
+      attempt += 1;
+      return attempt === 1
+        ? response(200, { marker: "baseline" })
+        : response(503);
+    }
+  });
+
+  await harness.controller.load();
+  const successfulLoad = harness.controller.getLastSuccessfulLoad();
+  await assert.rejects(
+    harness.controller.reloadAfterCurrent(),
+    /HTTP 503/);
+
+  assert.deepEqual(harness.controller.getReports(), { marker: "baseline" });
+  assert.equal(harness.controller.getVersion(), 1);
+  assert.equal(harness.controller.getLastSuccessfulLoad(), successfulLoad);
+});
+
+test("overlapping guaranteed fresh callers coalesce while waiting for the same post-current read", async () => {
+  const active = deferred();
+  const fresh = deferred();
+  let attempt = 0;
+  const harness = createHarness({
+    fetch: async () => {
+      attempt += 1;
+      return attempt === 1 ? active.promise : fresh.promise;
+    }
+  });
+
+  const ordinary = harness.controller.load();
+  const first = harness.controller.reloadAfterCurrent();
+  const second = harness.controller.reloadAfterCurrent();
+  assert.equal(first, second);
+
+  active.resolve(response(200, { marker: "active" }));
+  await ordinary;
+  await Promise.resolve();
+  assert.equal(harness.calls.length, 2);
+
+  fresh.resolve(response(200, { marker: "coalesced-fresh" }));
+  const [firstResult, secondResult] = await Promise.all([first, second]);
+  assert.equal(harness.calls.length, 2);
+  assert.equal(firstResult, secondResult);
+  assert.equal(firstResult.requestContext.rangeSignature, "[null,null]");
+  assert.deepEqual(
+    harness.controller.getReports(),
+    { marker: "coalesced-fresh" });
+  assert.equal(harness.controller.getVersion(), 2);
 });
 
 test("controller invokes live adapter callbacks instead of construction-time copies", async () => {

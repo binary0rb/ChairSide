@@ -112,6 +112,10 @@ This file records decisions that should survive across tasks, PRs, and debugging
 
 **Decision:** Reporting favors summary cards, plain-English interpretation, progressive disclosure, and operational questions over dense rankings or punitive comparisons.
 
+**Decision:** Report exception mutations use visible inline pending, success, failure, and reconciliation feedback. Consequential inclusion-changing and review-finalizing actions retain explicit confirmation. Mutation success and report-refresh success are represented separately, and uncertain outcomes require a fresh read before mutation retry.
+
+**Rationale:** Blocking alerts erase context and cannot distinguish a committed mutation from a failed refresh. Per-record pending guards, inline accessible status, and fresh reconciliation prevent duplicate side effects while preserving server authority.
+
 ## Completed follow-up work
 
 - Knowledge-graph comment/string false-positive extraction was corrected by issue #126 / PR #142 (`47da8f9`).

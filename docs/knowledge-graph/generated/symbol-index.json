@@ -607,7 +607,7 @@
                   {
                       "path":  "docs/knowledge-graph/decisions.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  13535,
+                      "sizeBytes":  14138,
                       "typeSymbols":  [
 
                                       ],
@@ -3068,7 +3068,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/report-data.js",
                       "kind":  "JavaScript",
-                      "sizeBytes":  3803,
+                      "sizeBytes":  5771,
                       "typeSymbols":  [
 
                                       ],
@@ -3088,19 +3088,24 @@
                                               "createReportData",
                                               "getReports",
                                               "getVersion",
+                                              "getLastSuccessfulLoad",
                                               "getDateRange",
+                                              "getRangeSignature",
                                               "setDateRange",
                                               "useLastSevenDays",
                                               "useMonthToDate",
                                               "useLastThirtyDays",
                                               "usePreset",
+                                              "startLoad",
                                               "load",
                                               "reload",
+                                              "reloadAfterCurrent",
                                               "reportsRequestUrl",
                                               "request",
                                               "currentAdminHeaders",
                                               "clearRejectedToken",
                                               "currentDate",
+                                              "createReportRequestContext",
                                               "utcDateString",
                                               "computePresetRange"
                                           ],
@@ -3111,7 +3116,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/reports.html",
                       "kind":  "Html",
-                      "sizeBytes":  9871,
+                      "sizeBytes":  10400,
                       "typeSymbols":  [
 
                                       ],
@@ -3137,7 +3142,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/reports.js",
                       "kind":  "JavaScript",
-                      "sizeBytes":  76812,
+                      "sizeBytes":  102778,
                       "typeSymbols":  [
 
                                       ],
@@ -3227,13 +3232,13 @@
                                               "noMatchMessage",
                                               "renderProcedureSummaries",
                                               "renderProcedureSummaryRow",
-                                              "renderExceptionCycles",
-                                              "renderExceptionRow",
-                                              "wireReportsActions",
-                                              "handleReportsCardKeydown",
-                                              "wireReportFilters",
-                                              "wireReportPressGuard",
-                                              "wireDoctorCockpitActions"
+                                              "completedRecordKey",
+                                              "reviewRecordKey",
+                                              "reportRangeSignature",
+                                              "currentReportAction",
+                                              "normalizeReportIdentityTimestamp",
+                                              "isUnresolvedReportAction",
+                                              "unresolvedReportActionCount"
                                           ],
                       "headings":  [
 
@@ -3484,7 +3489,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/styles.css",
                       "kind":  "Css",
-                      "sizeBytes":  89676,
+                      "sizeBytes":  91978,
                       "typeSymbols":  [
 
                                       ],
@@ -3675,7 +3680,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/BoardReadyPresentationTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  25621,
+                      "sizeBytes":  28718,
                       "typeSymbols":  [
                                           "BoardReadyPresentationTests"
                                       ],
@@ -3687,6 +3692,7 @@
                                             "Reports_and_doctor_cockpit_share_only_the_selected_doctor_foundation",
                                             "Doctor_operational_header_and_room_panel_contracts_remain_in_place",
                                             "Primary_workflow_highlights_only_the_enabled_next_action",
+                                            "Reports_actions_use_sibling_live_regions_while_doctor_remains_read_only",
                                             "All_pages_use_the_ordered_native_module_bootstrap",
                                             "StateKey",
                                             "ElementIds",
@@ -5667,7 +5673,7 @@
                   {
                       "path":  "tests/javascript/report-data.test.mjs",
                       "kind":  "JavaScript",
-                      "sizeBytes":  7309,
+                      "sizeBytes":  14389,
                       "typeSymbols":  [
 
                                       ],
@@ -5685,6 +5691,7 @@
                                        ],
                       "scriptFunctions":  [
                                               "response",
+                                              "deferred",
                                               "createHarness"
                                           ],
                       "headings":  [
@@ -5694,7 +5701,7 @@
                   {
                       "path":  "tests/javascript/reports.test.mjs",
                       "kind":  "JavaScript",
-                      "sizeBytes":  19228,
+                      "sizeBytes":  66266,
                       "typeSymbols":  [
 
                                       ],
@@ -5715,11 +5722,19 @@
                                               "adminRequestHeaders",
                                               "clearAdminToken",
                                               "storeAdminToken",
+                                              "readErrorMessage",
+                                              "recordDomMutation",
                                               "targetFor",
                                               "allocation",
                                               "reportPayload",
                                               "createFilterChip",
                                               "createHarness",
+                                              "actionButton",
+                                              "dispatchAction",
+                                              "statusAction",
+                                              "feedbackEntry",
+                                              "completedCycle",
+                                              "deferred",
                                               "selectedCard"
                                           ],
                       "headings":  [

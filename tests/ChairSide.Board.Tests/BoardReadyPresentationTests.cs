@@ -398,6 +398,56 @@ public sealed class BoardReadyPresentationTests
     }
 
     [Fact]
+    public void Reports_actions_use_sibling_live_regions_while_doctor_remains_read_only()
+    {
+        var root = FindRepositoryRoot();
+        var webRoot = Path.Combine(root, "src", "ChairSide.Board", "wwwroot");
+        var reportsPage = File.ReadAllText(Path.Combine(webRoot, "reports.html"));
+        var doctorPage = File.ReadAllText(Path.Combine(webRoot, "doctor.html"));
+        var reportsScript = File.ReadAllText(Path.Combine(webRoot, "reports.js"));
+
+        Assert.Matches(
+            @"(?s)<div[^>]*\bid=""reportActionFeedback""[^>]*\btabindex=""-1""[^>]*\bhidden[^>]*>"
+            + @".*?<div[^>]*\bid=""reportActionStatusPolite""[^>]*\brole=""status""[^>]*"
+            + @"\baria-live=""polite""[^>]*\baria-atomic=""false""[^>]*></div>"
+            + @".*?<div[^>]*\bid=""reportActionStatusAssertive""[^>]*\brole=""alert""[^>]*"
+            + @"\baria-live=""assertive""[^>]*\baria-atomic=""false""[^>]*></div>"
+            + @".*?</div>",
+            reportsPage);
+        Assert.Contains(
+            "<main class=\"reports-shell\" id=\"reportsMain\" tabindex=\"-1\">",
+            reportsPage,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "<h2 id=\"reportAccessHeading\" tabindex=\"-1\">Reports Access</h2>",
+            reportsScript,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "<script type=\"module\" src=\"/bootstrap.js?v=20260728-native-module-bootstrap\"></script>",
+            reportsPage,
+            StringComparison.Ordinal);
+
+        Assert.DoesNotContain("reportActionFeedback", doctorPage, StringComparison.Ordinal);
+        Assert.DoesNotContain("reportActionStatusPolite", doctorPage, StringComparison.Ordinal);
+        Assert.DoesNotContain("reportActionStatusAssertive", doctorPage, StringComparison.Ordinal);
+        Assert.DoesNotContain("data-action=\"mark-exception\"", doctorPage, StringComparison.Ordinal);
+        Assert.DoesNotContain("data-action=\"confirm-exclusion\"", doctorPage, StringComparison.Ordinal);
+
+        Assert.DoesNotMatch(@"(?:window\.)?alert\s*\(", reportsScript);
+        Assert.Contains("document.createElement(\"article\")", reportsScript, StringComparison.Ordinal);
+        Assert.Contains("message.textContent = entry.message;", reportsScript, StringComparison.Ordinal);
+        Assert.True(Regex.Matches(reportsScript, @"\bconfirm\s*\(").Count >= 2);
+        Assert.Contains("/api/reports/cycles/mark-exception", reportsScript, StringComparison.Ordinal);
+        Assert.Contains("`cycles/${reviewRecordId}`", reportsScript, StringComparison.Ordinal);
+        Assert.Contains("`aborted-assignments/${reviewRecordId}`", reportsScript, StringComparison.Ordinal);
+        Assert.Contains(
+            "`/api/reports/${recordPath}/confirm-exclusion`",
+            reportsScript,
+            StringComparison.Ordinal);
+        Assert.Contains("sourceType === \"AbortedAssignment\"", reportsScript, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void All_pages_use_the_ordered_native_module_bootstrap()
     {
         var root = FindRepositoryRoot();

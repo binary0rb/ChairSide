@@ -2139,6 +2139,99 @@ body[data-view="reports"] .report-disclosure .report-table-section {
   padding-bottom: 16px;
 }
 
+body[data-view="reports"] .report-action-feedback,
+body[data-view="reports"] .report-action-feedback__polite,
+body[data-view="reports"] .report-action-feedback__assertive {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+body[data-view="reports"] .report-action-feedback[hidden] {
+  display: none;
+}
+
+body[data-view="reports"] .reports-shell:focus-visible {
+  outline: 3px solid #2563eb;
+  outline-offset: 2px;
+}
+
+body[data-view="reports"] .report-action-status-entry {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 4px 12px;
+  align-items: center;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.9);
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
+body[data-view="reports"] .report-action-status-entry strong {
+  font-size: 14px;
+}
+
+body[data-view="reports"] .report-action-status-entry span {
+  min-width: 0;
+}
+
+body[data-view="reports"] .report-action-status-entry[data-tone="pending"],
+body[data-view="reports"] .report-action-status-entry[data-tone="refresh"] {
+  border-color: #bfdbfe;
+  background: #eff6ff;
+  color: #1e3a8a;
+}
+
+body[data-view="reports"] .report-action-status-entry[data-tone="success"] {
+  border-color: #86efac;
+  background: #f0fdf4;
+  color: #14532d;
+}
+
+body[data-view="reports"] .report-action-status-entry[data-tone="error"],
+body[data-view="reports"] .report-action-status-entry[data-tone="unknown"] {
+  border-color: #fecaca;
+  background: #fef2f2;
+  color: #7f1d1d;
+}
+
+body[data-view="reports"] .report-action-status-controls {
+  display: flex;
+  gap: 8px;
+  grid-column: 1 / -1;
+}
+
+body[data-view="reports"] .report-action-status-controls .utility-button {
+  width: auto;
+  min-height: 36px;
+  padding: 6px 10px;
+  font-size: 14px;
+}
+
+body[data-view="reports"] [data-report-action-row]:focus-visible {
+  outline: 3px solid #2563eb;
+  outline-offset: -3px;
+}
+
+@media (max-width: 720px) {
+  body[data-view="reports"] .report-action-feedback {
+    position: sticky;
+    left: 16px;
+    width: calc(100vw - 32px);
+    max-width: 100%;
+  }
+
+  body[data-view="reports"] .report-action-status-entry {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  body[data-view="reports"] .report-action-status-controls {
+    flex-wrap: wrap;
+  }
+}
+
 .procedure-badge {
   display: inline-flex;
   align-items: center;
