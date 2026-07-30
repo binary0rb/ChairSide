@@ -11,9 +11,13 @@ const boardUrl = new URL(
 const roomWorkflowUrl = new URL(
   "../../src/ChairSide.Board/wwwroot/room-workflow.js",
   import.meta.url);
+const reportsUrl = new URL(
+  "../../src/ChairSide.Board/wwwroot/reports.js",
+  import.meta.url);
 const moduleSource = await readFile(moduleUrl, "utf8");
 const boardSource = await readFile(boardUrl, "utf8");
 const roomWorkflowSource = await readFile(roomWorkflowUrl, "utf8");
+const reportsSource = await readFile(reportsUrl, "utf8");
 let moduleSequence = 0;
 
 class FakeEventTarget {
@@ -91,7 +95,7 @@ async function createHarness(t) {
   windowTarget.clearTimeout = timers.clearTimeout;
   globalThis.document = documentTarget;
   globalThis.window = windowTarget;
-  const app = { reportPressActive: false, tilePressActive: false };
+  const app = { tilePressActive: false };
   return {
     app,
     documentTarget,
@@ -102,13 +106,18 @@ async function createHarness(t) {
 }
 
 test("report press guard preserves selectors, timeout replacement, cleanup, and catch-up behavior", async t => {
-  const { app, documentTarget, interactions, timers } = await createHarness(t);
+  const { documentTarget, interactions, timers } = await createHarness(t);
   const pressTarget = new FakeEventTarget();
   let catchUps = 0;
+  let reportPressActive = false;
   const selector = "[data-report-doctor-id], [data-report-doctor-tab], .report-table button";
   interactions.wirePressInterruptionGuard({
     pressTarget,
     selector,
+    isPressActive: () => reportPressActive,
+    setPressActive: value => {
+      reportPressActive = value;
+    },
     onCatchUp: () => {
       catchUps += 1;
     }
@@ -117,14 +126,14 @@ test("report press guard preserves selectors, timeout replacement, cleanup, and 
   pressTarget.dispatch("pointerdown", {
     target: closestTarget(new Map())
   });
-  assert.equal(app.reportPressActive, false);
+  assert.equal(reportPressActive, false);
   assert.equal(timers.timers.length, 0);
 
   const eligible = {};
   pressTarget.dispatch("pointerdown", {
     target: closestTarget(new Map([[selector, eligible]]))
   });
-  assert.equal(app.reportPressActive, true);
+  assert.equal(reportPressActive, true);
   assert.equal(timers.timers[0].cadence, 3000);
 
   pressTarget.dispatch("pointerdown", {
@@ -134,7 +143,7 @@ test("report press guard preserves selectors, timeout replacement, cleanup, and 
   assert.ok(timers.cleared.includes(timers.timers[0]));
 
   documentTarget.dispatch("pointerup");
-  assert.equal(app.reportPressActive, false);
+  assert.equal(reportPressActive, false);
   assert.equal(catchUps, 1);
   assert.ok(timers.cleared.includes(timers.timers[1]));
   documentTarget.dispatch("pointerup");
@@ -144,14 +153,14 @@ test("report press guard preserves selectors, timeout replacement, cleanup, and 
     target: closestTarget(new Map([[selector, eligible]]))
   });
   documentTarget.dispatch("pointercancel");
-  assert.equal(app.reportPressActive, false);
+  assert.equal(reportPressActive, false);
   assert.equal(catchUps, 2);
 
   pressTarget.dispatch("pointerdown", {
     target: closestTarget(new Map([[selector, eligible]]))
   });
   timers.timers.at(-1).callback();
-  assert.equal(app.reportPressActive, false);
+  assert.equal(reportPressActive, false);
   assert.equal(catchUps, 2);
   documentTarget.dispatch("pointerup");
   assert.equal(catchUps, 2);
@@ -269,14 +278,14 @@ test("workflow retains room decisions while common mechanics own only private in
     moduleSource,
     /\b(renderReports|renderDoctorView|selectedDoctorId|selectedProcedureId|sedationOn|expectedUnitsConfirmed|discardAssignmentDraft)\b/);
   assert.match(
-    boardSource,
+    reportsSource,
     /selector: "\[data-report-doctor-id\], \[data-report-doctor-tab\], \.report-table button"/);
   assert.match(
-    boardSource,
+    reportsSource,
     /function wireReportPressGuard\(\) \{[\s\S]*?onCatchUp: \(\) => \{[\s\S]*?renderReports\(\);/);
   assert.match(
-    boardSource,
-    /function wireDoctorCockpitPressGuard\(\) \{[\s\S]*?selector: "\[data-report-doctor-tab\]"[\s\S]*?renderDoctorView\(\);/);
+    reportsSource,
+    /function wireDoctorCockpitPressGuard\(\) \{[\s\S]*?selector: "\[data-report-doctor-tab\]"[\s\S]*?renderPage\(\);/);
   assert.match(
     roomWorkflowSource,
     /wireTileGroup\(doctorTiles,[\s\S]*?draft\.selectedDoctorId = button\.dataset\.doctorId;[\s\S]*?wireTileGroup\(procedureTiles,[\s\S]*?draft\.selectedProcedureId = button\.dataset\.procedureId;[\s\S]*?draft\.sedationOn = false;[\s\S]*?draft\.expectedUnitsConfirmed = false;/);
@@ -290,9 +299,10 @@ test("workflow retains room decisions while common mechanics own only private in
     roomWorkflowSource,
     /if \(!isTilePressActive\(\)\) \{[\s\S]*?syncRoomSelection\(room\);[\s\S]*?renderSelectionTiles\(room\);/);
   assert.equal(
-    (boardSource.match(/if \(app\.reportPressActive\)/g) || []).length,
+    (reportsSource.match(/if \(state\.reportPressActive\)/g) || []).length,
     3);
   assert.equal(
-    (boardSource.match(/if \(!app\.reportPressActive\)/g) || []).length,
+    (reportsSource.match(/if \(!state\.reportPressActive\)/g) || []).length,
     1);
+  assert.doesNotMatch(boardSource, /\breportPressActive\b/);
 });

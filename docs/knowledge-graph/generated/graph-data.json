@@ -561,10 +561,22 @@
                       "path":  "src/ChairSide.Board/wwwroot/realtime-polling.js"
                   },
                   {
+                      "id":  "file:src/ChairSide.Board/wwwroot/report-data.js",
+                      "label":  "src/ChairSide.Board/wwwroot/report-data.js",
+                      "type":  "File",
+                      "path":  "src/ChairSide.Board/wwwroot/report-data.js"
+                  },
+                  {
                       "id":  "file:src/ChairSide.Board/wwwroot/reports.html",
                       "label":  "src/ChairSide.Board/wwwroot/reports.html",
                       "type":  "File",
                       "path":  "src/ChairSide.Board/wwwroot/reports.html"
+                  },
+                  {
+                      "id":  "file:src/ChairSide.Board/wwwroot/reports.js",
+                      "label":  "src/ChairSide.Board/wwwroot/reports.js",
+                      "type":  "File",
+                      "path":  "src/ChairSide.Board/wwwroot/reports.js"
                   },
                   {
                       "id":  "file:src/ChairSide.Board/wwwroot/request-utils.js",
@@ -925,6 +937,18 @@
                       "label":  "tests/javascript/realtime-polling.test.mjs",
                       "type":  "File",
                       "path":  "tests/javascript/realtime-polling.test.mjs"
+                  },
+                  {
+                      "id":  "file:tests/javascript/report-data.test.mjs",
+                      "label":  "tests/javascript/report-data.test.mjs",
+                      "type":  "File",
+                      "path":  "tests/javascript/report-data.test.mjs"
+                  },
+                  {
+                      "id":  "file:tests/javascript/reports.test.mjs",
+                      "label":  "tests/javascript/reports.test.mjs",
+                      "type":  "File",
+                      "path":  "tests/javascript/reports.test.mjs"
                   },
                   {
                       "id":  "file:tests/javascript/request-utils.test.mjs",
@@ -4312,7 +4336,17 @@
                   },
                   {
                       "from":  "repo:chairside",
+                      "to":  "file:src/ChairSide.Board/wwwroot/report-data.js",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
                       "to":  "file:src/ChairSide.Board/wwwroot/reports.html",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:src/ChairSide.Board/wwwroot/reports.js",
                       "label":  "contains"
                   },
                   {
@@ -4613,6 +4647,16 @@
                   {
                       "from":  "repo:chairside",
                       "to":  "file:tests/javascript/realtime-polling.test.mjs",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:tests/javascript/report-data.test.mjs",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:tests/javascript/reports.test.mjs",
                       "label":  "contains"
                   },
                   {

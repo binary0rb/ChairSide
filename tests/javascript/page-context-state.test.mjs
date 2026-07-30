@@ -105,7 +105,6 @@ test("page context preserves room and doctor fallback semantics", () => {
 test("application state preserves the exact initial shape and values", () => {
   assert.deepEqual(firstApplicationStateModule.app, {
     snapshot: null,
-    reports: null,
     connection: null,
     hubReady: false,
     tickHandle: null,
@@ -119,18 +118,11 @@ test("application state preserves the exact initial shape and values", () => {
     realtimeDegraded: false,
     realtimeLostAt: 0,
     pollInFlight: false,
-    reportsInFlight: false,
-    reportFilters: { sedation: "all", grouping: "base" },
-    reportDoctorId: null,
-    reportDoctorTab: "overview",
-    dateRange: { preset: "last7", start: null, end: null },
     roomNumber: 7,
     roomToken: "meta-room-token",
     roomTokenPromptVisible: false,
     doctorId: "otte",
-    tilePressActive: false,
-    reportPressActive: false,
-    reportsVersion: 0
+    tilePressActive: false
   });
 });
 
@@ -174,14 +166,14 @@ test("startup routing and awaited differences remain in board", () => {
     boardSource,
     /if \(app\.pollHandle \|\| app\.tickHandle \|\| app\.statusHandle\) \{[\s\S]*?return;\s*\}/);
   assert.match(boardSource, /await loadBoard\(\);/);
-  assert.match(boardSource, /if \(pageContext\.isReports\) \{[\s\S]*?await loadReports\(\);/);
-  assert.match(boardSource, /if \(pageContext\.isDoctor\) \{[\s\S]*?loadReports\(\);[\s\S]*?registerReportRefresh\(loadReports\);/);
+  assert.match(boardSource, /if \(pageContext\.isReports\) \{[\s\S]*?await reportData\.load\(\);[\s\S]*?reports\.wire\(\);/);
+  assert.match(boardSource, /if \(pageContext\.isDoctor\) \{[\s\S]*?reportData\.load\(\);[\s\S]*?registerReportRefresh\(reportData\.reload\);/);
   assert.match(
     boardSource,
-    /const workshop = pageContext\.isWorkshop\s*\? createWorkshop\(\{ getReports: \(\) => app\.reports \}\)\s*: null;/);
+    /const workshop = pageContext\.isWorkshop\s*\? createWorkshop\(\{ getReports: reportData\.getReports \}\)\s*: null;/);
   assert.match(
     boardSource,
-    /if \(pageContext\.isWorkshop\) \{[\s\S]*?loadReports\(\);[\s\S]*?registerReportRefresh\(loadReports\);[\s\S]*?workshop\.wire\(\);/);
+    /if \(pageContext\.isWorkshop\) \{[\s\S]*?reportData\.load\(\);[\s\S]*?registerReportRefresh\(reportData\.reload\);[\s\S]*?workshop\.wire\(\);/);
   assert.match(boardSource, /registerBoardPolling\(loadBoard\);/);
   assert.match(boardSource, /registerGeneralRender\(render\);/);
   assert.match(boardSource, /registerConnectionStatusRefresh\(\);/);

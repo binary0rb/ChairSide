@@ -2,7 +2,6 @@ import { pageContext } from "./page-context.js";
 
 export const app = {
   snapshot: null,
-  reports: null,
   connection: null,
   hubReady: false,
   tickHandle: null,
@@ -16,16 +15,6 @@ export const app = {
   realtimeDegraded: false,
   realtimeLostAt: 0,
   pollInFlight: false,
-  reportsInFlight: false,
-  // Hybrid reports filter state. Kept in app (not the DOM) so a SignalR/poll re-render
-  // never resets the user's selected filters. sedation: all | sedation | non-sedation.
-  // grouping: base | variant.
-  reportFilters: { sedation: "all", grouping: "base" },
-  reportDoctorId: null,
-  reportDoctorTab: "overview",
-  // Report date window. Drives the backend completed-cycle filter, so changing it reloads from the
-  // API. start/end are ISO yyyy-MM-dd (null = unbounded). Default preset is Last 7 days.
-  dateRange: { preset: "last7", start: null, end: null },
   roomNumber: pageContext.roomNumber,
   roomToken: pageContext.roomToken,
   roomTokenPromptVisible: false,
@@ -33,13 +22,5 @@ export const app = {
   // True while a pointer is pressed on a doctor/procedure tile. The 1s room poll
   // defers re-syncing and re-rendering the selection tiles while this is set so a
   // slow press is never interrupted by a mid-press DOM swap.
-  tilePressActive: false,
-  // True while a pointer is pressed on an interactive reports-page element (doctor card,
-  // tab button, or table action button). Defers innerHTML writes for those regions so a
-  // mid-press DOM swap cannot drop the click. Mirrors the tilePressActive pattern.
-  reportPressActive: false,
-  // Monotonically incremented each time loadReports() stores a new payload. Used as the
-  // data-identity component of render tokens so guarded renders can skip innerHTML writes
-  // on 1-second ticks where app.reports hasn't changed.
-  reportsVersion: 0
+  tilePressActive: false
 };

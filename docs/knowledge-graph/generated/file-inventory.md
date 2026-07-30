@@ -88,7 +88,7 @@ This file is mechanical output from `tools/knowledge-graph/New-ChairSideKnowledg
 | `src/ChairSide.Board/Services/SqliteBoardSchema.cs` | CSharp | types: SqliteBoardSchema, SqliteBoardInitialization, DatabaseInitializationTestHooks<br>methods: Initialize, InitializeDevelopment, InitializeDeployed, CreateCurrentSchema, InitializeSchemaAndMigrations, EnsureCompletedCycleIdColumn, MigrateNullableDoctorArrivedAt, MigrateAbortedAssignmentCanonicalSchema | - |
 | `src/ChairSide.Board/wwwroot/application-state.js` | JavaScript | - | - |
 | `src/ChairSide.Board/wwwroot/assets/icons/README.md` | Markdown | headings: Procedure icons, Tabler Icons license (MIT), Note | - |
-| `src/ChairSide.Board/wwwroot/board.js` | JavaScript | functions: loadVersionBadge, boot, loadBoard, loadReports, initDateRange, reportsRequestUrl, utcDateString, computePresetRange | - |
+| `src/ChairSide.Board/wwwroot/board.js` | JavaScript | functions: loadVersionBadge, boot, loadBoard, render, applySnapshot, syncTrainingEnvironmentBadge, boardNowMs, renderLegend | - |
 | `src/ChairSide.Board/wwwroot/bootstrap.js` | JavaScript | - | - |
 | `src/ChairSide.Board/wwwroot/common-interactions.js` | JavaScript | functions: clearReportPress, wirePressInterruptionGuard, clearTilePress, completeTilePress, wireTileGroup, wireTilePressCleanup | - |
 | `src/ChairSide.Board/wwwroot/connection-status.js` | JavaScript | functions: setConnectionStatus, updateConnectionStatus, registerConnectionStatusRefresh, ensureConnectionStatusIndicator, formatSnapshotAge, getConnectionStatusDetails | - |
@@ -99,7 +99,9 @@ This file is mechanical output from `tools/knowledge-graph/New-ChairSideKnowledg
 | `src/ChairSide.Board/wwwroot/master.html` | Html | - | - |
 | `src/ChairSide.Board/wwwroot/page-context.js` | JavaScript | functions: derivePageContext | - |
 | `src/ChairSide.Board/wwwroot/realtime-polling.js` | JavaScript | functions: connectRealtime, registerBoardPolling, markRealtimeDegraded, scheduleRealtimeRetry | - |
+| `src/ChairSide.Board/wwwroot/report-data.js` | JavaScript | functions: createReportData, getReports, getVersion, getDateRange, setDateRange, useLastSevenDays, useMonthToDate, useLastThirtyDays | - |
 | `src/ChairSide.Board/wwwroot/reports.html` | Html | - | - |
+| `src/ChairSide.Board/wwwroot/reports.js` | JavaScript | functions: createReports, selectDateRangePreset, applyCustomDateRange, syncDateRangeControls, wireDateRange, renderReportWindow, renderDoctorCockpit, renderReports | - |
 | `src/ChairSide.Board/wwwroot/request-utils.js` | JavaScript | functions: readAdminToken, storeAdminToken, clearAdminToken, adminRequestHeaders, mutationHeaders, readErrorMessage | - |
 | `src/ChairSide.Board/wwwroot/room.html` | Html | - | - |
 | `src/ChairSide.Board/wwwroot/room-1.html` | Html | - | - |
@@ -160,6 +162,8 @@ This file is mechanical output from `tools/knowledge-graph/New-ChairSideKnowledg
 | `tests/javascript/leaf-utilities.test.mjs` | JavaScript | - | - |
 | `tests/javascript/page-context-state.test.mjs` | JavaScript | - | - |
 | `tests/javascript/realtime-polling.test.mjs` | JavaScript | functions: initialApp, importModule, connectionHarness, callbackHarness, flushPromises | - |
+| `tests/javascript/report-data.test.mjs` | JavaScript | functions: response, createHarness | - |
+| `tests/javascript/reports.test.mjs` | JavaScript | functions: wirePressInterruptionGuard, adminRequestHeaders, clearAdminToken, storeAdminToken, targetFor, allocation, reportPayload, createFilterChip | - |
 | `tests/javascript/request-utils.test.mjs` | JavaScript | - | - |
 | `tests/javascript/room-card.test.mjs` | JavaScript | functions: readyRoom | - |
 | `tests/javascript/room-workflow.test.mjs` | JavaScript | functions: wireTileGroup, wireTilePressCleanup, mutationHeaders, readErrorMessage, dataUrl, assignment, room, createHarness | - |
