@@ -82,11 +82,10 @@ public sealed class RoomPanelPrestagingWorkflowTests
     }
 
     [Fact]
-    public void Room_pages_share_the_canonical_workflow_controls_and_remove_legacy_edit_mode()
+    public void Canonical_room_page_keeps_workflow_controls_and_removes_legacy_edit_mode()
     {
         var root = FindRepositoryRoot();
         var generic = File.ReadAllText(Path.Combine(root, "src", "ChairSide.Board", "wwwroot", "room.html"));
-        var roomOne = File.ReadAllText(Path.Combine(root, "src", "ChairSide.Board", "wwwroot", "room-1.html"));
         var boardScript = File.ReadAllText(Path.Combine(root, "src", "ChairSide.Board", "wwwroot", "board.js"));
         var roomWorkflowScript = File.ReadAllText(Path.Combine(root, "src", "ChairSide.Board", "wwwroot", "room-workflow.js"));
         var requiredIds = new[]
@@ -96,10 +95,7 @@ public sealed class RoomPanelPrestagingWorkflowTests
         };
 
         Assert.All(requiredIds, id => Assert.Contains($"id=\"{id}\"", generic));
-        Assert.All(requiredIds, id => Assert.Contains($"id=\"{id}\"", roomOne));
-        Assert.Equal(ElementIds(generic), ElementIds(roomOne));
         Assert.DoesNotContain("Update Assignment", generic, StringComparison.Ordinal);
-        Assert.DoesNotContain("Update Assignment", roomOne, StringComparison.Ordinal);
         Assert.DoesNotContain("assignmentEditMode", boardScript, StringComparison.Ordinal);
         Assert.DoesNotContain("assignmentEditMode", roomWorkflowScript, StringComparison.Ordinal);
         Assert.Contains("if (procedureChanged) {", roomWorkflowScript, StringComparison.Ordinal);

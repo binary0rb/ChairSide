@@ -591,12 +591,6 @@
                       "path":  "src/ChairSide.Board/wwwroot/room.html"
                   },
                   {
-                      "id":  "file:src/ChairSide.Board/wwwroot/room-1.html",
-                      "label":  "src/ChairSide.Board/wwwroot/room-1.html",
-                      "type":  "File",
-                      "path":  "src/ChairSide.Board/wwwroot/room-1.html"
-                  },
-                  {
                       "id":  "file:src/ChairSide.Board/wwwroot/room-card.js",
                       "label":  "src/ChairSide.Board/wwwroot/room-card.js",
                       "type":  "File",
@@ -1127,6 +1121,12 @@
                   {
                       "id":  "route:/boardHub",
                       "label":  "/boardHub",
+                      "type":  "Route",
+                      "path":  "src/ChairSide.Board/Program.cs"
+                  },
+                  {
+                      "id":  "route:/room-1.html",
+                      "label":  "/room-1.html",
                       "type":  "Route",
                       "path":  "src/ChairSide.Board/Program.cs"
                   },
@@ -1789,6 +1789,12 @@
                       "label":  "IReparsePointInspector",
                       "type":  "CodeType",
                       "path":  "src/ChairSide.Board/Services/IReparsePointInspector.cs"
+                  },
+                  {
+                      "id":  "symbol:type:LegacyRoomOneRedirect",
+                      "label":  "LegacyRoomOneRedirect",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Program.cs"
                   },
                   {
                       "id":  "symbol:type:LifecycleFixtureCorrectionTests",
@@ -2721,6 +2727,11 @@
                   },
                   {
                       "from":  "file:src/ChairSide.Board/Program.cs",
+                      "to":  "route:/room-1.html",
+                      "label":  "maps"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Program.cs",
                       "to":  "symbol:type:AuditRequestContext",
                       "label":  "declares"
                   },
@@ -2757,6 +2768,11 @@
                   {
                       "from":  "file:src/ChairSide.Board/Program.cs",
                       "to":  "symbol:type:ExceptionReviewEndpointHandler",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Program.cs",
+                      "to":  "symbol:type:LegacyRoomOneRedirect",
                       "label":  "declares"
                   },
                   {
@@ -4357,11 +4373,6 @@
                   {
                       "from":  "repo:chairside",
                       "to":  "file:src/ChairSide.Board/wwwroot/room.html",
-                      "label":  "contains"
-                  },
-                  {
-                      "from":  "repo:chairside",
-                      "to":  "file:src/ChairSide.Board/wwwroot/room-1.html",
                       "label":  "contains"
                   },
                   {

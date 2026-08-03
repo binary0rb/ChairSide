@@ -7,6 +7,7 @@ using ChairSide.Board.Options;
 using ChairSide.Board.Services;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Data.Sqlite;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 
@@ -249,7 +250,7 @@ public sealed partial class BoardStoreTests
     }
 
     [Fact]
-    public void Admin_access_protects_reports_and_keeps_board_room_surfaces_open()
+    public async Task Admin_access_protects_reports_and_legacy_room_redirect_remains_open()
     {
         Assert.False(AdminAccessGuard.IsProtectedPath("/reports.html"));
         Assert.True(AdminAccessGuard.IsProtectedPath("/api/reports"));
@@ -265,6 +266,18 @@ public sealed partial class BoardStoreTests
         Assert.False(AdminAccessGuard.IsProtectedPath("/api/rooms/1"));
         // Client error reporting must be unprotected so normal clients can post.
         Assert.False(AdminAccessGuard.IsProtectedPath("/api/client-errors"));
+
+        var context = new DefaultHttpContext();
+        using var serviceProvider = new ServiceCollection().AddLogging().BuildServiceProvider();
+        context.RequestServices = serviceProvider;
+        context.Request.QueryString = new QueryString("?roomId=2&room=3");
+        var result = LegacyRoomOneRedirect.CreateResult(context);
+
+        await result.ExecuteAsync(context);
+
+        Assert.Equal(StatusCodes.Status302Found, context.Response.StatusCode);
+        Assert.Equal(LegacyRoomOneRedirect.Destination, context.Response.Headers.Location);
+        Assert.Equal("no-store", context.Response.Headers.CacheControl);
     }
 
     [Fact]
