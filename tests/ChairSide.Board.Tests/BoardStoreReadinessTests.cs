@@ -247,10 +247,10 @@ public sealed partial class BoardStoreTests
     public void Client_report_metrics_escape_labels_and_values()
     {
         var root = FindRepositoryRoot();
-        var boardScript = File.ReadAllText(Path.Combine(root, "src", "ChairSide.Board", "wwwroot", "board.js"));
+        var reportsScript = File.ReadAllText(Path.Combine(root, "src", "ChairSide.Board", "wwwroot", "reports.js"));
 
-        Assert.Contains("<span>${escapeHtml(label)}</span>", boardScript);
-        Assert.Contains("<strong>${escapeHtml(value)}</strong>", boardScript);
+        Assert.Contains("<span>${escapeHtml(label)}</span>", reportsScript);
+        Assert.Contains("<strong>${escapeHtml(value)}</strong>", reportsScript);
     }
 
     [Fact]
@@ -258,15 +258,17 @@ public sealed partial class BoardStoreTests
     {
         var root = FindRepositoryRoot();
         var boardScript = File.ReadAllText(Path.Combine(root, "src", "ChairSide.Board", "wwwroot", "board.js"));
+        var roomWorkflowScript = File.ReadAllText(Path.Combine(root, "src", "ChairSide.Board", "wwwroot", "room-workflow.js"));
         var requestUtilities = File.ReadAllText(Path.Combine(root, "src", "ChairSide.Board", "wwwroot", "request-utils.js"));
 
         Assert.Contains("chairside-room-token-${roomNumber}", boardScript);
-	 Assert.Contains("function roomTokenStorageKey(roomNumber = pageContext.roomNumber)", boardScript);
+        Assert.Contains("function roomTokenStorageKey(roomNumber = pageContext.roomNumber)", boardScript);
         Assert.Contains("sessionStorage.setItem(roomTokenStorageKey(), token)", boardScript);
         Assert.Contains("sessionStorage.removeItem(roomTokenStorageKey())", boardScript);
         Assert.Contains("import {", boardScript);
-        Assert.Contains("mutationHeaders,", boardScript);
-        Assert.Contains("} from \"./request-utils.js\";", boardScript);
+        Assert.Contains("import { mutationHeaders, readErrorMessage } from \"./request-utils.js\";", roomWorkflowScript);
+        Assert.Contains("headers: mutationHeaders()", roomWorkflowScript);
+        Assert.Contains("headers: mutationHeaders({ \"Content-Type\": \"application/json\" })", roomWorkflowScript);
         Assert.Contains("export function mutationHeaders(baseHeaders = {})", requestUtilities);
         Assert.Contains("headers[roomTokenHeaderName] = app.roomToken", requestUtilities);
         Assert.Contains("const roomTokenHeaderName = \"X-ChairSide-Room-Token\"", requestUtilities);
