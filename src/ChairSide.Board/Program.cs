@@ -176,6 +176,8 @@ app.Use(async (context, next) =>
 app.UseDefaultFiles();
 app.UseStaticFiles();
 
+app.MapGet("/room-1.html", LegacyRoomOneRedirect.CreateResult);
+
 app.MapHub<BoardHub>("/boardHub");
 
 app.MapGet("/api/board", (DemoBoardStore store) => store.GetSnapshot());
@@ -507,6 +509,17 @@ return 0;
 // ---------------------------------------------------------------------------
 // Request / response types
 // ---------------------------------------------------------------------------
+
+public static class LegacyRoomOneRedirect
+{
+    public const string Destination = "/room.html?roomId=1";
+
+    public static IResult CreateResult(HttpContext context)
+    {
+        context.Response.Headers.CacheControl = "no-store";
+        return Results.Redirect(Destination, permanent: false);
+    }
+}
 
 public sealed record BeginPrestageRequest(
     string? DoctorId = null,

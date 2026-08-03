@@ -34,7 +34,6 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
-## Note
-
-`interlock.png` in this directory is no longer referenced by the app; the
-integration-check icon is now an inline Tabler link SVG.
+The obsolete `interlock.png` artifact was removed after confirming it had no
+runtime consumer. The maintained roster icon name `interlock` remains mapped
+to the inline Tabler link SVG in `wwwroot/board.js`.

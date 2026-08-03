@@ -6,7 +6,7 @@ Scope inspected: `src/ChairSide.Board/wwwroot/*.html`, `styles.css` (full file),
 
 ## 1. Summary
 
-ChairSide has two visual dialects living in one `styles.css`. Reports, the selected-doctor detail panel (shared by `reports.html` and `doctor.html`), and Workshop share a consistent "soft card" language: `border-radius` in the 10-14px range, 1px `var(--line)` borders, gentle `box-shadow`, a small set of reusable card/table/chip/help-bubble classes, and calm, muted color use. The main board (`master.html`) and room panel (`room.html`, `room-1.html`) use a deliberately different "operational tile" language: heavier 2-6px borders, `box-shadow: none`, saturated state colors, pulsing aging/stale animations, and large 64px-minimum touch targets. That split is largely intentional -- the board and room panel exist to be readable across a clinic floor and glanceable at speed, not to look like a report.
+ChairSide has two visual dialects living in one `styles.css`. Reports, the selected-doctor detail panel (shared by `reports.html` and `doctor.html`), and Workshop share a consistent "soft card" language: `border-radius` in the 10-14px range, 1px `var(--line)` borders, gentle `box-shadow`, a small set of reusable card/table/chip/help-bubble classes, and calm, muted color use. The main board (`master.html`) and room panel (`room.html`) use a deliberately different "operational tile" language: heavier 2-6px borders, `box-shadow: none`, saturated state colors, pulsing aging/stale animations, and large 64px-minimum touch targets. That split is largely intentional -- the board and room panel exist to be readable across a clinic floor and glanceable at speed, not to look like a report.
 
 The actual cohesion problem is narrower than "the whole app looks inconsistent": it's that (a) there is no shared token layer (color, spacing, radius, type scale) underneath either dialect, so each page/component re-derives its own numbers; (b) the board/room/doctor-list "visual polish" rules are copy-pasted three times (`body[data-view="master"]`, `body[data-view="doctor"] .doctor-list`, `body[data-view="room"] .panel-status`) including four near-duplicate `@keyframes` blocks for the same aging/stale pulse; and (c) a few components (chips, buttons, metric grids) have multiple independently-defined variants that could be one reusable component.
 
@@ -16,7 +16,7 @@ The desired direction is not a redesign. It's extracting the tokens and patterns
 
 These already work well and should be the reference points for future cohesion work, not replaced:
 
-- **Shared app shell.** `.app-header`, `.app-header.compact`, `.brand-lockup`/`.brand-logo`, and `.primary-nav`/`.nav-pill`/`.nav-menu` are identical across all seven pages (`master.html`, `index.html`, `room.html`, `room-1.html`, `reports.html`, `workshop.html`, `doctor.html`). This is the strongest existing cohesion anchor in the app.
+- **Shared app shell.** `.app-header`, `.app-header.compact`, `.brand-lockup`/`.brand-logo`, and `.primary-nav`/`.nav-pill`/`.nav-menu` are identical across all six maintained pages (`master.html`, `index.html`, `room.html`, `reports.html`, `workshop.html`, `doctor.html`). This is the strongest existing cohesion anchor in the app.
 - **Layer-pill semantic color coding.** `.layer-pill--population` (slate), `.layer-pill--data-quality` (amber), `.layer-pill--allocation` (indigo), and matching `.layer-rail--*` left-border accents give Reports a consistent way to signal "what kind of data is this" without inventing a new color per section. Workshop reuses the same indigo (`#6366f1`) for its own accent, which is a good, already-working cross-page reuse.
 - **The help-bubble pattern (`.help-icon` / `.help-icon-bubble`, plus the `--corner` placement variant).** Small, calm, hover/focus-revealed, pale-yellow note card. This is genuinely reusable and already spans Reports, Workshop stats, and the doctor cockpit.
 - **`.report-table` / `.report-table-wrap`.** One table treatment used for every data table in Reports (Procedure Baselines, Exceptions, Recent Completed Cycles) and reused verbatim for the selected-doctor Case Audit and Flow/Procedure Mix tabs.
@@ -33,7 +33,7 @@ Only classes/assets confirmed present in the repo are listed.
 **Assets (`wwwroot/assets/`)**
 - `assets/aos-logo.svg` -- the only brand asset, used via `.brand-logo` in every page header.
 - `assets/icons/README.md` -- documents that procedure icons are inline SVGs in `board.js` based on Tabler Icons (MIT licensed), with a few custom drawings (forceps, impression tray, jackhammer) in the same 24x24 stroke-2 style.
-- `assets/icons/interlock.png` -- present but explicitly noted in the README as **no longer referenced**; the integration-check icon it replaced is now an inline Tabler SVG. This is an orphaned asset.
+- `assets/icons/interlock.png` -- historical audit finding: this orphaned asset was removed in Issue #174 after confirming the integration-check icon renders as an inline Tabler SVG.
 
 **CSS custom properties (`:root`)**
 - `--bg`, `--ink`, `--muted`, `--line`, `--panel`, `--empty`, `--active-doctor` -- seven tokens total. No spacing, radius, shadow, or type-scale tokens exist yet.

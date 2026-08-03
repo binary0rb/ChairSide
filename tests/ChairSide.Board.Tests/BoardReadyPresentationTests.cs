@@ -333,7 +333,6 @@ public sealed class BoardReadyPresentationTests
         var root = FindRepositoryRoot();
         var doctor = File.ReadAllText(Path.Combine(root, "src", "ChairSide.Board", "wwwroot", "doctor.html"));
         var genericRoom = File.ReadAllText(Path.Combine(root, "src", "ChairSide.Board", "wwwroot", "room.html"));
-        var roomOne = File.ReadAllText(Path.Combine(root, "src", "ChairSide.Board", "wwwroot", "room-1.html"));
         var requiredRoomControls = new[]
         {
             "beginPrestageButton", "saveDetailsButton", "discardChangesButton", "withdrawReadyButton",
@@ -345,10 +344,7 @@ public sealed class BoardReadyPresentationTests
         var reportDetails = doctor.IndexOf("doctor-report-details", StringComparison.Ordinal);
         Assert.True(currentRooms >= 0 && snapshot > currentRooms && reportDetails > snapshot);
         Assert.All(requiredRoomControls, id => Assert.Contains($"id=\"{id}\"", genericRoom, StringComparison.Ordinal));
-        Assert.All(requiredRoomControls, id => Assert.Contains($"id=\"{id}\"", roomOne, StringComparison.Ordinal));
-        Assert.Equal(ElementIds(genericRoom), ElementIds(roomOne));
         Assert.DoesNotContain("Update Assignment", genericRoom, StringComparison.Ordinal);
-        Assert.DoesNotContain("Update Assignment", roomOne, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -359,7 +355,6 @@ public sealed class BoardReadyPresentationTests
         var roomWorkflowScript = File.ReadAllText(Path.Combine(root, "src", "ChairSide.Board", "wwwroot", "room-workflow.js"));
         var styles = File.ReadAllText(Path.Combine(root, "src", "ChairSide.Board", "wwwroot", "styles.css"));
         var genericRoom = File.ReadAllText(Path.Combine(root, "src", "ChairSide.Board", "wwwroot", "room.html"));
-        var roomOne = File.ReadAllText(Path.Combine(root, "src", "ChairSide.Board", "wwwroot", "room-1.html"));
         var primaryActionIds = new[]
         {
             "beginPrestageButton", "seatButton", "readyForDoctorButton", "doctorArrivedButton",
@@ -369,10 +364,8 @@ public sealed class BoardReadyPresentationTests
         Assert.All(primaryActionIds, id =>
         {
             Assert.Contains($"class=\"secondary-button\" id=\"{id}\"", genericRoom, StringComparison.Ordinal);
-            Assert.Contains($"class=\"secondary-button\" id=\"{id}\"", roomOne, StringComparison.Ordinal);
         });
         Assert.Contains("/styles.css?v=20260722-primary-workflow-action-colors", genericRoom, StringComparison.Ordinal);
-        Assert.Contains("/styles.css?v=20260722-primary-workflow-action-colors", roomOne, StringComparison.Ordinal);
         Assert.Contains("createRoomWorkflow", boardScript, StringComparison.Ordinal);
         Assert.Contains("function roomCapabilities(room)", roomWorkflowScript, StringComparison.Ordinal);
         Assert.Contains("function setNextPrimaryAction(room)", roomWorkflowScript, StringComparison.Ordinal);
@@ -459,7 +452,6 @@ public sealed class BoardReadyPresentationTests
             "index.html",
             "master.html",
             "reports.html",
-            "room-1.html",
             "room.html",
             "workshop.html"
         };

@@ -1,7 +1,7 @@
 ﻿{
     "generatedStamp":  "deterministic",
     "root":  ".",
-    "fileCount":  166,
+    "fileCount":  165,
     "files":  [
                   {
                       "path":  ".github/pull_request_template.md",
@@ -607,7 +607,7 @@
                   {
                       "path":  "docs/knowledge-graph/decisions.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  14138,
+                      "sizeBytes":  14145,
                       "typeSymbols":  [
 
                                       ],
@@ -756,7 +756,7 @@
                   {
                       "path":  "docs/ui-cohesion-audit.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  25136,
+                      "sizeBytes":  25094,
                       "typeSymbols":  [
 
                                       ],
@@ -921,7 +921,7 @@
                   {
                       "path":  "README.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  38418,
+                      "sizeBytes":  38715,
                       "typeSymbols":  [
 
                                       ],
@@ -1461,8 +1461,9 @@
                   {
                       "path":  "src/ChairSide.Board/Program.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  72422,
+                      "sizeBytes":  72777,
                       "typeSymbols":  [
+                                          "LegacyRoomOneRedirect",
                                           "BeginPrestageRequest",
                                           "CancelRoomAssignmentRequest",
                                           "ProcedureAliasResolver",
@@ -1479,6 +1480,7 @@
                                           "AuditRequestContext"
                                       ],
                       "methodSymbols":  [
+                                            "CreateResult",
                                             "Resolve",
                                             "IsBlankButSupplied",
                                             "ValidatePropertySet",
@@ -1491,6 +1493,7 @@
                                             "Build"
                                         ],
                       "routes":  [
+                                     "/room-1.html",
                                      "/boardHub",
                                      "/api/board",
                                      "/api/reports",
@@ -2686,7 +2689,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/assets/icons/README.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  1715,
+                      "sizeBytes":  1778,
                       "typeSymbols":  [
 
                                       ],
@@ -2707,8 +2710,7 @@
                                           ],
                       "headings":  [
                                        "Procedure icons",
-                                       "Tabler Icons license (MIT)",
-                                       "Note"
+                                       "Tabler Icons license (MIT)"
                                    ]
                   },
                   {
@@ -3068,7 +3070,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/report-data.js",
                       "kind":  "JavaScript",
-                      "sizeBytes":  5771,
+                      "sizeBytes":  5903,
                       "typeSymbols":  [
 
                                       ],
@@ -3116,7 +3118,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/reports.html",
                       "kind":  "Html",
-                      "sizeBytes":  10400,
+                      "sizeBytes":  10419,
                       "typeSymbols":  [
 
                                       ],
@@ -3142,7 +3144,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/reports.js",
                       "kind":  "JavaScript",
-                      "sizeBytes":  102778,
+                      "sizeBytes":  103717,
                       "typeSymbols":  [
 
                                       ],
@@ -3279,32 +3281,6 @@
                       "path":  "src/ChairSide.Board/wwwroot/room.html",
                       "kind":  "Html",
                       "sizeBytes":  6081,
-                      "typeSymbols":  [
-
-                                      ],
-                      "methodSymbols":  [
-
-                                        ],
-                      "routes":  [
-
-                                 ],
-                      "hubs":  [
-
-                               ],
-                      "cssVariables":  [
-
-                                       ],
-                      "scriptFunctions":  [
-
-                                          ],
-                      "headings":  [
-
-                                   ]
-                  },
-                  {
-                      "path":  "src/ChairSide.Board/wwwroot/room-1.html",
-                      "kind":  "Html",
-                      "sizeBytes":  6102,
                       "typeSymbols":  [
 
                                       ],
@@ -3489,7 +3465,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/styles.css",
                       "kind":  "Css",
-                      "sizeBytes":  91978,
+                      "sizeBytes":  92076,
                       "typeSymbols":  [
 
                                       ],
@@ -3680,7 +3656,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/BoardReadyPresentationTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  28718,
+                      "sizeBytes":  28007,
                       "typeSymbols":  [
                                           "BoardReadyPresentationTests"
                                       ],
@@ -3718,7 +3694,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/BoardStoreAssignmentTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  77517,
+                      "sizeBytes":  77534,
                       "typeSymbols":  [
                                           "BoardStoreTests"
                                       ],
@@ -4171,7 +4147,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/BoardStoreSecurityAndDiagnosticsTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  21609,
+                      "sizeBytes":  22286,
                       "typeSymbols":  [
                                           "BoardStoreTests"
                                       ],
@@ -4195,7 +4171,7 @@
                                             "Admin_access_rejects_query_string_token_and_accepts_header_token",
                                             "Admin_access_token_comparison_rejects_prefix_and_extended_tokens",
                                             "Room_device_token_comparison_rejects_prefix_and_extended_tokens",
-                                            "Admin_access_protects_reports_and_keeps_board_room_surfaces_open",
+                                            "Admin_access_protects_reports_and_legacy_room_redirect_remains_open",
                                             "Diagnostic_logger_appends_client_error_entry_to_log_file",
                                             "Diagnostic_logger_appends_room_audit_entry_to_log_file",
                                             "Diagnostic_logger_creates_log_directory_if_missing",
@@ -5101,7 +5077,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/RoomPanelPrestagingWorkflowTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  9172,
+                      "sizeBytes":  8816,
                       "typeSymbols":  [
                                           "RoomPanelPrestagingWorkflowTests"
                                       ],
@@ -5109,7 +5085,7 @@
                                             "Room_read_contract_restores_canonical_assignment_and_lock_after_reload",
                                             "Eligible_unchecked_normalizes_to_durable_no_at_each_room_commit_boundary",
                                             "Explicit_yes_remains_selected_and_uses_the_internal_sedation_modifier",
-                                            "Room_pages_share_the_canonical_workflow_controls_and_remove_legacy_edit_mode",
+                                            "Canonical_room_page_keeps_workflow_controls_and_removes_legacy_edit_mode",
                                             "ReadyWithSuppliedAssignment",
                                             "AssertRoomRead",
                                             "ElementIds",
@@ -5673,7 +5649,7 @@
                   {
                       "path":  "tests/javascript/report-data.test.mjs",
                       "kind":  "JavaScript",
-                      "sizeBytes":  14389,
+                      "sizeBytes":  14631,
                       "typeSymbols":  [
 
                                       ],
@@ -5701,7 +5677,7 @@
                   {
                       "path":  "tests/javascript/reports.test.mjs",
                       "kind":  "JavaScript",
-                      "sizeBytes":  66266,
+                      "sizeBytes":  67775,
                       "typeSymbols":  [
 
                                       ],

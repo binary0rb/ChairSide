@@ -347,7 +347,7 @@ Use `/room.html?roomId={roomNumber}` as the authoritative room panel URL. Room I
 Compatibility and legacy URLs:
 
 - Root master board: `http://localhost:5000/`
-- Legacy Room 1 panel: `http://localhost:5000/room-1.html`
+- Legacy Room 1 panel: `http://localhost:5000/room-1.html` is a temporary `302` compatibility redirect to `/room.html?roomId=1`. It always opens Room 1 and does not preserve conflicting `roomId` or `room` query values. External bookmarks and manually configured callers were not exhaustively verifiable, so the redirect remains during the compatibility period.
 - Legacy room query format: `http://localhost:5000/room.html?room=1`
 
 ## IIS Deployment
