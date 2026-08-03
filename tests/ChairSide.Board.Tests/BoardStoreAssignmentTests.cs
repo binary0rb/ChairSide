@@ -1490,6 +1490,12 @@ public sealed partial class BoardStoreTests
             "ChairSide.Board",
             "wwwroot",
             "board.js"));
+        var roomWorkflowJs = File.ReadAllText(Path.Combine(
+            FindRepositoryRoot(),
+            "src",
+            "ChairSide.Board",
+            "wwwroot",
+            "room-workflow.js"));
         var domUtilities = File.ReadAllText(Path.Combine(
             FindRepositoryRoot(),
             "src",
@@ -1498,9 +1504,15 @@ public sealed partial class BoardStoreTests
             "dom-utils.js"));
 
         Assert.Contains(
-            "import { escapeAttribute, escapeHtml, setDisabled, setHidden } from \"./dom-utils.js\";",
+            "import { escapeAttribute, escapeHtml } from \"./dom-utils.js\";",
             boardJs);
+        Assert.Contains(
+            "import { escapeAttribute, escapeHtml, setDisabled, setHidden } from \"./dom-utils.js\";",
+            roomWorkflowJs);
         Assert.Contains("export function escapeHtml", domUtilities);
+        Assert.Contains("export function escapeAttribute", domUtilities);
+        Assert.Contains("export function setDisabled", domUtilities);
+        Assert.Contains("export function setHidden", domUtilities);
         Assert.DoesNotContain("function escapeHtml", boardJs);
         Assert.Contains("${escapeHtml(doctor.name)}", boardJs);
         Assert.Contains("${escapeHtml(procedure.code)}", boardJs);
