@@ -90,7 +90,8 @@ public sealed class SqliteBoardRepository
                 expected_allocation_suggested_units,
                 expected_allocation_confirmed_units,
                 active_ready_handoff_id,
-                accepted_ready_handoff_id
+                accepted_ready_handoff_id,
+                is_add_on
             FROM active_rooms
             WHERE room_id BETWEEN 1 AND $roomCount
             ORDER BY room_id;
@@ -126,7 +127,8 @@ public sealed class SqliteBoardRepository
                 ExpectedAllocationSuggestedUnits = ReadNullableInt32(reader, 21),
                 ExpectedAllocationConfirmedUnits = ReadNullableInt32(reader, 22),
                 ActiveReadyHandoffId = ReadNullableString(reader, 23),
-                AcceptedReadyHandoffId = ReadNullableString(reader, 24)
+                AcceptedReadyHandoffId = ReadNullableString(reader, 24),
+                IsAddOn = reader.GetInt32(25) == 1
             });
         }
 
@@ -275,7 +277,8 @@ public sealed class SqliteBoardRepository
                 allocation_adjusted_from_default,
                 prestage_started_at,
                 episode_id,
-                accepted_ready_handoff_id
+                accepted_ready_handoff_id,
+                is_add_on
             FROM completed_room_cycles
             ORDER BY doctor_arrived_at DESC;
             """;
@@ -317,7 +320,8 @@ public sealed class SqliteBoardRepository
                 AllocationAdjustedFromDefault = reader.GetInt32(28) == 1,
                 PrestageStartedAt = ReadNullableDateTimeOffset(reader, 29),
                 EpisodeId = ReadNullableString(reader, 30),
-                AcceptedReadyHandoffId = ReadNullableString(reader, 31)
+                AcceptedReadyHandoffId = ReadNullableString(reader, 31),
+                IsAddOn = reader.GetInt32(32) == 1
             });
         }
 
@@ -383,6 +387,7 @@ public sealed class SqliteBoardRepository
                 prestage_started_at,
                 episode_id,
                 accepted_ready_handoff_id,
+                is_add_on,
                 created_at,
                 updated_at
             )
@@ -420,6 +425,7 @@ public sealed class SqliteBoardRepository
                 $prestageStartedAt,
                 $episodeId,
                 $acceptedReadyHandoffId,
+                $isAddOn,
                 $now,
                 $now
             )
@@ -455,6 +461,7 @@ public sealed class SqliteBoardRepository
                 prestage_started_at = excluded.prestage_started_at,
                 episode_id = excluded.episode_id,
                 accepted_ready_handoff_id = excluded.accepted_ready_handoff_id,
+                is_add_on = excluded.is_add_on,
                 updated_at = excluded.updated_at;
             """;
 
@@ -492,6 +499,7 @@ public sealed class SqliteBoardRepository
         command.Parameters.AddWithValue("$prestageStartedAt", ToDbValue(cycle.PrestageStartedAt));
         command.Parameters.AddWithValue("$episodeId", ToDbValue(cycle.EpisodeId));
         command.Parameters.AddWithValue("$acceptedReadyHandoffId", ToDbValue(cycle.AcceptedReadyHandoffId));
+        command.Parameters.AddWithValue("$isAddOn", cycle.IsAddOn ? 1 : 0);
         command.Parameters.AddWithValue("$now", now);
         command.ExecuteNonQuery();
 
@@ -769,7 +777,8 @@ public sealed class SqliteBoardRepository
             expectation.SedationState,
             expectation.ExpectedAllocationState,
             expectation.ExpectedAllocationSuggestedUnits,
-            expectation.ExpectedAllocationConfirmedUnits);
+            expectation.ExpectedAllocationConfirmedUnits,
+            expectation.IsAddOn);
         var hasIntegrityFault =
             string.IsNullOrWhiteSpace(expectation.EpisodeId)
             || expectation.ActiveReadyHandoffId != handoffId
@@ -868,7 +877,8 @@ public sealed class SqliteBoardRepository
             expectation.SedationState,
             expectation.ExpectedAllocationState,
             expectation.ExpectedAllocationSuggestedUnits,
-            expectation.ExpectedAllocationConfirmedUnits);
+            expectation.ExpectedAllocationConfirmedUnits,
+            expectation.IsAddOn);
         var hasIntegrityFault =
             string.IsNullOrWhiteSpace(expectation.EpisodeId)
             || expectation.ActiveReadyHandoffId != handoffId
@@ -933,7 +943,8 @@ public sealed class SqliteBoardRepository
             referenced.Assignment.SedationState,
             referenced.Assignment.ExpectedAllocationState,
             referenced.Assignment.ExpectedAllocationSuggestedUnits,
-            referenced.Assignment.ExpectedAllocationConfirmedUnits);
+            referenced.Assignment.ExpectedAllocationConfirmedUnits,
+            referenced.Assignment.IsAddOn);
         ApplyAssignment(persistedRoom, acceptedAssignment);
         persistedRoom.ActiveReadyHandoffId = null;
         persistedRoom.AcceptedReadyHandoffId = handoffId;
@@ -988,7 +999,8 @@ public sealed class SqliteBoardRepository
                 sedation_state,
                 expected_allocation_state,
                 expected_allocation_suggested_units,
-                expected_allocation_confirmed_units
+                expected_allocation_confirmed_units,
+                is_add_on
             FROM active_rooms
             WHERE room_id <> $excludedRoomId
               AND state = $doctorWorkingState
@@ -1014,7 +1026,8 @@ public sealed class SqliteBoardRepository
                         ReadNullableEnum<SedationState>(reader, 8),
                         ReadNullableEnum<ExpectedAllocationState>(reader, 9),
                         ReadNullableInt32(reader, 10),
-                        ReadNullableInt32(reader, 11))));
+                        ReadNullableInt32(reader, 11),
+                        reader.GetInt32(12) == 1)));
             }
         }
 
@@ -1218,7 +1231,8 @@ public sealed class SqliteBoardRepository
                 review_status,
                 suggested_action,
                 reviewed_at,
-                reviewed_by
+                reviewed_by,
+                is_add_on
             FROM aborted_room_assignments
             ORDER BY terminated_at DESC;
             """;
@@ -1258,7 +1272,8 @@ public sealed class SqliteBoardRepository
                 ReviewStatus = ReadNullableString(reader, 26) ?? ReviewStatuses.PendingReview,
                 SuggestedAction = ReadNullableString(reader, 27),
                 ReviewedAt = ReadNullableDateTimeOffset(reader, 28),
-                ReviewedBy = ReadNullableString(reader, 29)
+                ReviewedBy = ReadNullableString(reader, 29),
+                IsAddOn = reader.GetInt32(30) == 1
             });
         }
 
@@ -1365,7 +1380,8 @@ public sealed class SqliteBoardRepository
             sedation_state,
             expected_allocation_state,
             expected_allocation_suggested_units,
-            expected_allocation_confirmed_units
+            expected_allocation_confirmed_units,
+            is_add_on
         FROM ready_handoffs
         """;
 
@@ -1393,7 +1409,8 @@ public sealed class SqliteBoardRepository
                     ReadNullableEnum<SedationState>(reader, 10),
                     ReadNullableEnum<ExpectedAllocationState>(reader, 11),
                     ReadNullableInt32(reader, 12),
-                    reader.GetInt32(13))
+                    reader.GetInt32(13),
+                    reader.GetInt32(14) == 1)
             });
         }
 
@@ -1515,7 +1532,8 @@ public sealed class SqliteBoardRepository
                 sedation_state,
                 expected_allocation_state,
                 expected_allocation_suggested_units,
-                expected_allocation_confirmed_units
+                expected_allocation_confirmed_units,
+                is_add_on
             )
             VALUES (
                 $handoffId,
@@ -1527,7 +1545,8 @@ public sealed class SqliteBoardRepository
                 $sedationState,
                 $expectedAllocationState,
                 $expectedAllocationSuggestedUnits,
-                $expectedAllocationConfirmedUnits
+                $expectedAllocationConfirmedUnits,
+                $isAddOn
             );
             """;
         command.Parameters.AddWithValue("$handoffId", handoff.HandoffId);
@@ -1540,6 +1559,7 @@ public sealed class SqliteBoardRepository
         command.Parameters.AddWithValue("$expectedAllocationState", assignment.ExpectedAllocation.State.ToString());
         command.Parameters.AddWithValue("$expectedAllocationSuggestedUnits", ToDbValue(assignment.ExpectedAllocation.SuggestedValue));
         command.Parameters.AddWithValue("$expectedAllocationConfirmedUnits", assignment.ExpectedAllocation.ConfirmedValue!.Value);
+        command.Parameters.AddWithValue("$isAddOn", assignment.IsAddOn ? 1 : 0);
         command.ExecuteNonQuery();
     }
 
@@ -1707,6 +1727,7 @@ public sealed class SqliteBoardRepository
                 expected_allocation_suggested_units,
                 expected_allocation_confirmed_units,
                 terminal_ready_handoff_id,
+                is_add_on,
                 is_exception,
                 requires_review,
                 exception_reason,
@@ -1740,6 +1761,7 @@ public sealed class SqliteBoardRepository
                 $expectedAllocationSuggestedUnits,
                 $expectedAllocationConfirmedUnits,
                 $terminalReadyHandoffId,
+                $isAddOn,
                 $isException,
                 $requiresReview,
                 $exceptionReason,
@@ -1776,6 +1798,7 @@ public sealed class SqliteBoardRepository
         command.Parameters.AddWithValue("$expectedAllocationSuggestedUnits", ToDbValue(record.ExpectedAllocationSuggestedUnits));
         command.Parameters.AddWithValue("$expectedAllocationConfirmedUnits", ToDbValue(record.ExpectedAllocationConfirmedUnits));
         command.Parameters.AddWithValue("$terminalReadyHandoffId", ToDbValue(record.TerminalReadyHandoffId));
+        command.Parameters.AddWithValue("$isAddOn", record.IsAddOn ? 1 : 0);
         command.Parameters.AddWithValue("$isException", record.IsException ? 1 : 0);
         command.Parameters.AddWithValue("$requiresReview", record.RequiresReview ? 1 : 0);
         command.Parameters.AddWithValue("$exceptionReason", ToDbValue(record.ExceptionReason));
@@ -1830,6 +1853,7 @@ public sealed class SqliteBoardRepository
                 expected_allocation_state = $expectedAllocationState,
                 expected_allocation_suggested_units = $expectedAllocationSuggestedUnits,
                 expected_allocation_confirmed_units = $expectedAllocationConfirmedUnits,
+                is_add_on = $isAddOn,
                 active_ready_handoff_id = $activeReadyHandoffId,
                 accepted_ready_handoff_id = $acceptedReadyHandoffId,
                 updated_at = $updatedAt
@@ -1844,6 +1868,7 @@ public sealed class SqliteBoardRepository
                 AND expected_allocation_state IS $expectedExpectedAllocationState
                 AND expected_allocation_suggested_units IS $expectedExpectedAllocationSuggestedUnits
                 AND expected_allocation_confirmed_units IS $expectedExpectedAllocationConfirmedUnits
+                AND is_add_on IS $expectedIsAddOn
                 AND active_ready_handoff_id IS $expectedActiveReadyHandoffId
                 AND accepted_ready_handoff_id IS $expectedAcceptedReadyHandoffId
                 AND prestage_started_at IS $expectedPrestageStartedAt
@@ -1882,6 +1907,7 @@ public sealed class SqliteBoardRepository
         command.Parameters.AddWithValue("$expectedAllocationState", ToDbValue(room.ExpectedAllocationState));
         command.Parameters.AddWithValue("$expectedAllocationSuggestedUnits", ToDbValue(room.ExpectedAllocationSuggestedUnits));
         command.Parameters.AddWithValue("$expectedAllocationConfirmedUnits", ToDbValue(room.ExpectedAllocationConfirmedUnits));
+        command.Parameters.AddWithValue("$isAddOn", room.IsAddOn ? 1 : 0);
         command.Parameters.AddWithValue("$activeReadyHandoffId", ToDbValue(room.ActiveReadyHandoffId));
         command.Parameters.AddWithValue("$acceptedReadyHandoffId", ToDbValue(room.AcceptedReadyHandoffId));
         command.Parameters.AddWithValue("$updatedAt", FormatDateTimeOffset(DateTimeOffset.UtcNow));
@@ -1896,6 +1922,7 @@ public sealed class SqliteBoardRepository
         command.Parameters.AddWithValue("$expectedExpectedAllocationState", ToDbValue(expectation.ExpectedAllocationState));
         command.Parameters.AddWithValue("$expectedExpectedAllocationSuggestedUnits", ToDbValue(expectation.ExpectedAllocationSuggestedUnits));
         command.Parameters.AddWithValue("$expectedExpectedAllocationConfirmedUnits", ToDbValue(expectation.ExpectedAllocationConfirmedUnits));
+        command.Parameters.AddWithValue("$expectedIsAddOn", expectation.IsAddOn ? 1 : 0);
         command.Parameters.AddWithValue("$expectedActiveReadyHandoffId", ToDbValue(expectation.ActiveReadyHandoffId));
         command.Parameters.AddWithValue("$expectedAcceptedReadyHandoffId", ToDbValue(expectation.AcceptedReadyHandoffId));
         command.Parameters.AddWithValue("$expectedPrestageStartedAt", ToDbValue(expectation.PrestageStartedAt));
@@ -1947,6 +1974,7 @@ public sealed class SqliteBoardRepository
                 expected_allocation_state,
                 expected_allocation_suggested_units,
                 expected_allocation_confirmed_units,
+                is_add_on,
                 active_ready_handoff_id,
                 accepted_ready_handoff_id,
                 updated_at
@@ -1975,6 +2003,7 @@ public sealed class SqliteBoardRepository
                 $expectedAllocationState,
                 $expectedAllocationSuggestedUnits,
                 $expectedAllocationConfirmedUnits,
+                $isAddOn,
                 $activeReadyHandoffId,
                 $acceptedReadyHandoffId,
                 $updatedAt
@@ -2002,6 +2031,7 @@ public sealed class SqliteBoardRepository
                 expected_allocation_state = excluded.expected_allocation_state,
                 expected_allocation_suggested_units = excluded.expected_allocation_suggested_units,
                 expected_allocation_confirmed_units = excluded.expected_allocation_confirmed_units,
+                is_add_on = excluded.is_add_on,
                 active_ready_handoff_id = excluded.active_ready_handoff_id,
                 accepted_ready_handoff_id = excluded.accepted_ready_handoff_id,
                 updated_at = excluded.updated_at;
@@ -2030,6 +2060,7 @@ public sealed class SqliteBoardRepository
         command.Parameters.AddWithValue("$expectedAllocationState", ToDbValue(room.ExpectedAllocationState));
         command.Parameters.AddWithValue("$expectedAllocationSuggestedUnits", ToDbValue(room.ExpectedAllocationSuggestedUnits));
         command.Parameters.AddWithValue("$expectedAllocationConfirmedUnits", ToDbValue(room.ExpectedAllocationConfirmedUnits));
+        command.Parameters.AddWithValue("$isAddOn", room.IsAddOn ? 1 : 0);
         command.Parameters.AddWithValue("$activeReadyHandoffId", ToDbValue(room.ActiveReadyHandoffId));
         command.Parameters.AddWithValue("$acceptedReadyHandoffId", ToDbValue(room.AcceptedReadyHandoffId));
         command.Parameters.AddWithValue("$updatedAt", FormatDateTimeOffset(DateTimeOffset.UtcNow));
@@ -2048,6 +2079,7 @@ public sealed class SqliteBoardRepository
             ExpectedAllocationState = room.ExpectedAllocationState,
             ExpectedAllocationSuggestedUnits = room.ExpectedAllocationSuggestedUnits,
             ExpectedAllocationConfirmedUnits = room.ExpectedAllocationConfirmedUnits,
+            IsAddOn = room.IsAddOn,
             ActiveReadyHandoffId = room.ActiveReadyHandoffId,
             AcceptedReadyHandoffId = room.AcceptedReadyHandoffId,
             State = room.State,
@@ -2109,6 +2141,7 @@ public sealed class SqliteBoardRepository
             ExpectedAllocationUnits = cycle.ExpectedAllocationUnits,
             ExpectedAllocationMinutes = cycle.ExpectedAllocationMinutes,
             AllocationAdjustedFromDefault = cycle.AllocationAdjustedFromDefault,
+            IsAddOn = cycle.IsAddOn,
             FinalWaitState = cycle.FinalWaitState,
             AgingThresholdReached = cycle.AgingThresholdReached,
             StaleThresholdReached = cycle.StaleThresholdReached,
@@ -2136,6 +2169,7 @@ public sealed class SqliteBoardRepository
             ExpectedAllocationSuggestedUnits = record.ExpectedAllocationSuggestedUnits,
             ExpectedAllocationConfirmedUnits = record.ExpectedAllocationConfirmedUnits,
             TerminalReadyHandoffId = record.TerminalReadyHandoffId,
+            IsAddOn = record.IsAddOn,
             OriginalDefaultExpectedUnits = record.OriginalDefaultExpectedUnits,
             ExpectedAllocationUnits = record.ExpectedAllocationUnits,
             ExpectedAllocationMinutes = record.ExpectedAllocationMinutes,
@@ -2177,6 +2211,7 @@ public sealed class SqliteBoardRepository
         cycle.ExpectedAllocationUnits = confirmedUnits;
         cycle.ExpectedAllocationMinutes = confirmedUnits * 10;
         cycle.AllocationAdjustedFromDefault = suggestedUnits.HasValue && suggestedUnits.Value != confirmedUnits;
+        cycle.IsAddOn = assignment.IsAddOn;
     }
 
     private static void ApplyAssignment(RoomState room, PersistedRoomAssignment assignment)
@@ -2189,6 +2224,7 @@ public sealed class SqliteBoardRepository
         room.ExpectedAllocationState = assignment.ExpectedAllocationState;
         room.ExpectedAllocationSuggestedUnits = assignment.ExpectedAllocationSuggestedUnits;
         room.ExpectedAllocationConfirmedUnits = assignment.ExpectedAllocationConfirmedUnits;
+        room.IsAddOn = assignment.IsAddOn;
 
         if (assignment.ExpectedAllocationConfirmedUnits is { } confirmedUnits)
         {

@@ -83,6 +83,28 @@ public sealed class PrestagingLifecycleApiContractTests
     }
 
     [Fact]
+    public void Add_on_is_an_optional_boolean_that_defaults_false_and_survives_conversion()
+    {
+        var omitted = PrestagingLifecycleRequestParser.ParseAssignment(
+            "{\"doctorId\":\"otte\",\"procedureCode\":\"CON\",\"confirmedExpectedAllocationUnits\":1}");
+        var selected = PrestagingLifecycleRequestParser.ParseAssignment(
+            "{\"doctorId\":\"otte\",\"procedureCode\":\"CON\",\"confirmedExpectedAllocationUnits\":1,\"isAddOn\":true}");
+        var invalid = PrestagingLifecycleRequestParser.ParseAssignment("{\"isAddOn\":\"yes\"}");
+
+        Assert.False(omitted.Value!.IsAddOn);
+        Assert.True(selected.Value!.IsAddOn);
+        Assert.Equal(PrestagingLifecycleErrorCodes.MalformedRequest, invalid.Error?.Code);
+
+        var converted = CanonicalAssignmentRequestConverter.Convert(
+            selected.Value!,
+            Procedure("CON", sedationEligible: false, defaultUnits: 1));
+
+        Assert.Null(converted.Error);
+        Assert.True(converted.Value!.IsAddOn);
+        Assert.Equal(AssignmentCompleteness.Complete, converted.Value?.Completeness);
+    }
+
+    [Fact]
     public void Assignment_conversion_normalizes_eligible_unchecked_to_no_and_preserves_confirmed_states()
     {
         var absent = CanonicalAssignmentRequestConverter.Convert(

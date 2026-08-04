@@ -101,6 +101,67 @@ public sealed class PrestagingLifecycleTransitionTests
     }
 
     [Fact]
+    public void Add_on_survives_save_restart_handoff_completion_and_resets_for_the_next_episode()
+    {
+        using var workspace = TestWorkspace.Create();
+        var now = new DateTimeOffset(2026, 8, 4, 14, 0, 0, TimeSpan.Zero);
+        var clock = new ManualTimeProvider(now);
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production, timeProvider: clock);
+        var addOn = RoomAssignmentContract.Create(
+            "otte",
+            "CON",
+            SedationContract.UnavailableProcedureIneligible(),
+            ExpectedAllocationContract.ConfirmedSuggestedValue(1),
+            isAddOn: true);
+
+        Assert.NotNull(context.Store.BeginPrestage(1));
+        Assert.NotNull(context.Store.SaveAssignmentDetails(1, addOn));
+        Assert.True(context.Repository.LoadRooms(3).Single(room => room.RoomId == 1).IsAddOn);
+
+        context = StoreContext.Create(workspace, environmentName: Environments.Production, timeProvider: clock);
+        Assert.True(context.Store.GetRoom(1)!.Assignment!.IsAddOn);
+        Assert.NotNull(context.Store.SeatRoomCanonical(1, null).Room);
+        clock.SetUtcNow(now.AddMinutes(2));
+        Assert.NotNull(context.Store.MarkReadyForDoctor(1));
+
+        var readyRoom = context.Repository.LoadRooms(3).Single(room => room.RoomId == 1);
+        var handoff = Assert.Single(context.Repository.LoadReadyHandoffsByEpisode(readyRoom.EpisodeId!));
+        Assert.True(handoff.Assignment.IsAddOn);
+
+        clock.SetUtcNow(now.AddMinutes(4));
+        Assert.NotNull(context.Store.MarkDoctorArrived(1));
+        Assert.True(Assert.Single(context.Repository.LoadCompletedCycles()).IsAddOn);
+        Assert.NotNull(context.Store.MarkDoctorComplete(1));
+        Assert.NotNull(context.Store.MarkRoomAvailable(1));
+        Assert.True(Assert.Single(context.Store.GetReports().RecentCompletedCycles).IsAddOn);
+
+        var available = context.Repository.LoadRooms(3).Single(room => room.RoomId == 1);
+        Assert.False(available.IsAddOn);
+        var next = context.Store.BeginPrestageCanonical(1);
+        Assert.False(next.Assignment!.IsAddOn);
+    }
+
+    [Fact]
+    public void Canceled_add_on_is_preserved_in_aborted_history_and_cleared_from_the_room()
+    {
+        using var workspace = TestWorkspace.Create();
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production);
+        var addOn = RoomAssignmentContract.Create(
+            "otte",
+            "CON",
+            SedationContract.UnavailableProcedureIneligible(),
+            ExpectedAllocationContract.ConfirmedSuggestedValue(1),
+            isAddOn: true);
+
+        Assert.NotNull(context.Store.BeginPrestage(1));
+        Assert.NotNull(context.Store.SaveAssignmentDetails(1, addOn));
+        Assert.NotNull(context.Store.CancelPrestage(1));
+
+        Assert.True(Assert.Single(context.Repository.LoadAbortedAssignments()).IsAddOn);
+        Assert.False(context.Repository.LoadRooms(3).Single(room => room.RoomId == 1).IsAddOn);
+    }
+
+    [Fact]
     public void Seat_with_draft_persists_the_assignment_and_seating_in_one_transition()
     {
         using var workspace = TestWorkspace.Create();

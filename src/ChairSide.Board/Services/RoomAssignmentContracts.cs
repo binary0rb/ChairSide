@@ -223,13 +223,15 @@ public sealed record RoomAssignmentContract
         string? procedureCode,
         SedationContract sedation,
         ExpectedAllocationContract expectedAllocation,
-        AssignmentCompleteness completeness)
+        AssignmentCompleteness completeness,
+        bool isAddOn)
     {
         DoctorId = doctorId;
         ProcedureCode = procedureCode;
         Sedation = sedation;
         ExpectedAllocation = expectedAllocation;
         Completeness = completeness;
+        IsAddOn = isAddOn;
     }
 
     public string? DoctorId { get; }
@@ -242,11 +244,14 @@ public sealed record RoomAssignmentContract
 
     public AssignmentCompleteness Completeness { get; }
 
+    public bool IsAddOn { get; }
+
     public static RoomAssignmentContract Create(
         string? doctorId,
         string? procedureCode,
         SedationContract sedation,
-        ExpectedAllocationContract expectedAllocation)
+        ExpectedAllocationContract expectedAllocation,
+        bool isAddOn = false)
     {
         ArgumentNullException.ThrowIfNull(sedation);
         ArgumentNullException.ThrowIfNull(expectedAllocation);
@@ -266,7 +271,8 @@ public sealed record RoomAssignmentContract
             normalizedProcedureCode,
             sedation,
             expectedAllocation,
-            completeness);
+            completeness,
+            isAddOn);
     }
 
     private static string? NormalizeToken(string? value) =>

@@ -3,14 +3,15 @@ using System.Text.Json;
 namespace ChairSide.Board.Services;
 
 /// <summary>
-/// Writable canonical assignment shape for the Prestaging lifecycle API. These four values express
+/// Writable canonical assignment shape for the Prestaging lifecycle API. These values express
 /// user input only; the server derives canonical domain states and assignment completeness.
 /// </summary>
 public sealed record CanonicalAssignmentRequest(
     string? DoctorId,
     string? ProcedureCode,
     string? SedationChoice,
-    int? ConfirmedExpectedAllocationUnits);
+    int? ConfirmedExpectedAllocationUnits,
+    bool IsAddOn = false);
 
 public sealed record EmptyLifecycleActionRequest
 {
@@ -100,7 +101,8 @@ public static class PrestagingLifecycleRequestParser
         "doctorId",
         "procedureCode",
         "sedationChoice",
-        "confirmedExpectedAllocationUnits"
+        "confirmedExpectedAllocationUnits",
+        "isAddOn"
     };
 
     private static readonly IReadOnlySet<string> SeatProperties = new HashSet<string>(StringComparer.Ordinal)
@@ -229,6 +231,7 @@ public static class PrestagingLifecycleRequestParser
         string? procedureCode = null;
         string? sedationChoice = null;
         int? confirmedUnits = null;
+        var isAddOn = false;
 
         foreach (var property in root.EnumerateObject())
         {
@@ -277,10 +280,17 @@ public static class PrestagingLifecycleRequestParser
                     }
                     confirmedUnits = parsedUnits;
                     break;
+                case "isAddOn":
+                    if (property.Value.ValueKind is not (JsonValueKind.True or JsonValueKind.False))
+                    {
+                        return Failure<CanonicalAssignmentRequest>(InvalidType("isAddOn", "a boolean"));
+                    }
+                    isAddOn = property.Value.GetBoolean();
+                    break;
             }
         }
 
-        return Success(new CanonicalAssignmentRequest(doctorId, procedureCode, sedationChoice, confirmedUnits));
+        return Success(new CanonicalAssignmentRequest(doctorId, procedureCode, sedationChoice, confirmedUnits, isAddOn));
     }
 
     private static (JsonElement Value, PrestagingLifecycleErrorResponse? Error) ParseObject(
@@ -436,7 +446,8 @@ public static class CanonicalAssignmentRequestConverter
                 doctorId,
                 procedureCode: null,
                 SedationContract.UnavailableNoProcedure(),
-                ExpectedAllocationContract.Unknown()));
+                ExpectedAllocationContract.Unknown(),
+                request.IsAddOn));
         }
 
         if (procedure is null
@@ -476,7 +487,7 @@ public static class CanonicalAssignmentRequestConverter
                 confirmed.Value)
         };
 
-        return Success(RoomAssignmentContract.Create(doctorId, procedureCode, sedation, allocation));
+        return Success(RoomAssignmentContract.Create(doctorId, procedureCode, sedation, allocation, request.IsAddOn));
     }
 
     private static bool MatchesProcedure(ProcedureCategory procedure, string procedureCode) =>

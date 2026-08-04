@@ -2181,6 +2181,7 @@ public sealed class PrestagingLifecycleEndpointTests
             ExpectedAllocationState = room.ExpectedAllocationState,
             ExpectedAllocationSuggestedUnits = room.ExpectedAllocationSuggestedUnits,
             ExpectedAllocationConfirmedUnits = room.ExpectedAllocationConfirmedUnits,
+            IsAddOn = room.IsAddOn,
             State = room.State,
             PrestageStartedAt = room.PrestageStartedAt,
             SeatedAt = room.SeatedAt,

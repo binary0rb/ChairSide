@@ -121,6 +121,7 @@ public sealed partial class BoardStoreTests
         Assert.Equal(expected.ExpectedAllocationUnits, actual.ExpectedAllocationUnits);
         Assert.Equal(expected.ExpectedAllocationMinutes, actual.ExpectedAllocationMinutes);
         Assert.Equal(expected.AllocationAdjustedFromDefault, actual.AllocationAdjustedFromDefault);
+        Assert.Equal(expected.IsAddOn, actual.IsAddOn);
     }
 
     private static void AssertSameAbortedAssignment(AbortedRoomAssignment expected, AbortedRoomAssignment actual)
@@ -136,6 +137,7 @@ public sealed partial class BoardStoreTests
         Assert.Equal(expected.ExpectedAllocationUnits, actual.ExpectedAllocationUnits);
         Assert.Equal(expected.ExpectedAllocationMinutes, actual.ExpectedAllocationMinutes);
         Assert.Equal(expected.AllocationAdjustedFromDefault, actual.AllocationAdjustedFromDefault);
+        Assert.Equal(expected.IsAddOn, actual.IsAddOn);
         Assert.Equal(expected.PrestageStartedAt, actual.PrestageStartedAt);
         Assert.Equal(expected.SeatedAt, actual.SeatedAt);
         Assert.Equal(expected.ReadyForDoctorAt, actual.ReadyForDoctorAt);

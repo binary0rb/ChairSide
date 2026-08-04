@@ -206,6 +206,7 @@ internal static class SqliteBoardSchema
                     expected_allocation_state TEXT NULL,
                     expected_allocation_suggested_units INTEGER NULL,
                     expected_allocation_confirmed_units INTEGER NULL,
+                    is_add_on INTEGER NOT NULL DEFAULT 0 CHECK (is_add_on IN (0, 1)),
                     active_ready_handoff_id TEXT NULL,
                     accepted_ready_handoff_id TEXT NULL,
                     updated_at TEXT NOT NULL
@@ -246,6 +247,7 @@ internal static class SqliteBoardSchema
                     prestage_started_at TEXT NULL,
                     episode_id TEXT NULL,
                     accepted_ready_handoff_id TEXT NULL,
+                    is_add_on INTEGER NOT NULL DEFAULT 0 CHECK (is_add_on IN (0, 1)),
                     created_at TEXT NOT NULL,
                     updated_at TEXT NOT NULL,
                     UNIQUE(room_id, seated_at)
@@ -264,6 +266,7 @@ internal static class SqliteBoardSchema
                     expected_allocation_suggested_units INTEGER NULL,
                     expected_allocation_confirmed_units INTEGER NULL,
                     terminal_ready_handoff_id TEXT NULL,
+                    is_add_on INTEGER NOT NULL DEFAULT 0 CHECK (is_add_on IN (0, 1)),
                     original_default_expected_units INTEGER NOT NULL DEFAULT 0,
                     expected_allocation_units INTEGER NOT NULL DEFAULT 0,
                     expected_allocation_minutes INTEGER NOT NULL DEFAULT 0,
@@ -302,6 +305,7 @@ internal static class SqliteBoardSchema
                     expected_allocation_state TEXT NOT NULL CHECK (expected_allocation_state IN ('ConfirmedSuggestedValue', 'ConfirmedAdjustedValue')),
                     expected_allocation_suggested_units INTEGER NULL CHECK (expected_allocation_suggested_units IS NULL OR expected_allocation_suggested_units > 0),
                     expected_allocation_confirmed_units INTEGER NOT NULL CHECK (expected_allocation_confirmed_units > 0),
+                    is_add_on INTEGER NOT NULL DEFAULT 0 CHECK (is_add_on IN (0, 1)),
                     CHECK (
                         (CASE WHEN withdrawn_at IS NULL THEN 0 ELSE 1 END)
                         + (CASE WHEN accepted_at IS NULL THEN 0 ELSE 1 END)
@@ -369,14 +373,18 @@ internal static class SqliteBoardSchema
         TryAddColumn(connection, "ALTER TABLE active_rooms ADD COLUMN expected_allocation_confirmed_units INTEGER NULL");
         TryAddColumn(connection, "ALTER TABLE active_rooms ADD COLUMN active_ready_handoff_id TEXT NULL");
         TryAddColumn(connection, "ALTER TABLE active_rooms ADD COLUMN accepted_ready_handoff_id TEXT NULL");
+        TryAddColumn(connection, "ALTER TABLE active_rooms ADD COLUMN is_add_on INTEGER NOT NULL DEFAULT 0 CHECK (is_add_on IN (0, 1))");
         TryAddColumn(connection, "ALTER TABLE completed_room_cycles ADD COLUMN prestage_started_at TEXT NULL");
         TryAddColumn(connection, "ALTER TABLE completed_room_cycles ADD COLUMN episode_id TEXT NULL");
         TryAddColumn(connection, "ALTER TABLE completed_room_cycles ADD COLUMN accepted_ready_handoff_id TEXT NULL");
+        TryAddColumn(connection, "ALTER TABLE completed_room_cycles ADD COLUMN is_add_on INTEGER NOT NULL DEFAULT 0 CHECK (is_add_on IN (0, 1))");
         TryAddColumn(connection, "ALTER TABLE aborted_room_assignments ADD COLUMN sedation_state TEXT NULL");
         TryAddColumn(connection, "ALTER TABLE aborted_room_assignments ADD COLUMN expected_allocation_state TEXT NULL");
         TryAddColumn(connection, "ALTER TABLE aborted_room_assignments ADD COLUMN expected_allocation_suggested_units INTEGER NULL");
         TryAddColumn(connection, "ALTER TABLE aborted_room_assignments ADD COLUMN expected_allocation_confirmed_units INTEGER NULL");
         TryAddColumn(connection, "ALTER TABLE aborted_room_assignments ADD COLUMN terminal_ready_handoff_id TEXT NULL");
+        TryAddColumn(connection, "ALTER TABLE aborted_room_assignments ADD COLUMN is_add_on INTEGER NOT NULL DEFAULT 0 CHECK (is_add_on IN (0, 1))");
+        TryAddColumn(connection, "ALTER TABLE ready_handoffs ADD COLUMN is_add_on INTEGER NOT NULL DEFAULT 0 CHECK (is_add_on IN (0, 1))");
         TryAddColumn(connection, "ALTER TABLE aborted_room_assignments ADD COLUMN is_exception INTEGER NOT NULL DEFAULT 0");
         TryAddColumn(connection, "ALTER TABLE aborted_room_assignments ADD COLUMN requires_review INTEGER NOT NULL DEFAULT 0");
         TryAddColumn(connection, "ALTER TABLE aborted_room_assignments ADD COLUMN exception_reason TEXT NULL");
@@ -440,6 +448,7 @@ internal static class SqliteBoardSchema
             prestage_started_at TEXT NULL,
             episode_id TEXT NULL,
             accepted_ready_handoff_id TEXT NULL,
+            is_add_on INTEGER NOT NULL DEFAULT 0 CHECK (is_add_on IN (0, 1)),
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL,
             UNIQUE(room_id, seated_at)
@@ -483,6 +492,7 @@ internal static class SqliteBoardSchema
         "prestage_started_at",
         "episode_id",
         "accepted_ready_handoff_id",
+        "is_add_on",
         "created_at",
         "updated_at"
     ];
@@ -501,6 +511,7 @@ internal static class SqliteBoardSchema
             expected_allocation_suggested_units INTEGER NULL,
             expected_allocation_confirmed_units INTEGER NULL,
             terminal_ready_handoff_id TEXT NULL,
+            is_add_on INTEGER NOT NULL DEFAULT 0 CHECK (is_add_on IN (0, 1)),
             original_default_expected_units INTEGER NOT NULL DEFAULT 0,
             expected_allocation_units INTEGER NOT NULL DEFAULT 0,
             expected_allocation_minutes INTEGER NOT NULL DEFAULT 0,
@@ -538,6 +549,7 @@ internal static class SqliteBoardSchema
         "expected_allocation_suggested_units",
         "expected_allocation_confirmed_units",
         "terminal_ready_handoff_id",
+        "is_add_on",
         "original_default_expected_units",
         "expected_allocation_units",
         "expected_allocation_minutes",

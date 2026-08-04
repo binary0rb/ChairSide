@@ -163,7 +163,7 @@ public sealed class DemoBoardStore
         var procedure = request.ProcedureCode is null ? null : FindActiveProcedure(request.ProcedureCode);
         var converted = CanonicalAssignmentRequestConverter.Convert(request, procedure);
         if (converted.Value is not { } assignment || assignment.Sedation.State != SedationState.EligibleYes) return converted;
-        return new(RoomAssignmentContract.Create(assignment.DoctorId, ComposeProcedureCode(assignment.ProcedureCode!, true), assignment.Sedation, assignment.ExpectedAllocation), null);
+        return new(RoomAssignmentContract.Create(assignment.DoctorId, ComposeProcedureCode(assignment.ProcedureCode!, true), assignment.Sedation, assignment.ExpectedAllocation, assignment.IsAddOn), null);
     }
 
     public PrestagingLifecycleMutationResult BeginPrestageCanonical(int roomNumber)
@@ -398,6 +398,7 @@ public sealed class DemoBoardStore
                 ExpectedAllocationUnits = snapshot.ExpectedAllocationUnits,
                 ExpectedAllocationMinutes = snapshot.ExpectedAllocationMinutes,
                 AllocationAdjustedFromDefault = snapshot.AllocationAdjustedFromDefault,
+                IsAddOn = snapshot.IsAddOn,
                 PrestageStartedAt = snapshot.PrestageStartedAt,
                 SeatedAt = snapshot.SeatedAt,
                 ReadyForDoctorAt = snapshot.ReadyForDoctorAt,
@@ -724,7 +725,8 @@ public sealed class DemoBoardStore
                     OriginalDefaultExpectedUnits = candidate.OriginalDefaultExpectedUnits,
                     ExpectedAllocationUnits = candidate.ExpectedAllocationUnits,
                     ExpectedAllocationMinutes = candidate.ExpectedAllocationMinutes,
-                    AllocationAdjustedFromDefault = candidate.AllocationAdjustedFromDefault
+                    AllocationAdjustedFromDefault = candidate.AllocationAdjustedFromDefault,
+                    IsAddOn = candidate.IsAddOn
                 };
                 var persistence = _repository.AcceptReadyHandoffAndSaveCycleGuarded(
                     candidate,
@@ -919,7 +921,8 @@ public sealed class DemoBoardStore
                 OriginalDefaultExpectedUnits = snapshot.OriginalDefaultExpectedUnits,
                 ExpectedAllocationUnits = snapshot.ExpectedAllocationUnits,
                 ExpectedAllocationMinutes = snapshot.ExpectedAllocationMinutes,
-                AllocationAdjustedFromDefault = snapshot.AllocationAdjustedFromDefault
+                AllocationAdjustedFromDefault = snapshot.AllocationAdjustedFromDefault,
+                IsAddOn = snapshot.IsAddOn
         };
         var committed = _repository.AcceptReadyHandoffAndSaveCycle(
             snapshot,
@@ -2106,6 +2109,7 @@ public sealed class DemoBoardStore
             ExpectedAllocationUnits = snapshot.ExpectedAllocationUnits,
             ExpectedAllocationMinutes = snapshot.ExpectedAllocationMinutes,
             AllocationAdjustedFromDefault = snapshot.AllocationAdjustedFromDefault,
+            IsAddOn = snapshot.IsAddOn,
             PrestageStartedAt = snapshot.PrestageStartedAt,
             SeatedAt = snapshot.SeatedAt,
             ReadyForDoctorAt = snapshot.ReadyForDoctorAt,
@@ -2171,7 +2175,8 @@ public sealed class DemoBoardStore
                 OriginalDefaultExpectedUnits = snapshot.OriginalDefaultExpectedUnits,
                 ExpectedAllocationUnits = snapshot.ExpectedAllocationUnits,
                 ExpectedAllocationMinutes = snapshot.ExpectedAllocationMinutes,
-                AllocationAdjustedFromDefault = snapshot.AllocationAdjustedFromDefault
+                AllocationAdjustedFromDefault = snapshot.AllocationAdjustedFromDefault,
+                IsAddOn = snapshot.IsAddOn
             };
 
         // The in-progress cycle may still carry the state captured when Doctor Arrived created it.
@@ -2532,6 +2537,7 @@ public sealed class DemoBoardStore
             && cycle.OriginalDefaultExpectedUnits == (suggestedUnits ?? confirmedUnits)
             && cycle.ExpectedAllocationUnits == confirmedUnits
             && cycle.ExpectedAllocationMinutes == confirmedUnits * 10
+            && cycle.IsAddOn == handoff.Assignment.IsAddOn
             && cycle.AllocationAdjustedFromDefault ==
                 (suggestedUnits.HasValue && suggestedUnits.Value != confirmedUnits);
     }
@@ -2797,6 +2803,7 @@ public sealed class DemoBoardStore
             ExpectedAllocationState = room.ExpectedAllocationState,
             ExpectedAllocationSuggestedUnits = room.ExpectedAllocationSuggestedUnits,
             ExpectedAllocationConfirmedUnits = room.ExpectedAllocationConfirmedUnits,
+            IsAddOn = room.IsAddOn,
             ActiveReadyHandoffId = room.ActiveReadyHandoffId,
             AcceptedReadyHandoffId = room.AcceptedReadyHandoffId,
             State = room.State,
@@ -2826,6 +2833,7 @@ public sealed class DemoBoardStore
         destination.ExpectedAllocationState = committed.ExpectedAllocationState;
         destination.ExpectedAllocationSuggestedUnits = committed.ExpectedAllocationSuggestedUnits;
         destination.ExpectedAllocationConfirmedUnits = committed.ExpectedAllocationConfirmedUnits;
+        destination.IsAddOn = committed.IsAddOn;
         destination.ActiveReadyHandoffId = committed.ActiveReadyHandoffId;
         destination.AcceptedReadyHandoffId = committed.AcceptedReadyHandoffId;
         destination.State = committed.State;
@@ -2853,6 +2861,7 @@ public sealed class DemoBoardStore
         room.ExpectedAllocationState = assignment.ExpectedAllocationState;
         room.ExpectedAllocationSuggestedUnits = assignment.ExpectedAllocationSuggestedUnits;
         room.ExpectedAllocationConfirmedUnits = assignment.ExpectedAllocationConfirmedUnits;
+        room.IsAddOn = assignment.IsAddOn;
         room.OriginalDefaultExpectedUnits = assignment.ExpectedAllocationSuggestedUnits ?? assignment.ExpectedAllocationConfirmedUnits ?? 0;
         room.ExpectedAllocationUnits = assignment.ExpectedAllocationConfirmedUnits ?? 0;
         room.ExpectedAllocationMinutes = room.ExpectedAllocationUnits * 10;
@@ -2870,7 +2879,8 @@ public sealed class DemoBoardStore
             room.SedationState,
             room.ExpectedAllocationState,
             room.ExpectedAllocationSuggestedUnits,
-            room.ExpectedAllocationConfirmedUnits);
+            room.ExpectedAllocationConfirmedUnits,
+            room.IsAddOn);
 
     private static RoomAssignmentContract CreateLegacyCompatibleAssignment(
         Doctor doctor,
@@ -2918,6 +2928,7 @@ public sealed class DemoBoardStore
             ExpectedAllocationUnits = cycle.ExpectedAllocationUnits,
             ExpectedAllocationMinutes = cycle.ExpectedAllocationMinutes,
             AllocationAdjustedFromDefault = cycle.AllocationAdjustedFromDefault,
+            IsAddOn = cycle.IsAddOn,
             DoctorOccupiedWaitSeconds = cycle.DoctorOccupiedWaitSeconds,
             DoctorAvailableWaitSeconds = cycle.DoctorAvailableWaitSeconds,
             HasReportingException = cycle.HasReportingException,
@@ -2955,6 +2966,7 @@ public sealed class DemoBoardStore
         room.ExpectedAllocationState = null;
         room.ExpectedAllocationSuggestedUnits = null;
         room.ExpectedAllocationConfirmedUnits = null;
+        room.IsAddOn = false;
         room.ActiveReadyHandoffId = null;
         room.AcceptedReadyHandoffId = null;
         room.State = RoomStates.Available;
@@ -3399,6 +3411,7 @@ public sealed class CompletedRoomCycle
     public int ExpectedAllocationUnits { get; set; }
     public int ExpectedAllocationMinutes { get; set; }
     public bool AllocationAdjustedFromDefault { get; set; }
+    public bool IsAddOn { get; set; }
 
     // Computed at report time from cross-cycle doctor-occupied intervals. Not persisted to storage.
     public int? DoctorOccupiedWaitSeconds { get; set; }
@@ -3582,6 +3595,7 @@ public sealed class RoomState(int roomId)
     public ExpectedAllocationState? ExpectedAllocationState { get; set; }
     public int? ExpectedAllocationSuggestedUnits { get; set; }
     public int? ExpectedAllocationConfirmedUnits { get; set; }
+    public bool IsAddOn { get; set; }
     public string? ActiveReadyHandoffId { get; set; }
     public string? AcceptedReadyHandoffId { get; set; }
     public string State { get; set; } = RoomStates.Available;
@@ -3689,6 +3703,7 @@ public sealed class AbortedRoomAssignment
     public int ExpectedAllocationUnits { get; set; }
     public int ExpectedAllocationMinutes { get; set; }
     public bool AllocationAdjustedFromDefault { get; set; }
+    public bool IsAddOn { get; set; }
 
     // Phase timestamps captured up to the point of termination. PrestageStartedAt is null only for a
     // legacy row that was seated before the Prestaging feature; SeatedAt/ReadyForDoctorAt are present

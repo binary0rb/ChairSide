@@ -22,6 +22,14 @@ This file records decisions that should survive across tasks, PRs, and debugging
 
 **Sedation interaction:** Sedation remains a modifier. For an eligible procedure, unchecked means no sedation and checked means sedation; the room workflow does not require a separate No action. Committing an eligible unchecked draft normalizes it to durable `EligibleNo`, while `EligibleUnresolved` remains compatible with partial or legacy state.
 
+## Add-on case modifier
+
+**Decision:** Add-on is sparse scheduling-context metadata attached to any valid case, not a procedure or lifecycle state. Every new assignment episode defaults to `false`; staff opt in only when an unscheduled case was worked into the day, and no explicit No acknowledgement is required. The modifier remains independent of sedation and procedure changes, remains correctable through Ready, locks after Doctor Arrived, and resets when the room returns to Available. The doctor/procedure/sedation/allocation handoff remains locked at Ready; Add-on is non-dispatch metadata and does not weaken that safety boundary.
+
+**Persistence and reporting:** The flag travels with the canonical assignment read/write shape and survives active-room persistence, restart reconstruction, Ready handoff history, completed cycles, and aborted assignments. A correction while Ready must update the active room and owned Active handoff atomically without changing locked dispatch fields. Add-on cases remain in ordinary reporting by default and are not exceptions solely because they are add-ons.
+
+**Rationale:** Add-ons occur only a few times per month. Requiring a negative response for nearly every routine case would add repetitive noise without a clinical or lifecycle safety benefit; durable opt-in metadata preserves the rare event without burdening normal seating.
+
 ## Ready handoff boundary
 
 **Decision:** Ready requires a complete, currently valid assignment and creates an immutable owned Active handoff. The assignment may already be durable or may be persisted atomically by an assignment-bearing canonical Ready request. Ready is the assignment-lock boundary; Doctor Arrived accepts the handoff rather than reconstructing assignment.
