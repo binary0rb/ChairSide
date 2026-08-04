@@ -159,7 +159,7 @@
                   {
                       "path":  "docs/design/prestage-assignment-lifecycle.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  12986,
+                      "sizeBytes":  13792,
                       "typeSymbols":  [
 
                                       ],
@@ -576,7 +576,7 @@
                   {
                       "path":  "docs/knowledge-graph/chairside.graph.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  12736,
+                      "sizeBytes":  13299,
                       "typeSymbols":  [
 
                                       ],
@@ -607,7 +607,7 @@
                   {
                       "path":  "docs/knowledge-graph/decisions.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  14145,
+                      "sizeBytes":  15533,
                       "typeSymbols":  [
 
                                       ],
@@ -631,6 +631,7 @@
                                        "Knowledge graph scope",
                                        "Non-PHI boundary",
                                        "Prestaging and assignment drafts",
+                                       "Add-on case modifier",
                                        "Ready handoff boundary",
                                        "Ready urgency",
                                        "Cancellation, expiration, and recovery",
@@ -756,7 +757,7 @@
                   {
                       "path":  "docs/ui-cohesion-audit.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  25094,
+                      "sizeBytes":  25097,
                       "typeSymbols":  [
 
                                       ],
@@ -921,7 +922,7 @@
                   {
                       "path":  "README.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  38715,
+                      "sizeBytes":  38720,
                       "typeSymbols":  [
 
                                       ],
@@ -1461,7 +1462,7 @@
                   {
                       "path":  "src/ChairSide.Board/Program.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  72777,
+                      "sizeBytes":  72805,
                       "typeSymbols":  [
                                           "LegacyRoomOneRedirect",
                                           "BeginPrestageRequest",
@@ -1715,7 +1716,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/DemoBoardStore.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  182693,
+                      "sizeBytes":  183343,
                       "typeSymbols":  [
                                           "ExceptionReasons",
                                           "ReportingExceptionReasons",
@@ -2038,7 +2039,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/PrestagingLifecycleApiContracts.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  23404,
+                      "sizeBytes":  23911,
                       "typeSymbols":  [
                                           "CanonicalAssignmentRequest",
                                           "EmptyLifecycleActionRequest",
@@ -2167,7 +2168,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/ReadyHandoffPersistenceRecords.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  9911,
+                      "sizeBytes":  10067,
                       "typeSymbols":  [
                                           "ActiveRoomWriteExpectation",
                                           "GuardedReadyHandoffPersistenceOutcome",
@@ -2212,7 +2213,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/ReportsSnapshotBuilder.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  41594,
+                      "sizeBytes":  41671,
                       "typeSymbols":  [
                                           "ReportsSnapshotBuilder"
                                       ],
@@ -2337,7 +2338,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/RoomAssignmentContracts.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  16537,
+                      "sizeBytes":  16677,
                       "typeSymbols":  [
                                           "AssignmentCompleteness",
                                           "SedationState",
@@ -2551,7 +2552,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/SqliteBoardRepository.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  112581,
+                      "sizeBytes":  114177,
                       "typeSymbols":  [
                                           "SqliteBoardRepository",
                                           "DoctorWorkingRoomRecord",
@@ -2618,7 +2619,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/SqliteBoardSchema.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  47105,
+                      "sizeBytes":  48234,
                       "typeSymbols":  [
                                           "SqliteBoardSchema",
                                           "SqliteBoardInitialization",
@@ -2689,7 +2690,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/assets/icons/README.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  1778,
+                      "sizeBytes":  1781,
                       "typeSymbols":  [
 
                                       ],
@@ -3656,7 +3657,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/BoardReadyPresentationTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  28007,
+                      "sizeBytes":  28018,
                       "typeSymbols":  [
                                           "BoardReadyPresentationTests"
                                       ],
@@ -3694,7 +3695,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/BoardStoreAssignmentTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  77534,
+                      "sizeBytes":  78094,
                       "typeSymbols":  [
                                           "BoardStoreTests"
                                       ],
@@ -3919,7 +3920,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/BoardStorePersistenceTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  29659,
+                      "sizeBytes":  29800,
                       "typeSymbols":  [
                                           "BoardStoreTests"
                                       ],
@@ -3993,7 +3994,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/BoardStoreReadinessTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  13563,
+                      "sizeBytes":  13891,
                       "typeSymbols":  [
                                           "BoardStoreTests"
                                       ],
@@ -4028,7 +4029,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/BoardStoreRecoveryTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  75004,
+                      "sizeBytes":  75295,
                       "typeSymbols":  [
                                           "BoardStoreTests"
                                       ],
@@ -4147,7 +4148,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/BoardStoreSecurityAndDiagnosticsTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  22286,
+                      "sizeBytes":  22307,
                       "typeSymbols":  [
                                           "BoardStoreTests"
                                       ],
@@ -4751,7 +4752,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/PrestagingLifecycleApiContractTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  17467,
+                      "sizeBytes":  18602,
                       "typeSymbols":  [
                                           "PrestagingLifecycleApiContractTests"
                                       ],
@@ -4761,6 +4762,7 @@
                                             "Assignment_parser_rejects_unknown_duplicate_and_malformed_json",
                                             "Assignment_parser_rejects_invalid_sedation_values",
                                             "Assignment_parser_rejects_invalid_allocation_values",
+                                            "Add_on_is_an_optional_boolean_that_defaults_false_and_survives_conversion",
                                             "Assignment_conversion_normalizes_eligible_unchecked_to_no_and_preserves_confirmed_states",
                                             "Assignment_conversion_derives_unavailable_sedation_for_ineligible_procedure",
                                             "Assignment_conversion_rejects_impossible_domain_combinations",
@@ -4797,7 +4799,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/PrestagingLifecycleEndpointTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  146512,
+                      "sizeBytes":  146549,
                       "typeSymbols":  [
                                           "PrestagingLifecycleEndpointTests",
                                           "Harness",
@@ -4865,7 +4867,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/PrestagingLifecycleTransitionTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  12896,
+                      "sizeBytes":  15980,
                       "typeSymbols":  [
                                           "PrestagingLifecycleTransitionTests"
                                       ],
@@ -4873,6 +4875,8 @@
                                             "Bare_begin_persists_a_truthful_absent_assignment",
                                             "Ready_withdrawal_returns_to_editable_seated_and_preserves_episode",
                                             "Doctor_arrived_accepts_the_immutable_ready_snapshot",
+                                            "Add_on_survives_save_restart_handoff_completion_and_resets_for_the_next_episode",
+                                            "Canceled_add_on_is_preserved_in_aborted_history_and_cleared_from_the_room",
                                             "Seat_with_draft_persists_the_assignment_and_seating_in_one_transition",
                                             "Changed_procedure_with_incompatible_dependent_state_is_rejected",
                                             "Changed_procedure_with_valid_replacement_values_is_accepted",
@@ -4936,7 +4940,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/ReadyHandoffPersistenceTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  69354,
+                      "sizeBytes":  71595,
                       "typeSymbols":  [
                                           "ReadyHandoffPersistenceTests",
                                           "RoomSnapshot",
@@ -4947,6 +4951,7 @@
                                             "Legacy_schema_migration_preserves_final_reporting_without_fabricating_ready_data",
                                             "Canonical_active_room_assignment_round_trips",
                                             "Canonical_assignment_compare_and_swap_rejects_wrong_expected_identity",
+                                            "Canonical_assignment_compare_and_swap_rejects_durable_add_on_change",
                                             "Canonical_assignment_compare_and_swap_rejects_expected_null_active_handoff",
                                             "Canonical_assignment_database_abort_does_not_mutate_supplied_room",
                                             "Ready_handoff_creation_persists_active_reference_and_complete_snapshot",
@@ -4981,8 +4986,7 @@
                                             "AbortedAssignment",
                                             "LoadRoom",
                                             "CopyRoom",
-                                            "AssertOperationFailsWithoutChanges",
-                                            "InvokeReadyHandoffOperation"
+                                            "AssertOperationFailsWithoutChanges"
                                         ],
                       "routes":  [
 
@@ -5077,7 +5081,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/RoomPanelPrestagingWorkflowTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  8816,
+                      "sizeBytes":  8820,
                       "typeSymbols":  [
                                           "RoomPanelPrestagingWorkflowTests"
                                       ],
@@ -5331,7 +5335,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/TestSupport/SqliteTestSupport.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  6390,
+                      "sizeBytes":  6456,
                       "typeSymbols":  [
                                           "BoardStoreTests"
                                       ],
@@ -5388,7 +5392,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/TestSupport/StoreScenarioTestSupport.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  12312,
+                      "sizeBytes":  12426,
                       "typeSymbols":  [
                                           "BoardStoreTests"
                                       ],
