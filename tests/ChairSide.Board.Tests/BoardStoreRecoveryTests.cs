@@ -257,7 +257,14 @@ public sealed partial class BoardStoreTests
                 MaxActiveDurationHours = 8
             });
 
-        Assert.NotNull(context.Store.BeginPrestage(1, "otte", "EXT", sedation: true, expectedAllocationUnits: 5));
+        var addOn = RoomAssignmentContract.Create(
+            "otte",
+            "EXT+SED",
+            SedationContract.EligibleYes(),
+            ExpectedAllocationContract.ConfirmedAdjustedValue(3, 5),
+            isAddOn: true);
+        Assert.NotNull(context.Store.BeginPrestage(1));
+        Assert.NotNull(context.Store.SaveAssignmentDetails(1, addOn));
         var active = context.Repository.LoadRooms(3).Single(room => room.RoomId == 1);
         clock.SetUtcNow(terminatedAt);
 
@@ -275,6 +282,7 @@ public sealed partial class BoardStoreTests
         Assert.Equal(5, abort.ExpectedAllocationUnits);
         Assert.Equal(50, abort.ExpectedAllocationMinutes);
         Assert.True(abort.AllocationAdjustedFromDefault);
+        Assert.True(abort.IsAddOn);
         Assert.Equal(prestageAt, abort.PrestageStartedAt);
         Assert.Null(abort.SeatedAt);
         Assert.Null(abort.ReadyForDoctorAt);

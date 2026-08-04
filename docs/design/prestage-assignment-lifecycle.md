@@ -27,6 +27,8 @@ Prestaging and Seated may persist an absent, partial, or complete assignment. A 
 
 Sedation is an optional modifier, not a separate required Yes/No question. With no procedure it is not applicable, and with an ineligible procedure it is unavailable. For an eligible procedure the room control is enabled; unchecked means no sedation and checked means sedation. When an eligible unchecked draft is committed by Save Details, Seat, or Ready, canonical transport normalizes it to durable `EligibleNo`. `EligibleUnresolved` remains readable for partial or legacy state, but the canonical room workflow does not require an extra No click.
 
+Add-on is separate sparse scheduling-context metadata. It defaults to `false` when every new episode begins and requires no explicit No response. Selecting it does not change assignment completeness, procedure validity, sedation eligibility, or lifecycle progression. Doctor, procedure, sedation, and allocation remain locked at Ready; Add-on stays correctable through Ready because it is non-dispatch metadata, locks after Doctor Arrived, and resets when the room returns to Available. A Ready-state correction updates the active room and owned Active handoff flag atomically without changing locked dispatch facts.
+
 When procedure is absent, sedation is unavailable and expected allocation must be Unknown. Procedure-derived Suggested, ConfirmedSuggestedValue, or ConfirmedAdjustedValue allocation cannot remain attached to an absent procedure.
 
 `SaveAssignmentDetails` is the explicit draft commit. Assignment-bearing Seat or Ready may persist its supplied canonical assignment in the same transaction as the lifecycle action. Save Details, Seat, and Ready reject invalid data without changing durable or live room state.
@@ -45,7 +47,7 @@ An omitted or explicit empty Ready request uses the durably saved assignment. An
 
 ## Canonical HTTP contract
 
-Issue #120 exposes canonical Begin Prestage, Save Details, Seat, Ready, Withdraw Ready, and Doctor Arrived operations. Canonical assignment input uses `doctorId`, undecorated `procedureCode`, `sedationChoice`, and `confirmedExpectedAllocationUnits`; the internal `+SED` decoration is never accepted or returned by canonical transport. For an eligible procedure, `sedationChoice: "yes"` persists `EligibleYes`, while omitted or null `sedationChoice` represents the unchecked modifier and persists `EligibleNo`. Explicit `"no"` remains compatible.
+Issue #120 exposes canonical Begin Prestage, Save Details, Seat, Ready, Withdraw Ready, and Doctor Arrived operations. Canonical assignment input uses `doctorId`, undecorated `procedureCode`, `sedationChoice`, `confirmedExpectedAllocationUnits`, and optional boolean `isAddOn`; omitted `isAddOn` defaults to `false`. The internal `+SED` decoration is never accepted or returned by canonical transport. For an eligible procedure, `sedationChoice: "yes"` persists `EligibleYes`, while omitted or null `sedationChoice` represents the unchecked modifier and persists `EligibleNo`. Explicit `"no"` remains compatible.
 
 The canonical Seat request nests assignment under `assignment`. The former flat assignment-bearing Seat parser, `/update-assignment`, and `/assignment` routes were removed after issue #158 found no maintained deployed callers. Bodyless Ready and Doctor Arrived were explicitly outside that removal: they retain the top-level `RoomStatus` success response, while explicit canonical request bodies return the lifecycle action envelope.
 
@@ -89,7 +91,7 @@ The general `SaveRoom`/`SaveRooms` UPSERT path remains available for unrelated i
 
 ## Reporting
 
-The handoff accepted by Doctor Arrived supplies finalized doctor, procedure, sedation, and allocation attribution. Withdrawn handoffs remain auditable but are excluded from accepted attribution and their Ready intervals do not become accepted Ready-to-arrival time. Pre-arrival aborts remain outside throughput. Post-arrival expiration belongs only to review-required exception populations.
+The handoff accepted by Doctor Arrived supplies finalized doctor, procedure, sedation, allocation, and Add-on attribution. Withdrawn handoffs remain auditable but are excluded from accepted attribution and their Ready intervals do not become accepted Ready-to-arrival time. Pre-arrival aborts remain outside throughput. Post-arrival expiration belongs only to review-required exception populations. Add-on cases remain in ordinary reporting and are not classified as exceptions solely because of the modifier.
 
 Completed-cycle Aging/Stale threshold flags are calculated from the accepted Ready interval without requiring newly persisted Aging/Stale primary room states. Legacy completed cycles retain their existing assignment and timing representation; no Ready timestamp or handoff is fabricated for them.
 

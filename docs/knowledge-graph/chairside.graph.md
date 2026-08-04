@@ -67,6 +67,9 @@ flowchart LR
     DoctorRoster["ConfigOption: Doctor roster"] --> CanonicalAssignment
     ProcedureRoster["ConfigOption: Procedure roster"] --> CanonicalAssignment
     SedationModifier["DomainConcept: Sedation modifier"] --> CanonicalAssignment
+    AddOnModifier["DomainConcept: Add-on case modifier"] --> CanonicalAssignment
+    AddOnModifier --> OptionalAddOn["DesignDecision: Defaults false / opt-in only"]
+    OptionalAddOn --> SaveDetails
     SedationModifier --> OptionalSedation["DesignDecision: Eligible unchecked means no sedation"]
     OptionalSedation --> SaveDetails
     CanonicalAssignment --> RoomReadModel["Contract: Durable room assignment read model"]
@@ -103,6 +106,7 @@ flowchart LR
 - Pre-arrival cancellation and max-duration expiration are aborted history outside throughput. Pre-arrival after-hours terminations remain aborted history but also enter the unified review queue. Post-arrival expiration is review-required exception history without a fabricated completion timestamp.
 - The after-hours sweep is independently retryable per room: successful rooms remain committed, failed and later active rooms retry, and the clinic day is marked complete only after a successful full pass.
 - Canonical lifecycle writes are compare-and-swap guarded against the complete originally loaded room, assignment, handoff, and timestamp expectation. Stale writes do not retry or mutate live state.
+- Add-on is optional scheduling-context metadata, defaults to false for every new episode, remains independent of procedure and sedation, stays correctable through Ready, locks after Doctor Arrived, survives active and historical persistence, and remains in ordinary reporting by default. Ready still locks doctor/procedure/sedation/allocation dispatch facts.
 - `RoomCapabilitiesEvaluator`, projected through the board store, is authoritative for server-known base action availability. Browser-only unsaved-draft guards remain local, and endpoint/store validation remains final.
 - `DemoBoardStore.DeriveIntegrityFaults` is the repository-aware production integrity authority. Faulted rooms remain visible, unsafe progression is blocked without rewriting persisted facts, and supported cancellation and legacy recovery remain available.
 - Doctor Arrived serializes durable cross-room doctor ownership and commits the room, Accepted handoff, and reporting cycle together.

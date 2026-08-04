@@ -58,6 +58,7 @@ public sealed partial class BoardStoreTests
         "expected_allocation_state",
         "expected_allocation_suggested_units",
         "expected_allocation_confirmed_units",
+        "is_add_on",
         "active_ready_handoff_id",
         "accepted_ready_handoff_id",
         "updated_at"
@@ -99,6 +100,7 @@ public sealed partial class BoardStoreTests
         "prestage_started_at",
         "episode_id",
         "accepted_ready_handoff_id",
+        "is_add_on",
         "created_at",
         "updated_at"
     ];
@@ -117,6 +119,7 @@ public sealed partial class BoardStoreTests
         "expected_allocation_suggested_units",
         "expected_allocation_confirmed_units",
         "terminal_ready_handoff_id",
+        "is_add_on",
         "original_default_expected_units",
         "expected_allocation_units",
         "expected_allocation_minutes",

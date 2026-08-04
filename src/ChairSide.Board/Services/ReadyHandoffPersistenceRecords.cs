@@ -30,7 +30,8 @@ internal sealed record ActiveRoomWriteExpectation(
     int OriginalDefaultExpectedUnits,
     int ExpectedAllocationUnits,
     int ExpectedAllocationMinutes,
-    bool AllocationAdjustedFromDefault)
+    bool AllocationAdjustedFromDefault,
+    bool IsAddOn)
 {
     public static ActiveRoomWriteExpectation FromRoom(RoomState room)
     {
@@ -60,7 +61,8 @@ internal sealed record ActiveRoomWriteExpectation(
             room.OriginalDefaultExpectedUnits,
             room.ExpectedAllocationUnits,
             room.ExpectedAllocationMinutes,
-            room.AllocationAdjustedFromDefault);
+            room.AllocationAdjustedFromDefault,
+            room.IsAddOn);
     }
 }
 
@@ -116,7 +118,8 @@ public sealed record PersistedRoomAssignment(
     SedationState? SedationState,
     ExpectedAllocationState? ExpectedAllocationState,
     int? ExpectedAllocationSuggestedUnits,
-    int? ExpectedAllocationConfirmedUnits)
+    int? ExpectedAllocationConfirmedUnits,
+    bool IsAddOn = false)
 {
     internal bool MatchesHandoffSnapshot(PersistedRoomAssignment other)
     {
@@ -127,7 +130,8 @@ public sealed record PersistedRoomAssignment(
             && SedationState == other.SedationState
             && ExpectedAllocationState == other.ExpectedAllocationState
             && ExpectedAllocationSuggestedUnits == other.ExpectedAllocationSuggestedUnits
-            && ExpectedAllocationConfirmedUnits == other.ExpectedAllocationConfirmedUnits;
+            && ExpectedAllocationConfirmedUnits == other.ExpectedAllocationConfirmedUnits
+            && IsAddOn == other.IsAddOn;
     }
 
     public static PersistedRoomAssignment FromCanonicalContract(
@@ -145,7 +149,8 @@ public sealed record PersistedRoomAssignment(
             assignment.Sedation.State,
             assignment.ExpectedAllocation.State,
             assignment.ExpectedAllocation.SuggestedValue,
-            assignment.ExpectedAllocation.ConfirmedValue);
+            assignment.ExpectedAllocation.ConfirmedValue,
+            assignment.IsAddOn);
     }
 
     public static PersistedRoomAssignment FromContract(
@@ -178,7 +183,7 @@ public sealed record PersistedRoomAssignment(
             allocationState,
             ExpectedAllocationSuggestedUnits,
             ExpectedAllocationConfirmedUnits);
-        return RoomAssignmentContract.Create(DoctorId, ProcedureCode, sedation, allocation);
+        return RoomAssignmentContract.Create(DoctorId, ProcedureCode, sedation, allocation, IsAddOn);
     }
 
     // Safe counterpart to ToContract for read/projection paths. A persisted row can hold malformed or

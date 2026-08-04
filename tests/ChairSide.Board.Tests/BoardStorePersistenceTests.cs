@@ -80,6 +80,7 @@ public sealed partial class BoardStoreTests
             ExpectedAllocationUnits = 4,
             ExpectedAllocationMinutes = 40,
             AllocationAdjustedFromDefault = true,
+            IsAddOn = true,
             PrestageStartedAt = prestageStartedAt,
             SeatedAt = seatedAt,
             ReadyForDoctorAt = null,
@@ -103,6 +104,7 @@ public sealed partial class BoardStoreTests
         Assert.Equal(4, reloaded.ExpectedAllocationUnits);
         Assert.Equal(40, reloaded.ExpectedAllocationMinutes);
         Assert.True(reloaded.AllocationAdjustedFromDefault);
+        Assert.True(reloaded.IsAddOn);
         Assert.Equal(prestageStartedAt, reloaded.PrestageStartedAt);
         Assert.Equal(seatedAt, reloaded.SeatedAt);
         Assert.Null(reloaded.ReadyForDoctorAt);
@@ -195,6 +197,7 @@ public sealed partial class BoardStoreTests
             PrestageStartedAt = seatedAt.AddMinutes(-5),
             SeatedAt = seatedAt,
             SeatedToDoctorSeconds = 600,
+            IsAddOn = true,
             FinalWaitState = RoomStates.ReadyForDoctor
         };
 
@@ -208,6 +211,7 @@ public sealed partial class BoardStoreTests
         Assert.Equal(insertedId, loadedCycle.CompletedCycleId);
         Assert.Equal("episode-e", loadedCycle.EpisodeId);
         Assert.Equal(seatedAt.AddMinutes(-5), loadedCycle.PrestageStartedAt);
+        Assert.True(loadedCycle.IsAddOn);
 
         // The active room was reset to Available in the same operation.
         var room1 = context.Repository.LoadRooms(3).Single(room => room.RoomId == 1);

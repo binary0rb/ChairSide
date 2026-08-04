@@ -20,6 +20,10 @@ public sealed class ReadyHandoffPersistenceTests
         Assert.Contains("accepted_ready_handoff_id", GetColumnNames(connection, "active_rooms"));
         Assert.Contains("accepted_ready_handoff_id", GetColumnNames(connection, "completed_room_cycles"));
         Assert.Contains("terminal_ready_handoff_id", GetColumnNames(connection, "aborted_room_assignments"));
+        Assert.Contains("is_add_on", GetColumnNames(connection, "active_rooms"));
+        Assert.Contains("is_add_on", GetColumnNames(connection, "completed_room_cycles"));
+        Assert.Contains("is_add_on", GetColumnNames(connection, "aborted_room_assignments"));
+        Assert.Contains("is_add_on", GetColumnNames(connection, "ready_handoffs"));
         Assert.Contains("ready_handoffs", GetTableNames(connection));
         Assert.Contains("ix_ready_handoffs_one_active_per_episode", GetIndexNames(connection));
         Assert.Contains("ix_ready_handoffs_one_accepted_per_episode", GetIndexNames(connection));
@@ -192,6 +196,7 @@ public sealed class ReadyHandoffPersistenceTests
         Assert.Null(active.ExpectedAllocationState);
         Assert.Null(active.ActiveReadyHandoffId);
         Assert.Null(active.AcceptedReadyHandoffId);
+        Assert.False(active.IsAddOn);
 
         var completed = context.Repository.LoadCompletedCycles()
             .Single(cycle => cycle.EpisodeId == "legacy-complete");
@@ -200,6 +205,7 @@ public sealed class ReadyHandoffPersistenceTests
         Assert.Null(completed.AcceptedReadyHandoffId);
         Assert.Null(completed.ReadyForDoctorAt);
         Assert.Null(completed.ReadyToDoctorSeconds);
+        Assert.False(completed.IsAddOn);
 
         var reports = context.Store.GetReports();
         var reportedLegacy = reports.RecentCompletedCycles
@@ -238,6 +244,7 @@ public sealed class ReadyHandoffPersistenceTests
         Assert.Equal("legacy-abort", aborted.EpisodeId);
         Assert.Equal(SedationState.EligibleYes, aborted.SedationState);
         Assert.Null(aborted.TerminalReadyHandoffId);
+        Assert.False(aborted.IsAddOn);
     }
 
     [Theory]
@@ -299,6 +306,42 @@ public sealed class ReadyHandoffPersistenceTests
         Assert.Null(result);
         Assert.Equal(candidateBefore, RoomSnapshot.From(candidate));
         Assert.Equal(RoomSnapshot.From(durableBefore), RoomSnapshot.From(LoadRoom(context)));
+    }
+
+    [Fact]
+    public void Canonical_assignment_compare_and_swap_rejects_durable_add_on_change()
+    {
+        using var workspace = TestWorkspace.Create();
+        var context = StoreContext.Create(workspace, environmentName: Environments.Production);
+        Assert.Equal(PrestagingLifecycleMutationOutcome.Success, context.Store.BeginPrestageCanonical(1).Outcome);
+        Assert.Equal(
+            PrestagingLifecycleMutationOutcome.Success,
+            context.Store.SaveAssignmentDetailsCanonical(1, CompleteAssignment()).Outcome);
+
+        var durableBefore = LoadRoom(context);
+        Assert.False(durableBefore.IsAddOn);
+        var expectation = ActiveRoomWriteExpectation.FromRoom(durableBefore);
+        var candidate = CopyRoom(durableBefore);
+        var candidateBefore = RoomSnapshot.From(candidate);
+
+        using (var connection = OpenConnection(context.DatabasePath))
+        {
+            ExecuteSql(connection, "UPDATE active_rooms SET is_add_on = 1 WHERE room_id = 1;");
+        }
+
+        var durableAfterIndependentChange = RoomSnapshot.From(LoadRoom(context));
+        Assert.True(durableAfterIndependentChange.IsAddOn);
+
+        var result = context.Repository.SaveCanonicalAssignment(
+            candidate,
+            CompletePersistedAssignment(),
+            expectation,
+            context.Doctors,
+            context.Procedures);
+
+        Assert.Null(result);
+        Assert.Equal(candidateBefore, RoomSnapshot.From(candidate));
+        Assert.Equal(durableAfterIndependentChange, RoomSnapshot.From(LoadRoom(context)));
     }
 
     [Fact]
@@ -1141,7 +1184,8 @@ public sealed class ReadyHandoffPersistenceTests
             FinalWaitState = RoomStates.ReadyForDoctor,
             OriginalDefaultExpectedUnits = 3,
             ExpectedAllocationUnits = 3,
-            ExpectedAllocationMinutes = 30
+            ExpectedAllocationMinutes = 30,
+            IsAddOn = room.IsAddOn
         };
 
     private static AbortedRoomAssignment AbortedAssignment(RoomState room, DateTimeOffset terminatedAt) =>
@@ -1155,6 +1199,7 @@ public sealed class ReadyHandoffPersistenceTests
             ExpectedAllocationState = room.ExpectedAllocationState,
             ExpectedAllocationSuggestedUnits = room.ExpectedAllocationSuggestedUnits,
             ExpectedAllocationConfirmedUnits = room.ExpectedAllocationConfirmedUnits,
+            IsAddOn = room.IsAddOn,
             OriginalDefaultExpectedUnits = room.OriginalDefaultExpectedUnits,
             ExpectedAllocationUnits = room.ExpectedAllocationUnits,
             ExpectedAllocationMinutes = room.ExpectedAllocationMinutes,
@@ -1183,6 +1228,7 @@ public sealed class ReadyHandoffPersistenceTests
             ExpectedAllocationState = room.ExpectedAllocationState,
             ExpectedAllocationSuggestedUnits = room.ExpectedAllocationSuggestedUnits,
             ExpectedAllocationConfirmedUnits = room.ExpectedAllocationConfirmedUnits,
+            IsAddOn = room.IsAddOn,
             ActiveReadyHandoffId = room.ActiveReadyHandoffId,
             AcceptedReadyHandoffId = room.AcceptedReadyHandoffId,
             State = room.State,
@@ -1297,7 +1343,8 @@ public sealed class ReadyHandoffPersistenceTests
         int OriginalDefaultExpectedUnits,
         int ExpectedAllocationUnits,
         int ExpectedAllocationMinutes,
-        bool AllocationAdjustedFromDefault)
+        bool AllocationAdjustedFromDefault,
+        bool IsAddOn)
     {
         public static RoomSnapshot From(RoomState room) =>
             new(
@@ -1324,7 +1371,8 @@ public sealed class ReadyHandoffPersistenceTests
                 room.OriginalDefaultExpectedUnits,
                 room.ExpectedAllocationUnits,
                 room.ExpectedAllocationMinutes,
-                room.AllocationAdjustedFromDefault);
+                room.AllocationAdjustedFromDefault,
+                room.IsAddOn);
     }
 
     private sealed record HandoffSnapshot(
