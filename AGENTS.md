@@ -219,7 +219,7 @@ Rooms should be configurable, with the default early prototype using:
 9. `Room Available` returns the room to `AVAILABLE`.
 10. The system logs non-PHI operational timing.
 
-Ready is the assignment-lock boundary. Cancellation and expiration before Doctor Arrived produce aborted history outside throughput. Post-arrival expiration produces a review-required exception without fabricating `DoctorCompleteAt`. Legacy persisted Aging/Stale rows remain readable recovery states.
+Ready locks doctor, procedure, sedation, and allocation dispatch facts. Add-on remains correctable through Ready and locks after Doctor Arrived. Cancellation and expiration before Doctor Arrived produce aborted history outside throughput. Post-arrival expiration produces a review-required exception without fabricating `DoctorCompleteAt`. Legacy persisted Aging/Stale rows remain readable recovery states.
 
 Canonical lifecycle persistence is compare-and-swap guarded by the complete originally loaded room expectation: episode and lifecycle identity, assignment and allocation values, both handoff references, and lifecycle timestamps. Stale writes return a typed failure and do not mutate live state, reload, or retry. Ready, Withdraw Ready, and Doctor Arrived validate handoff history transactionally; Doctor Arrived also serializes durable cross-room doctor ownership. SQLite failures roll back transaction-local writes and leave live memory unchanged.
 

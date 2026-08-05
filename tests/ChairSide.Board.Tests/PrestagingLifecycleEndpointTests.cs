@@ -2065,6 +2065,54 @@ public sealed class PrestagingLifecycleEndpointTests
     }
 
     [Fact]
+    public async Task Canonical_ready_save_updates_only_add_on_and_preserves_locked_dispatch_fields()
+    {
+        using var h = new Harness();
+        await h.Begin(1, null);
+        await h.Seat(1, """{"assignment":{"doctorId":"pledger","procedureCode":"EXT","sedationChoice":"yes","confirmedExpectedAllocationUnits":4}}""");
+        var ready = Action(await h.Ready(1, "{}"));
+        var handoffId = ready.Room.ActiveReadyHandoffId!;
+
+        var corrected = Action(await h.Save(
+            1,
+            """{"doctorId":"pledger","procedureCode":"EXT","sedationChoice":"yes","confirmedExpectedAllocationUnits":4,"isAddOn":true}"""));
+
+        Assert.True(corrected.Room.Assignment?.IsAddOn);
+        Assert.True(corrected.Handoff?.Assignment.IsAddOn);
+        Assert.Equal("pledger", corrected.Room.Assignment?.DoctorId);
+        Assert.Equal("EXT", corrected.Room.Assignment?.ProcedureCode);
+        Assert.Equal(SedationState.EligibleYes, corrected.Room.Assignment?.Sedation.State);
+        Assert.Equal(4, corrected.Room.Assignment?.ExpectedAllocation.ConfirmedValue);
+        Assert.True(h.Context.Repository.LoadReadyHandoff(handoffId)?.Assignment.IsAddOn);
+
+        AssertError(
+            await h.Save(
+                1,
+                """{"doctorId":"otte","procedureCode":"EXT","sedationChoice":"yes","confirmedExpectedAllocationUnits":4,"isAddOn":false}"""),
+            409,
+            PrestagingLifecycleErrorCodes.AssignmentLocked);
+        Assert.True(GetLiveRoom(h.Context.Store).IsAddOn);
+        Assert.True(h.Context.Repository.LoadReadyHandoff(handoffId)?.Assignment.IsAddOn);
+
+        Action(await h.DoctorArrived(1, "{}"));
+        AssertError(
+            await h.Save(
+                1,
+                """{"doctorId":"pledger","procedureCode":"EXT","sedationChoice":"yes","confirmedExpectedAllocationUnits":4,"isAddOn":false}"""),
+            409,
+            PrestagingLifecycleErrorCodes.AssignmentLocked);
+        Assert.True(GetLiveRoom(h.Context.Store).IsAddOn);
+        Assert.True(Assert.Single(h.Context.Repository.LoadCompletedCycles()).IsAddOn);
+        AssertAudit(
+            (await h.ReadAuditEntriesAsync()).Last(entry => entry.Action == "save-assignment-details"),
+            "save-assignment-details",
+            RoomStates.DoctorInRoom,
+            null,
+            false,
+            PrestagingLifecycleErrorCodes.AssignmentLocked);
+    }
+
+    [Fact]
     public async Task Canonical_doctor_arrived_keeps_assignment_details_locked_without_mutation()
     {
         using var workspace = TestWorkspace.Create();

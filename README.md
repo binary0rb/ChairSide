@@ -63,14 +63,14 @@ The canonical room lifecycle is:
 - Turnover
 - Available
 
-`Begin Prestage` creates an episode without requiring assignment. `Save Details` explicitly commits absent, partial, or complete assignment details while Prestaging or Seated. `Seat Room` records truthful `seatedAt`; an assignment-bearing Seat can persist its canonical draft atomically. `Ready for Doctor` requires a complete, currently valid assignment, creates an immutable Active handoff, records `readyForDoctorAt`, and locks assignment editing. The canonical API and room panel can persist a complete current draft atomically with Seat or Ready.
+`Begin Prestage` creates an episode without requiring assignment. `Save Details` explicitly commits absent, partial, or complete assignment details while Prestaging or Seated. `Seat Room` records truthful `seatedAt`; an assignment-bearing Seat can persist its canonical draft atomically. `Ready for Doctor` requires a complete, currently valid assignment, creates an Active handoff, records `readyForDoctorAt`, and locks doctor, procedure, sedation, and allocation editing. Add-on remains correctable through Ready and locks after `Doctor Arrived`. The canonical API and room panel can persist a complete current draft atomically with Seat or Ready.
 
 `Withdraw Ready` returns the same episode to Seated, clears urgency, and leaves the handoff historical as Withdrawn so corrected details can be saved. Reissuing Ready creates a new handoff and a new urgency interval. `Doctor Arrived` accepts the current handoff, clears urgency, records `doctorArrivedAt`, calculates wait timing, and moves the room to Doctor In Room. `Doctor Complete` enters Turnover, and `Room Available` completes the cycle and resets the active room.
 
 Before Ready, staff can safely correct common assignment mistakes:
 
 - Doctor, procedure, sedation, and expected-allocation controls remain directly editable while Prestaging or Seated; `Save Details` explicitly commits the current draft and preserves episode/lifecycle timestamps.
-- A Ready assignment must first be withdrawn before it can be edited.
+- A Ready assignment must first be withdrawn before its doctor, procedure, sedation, or expected allocation can be edited. Add-on alone remains correctable through Ready.
 - `Cancel Seating` requires confirmation, resets the room to available, and does not create a report entry.
 
 After `Doctor Arrived`, correction actions are blocked. Seated-to-doctor reporting is recorded only at `Doctor Arrived`.

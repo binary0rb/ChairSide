@@ -59,7 +59,7 @@
                   {
                       "path":  "AGENTS.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  16895,
+                      "sizeBytes":  17001,
                       "typeSymbols":  [
 
                                       ],
@@ -513,7 +513,7 @@
                   {
                       "path":  "docs/knowledge/workflow/room-lifecycle.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  9276,
+                      "sizeBytes":  9519,
                       "typeSymbols":  [
 
                                       ],
@@ -922,7 +922,7 @@
                   {
                       "path":  "README.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  38720,
+                      "sizeBytes":  38919,
                       "typeSymbols":  [
 
                                       ],
@@ -1716,7 +1716,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/DemoBoardStore.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  183343,
+                      "sizeBytes":  185809,
                       "typeSymbols":  [
                                           "ExceptionReasons",
                                           "ReportingExceptionReasons",
@@ -2039,7 +2039,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/PrestagingLifecycleApiContracts.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  23911,
+                      "sizeBytes":  23948,
                       "typeSymbols":  [
                                           "CanonicalAssignmentRequest",
                                           "EmptyLifecycleActionRequest",
@@ -2168,11 +2168,13 @@
                   {
                       "path":  "src/ChairSide.Board/Services/ReadyHandoffPersistenceRecords.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  10067,
+                      "sizeBytes":  10998,
                       "typeSymbols":  [
                                           "ActiveRoomWriteExpectation",
                                           "GuardedReadyHandoffPersistenceOutcome",
                                           "GuardedReadyHandoffPersistenceResult",
+                                          "GuardedReadyAddOnCorrectionPersistenceOutcome",
+                                          "GuardedReadyAddOnCorrectionPersistenceResult",
                                           "GuardedWithdrawReadyPersistenceOutcome",
                                           "GuardedWithdrawReadyPersistenceResult",
                                           "GuardedDoctorArrivedPersistenceOutcome",
@@ -2187,6 +2189,7 @@
                                             "FromRoom",
                                             "IsValid",
                                             "MatchesHandoffSnapshot",
+                                            "MatchesDispatchSnapshot",
                                             "FromCanonicalContract",
                                             "FromContract",
                                             "ToContract",
@@ -2338,7 +2341,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/RoomAssignmentContracts.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  16677,
+                      "sizeBytes":  17023,
                       "typeSymbols":  [
                                           "AssignmentCompleteness",
                                           "SedationState",
@@ -2552,7 +2555,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/SqliteBoardRepository.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  114177,
+                      "sizeBytes":  120681,
                       "typeSymbols":  [
                                           "SqliteBoardRepository",
                                           "DoctorWorkingRoomRecord",
@@ -2570,6 +2573,7 @@
                                             "SaveCompletedCycleAndRoom",
                                             "TerminateIncompleteAssignment",
                                             "SaveCanonicalAssignment",
+                                            "CorrectReadyAddOnGuarded",
                                             "CreateReadyHandoff",
                                             "CreateReadyHandoffGuarded",
                                             "WithdrawReadyHandoff",
@@ -2594,11 +2598,10 @@
                                             "ValidateRoomEpisode",
                                             "InsertReadyHandoff",
                                             "UpdateReadyHandoffOutcome",
+                                            "UpdateReadyHandoffAddOnGuarded",
                                             "UpdateReadyHandoffOutcomeGuarded",
                                             "TerminateReadyHandoff",
-                                            "InsertAbortedAssignment",
-                                            "UpdateCanonicalRoom",
-                                            "CopyRoomForPersistence"
+                                            "InsertAbortedAssignment"
                                         ],
                       "routes":  [
 
@@ -2793,7 +2796,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/bootstrap.js",
                       "kind":  "JavaScript",
-                      "sizeBytes":  80,
+                      "sizeBytes":  81,
                       "typeSymbols":  [
 
                                       ],
@@ -2881,7 +2884,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/doctor.html",
                       "kind":  "Html",
-                      "sizeBytes":  2790,
+                      "sizeBytes":  2779,
                       "typeSymbols":  [
 
                                       ],
@@ -2964,7 +2967,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/index.html",
                       "kind":  "Html",
-                      "sizeBytes":  2803,
+                      "sizeBytes":  2792,
                       "typeSymbols":  [
 
                                       ],
@@ -2990,7 +2993,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/master.html",
                       "kind":  "Html",
-                      "sizeBytes":  2803,
+                      "sizeBytes":  2792,
                       "typeSymbols":  [
 
                                       ],
@@ -3119,7 +3122,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/reports.html",
                       "kind":  "Html",
-                      "sizeBytes":  10419,
+                      "sizeBytes":  10414,
                       "typeSymbols":  [
 
                                       ],
@@ -3281,7 +3284,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/room.html",
                       "kind":  "Html",
-                      "sizeBytes":  6081,
+                      "sizeBytes":  6680,
                       "typeSymbols":  [
 
                                       ],
@@ -3307,7 +3310,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/room-card.js",
                       "kind":  "JavaScript",
-                      "sizeBytes":  10846,
+                      "sizeBytes":  11056,
                       "typeSymbols":  [
 
                                       ],
@@ -3345,7 +3348,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/room-workflow.js",
                       "kind":  "JavaScript",
-                      "sizeBytes":  40893,
+                      "sizeBytes":  43014,
                       "typeSymbols":  [
 
                                       ],
@@ -3367,6 +3370,7 @@
                                               "isConfiguredRoom",
                                               "roomCapabilities",
                                               "canEditAssignment",
+                                              "canEditAddOn",
                                               "setRoomControlsEnabled",
                                               "setNextPrimaryAction",
                                               "syncRoomSelection",
@@ -3391,6 +3395,7 @@
                                               "procedureAccentStyle",
                                               "selectedProcedureIsSedationEligible",
                                               "renderSedationToggle",
+                                              "renderAddOnToggle",
                                               "isLegacyActiveRoom",
                                               "setInnerHtmlIfChanged",
                                               "render",
@@ -3466,7 +3471,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/styles.css",
                       "kind":  "Css",
-                      "sizeBytes":  92076,
+                      "sizeBytes":  92312,
                       "typeSymbols":  [
 
                                       ],
@@ -3527,7 +3532,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/workshop.html",
                       "kind":  "Html",
-                      "sizeBytes":  11384,
+                      "sizeBytes":  11379,
                       "typeSymbols":  [
 
                                       ],
@@ -3657,7 +3662,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/BoardReadyPresentationTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  28018,
+                      "sizeBytes":  28498,
                       "typeSymbols":  [
                                           "BoardReadyPresentationTests"
                                       ],
@@ -4463,7 +4468,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/DurableFailureInjectionTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  28197,
+                      "sizeBytes":  31790,
                       "typeSymbols":  [
                                           "DurableFailureInjectionTests",
                                           "HandoffSnapshot",
@@ -4478,6 +4483,7 @@
                                             "Save_assignment_details_database_abort_throws_and_preserves_live_room",
                                             "Canonical_assignment_bearing_seat_database_abort_returns_persistence_failure_and_preserves_state",
                                             "Canonical_assignment_bearing_ready_database_abort_rolls_back_assignment_and_handoff",
+                                            "Ready_add_on_database_abort_rolls_back_room_handoff_and_live_state",
                                             "EnabledExpiration",
                                             "LoadRoom",
                                             "GetLiveRoom",
@@ -4486,6 +4492,7 @@
                                             "InstallCanonicalFailureTrigger",
                                             "InstallCanonicalSeatFailureTrigger",
                                             "InstallCanonicalReadyFailureTrigger",
+                                            "InstallReadyAddOnFailureTrigger",
                                             "DropTrigger",
                                             "ExecuteSql",
                                             "AssertInjectedAbort",
@@ -4687,7 +4694,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/PrestagingAssignmentContractTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  21591,
+                      "sizeBytes":  21867,
                       "typeSymbols":  [
                                           "PrestagingAssignmentContractTests",
                                           "HandoffEnvelope"
@@ -4799,7 +4806,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/PrestagingLifecycleEndpointTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  146549,
+                      "sizeBytes":  149006,
                       "typeSymbols":  [
                                           "PrestagingLifecycleEndpointTests",
                                           "Harness",
@@ -5081,7 +5088,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/RoomPanelPrestagingWorkflowTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  8820,
+                      "sizeBytes":  12920,
                       "typeSymbols":  [
                                           "RoomPanelPrestagingWorkflowTests"
                                       ],
@@ -5089,6 +5096,8 @@
                                             "Room_read_contract_restores_canonical_assignment_and_lock_after_reload",
                                             "Eligible_unchecked_normalizes_to_durable_no_at_each_room_commit_boundary",
                                             "Explicit_yes_remains_selected_and_uses_the_internal_sedation_modifier",
+                                            "Ready_add_on_correction_updates_room_and_active_handoff_then_locks_after_arrival",
+                                            "Ready_add_on_correction_rejects_any_dispatch_assignment_change",
                                             "Canonical_room_page_keeps_workflow_controls_and_removes_legacy_edit_mode",
                                             "ReadyWithSuppliedAssignment",
                                             "AssertRoomRead",
@@ -5750,7 +5759,7 @@
                   {
                       "path":  "tests/javascript/room-card.test.mjs",
                       "kind":  "JavaScript",
-                      "sizeBytes":  5164,
+                      "sizeBytes":  5455,
                       "typeSymbols":  [
 
                                       ],
@@ -5776,7 +5785,7 @@
                   {
                       "path":  "tests/javascript/room-workflow.test.mjs",
                       "kind":  "JavaScript",
-                      "sizeBytes":  18731,
+                      "sizeBytes":  21772,
                       "typeSymbols":  [
 
                                       ],

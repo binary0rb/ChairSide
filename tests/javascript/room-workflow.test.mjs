@@ -136,6 +136,7 @@ const controlIds = [
   "doctorTiles",
   "procedureTiles",
   "sedationToggle",
+  "addOnToggle",
   "allocationSection",
   "allocationUnits",
   "allocationMinutes",
@@ -176,7 +177,8 @@ function assignment({
   sedationState = "EligibleYes",
   allocationState = "ConfirmedAdjustedValue",
   suggestedValue = 3,
-  confirmedValue = 4
+  confirmedValue = 4,
+  isAddOn = false
 } = {}) {
   return {
     doctorId,
@@ -187,7 +189,8 @@ function assignment({
       suggestedValue,
       confirmedValue
     },
-    completeness: confirmedValue === null ? "Partial" : "Complete"
+    completeness: confirmedValue === null ? "Partial" : "Complete",
+    isAddOn
   };
 }
 
@@ -203,6 +206,7 @@ function room(overrides = {}) {
     capabilities: {
       canBeginPrestage: false,
       canEditAssignment: true,
+      canEditAddOn: true,
       canSaveDetails: true,
       canSeat: true,
       canCancelPrestage: true,
@@ -220,8 +224,11 @@ function room(overrides = {}) {
 function createHarness(initialRoom = room()) {
   const controls = new Map(controlIds.map(id => [id, new ControlStub(id)]));
   const sedationToggle = controls.get("sedationToggle");
-  sedationToggle.children.set(".sedation-state", new ControlStub("sedationState"));
+  sedationToggle.children.set(".modifier-state", new ControlStub("sedationState"));
   sedationToggle.children.set(".sedation-hint", new ControlStub("sedationHint"));
+  const addOnToggle = controls.get("addOnToggle");
+  addOnToggle.children.set(".modifier-state", new ControlStub("addOnState"));
+  addOnToggle.children.set(".add-on-hint", new ControlStub("addOnHint"));
   const focusDoctor = new ControlStub("focusDoctor");
   const focusProcedure = new ControlStub("focusProcedure");
   const snapshot = {
@@ -381,6 +388,77 @@ test("procedure changes invalidate sedation and allocation confirmation", () => 
   assert.equal(harness.controls.get("saveDetailsButton").hidden, false);
 });
 
+test("Add-on is optional, survives procedure changes, and uses Save Details", async () => {
+  const harness = createHarness();
+
+  assert.equal(harness.controls.get("addOnToggle").getAttribute("aria-checked"), "false");
+  await harness.controls.get("addOnToggle").dispatch("click");
+  assert.equal(harness.controls.get("addOnToggle").getAttribute("aria-checked"), "true");
+  assert.equal(harness.controls.get("saveDetailsButton").hidden, false);
+
+  globalThis.__roomWorkflowTileGroups.get("procedureId")({
+    dataset: { procedureId: "IMP" }
+  });
+  assert.equal(harness.controls.get("addOnToggle").getAttribute("aria-checked"), "true");
+
+  await harness.controls.get("saveDetailsButton").dispatch("click");
+  assert.equal(JSON.parse(harness.calls[0].options.body).isAddOn, true);
+});
+
+test("Ready locks dispatch controls while Add-on remains editable until Doctor Arrived", async () => {
+  const readyRoom = room({
+    state: "ReadyForDoctor",
+    assignmentLocked: true,
+    capabilities: {
+      ...room().capabilities,
+      canEditAssignment: false,
+      canEditAddOn: true,
+      canSaveDetails: true,
+      canSeat: false,
+      canReady: false,
+      canCancelPrestage: false,
+      canDoctorArrive: true
+    }
+  });
+  const harness = createHarness(readyRoom);
+
+  assert.match(harness.controls.get("doctorTiles").innerHTML, /disabled/);
+  assert.equal(harness.controls.get("sedationToggle").disabled, true);
+  assert.equal(harness.controls.get("addOnToggle").disabled, false);
+  await harness.controls.get("addOnToggle").dispatch("click");
+  assert.equal(harness.controls.get("saveDetailsButton").hidden, false);
+  await harness.controls.get("saveDetailsButton").dispatch("click");
+  assert.deepEqual(JSON.parse(harness.calls[0].options.body), {
+    doctorId: "otte",
+    procedureCode: "EXT",
+    sedationChoice: "yes",
+    confirmedExpectedAllocationUnits: 4,
+    isAddOn: true
+  });
+
+  const arrived = room({
+    state: "DoctorInRoom",
+    doctorArrivedAt: "2026-07-29T15:30:00Z",
+    assignmentLocked: true,
+    assignment: assignment({ isAddOn: true }),
+    capabilities: {
+      ...room().capabilities,
+      canEditAssignment: false,
+      canEditAddOn: false,
+      canSaveDetails: false,
+      canSeat: false,
+      canReady: false,
+      canCancelPrestage: false,
+      canDoctorArrive: false,
+      canDoctorComplete: true
+    }
+  });
+  harness.snapshot.rooms[0] = arrived;
+  harness.workflow.render(arrived);
+  assert.equal(harness.controls.get("addOnToggle").disabled, true);
+  assert.equal(harness.controls.get("addOnToggle").getAttribute("aria-checked"), "true");
+});
+
 test("suggested allocation remains distinct from confirmed and manual allocation", async () => {
   const suggestedRoom = room({
     assignment: assignment({
@@ -438,7 +516,8 @@ test("Save Details, Seat, Ready, and Doctor Arrived retain exact transport shape
     doctorId: "pledger",
     procedureCode: "EXT",
     sedationChoice: "yes",
-    confirmedExpectedAllocationUnits: 4
+    confirmedExpectedAllocationUnits: 4,
+    isAddOn: false
   });
 
   const seatHarness = createHarness();
@@ -450,7 +529,8 @@ test("Save Details, Seat, Ready, and Doctor Arrived retain exact transport shape
       doctorId: "otte",
       procedureCode: "EXT",
       sedationChoice: "yes",
-      confirmedExpectedAllocationUnits: 4
+      confirmedExpectedAllocationUnits: 4,
+      isAddOn: false
     }
   });
 
@@ -463,7 +543,8 @@ test("Save Details, Seat, Ready, and Doctor Arrived retain exact transport shape
       doctorId: "otte",
       procedureCode: "EXT",
       sedationChoice: "yes",
-      confirmedExpectedAllocationUnits: 4
+      confirmedExpectedAllocationUnits: 4,
+      isAddOn: false
     }
   });
 
@@ -473,7 +554,8 @@ test("Save Details, Seat, Ready, and Doctor Arrived retain exact transport shape
     capabilities: {
       ...room().capabilities,
       canEditAssignment: false,
-      canSaveDetails: false,
+      canEditAddOn: true,
+      canSaveDetails: true,
       canSeat: false,
       canReady: false,
       canCancelPrestage: false,

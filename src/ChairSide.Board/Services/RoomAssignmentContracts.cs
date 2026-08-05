@@ -348,6 +348,7 @@ public static class ReadyUrgencyEvaluator
 public sealed record RoomCapabilities(
     bool CanBeginPrestage,
     bool CanEditAssignment,
+    bool CanEditAddOn,
     bool CanSaveDetails,
     bool CanSeat,
     bool CanCancelPrestage,
@@ -372,6 +373,7 @@ public static class RoomCapabilitiesEvaluator
             CanonicalRoomLifecycleState.Available => new RoomCapabilities(
                 CanBeginPrestage: true,
                 CanEditAssignment: false,
+                CanEditAddOn: false,
                 CanSaveDetails: false,
                 CanSeat: false,
                 CanCancelPrestage: false,
@@ -384,6 +386,7 @@ public static class RoomCapabilitiesEvaluator
             CanonicalRoomLifecycleState.Prestaging => new RoomCapabilities(
                 CanBeginPrestage: false,
                 CanEditAssignment: canonicalPreArrival,
+                CanEditAddOn: canonicalPreArrival,
                 CanSaveDetails: canonicalPreArrival,
                 CanSeat: canonicalPreArrival,
                 CanCancelPrestage: true,
@@ -396,6 +399,7 @@ public static class RoomCapabilitiesEvaluator
             CanonicalRoomLifecycleState.SeatedInPrep => new RoomCapabilities(
                 CanBeginPrestage: false,
                 CanEditAssignment: canonicalPreArrival,
+                CanEditAddOn: canonicalPreArrival,
                 CanSaveDetails: canonicalPreArrival,
                 CanSeat: false,
                 CanCancelPrestage: false,
@@ -408,7 +412,8 @@ public static class RoomCapabilitiesEvaluator
             CanonicalRoomLifecycleState.ReadyForDoctor => new RoomCapabilities(
                 CanBeginPrestage: false,
                 CanEditAssignment: false,
-                CanSaveDetails: false,
+                CanEditAddOn: canonicalPreArrival,
+                CanSaveDetails: canonicalPreArrival,
                 CanSeat: false,
                 CanCancelPrestage: false,
                 CanCancelSeating: true,
@@ -420,6 +425,7 @@ public static class RoomCapabilitiesEvaluator
             CanonicalRoomLifecycleState.DoctorWorking => new RoomCapabilities(
                 CanBeginPrestage: false,
                 CanEditAssignment: false,
+                CanEditAddOn: false,
                 CanSaveDetails: false,
                 CanSeat: false,
                 CanCancelPrestage: false,
@@ -432,6 +438,7 @@ public static class RoomCapabilitiesEvaluator
             CanonicalRoomLifecycleState.Turnover => new RoomCapabilities(
                 CanBeginPrestage: false,
                 CanEditAssignment: false,
+                CanEditAddOn: false,
                 CanSaveDetails: false,
                 CanSeat: false,
                 CanCancelPrestage: false,
@@ -444,6 +451,7 @@ public static class RoomCapabilitiesEvaluator
             _ => new RoomCapabilities(
                 CanBeginPrestage: false,
                 CanEditAssignment: false,
+                CanEditAddOn: false,
                 CanSaveDetails: false,
                 CanSeat: false,
                 CanCancelPrestage: false,

@@ -77,6 +77,17 @@ internal sealed record GuardedReadyHandoffPersistenceResult(
     GuardedReadyHandoffPersistenceOutcome Outcome,
     CommittedReadyHandoffResult? Committed = null);
 
+internal enum GuardedReadyAddOnCorrectionPersistenceOutcome
+{
+    Success,
+    StaleWrite,
+    IntegrityFault
+}
+
+internal sealed record GuardedReadyAddOnCorrectionPersistenceResult(
+    GuardedReadyAddOnCorrectionPersistenceOutcome Outcome,
+    CommittedReadyHandoffResult? Committed = null);
+
 internal enum GuardedWithdrawReadyPersistenceOutcome
 {
     Success,
@@ -132,6 +143,18 @@ public sealed record PersistedRoomAssignment(
             && ExpectedAllocationSuggestedUnits == other.ExpectedAllocationSuggestedUnits
             && ExpectedAllocationConfirmedUnits == other.ExpectedAllocationConfirmedUnits
             && IsAddOn == other.IsAddOn;
+    }
+
+    internal bool MatchesDispatchSnapshot(PersistedRoomAssignment other)
+    {
+        ArgumentNullException.ThrowIfNull(other);
+
+        return string.Equals(DoctorId, other.DoctorId, StringComparison.Ordinal)
+            && string.Equals(ProcedureCode, other.ProcedureCode, StringComparison.Ordinal)
+            && SedationState == other.SedationState
+            && ExpectedAllocationState == other.ExpectedAllocationState
+            && ExpectedAllocationSuggestedUnits == other.ExpectedAllocationSuggestedUnits
+            && ExpectedAllocationConfirmedUnits == other.ExpectedAllocationConfirmedUnits;
     }
 
     public static PersistedRoomAssignment FromCanonicalContract(

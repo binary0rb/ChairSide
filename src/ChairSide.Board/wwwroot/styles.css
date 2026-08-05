@@ -2291,18 +2291,18 @@ button:disabled {
   opacity: 0.95;
 }
 
-/* Sedation modifier toggle: a single full-width switch tile that reuses the
+/* Case modifier toggles: full-width switch tiles that reuse the
    selection-tile sizing (76px min-height preserves the touch target). The On/Off
    pill and selected highlight communicate the explicit, default-off state. */
-.sedation-tile {
+.modifier-tile {
   justify-content: space-between;
 }
 
-.sedation-tile .selection-copy {
+.modifier-tile .selection-copy {
   padding-right: 12px;
 }
 
-.sedation-state {
+.modifier-state {
   flex: 0 0 auto;
   min-width: 52px;
   padding: 6px 12px;
@@ -2317,10 +2317,22 @@ button:disabled {
   letter-spacing: 0.04em;
 }
 
-.sedation-tile.selected .sedation-state {
+.modifier-tile.selected .modifier-state {
   border-color: #2563eb;
   background: #2563eb;
   color: #ffffff;
+}
+
+.room-case-modifier-badge {
+  align-self: flex-start;
+  padding: 4px 8px;
+  border: 1px solid #f59e0b;
+  border-radius: 999px;
+  background: #fffbeb;
+  color: #92400e;
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
 }
 
 /* Reporting data-hygiene badges: small neutral pills in the raw/audit cycle table. Never alarm. */

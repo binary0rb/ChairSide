@@ -13,6 +13,7 @@ public sealed class DurableFailureInjectionTests
     private const string CanonicalTriggerName = "fail_room_1_canonical_assignment";
     private const string CanonicalSeatTriggerName = "fail_room_1_canonical_seat";
     private const string CanonicalReadyTriggerName = "fail_room_1_canonical_ready";
+    private const string ReadyAddOnTriggerName = "fail_room_1_ready_add_on";
 
     [Fact]
     public void Cancel_seating_database_abort_rolls_back_aborted_history_and_preserves_live_room()
@@ -397,6 +398,65 @@ public sealed class DurableFailureInjectionTests
         Assert.Empty(reloaded.Repository.LoadCompletedCycles());
     }
 
+    [Fact]
+    public void Ready_add_on_database_abort_rolls_back_room_handoff_and_live_state()
+    {
+        using var workspace = TestWorkspace.Create();
+        var databasePath = workspace.ProductionDatabasePath();
+        var context = StoreContext.Create(
+            workspace,
+            environmentName: Environments.Production,
+            databasePath: databasePath);
+        var scheduled = RoomAssignmentContract.Create(
+            "otte",
+            "CON",
+            SedationContract.UnavailableProcedureIneligible(),
+            ExpectedAllocationContract.ConfirmedSuggestedValue(1),
+            isAddOn: false);
+        var addOn = RoomAssignmentContract.Create(
+            "otte",
+            "CON",
+            SedationContract.UnavailableProcedureIneligible(),
+            ExpectedAllocationContract.ConfirmedSuggestedValue(1),
+            isAddOn: true);
+
+        Assert.Equal(PrestagingLifecycleMutationOutcome.Success, context.Store.BeginPrestageCanonical(1).Outcome);
+        Assert.Equal(PrestagingLifecycleMutationOutcome.Success, context.Store.SeatRoomCanonical(1, scheduled).Outcome);
+        Assert.Equal(PrestagingLifecycleMutationOutcome.Success, context.Store.MarkReadyForDoctorCanonical(1, null).Outcome);
+        var liveBefore = RoomSnapshot.From(GetLiveRoom(context.Store));
+        var durableBefore = RoomSnapshot.From(LoadRoom(context));
+        var handoffId = Assert.IsType<string>(durableBefore.ActiveReadyHandoffId);
+        var handoffBefore = HandoffSnapshot.From(context.Repository.LoadReadyHandoff(handoffId)!);
+        var eventCountBefore = context.Store.GetSnapshot().RecentEvents.Count;
+
+        InstallReadyAddOnFailureTrigger(databasePath);
+        PrestagingLifecycleMutationResult result;
+        try
+        {
+            result = context.Store.SaveAssignmentDetailsCanonical(1, addOn);
+        }
+        finally
+        {
+            DropTrigger(databasePath, ReadyAddOnTriggerName);
+        }
+
+        Assert.Equal(PrestagingLifecycleMutationOutcome.PersistenceFailure, result.Outcome);
+        AssertInjectedAbort(
+            Assert.IsType<SqliteException>(result.PersistenceException),
+            "injected Ready Add-on failure");
+        Assert.Equal(liveBefore, RoomSnapshot.From(GetLiveRoom(context.Store)));
+        Assert.Equal(durableBefore, RoomSnapshot.From(LoadRoom(context)));
+        Assert.Equal(handoffBefore, HandoffSnapshot.From(context.Repository.LoadReadyHandoff(handoffId)!));
+        Assert.Equal(eventCountBefore, context.Store.GetSnapshot().RecentEvents.Count);
+
+        var reloaded = StoreContext.Create(
+            workspace,
+            environmentName: Environments.Production,
+            databasePath: databasePath);
+        Assert.Equal(durableBefore, RoomSnapshot.From(LoadRoom(reloaded)));
+        Assert.Equal(handoffBefore, HandoffSnapshot.From(reloaded.Repository.LoadReadyHandoff(handoffId)!));
+    }
+
     private static RoomExpirationOptions EnabledExpiration() =>
         new()
         {
@@ -477,6 +537,19 @@ public sealed class DurableFailureInjectionTests
             WHEN NEW.room_id = 1
             BEGIN
                 SELECT RAISE(ABORT, 'injected canonical ready failure');
+            END;
+            """);
+
+    private static void InstallReadyAddOnFailureTrigger(string databasePath) =>
+        ExecuteSql(databasePath, """
+            CREATE TRIGGER fail_room_1_ready_add_on
+            BEFORE UPDATE OF is_add_on ON ready_handoffs
+            FOR EACH ROW
+            WHEN OLD.room_id = 1
+                AND OLD.is_add_on = 0
+                AND NEW.is_add_on = 1
+            BEGIN
+                SELECT RAISE(ABORT, 'injected Ready Add-on failure');
             END;
             """);
 
@@ -607,7 +680,8 @@ public sealed class DurableFailureInjectionTests
         int OriginalDefaultExpectedUnits,
         int ExpectedAllocationUnits,
         int ExpectedAllocationMinutes,
-        bool AllocationAdjustedFromDefault)
+        bool AllocationAdjustedFromDefault,
+        bool IsAddOn)
     {
         public static RoomSnapshot From(RoomState room) =>
             new(
@@ -634,6 +708,7 @@ public sealed class DurableFailureInjectionTests
                 room.OriginalDefaultExpectedUnits,
                 room.ExpectedAllocationUnits,
                 room.ExpectedAllocationMinutes,
-                room.AllocationAdjustedFromDefault);
+                room.AllocationAdjustedFromDefault,
+                room.IsAddOn);
     }
 }
