@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>ChairSide Board - Room Panel</title>
-  <link rel="stylesheet" href="/styles.css?v=20260722-primary-workflow-action-colors">
+  <link rel="stylesheet" href="/styles.css?v=20260804-add-on-interaction">
 </head>
 <body data-view="room">
   <header class="app-header compact">
@@ -58,12 +58,22 @@
       </div>
       <div class="selection-section sedation-section">
         <span class="control-label" id="sedationToggleLabel">Sedation</span>
-        <button class="selection-tile sedation-tile" id="sedationToggle" type="button" role="switch" aria-checked="false" aria-labelledby="sedationToggleLabel" disabled>
+        <button class="selection-tile modifier-tile sedation-tile" id="sedationToggle" type="button" role="switch" aria-checked="false" aria-labelledby="sedationToggleLabel" disabled>
           <span class="selection-copy">
             <strong>Add Sedation</strong>
             <small class="sedation-hint">Select an eligible procedure first</small>
           </span>
-          <span class="sedation-state" aria-hidden="true">Off</span>
+          <span class="modifier-state" aria-hidden="true">Off</span>
+        </button>
+      </div>
+      <div class="selection-section add-on-section">
+        <span class="control-label" id="addOnToggleLabel">Add-on</span>
+        <button class="selection-tile modifier-tile add-on-tile" id="addOnToggle" type="button" role="switch" aria-checked="false" aria-labelledby="addOnToggleLabel" disabled>
+          <span class="selection-copy">
+            <strong>Mark as Add-on</strong>
+            <small class="add-on-hint">Optional modifier for an unscheduled case</small>
+          </span>
+          <span class="modifier-state" aria-hidden="true">Off</span>
         </button>
       </div>
       <div class="selection-section allocation-section" id="allocationSection" hidden>
@@ -98,6 +108,6 @@
     </section>
   </main>
 
-  <script type="module" src="/bootstrap.js?v=20260728-native-module-bootstrap"></script>
+  <script type="module" src="/bootstrap.js?v=20260804-add-on-interaction"></script>
 </body>
 </html>

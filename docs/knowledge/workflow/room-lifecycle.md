@@ -13,7 +13,7 @@ ChairSide tracks room episodes, not patients. The canonical lifecycle is:
 1. Begin Prestage creates `EpisodeId`, records `PrestageStartedAt`, and enters `Prestaging` without requiring an assignment.
 2. Save Details explicitly persists an absent, partial, or complete assignment while `Prestaging` or `Seated`.
 3. Seat Room records truthful `SeatedAt`. An assignment-bearing Seat may persist the supplied canonical draft in the same transaction.
-4. Ready for Doctor requires a complete, currently valid assignment. It may use the durable draft or atomically persist a supplied canonical draft, then enters primary state `ReadyForDoctor`, creates an owned Active handoff, and locks the assignment.
+4. Ready for Doctor requires a complete, currently valid assignment. It may use the durable draft or atomically persist a supplied canonical draft, then enters primary state `ReadyForDoctor`, creates an owned Active handoff, and locks doctor, procedure, sedation, and allocation. Add-on remains correctable through Ready and locks after Doctor Arrived.
 5. Doctor Arrived accepts that handoff, clears Ready urgency, records `DoctorArrivedAt`, and enters `DoctorInRoom`.
 6. Doctor Complete records `DoctorCompleteAt` and enters `Turnover`.
 7. Room Available records completion and releases the room to `Available`.
@@ -50,7 +50,7 @@ Unsaved assignment-draft completeness and dirtiness are browser-only facts and r
 
 ## Concurrency and durability
 
-Canonical lifecycle writes capture the complete originally loaded durable room expectation: room/episode/state identity, assignment and allocation values, both handoff references, and lifecycle timestamps. The guarded SQLite update uses null-safe comparisons. A stale context receives `stale-write`; it does not mutate live memory, retry, reload, append an event, regress Ready, overwrite the locked assignment, or orphan a handoff.
+Canonical lifecycle writes capture the complete originally loaded durable room expectation: room/episode/state identity, assignment and allocation values, both handoff references, and lifecycle timestamps. The guarded SQLite update uses null-safe comparisons. A stale context receives `stale-write`; it does not mutate live memory, retry, reload, append an event, regress Ready, overwrite locked dispatch facts, or orphan a handoff. A Ready Add-on correction compare-and-swap updates the active room and owned Active handoff atomically without changing those dispatch facts.
 
 Ready and Withdraw Ready validate episode handoff history in the same transaction as the room mutation. Doctor Arrived uses an immediate SQLite transaction to serialize cross-room doctor ownership, validates canonical working rooms against their Accepted handoffs, and commits the room, Active-to-Accepted handoff transition, and reporting cycle atomically. SQLite failures roll back transaction-local writes; live memory and events change only after commit.
 

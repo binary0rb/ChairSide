@@ -596,6 +596,108 @@ public sealed class SqliteBoardRepository
         return new CommittedRoomResult(persistedRoom);
     }
 
+    internal GuardedReadyAddOnCorrectionPersistenceResult CorrectReadyAddOnGuarded(
+        RoomState room,
+        RoomAssignmentContract assignment,
+        ActiveRoomWriteExpectation expectation)
+    {
+        ArgumentNullException.ThrowIfNull(room);
+        ArgumentNullException.ThrowIfNull(assignment);
+        ArgumentNullException.ThrowIfNull(expectation);
+        if (room.RoomId != expectation.RoomId)
+        {
+            throw new InvalidOperationException("Ready Add-on correction expectation must identify the candidate room.");
+        }
+        if (assignment.Completeness != AssignmentCompleteness.Complete)
+        {
+            throw new ArgumentException("Ready Add-on correction requires the complete locked assignment.", nameof(assignment));
+        }
+
+        var expectedAssignment = new PersistedRoomAssignment(
+            expectation.AssignedDoctorId,
+            expectation.AssignedDoctorDisplayName,
+            expectation.ProcedureCode,
+            expectation.ProcedureCategory,
+            expectation.SedationState,
+            expectation.ExpectedAllocationState,
+            expectation.ExpectedAllocationSuggestedUnits,
+            expectation.ExpectedAllocationConfirmedUnits,
+            expectation.IsAddOn);
+        var correctedAssignment = PersistedRoomAssignment.FromCanonicalContract(
+            assignment,
+            expectation.AssignedDoctorDisplayName,
+            expectation.ProcedureCategory);
+        if (!expectedAssignment.MatchesDispatchSnapshot(correctedAssignment))
+        {
+            throw new ArgumentException(
+                "Ready Add-on correction cannot change locked dispatch assignment fields.",
+                nameof(assignment));
+        }
+        var candidateExpectation = ActiveRoomWriteExpectation.FromRoom(room);
+        if ((candidateExpectation with { IsAddOn = expectation.IsAddOn }) != expectation)
+        {
+            throw new ArgumentException(
+                "Ready Add-on correction cannot change lifecycle or locked room fields.",
+                nameof(room));
+        }
+        if (string.IsNullOrWhiteSpace(expectation.EpisodeId)
+            || string.IsNullOrWhiteSpace(expectation.ActiveReadyHandoffId)
+            || expectation.AcceptedReadyHandoffId is not null)
+        {
+            return new GuardedReadyAddOnCorrectionPersistenceResult(
+                GuardedReadyAddOnCorrectionPersistenceOutcome.IntegrityFault);
+        }
+
+        var persistedRoom = CopyRoomForPersistence(room);
+        ApplyAssignment(persistedRoom, correctedAssignment);
+        using var connection = OpenConnection();
+        using var transaction = connection.BeginTransaction();
+        var rows = UpdateCanonicalRoom(connection, transaction, persistedRoom, expectation);
+        if (rows == 0)
+        {
+            transaction.Rollback();
+            return new GuardedReadyAddOnCorrectionPersistenceResult(
+                GuardedReadyAddOnCorrectionPersistenceOutcome.StaleWrite);
+        }
+        if (rows != 1)
+        {
+            throw new InvalidOperationException("Ready Add-on correction must update exactly one room.");
+        }
+
+        var history = LoadReadyHandoffsByEpisode(connection, transaction, expectation.EpisodeId);
+        var handoffId = expectation.ActiveReadyHandoffId;
+        var referenced = history.SingleOrDefault(existing => existing.HandoffId == handoffId);
+        var hasIntegrityFault =
+            referenced is null
+            || referenced.RoomId != expectation.RoomId
+            || referenced.EpisodeId != expectation.EpisodeId
+            || referenced.ContractStatus != ReadyHandoffStatus.Active
+            || !expectedAssignment.MatchesHandoffSnapshot(referenced.Assignment)
+            || history.Any(existing =>
+                existing.RoomId != expectation.RoomId
+                || !string.Equals(existing.EpisodeId, expectation.EpisodeId, StringComparison.Ordinal)
+                || (existing.HandoffId != handoffId
+                    && existing.ContractStatus != ReadyHandoffStatus.Withdrawn));
+        if (hasIntegrityFault
+            || !UpdateReadyHandoffAddOnGuarded(
+                connection,
+                transaction,
+                referenced!,
+                correctedAssignment.IsAddOn))
+        {
+            transaction.Rollback();
+            return new GuardedReadyAddOnCorrectionPersistenceResult(
+                GuardedReadyAddOnCorrectionPersistenceOutcome.IntegrityFault);
+        }
+
+        transaction.Commit();
+        return new GuardedReadyAddOnCorrectionPersistenceResult(
+            GuardedReadyAddOnCorrectionPersistenceOutcome.Success,
+            new CommittedReadyHandoffResult(
+                CopyReadyHandoff(referenced!, assignment: correctedAssignment),
+                persistedRoom));
+    }
+
     public PersistedReadyHandoff CreateReadyHandoff(
         RoomState room,
         RoomAssignmentContract assignment,
@@ -1606,6 +1708,40 @@ public sealed class SqliteBoardRepository
         }
     }
 
+    private static bool UpdateReadyHandoffAddOnGuarded(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        PersistedReadyHandoff handoff,
+        bool isAddOn)
+    {
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = """
+            UPDATE ready_handoffs
+            SET is_add_on = $isAddOn
+            WHERE handoff_id = $handoffId
+                AND episode_id = $episodeId
+                AND room_id = $roomId
+                AND withdrawn_at IS NULL
+                AND accepted_at IS NULL
+                AND terminated_at IS NULL
+                AND is_add_on IS $expectedIsAddOn
+                AND EXISTS (
+                    SELECT 1
+                    FROM active_rooms
+                    WHERE active_rooms.room_id = ready_handoffs.room_id
+                        AND active_rooms.episode_id = ready_handoffs.episode_id
+                        AND active_rooms.active_ready_handoff_id = ready_handoffs.handoff_id
+                );
+            """;
+        command.Parameters.AddWithValue("$isAddOn", isAddOn ? 1 : 0);
+        command.Parameters.AddWithValue("$handoffId", handoff.HandoffId);
+        command.Parameters.AddWithValue("$episodeId", handoff.EpisodeId);
+        command.Parameters.AddWithValue("$roomId", handoff.RoomId);
+        command.Parameters.AddWithValue("$expectedIsAddOn", handoff.Assignment.IsAddOn ? 1 : 0);
+        return command.ExecuteNonQuery() == 1;
+    }
+
     private static void UpdateReadyHandoffOutcomeGuarded(
         SqliteConnection connection,
         SqliteTransaction transaction,
@@ -2102,7 +2238,8 @@ public sealed class SqliteBoardRepository
         DateTimeOffset? withdrawnAt = null,
         DateTimeOffset? acceptedAt = null,
         DateTimeOffset? terminatedAt = null,
-        string? terminationKind = null) =>
+        string? terminationKind = null,
+        PersistedRoomAssignment? assignment = null) =>
         new()
         {
             HandoffId = handoff.HandoffId,
@@ -2113,7 +2250,7 @@ public sealed class SqliteBoardRepository
             AcceptedAt = acceptedAt ?? handoff.AcceptedAt,
             TerminatedAt = terminatedAt ?? handoff.TerminatedAt,
             TerminationKind = terminationKind ?? handoff.TerminationKind,
-            Assignment = handoff.Assignment
+            Assignment = assignment ?? handoff.Assignment
         };
 
     private static CompletedRoomCycle CopyCompletedCycleForPersistence(CompletedRoomCycle cycle) =>

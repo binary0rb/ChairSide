@@ -32,6 +32,9 @@ export function createRoomCardPresentation({
       ? procedure.formatCode(procedureDisplayCode)
       : state === "empty" ? "OPEN" : "PROCEDURE PENDING";
     const assignmentSummary = roomAssignmentSummary(room, display, state);
+    const addOnBadge = display.isAddOn
+      ? '<span class="room-case-modifier-badge">ADD-ON</span>'
+      : "";
 
     const accent = display.procedureCode ? procedure.resolveAccent(display.procedureCode) : "";
     const tileStyle = `--doctor-color: ${escapeAttribute(doctorColor)}`
@@ -47,6 +50,7 @@ export function createRoomCardPresentation({
           ${displayedProcedure ? procedure.renderIcon(displayedProcedure) : procedure.renderEmptyIcon()}
           <span>${escapeHtml(procedureLabel)}</span>
         </div>
+        ${addOnBadge}
         ${assignmentSummary ? `<small class="room-assignment-summary">${escapeHtml(assignmentSummary)}</small>` : ""}
         <div class="room-footer">
           <span class="room-doctor">
@@ -108,7 +112,8 @@ export function createRoomCardPresentation({
         procedureCode,
         procedure: procedure.fromCode(procedureCode),
         sedationState: assignment.sedation?.state || null,
-        expectedAllocation: assignment.expectedAllocation || null
+        expectedAllocation: assignment.expectedAllocation || null,
+        isAddOn: assignment.isAddOn === true
       };
     }
 
@@ -123,7 +128,8 @@ export function createRoomCardPresentation({
       procedureCode,
       procedure: procedure.fromCode(procedureCode) || room?.procedure || null,
       sedationState: procedure.hasSedationModifier(room?.procedureCode) ? "EligibleYes" : null,
-      expectedAllocation: null
+      expectedAllocation: null,
+      isAddOn: false
     };
   }
 

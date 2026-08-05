@@ -588,7 +588,8 @@ public static class PrestagingLifecycleResponseProjector
                 assignment.DoctorId,
                 baseCode,
                 assignment.Sedation,
-                assignment.ExpectedAllocation);
+                assignment.ExpectedAllocation,
+                assignment.IsAddOn);
     }
 
     private static ReadyHandoffContract? ProjectHandoff(ReadyHandoffContract? handoff)

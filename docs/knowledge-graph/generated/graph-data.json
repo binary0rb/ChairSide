@@ -1743,6 +1743,18 @@
                       "path":  "src/ChairSide.Board/Services/ReadyHandoffPersistenceRecords.cs"
                   },
                   {
+                      "id":  "symbol:type:GuardedReadyAddOnCorrectionPersistenceOutcome",
+                      "label":  "GuardedReadyAddOnCorrectionPersistenceOutcome",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/ReadyHandoffPersistenceRecords.cs"
+                  },
+                  {
+                      "id":  "symbol:type:GuardedReadyAddOnCorrectionPersistenceResult",
+                      "label":  "GuardedReadyAddOnCorrectionPersistenceResult",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/ReadyHandoffPersistenceRecords.cs"
+                  },
+                  {
                       "id":  "symbol:type:GuardedReadyHandoffPersistenceOutcome",
                       "label":  "GuardedReadyHandoffPersistenceOutcome",
                       "type":  "CodeType",
@@ -3323,6 +3335,16 @@
                   {
                       "from":  "file:src/ChairSide.Board/Services/ReadyHandoffPersistenceRecords.cs",
                       "to":  "symbol:type:GuardedDoctorArrivedPersistenceResult",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/ReadyHandoffPersistenceRecords.cs",
+                      "to":  "symbol:type:GuardedReadyAddOnCorrectionPersistenceOutcome",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/ReadyHandoffPersistenceRecords.cs",
+                      "to":  "symbol:type:GuardedReadyAddOnCorrectionPersistenceResult",
                       "label":  "declares"
                   },
                   {

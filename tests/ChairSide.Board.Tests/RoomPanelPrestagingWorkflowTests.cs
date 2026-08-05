@@ -82,6 +82,67 @@ public sealed class RoomPanelPrestagingWorkflowTests
     }
 
     [Fact]
+    public void Ready_add_on_correction_updates_room_and_active_handoff_then_locks_after_arrival()
+    {
+        using var workspace = TestWorkspace.Create();
+        var context = StoreContext.Create(workspace, Environments.Production);
+        var scheduled = context.Store.ConvertCanonicalAssignment(
+            new CanonicalAssignmentRequest("otte", "EXT", "yes", 4, IsAddOn: false)).Value!;
+        var addOn = context.Store.ConvertCanonicalAssignment(
+            new CanonicalAssignmentRequest("otte", "EXT", "yes", 4, IsAddOn: true)).Value!;
+
+        Assert.Equal(PrestagingLifecycleMutationOutcome.Success, context.Store.BeginPrestageCanonical(1).Outcome);
+        Assert.Equal(PrestagingLifecycleMutationOutcome.Success, context.Store.SeatRoomCanonical(1, scheduled).Outcome);
+        Assert.Equal(PrestagingLifecycleMutationOutcome.Success, context.Store.MarkReadyForDoctorCanonical(1, null).Outcome);
+
+        var corrected = context.Store.SaveAssignmentDetailsCanonical(1, addOn);
+
+        Assert.Equal(PrestagingLifecycleMutationOutcome.Success, corrected.Outcome);
+        Assert.True(corrected.Room?.Assignment?.IsAddOn);
+        Assert.True(corrected.Handoff?.Assignment.IsAddOn);
+        var durableRoom = context.Repository.LoadRooms(3).Single(room => room.RoomId == 1);
+        var durableHandoff = context.Repository.LoadReadyHandoff(durableRoom.ActiveReadyHandoffId!)!;
+        Assert.True(durableRoom.IsAddOn);
+        Assert.True(durableHandoff.Assignment.IsAddOn);
+
+        var reloaded = StoreContext.Create(workspace, Environments.Production, context.DatabasePath);
+        Assert.True(reloaded.Store.GetRoom(1)?.Assignment?.IsAddOn);
+        Assert.True(reloaded.Repository.LoadReadyHandoff(durableRoom.ActiveReadyHandoffId!)?.Assignment.IsAddOn);
+
+        Assert.Equal(
+            PrestagingLifecycleMutationOutcome.Success,
+            reloaded.Store.MarkDoctorArrivedCanonical(1).Outcome);
+        var locked = reloaded.Store.SaveAssignmentDetailsCanonical(1, scheduled);
+        Assert.Equal(PrestagingLifecycleMutationOutcome.AssignmentLocked, locked.Outcome);
+        Assert.True(reloaded.Store.GetRoom(1)?.Assignment?.IsAddOn);
+        Assert.True(Assert.Single(reloaded.Repository.LoadCompletedCycles()).IsAddOn);
+    }
+
+    [Fact]
+    public void Ready_add_on_correction_rejects_any_dispatch_assignment_change()
+    {
+        using var workspace = TestWorkspace.Create();
+        var context = StoreContext.Create(workspace, Environments.Production);
+        var scheduled = context.Store.ConvertCanonicalAssignment(
+            new CanonicalAssignmentRequest("otte", "CON", null, 1)).Value!;
+        var changedDispatch = context.Store.ConvertCanonicalAssignment(
+            new CanonicalAssignmentRequest("pledger", "CON", null, 1, IsAddOn: true)).Value!;
+
+        Assert.Equal(PrestagingLifecycleMutationOutcome.Success, context.Store.BeginPrestageCanonical(1).Outcome);
+        Assert.Equal(PrestagingLifecycleMutationOutcome.Success, context.Store.SeatRoomCanonical(1, scheduled).Outcome);
+        Assert.Equal(PrestagingLifecycleMutationOutcome.Success, context.Store.MarkReadyForDoctorCanonical(1, null).Outcome);
+
+        var rejected = context.Store.SaveAssignmentDetailsCanonical(1, changedDispatch);
+
+        Assert.Equal(PrestagingLifecycleMutationOutcome.AssignmentLocked, rejected.Outcome);
+        Assert.Equal("otte", context.Store.GetRoom(1)?.Assignment?.DoctorId);
+        Assert.False(context.Store.GetRoom(1)?.Assignment?.IsAddOn);
+        var room = context.Repository.LoadRooms(3).Single(item => item.RoomId == 1);
+        Assert.False(room.IsAddOn);
+        Assert.False(context.Repository.LoadReadyHandoff(room.ActiveReadyHandoffId!)?.Assignment.IsAddOn);
+    }
+
+    [Fact]
     public void Canonical_room_page_keeps_workflow_controls_and_removes_legacy_edit_mode()
     {
         var root = FindRepositoryRoot();
@@ -91,7 +152,7 @@ public sealed class RoomPanelPrestagingWorkflowTests
         var requiredIds = new[]
         {
             "beginPrestageButton", "saveDetailsButton", "discardChangesButton", "withdrawReadyButton",
-            "sedationToggle", "allocationSection", "allocationConfirm", "seatButton", "readyForDoctorButton"
+            "sedationToggle", "addOnToggle", "allocationSection", "allocationConfirm", "seatButton", "readyForDoctorButton"
         };
 
         Assert.All(requiredIds, id => Assert.Contains($"id=\"{id}\"", generic));
@@ -105,6 +166,9 @@ public sealed class RoomPanelPrestagingWorkflowTests
         Assert.Contains("isAssignmentDraftDirty", roomWorkflowScript, StringComparison.Ordinal);
         Assert.Contains("sedationChoice: selectedProcedure?.sedationEligible && draft.sedationOn ? \"yes\" : null", roomWorkflowScript, StringComparison.Ordinal);
         Assert.Contains("room?.assignment?.sedation?.state === \"EligibleYes\"", roomWorkflowScript, StringComparison.Ordinal);
+        Assert.Contains("isAddOn: draft.addOn", roomWorkflowScript, StringComparison.Ordinal);
+        Assert.Contains("canEditAddOn", roomWorkflowScript, StringComparison.Ordinal);
+        Assert.DoesNotContain("draft.addOn = false;", roomWorkflowScript, StringComparison.Ordinal);
         Assert.Contains("function isLegacyActiveRoom(room)", roomWorkflowScript, StringComparison.Ordinal);
         Assert.Contains(
             "setDisabled(document.getElementById(\"readyForDoctorButton\"), !capabilities.canReady);",

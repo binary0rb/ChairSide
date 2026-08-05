@@ -451,21 +451,25 @@ public sealed class PrestagingAssignmentContractTests
         Assert.True(available.CanBeginPrestage);
         Assert.False(available.CanEditAssignment);
         Assert.True(prestaging.CanEditAssignment);
+        Assert.True(prestaging.CanEditAddOn);
         Assert.True(prestaging.CanSaveDetails);
         Assert.True(prestaging.CanSeat);
         Assert.True(prestaging.CanCancelPrestage);
         Assert.False(prestaging.CanCancelSeating);
         Assert.False(prestaging.CanReady);
         Assert.True(seated.CanEditAssignment);
+        Assert.True(seated.CanEditAddOn);
         Assert.True(seated.CanReady);
         Assert.True(seated.CanCancelSeating);
         Assert.False(seated.CanSeat);
         Assert.False(ready.CanEditAssignment);
-        Assert.False(ready.CanSaveDetails);
+        Assert.True(ready.CanEditAddOn);
+        Assert.True(ready.CanSaveDetails);
         Assert.True(ready.CanCancelSeating);
         Assert.True(ready.CanWithdrawReady);
         Assert.True(ready.CanDoctorArrive);
         Assert.False(working.CanEditAssignment);
+        Assert.False(working.CanEditAddOn);
         Assert.False(working.CanWithdrawReady);
         Assert.True(working.CanDoctorComplete);
         Assert.True(turnover.CanRoomAvailable);
@@ -488,6 +492,7 @@ public sealed class PrestagingAssignmentContractTests
             hasIntegrityFaults: false);
 
         Assert.False(capabilities.CanEditAssignment);
+        Assert.False(capabilities.CanEditAddOn);
         Assert.False(capabilities.CanSaveDetails);
         Assert.False(capabilities.CanSeat);
         Assert.False(capabilities.CanReady);
@@ -507,6 +512,7 @@ public sealed class PrestagingAssignmentContractTests
             hasIntegrityFaults: true);
 
         Assert.False(capabilities.CanWithdrawReady);
+        Assert.False(capabilities.CanEditAddOn);
         Assert.False(capabilities.CanDoctorArrive);
         Assert.False(capabilities.CanDoctorComplete);
         Assert.False(capabilities.CanRoomAvailable);

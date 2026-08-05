@@ -24,6 +24,7 @@ export function createRoomWorkflow({
     selectedDoctorId: null,
     selectedProcedureId: null,
     sedationOn: false,
+    addOn: false,
     expectedUnits: null,
     expectedUnitsManual: false,
     expectedUnitsConfirmed: false,
@@ -47,6 +48,7 @@ export function createRoomWorkflow({
     return {
       canBeginPrestage: room?.capabilities?.canBeginPrestage === true,
       canEditAssignment: room?.capabilities?.canEditAssignment === true,
+      canEditAddOn: room?.capabilities?.canEditAddOn === true,
       canSaveDetails: room?.capabilities?.canSaveDetails === true,
       canSeat: room?.capabilities?.canSeat === true,
       canCancelPrestage: room?.capabilities?.canCancelPrestage === true,
@@ -63,9 +65,13 @@ export function createRoomWorkflow({
     return roomCapabilities(room).canEditAssignment;
   }
 
+  function canEditAddOn(room) {
+    return roomCapabilities(room).canEditAddOn;
+  }
+
   function setRoomControlsEnabled(room) {
     const capabilities = roomCapabilities(room);
-    const isDirty = capabilities.canEditAssignment && isAssignmentDraftDirty(room);
+    const isDirty = capabilities.canSaveDetails && isAssignmentDraftDirty(room);
     const canCancel = capabilities.canCancelPrestage || capabilities.canCancelSeating;
 
     setDisabled(
@@ -138,6 +144,7 @@ export function createRoomWorkflow({
     draft.selectedDoctorId = assignment?.doctorId || null;
     draft.selectedProcedureId = assignment?.procedureCode || null;
     draft.sedationOn = assignment?.sedation?.state === "EligibleYes";
+    draft.addOn = assignment?.isAddOn === true;
     const allocation = assignment?.expectedAllocation;
     draft.expectedUnits = allocation?.confirmedValue ?? allocation?.suggestedValue ?? null;
     draft.expectedUnitsConfirmed = allocation?.state === "ConfirmedSuggestedValue"
@@ -170,7 +177,8 @@ export function createRoomWorkflow({
       procedureCode,
       sedation: { state: sedationState },
       expectedAllocation: { state: "Unknown", suggestedValue: null, confirmedValue: null },
-      completeness: "Partial"
+      completeness: "Partial",
+      isAddOn: false
     };
   }
 
@@ -185,7 +193,8 @@ export function createRoomWorkflow({
       sedationState: assignment.sedation?.state || null,
       allocationState: assignment.expectedAllocation?.state || null,
       suggestedValue: assignment.expectedAllocation?.suggestedValue ?? null,
-      confirmedValue: assignment.expectedAllocation?.confirmedValue ?? null
+      confirmedValue: assignment.expectedAllocation?.confirmedValue ?? null,
+      isAddOn: assignment.isAddOn === true
     });
   }
 
@@ -217,7 +226,8 @@ export function createRoomWorkflow({
       sedationState,
       allocationState,
       suggestedValue,
-      confirmedValue
+      confirmedValue,
+      isAddOn: draft.addOn
     };
   }
 
@@ -226,7 +236,7 @@ export function createRoomWorkflow({
   }
 
   function isAssignmentDraftDirty(room = getCurrentRoom()) {
-    return canEditAssignment(room)
+    return (canEditAssignment(room) || canEditAddOn(room))
       && draftAssignmentSignature() !== draft.persistedAssignmentSignature;
   }
 
@@ -243,7 +253,8 @@ export function createRoomWorkflow({
       sedationChoice: selectedProcedure?.sedationEligible && draft.sedationOn ? "yes" : null,
       confirmedExpectedAllocationUnits: selectedProcedure && draft.expectedUnitsConfirmed
         ? clampExpectedUnits(draft.expectedUnits ?? selectedProcedureDefaultUnits())
-        : null
+        : null,
+      isAddOn: draft.addOn
     };
   }
 
@@ -283,6 +294,14 @@ export function createRoomWorkflow({
       return;
     }
     const capabilities = roomCapabilities(room);
+    if (capabilities.canEditAddOn && !capabilities.canEditAssignment) {
+      const isDirty = isAssignmentDraftDirty(room);
+      target.textContent = isDirty
+        ? "Add-on change ready. Use Save Details to update the active case."
+        : "Dispatch assignment locked for the active Ready handoff. Add-on remains editable until Doctor Arrived.";
+      target.dataset.tone = isDirty ? "success" : "neutral";
+      return;
+    }
     if (room.assignmentLocked
       || capabilities.canWithdrawReady
       || state === "doctor-in-room"
@@ -322,6 +341,7 @@ export function createRoomWorkflow({
     renderDoctorTiles(room);
     renderProcedureTiles(room);
     renderSedationToggle(room);
+    renderAddOnToggle(room);
     renderAllocationSelector(room);
   }
 
@@ -563,7 +583,7 @@ export function createRoomWorkflow({
     toggle.classList.toggle("selected", isOn);
     toggle.setAttribute("aria-checked", String(isOn));
 
-    const state = toggle.querySelector(".sedation-state");
+    const state = toggle.querySelector(".modifier-state");
     if (state) {
       state.textContent = isOn ? "On" : "Off";
     }
@@ -579,6 +599,35 @@ export function createRoomWorkflow({
             : eligible
               ? "Optional modifier. Leave off when sedation is not used."
               : "Not available for this procedure";
+    }
+  }
+
+  function renderAddOnToggle(room) {
+    const toggle = document.getElementById("addOnToggle");
+    if (!toggle) {
+      return;
+    }
+
+    const interactable = canEditAddOn(room);
+    const isOn = interactable ? draft.addOn : room?.assignment?.isAddOn === true;
+    toggle.disabled = !interactable;
+    toggle.classList.toggle("selected", isOn);
+    toggle.setAttribute("aria-checked", String(isOn));
+
+    const state = toggle.querySelector(".modifier-state");
+    if (state) {
+      state.textContent = isOn ? "On" : "Off";
+    }
+
+    const hint = toggle.querySelector(".add-on-hint");
+    if (hint) {
+      hint.textContent = interactable
+        ? "Optional modifier for an unscheduled case."
+        : room?.doctorArrivedAt
+          ? "Locked after Doctor Arrived."
+          : isLegacyActiveRoom(room)
+            ? "Legacy assignment is read-only until the room is restarted."
+            : "Available after Begin Prestage.";
     }
   }
 
@@ -664,7 +713,7 @@ export function createRoomWorkflow({
     });
 
     saveDetailsButton.addEventListener("click", async () => {
-      if (!canEditAssignment(getCurrentRoom()) || !isAssignmentDraftDirty()) {
+      if (!roomCapabilities(getCurrentRoom()).canSaveDetails || !isAssignmentDraftDirty()) {
         return;
       }
       setRoomActionStatus("Saving details...", "pending");
@@ -909,6 +958,16 @@ export function createRoomWorkflow({
       }
 
       draft.sedationOn = !draft.sedationOn;
+      render(getCurrentRoom());
+    });
+
+    const addOnToggle = document.getElementById("addOnToggle");
+    addOnToggle?.addEventListener("click", () => {
+      if (addOnToggle.disabled || !canEditAddOn(getCurrentRoom())) {
+        return;
+      }
+
+      draft.addOn = !draft.addOn;
       render(getCurrentRoom());
     });
 

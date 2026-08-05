@@ -202,7 +202,45 @@ public sealed class DemoBoardStore
                 if (room is null) return CanonicalFailure(PrestagingLifecycleMutationOutcome.RoomNotFound);
                 var faults = DeriveIntegrityFaults(room);
                 if (faults.Count > 0) return CanonicalFailure(PrestagingLifecycleMutationOutcome.IntegrityFault, faults);
-                if (room.State is RoomStates.ReadyForDoctor or RoomStates.Aging or RoomStates.Stale || room.DoctorArrivedAt is not null) return CanonicalFailure(PrestagingLifecycleMutationOutcome.AssignmentLocked);
+                if (room.DoctorArrivedAt is not null) return CanonicalFailure(PrestagingLifecycleMutationOutcome.AssignmentLocked);
+                if (room.State is RoomStates.ReadyForDoctor or RoomStates.Aging or RoomStates.Stale)
+                {
+                    var currentAssignment = GetCanonicalAssignment(room);
+                    var requestedAssignment = PersistedRoomAssignment.FromCanonicalContract(
+                        assignment,
+                        room.AssignedDoctorDisplayName,
+                        room.ProcedureCategory);
+                    if (!currentAssignment.MatchesDispatchSnapshot(requestedAssignment))
+                    {
+                        return CanonicalFailure(PrestagingLifecycleMutationOutcome.AssignmentLocked);
+                    }
+                    if (currentAssignment.IsAddOn == requestedAssignment.IsAddOn)
+                    {
+                        return CanonicalSuccess(room, currentAssignment.ToContract(), Now);
+                    }
+
+                    var readyWriteExpectation = ActiveRoomWriteExpectation.FromRoom(room);
+                    var readyCandidate = CopyRoomState(room);
+                    ApplyPersistedAssignment(readyCandidate, requestedAssignment);
+                    var correction = _repository.CorrectReadyAddOnGuarded(readyCandidate, assignment, readyWriteExpectation);
+                    if (correction.Outcome == GuardedReadyAddOnCorrectionPersistenceOutcome.StaleWrite)
+                    {
+                        return CanonicalFailure(PrestagingLifecycleMutationOutcome.StaleWrite);
+                    }
+                    if (correction.Outcome == GuardedReadyAddOnCorrectionPersistenceOutcome.IntegrityFault)
+                    {
+                        return CanonicalFailure(
+                            PrestagingLifecycleMutationOutcome.IntegrityFault,
+                            [new RoomIntegrityFault(RoomIntegrityFaultCode.ContradictoryHandoffReferences, currentAssignment.ToContract())]);
+                    }
+
+                    var readyCommitted = correction.Committed
+                        ?? throw new InvalidOperationException("Successful Ready Add-on correction must return committed state.");
+                    ApplyCommittedRoom(room, readyCommitted.Room);
+                    var correctedAt = Now;
+                    AddEvent(new RoomEvent(room.RoomId, "AssignmentSaved", correctedAt, room.AssignedDoctor, room.ProcedureCode));
+                    return CanonicalSuccess(room, readyCommitted.Handoff.Assignment.ToContract(), correctedAt, readyCommitted.Handoff.ToContract());
+                }
                 if (room.State is not (RoomStates.Prestaging or RoomStates.Seated)) return CanonicalFailure(PrestagingLifecycleMutationOutcome.LifecycleConflict);
                 if (!IsAssignmentValidForRoster(assignment)) return CanonicalFailure(PrestagingLifecycleMutationOutcome.InvalidAssignment);
                 var expectation = ActiveRoomWriteExpectation.FromRoom(room);

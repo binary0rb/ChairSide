@@ -52,7 +52,7 @@ const presentation = createRoomCardPresentation({
   }
 });
 
-function readyRoom(readyUrgency) {
+function readyRoom(readyUrgency, isAddOn = false) {
   return {
     roomId: 4,
     state: "ReadyForDoctor",
@@ -72,7 +72,8 @@ function readyRoom(readyUrgency) {
         state: "ConfirmedAdjustedValue",
         suggestedValue: 3,
         confirmedValue: 4
-      }
+      },
+      isAddOn
     }
   };
 }
@@ -104,6 +105,11 @@ test("Ready stays primary while Aging and Stale render as subordinate urgency", 
       new RegExp(`<span class="ready-urgency-badge ${normalizedUrgency}">${urgency.toUpperCase()}</span>`));
     assert.doesNotMatch(html, /class="room-tile (aging|stale)\b/);
   }
+});
+
+test("Add-on badge renders only for flagged canonical assignments", () => {
+  assert.match(presentation.renderRoomTile(readyRoom("None", true)), />ADD-ON</);
+  assert.doesNotMatch(presentation.renderRoomTile(readyRoom("None", false)), />ADD-ON</);
 });
 
 test("standard and large cards use the same renderer with only the large modifier", () => {

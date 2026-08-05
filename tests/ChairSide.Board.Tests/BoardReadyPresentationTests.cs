@@ -84,6 +84,9 @@ public sealed class BoardReadyPresentationTests
         Assert.Equal(RoomStates.ReadyForDoctor, urgent.State);
         Assert.Equal(expectedUrgency, urgent.ReadyUrgency);
         Assert.True(urgent.AssignmentLocked);
+        Assert.False(urgent.Capabilities?.CanEditAssignment);
+        Assert.True(urgent.Capabilities?.CanEditAddOn);
+        Assert.True(urgent.Capabilities?.CanSaveDetails);
         Assert.Equal("pledger", urgent.Assignment?.DoctorId);
         Assert.Equal("EXT", urgent.Assignment?.ProcedureCode);
         Assert.True(urgent.Capabilities?.CanWithdrawReady);
@@ -107,6 +110,8 @@ public sealed class BoardReadyPresentationTests
         Assert.Equal(RoomStates.DoctorInRoom, arrived.State);
         Assert.Equal(ReadyUrgency.None, arrived.ReadyUrgency);
         Assert.True(arrived.AssignmentLocked);
+        Assert.False(arrived.Capabilities?.CanEditAddOn);
+        Assert.False(arrived.Capabilities?.CanSaveDetails);
         Assert.Equal("pledger", arrived.Assignment?.DoctorId);
         Assert.Equal("EXT", arrived.Assignment?.ProcedureCode);
         Assert.NotNull(arrived.AcceptedReadyHandoffId);
@@ -144,6 +149,8 @@ public sealed class BoardReadyPresentationTests
         Assert.Contains("Doctor pending", roomCardScript, StringComparison.Ordinal);
         Assert.Contains("Procedure pending", roomCardScript, StringComparison.Ordinal);
         Assert.Contains("Allocation pending", roomCardScript, StringComparison.Ordinal);
+        Assert.Contains("class=\"room-case-modifier-badge\">ADD-ON", roomCardScript, StringComparison.Ordinal);
+        Assert.Contains(".room-case-modifier-badge", styles, StringComparison.Ordinal);
         Assert.Contains("Aging: Ready wait &gt;", boardScript, StringComparison.Ordinal);
         Assert.Contains("Stale: Ready wait &gt;", boardScript, StringComparison.Ordinal);
         Assert.Contains(".room-tile.ready-for-doctor.urgency-aging", styles, StringComparison.Ordinal);
@@ -365,7 +372,7 @@ public sealed class BoardReadyPresentationTests
         {
             Assert.Contains($"class=\"secondary-button\" id=\"{id}\"", genericRoom, StringComparison.Ordinal);
         });
-        Assert.Contains("/styles.css?v=20260722-primary-workflow-action-colors", genericRoom, StringComparison.Ordinal);
+        Assert.Contains("/styles.css?v=20260804-add-on-interaction", genericRoom, StringComparison.Ordinal);
         Assert.Contains("createRoomWorkflow", boardScript, StringComparison.Ordinal);
         Assert.Contains("function roomCapabilities(room)", roomWorkflowScript, StringComparison.Ordinal);
         Assert.Contains("function setNextPrimaryAction(room)", roomWorkflowScript, StringComparison.Ordinal);
@@ -416,7 +423,7 @@ public sealed class BoardReadyPresentationTests
             reportsScript,
             StringComparison.Ordinal);
         Assert.Contains(
-            "<script type=\"module\" src=\"/bootstrap.js?v=20260728-native-module-bootstrap\"></script>",
+            "<script type=\"module\" src=\"/bootstrap.js?v=20260804-add-on-interaction\"></script>",
             reportsPage,
             StringComparison.Ordinal);
 
@@ -456,12 +463,12 @@ public sealed class BoardReadyPresentationTests
             "workshop.html"
         };
         const string moduleEntry =
-            "<script type=\"module\" src=\"/bootstrap.js?v=20260728-native-module-bootstrap\"></script>";
+            "<script type=\"module\" src=\"/bootstrap.js?v=20260804-add-on-interaction\"></script>";
 
         var signalRImport =
             bootstrap.IndexOf("import \"./signalr-lite.js\";", StringComparison.Ordinal);
         var boardImport =
-            bootstrap.IndexOf("import \"./board.js?v=20260727-room-capabilities\";", StringComparison.Ordinal);
+            bootstrap.IndexOf("import \"./board.js?v=20260804-add-on-interaction\";", StringComparison.Ordinal);
         Assert.True(signalRImport >= 0);
         Assert.True(boardImport > signalRImport);
 
