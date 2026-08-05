@@ -1,7 +1,7 @@
 ---
 title: Room lifecycle
 tags: [room, board, room-lifecycle, data-persistence, permissions, device-binding, domain-rule, active, last-verified]
-last_verified_commit: 61dac09
+last_verified_commit: b516481
 ---
 
 # Room lifecycle
