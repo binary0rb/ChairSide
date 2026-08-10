@@ -102,9 +102,28 @@ test("Ready stays primary while Aging and Stale render as subordinate urgency", 
     assert.match(html, /<span class="ready-primary-badge">READY<\/span>/);
     assert.match(
       html,
-      new RegExp(`<span class="ready-urgency-badge ${normalizedUrgency}">${urgency.toUpperCase()}</span>`));
+      new RegExp(`<span class="ready-urgency-badge ready-timer-badge ${normalizedUrgency}">${urgency.toUpperCase()}</span>`));
     assert.doesNotMatch(html, /class="room-tile (aging|stale)\b/);
   }
+});
+
+test("Ready without urgency renders the Master ON TIME timer presentation", () => {
+  const room = readyRoom("None");
+  room.readyForDoctorAt = "2026-07-29T15:29:00Z";
+  const html = presentation.renderRoomTile(room);
+
+  assert.match(html, /class="room-tile ready-for-doctor /);
+  assert.doesNotMatch(html, /urgency-(aging|stale)/);
+  assert.match(html, /aria-label="Ready for Doctor, on time"/);
+  assert.match(html, /<span class="ready-primary-badge">READY<\/span>/);
+  assert.match(html, /<span class="ready-urgency-badge ready-timer-badge on-time">ON TIME<\/span>/);
+});
+
+test("active procedure markup exposes the configured label beneath its code", () => {
+  const html = presentation.renderRoomTile(readyRoom("Aging"));
+
+  assert.match(html, />EXT \+ SED<\/span>/);
+  assert.match(html, /<small class="room-procedure-label">Extraction<\/small>/);
 });
 
 test("Add-on badge renders only for flagged canonical assignments", () => {

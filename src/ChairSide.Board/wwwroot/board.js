@@ -263,7 +263,7 @@ function renderLegend() {
   const procedureTarget = document.getElementById("procedureLegend");
   if (procedureTarget) {
     procedureTarget.innerHTML = app.snapshot.procedures.map(procedure => `
-      <span class="procedure-chip">
+      <span class="procedure-chip" style="${procedureAccentStyle(procedure.code)}">
         <span>${renderProcedureIcon(procedure)}</span>
         <strong>${escapeHtml(procedure.code)}</strong>
         <small>${escapeHtml(procedure.label)}</small>
@@ -730,9 +730,28 @@ function renderProcedureBadge(procedureCode) {
   `;
 }
 
-// One outline icon per default-roster procedure code. Codes that share an
-// icon name in the roster (CON/POE, POST/MISC, BX/BXPOST) get distinct icons
-// here without touching roster semantics.
+// Approved active procedures use the polished PNG artwork. The existing SVG
+// map remains the fallback for legacy, custom, and unknown roster entries.
+const procedurePngAssetsByCode = {
+  CON: "consult.png",
+  EXT: "ext.png",
+  POST: "post.png",
+  IMP: "imp.png",
+  BX: "bx.png",
+  MISC: "misc.png",
+  POE: "poe.png",
+  IMPRES: "impres.png",
+  INTCK: "intck.png",
+  BXPOST: "bxpost.png",
+  IMPRM: "imprm.png",
+  PCOC: "pcoc.png",
+  UNCOV: "uncov.png",
+  EXBOND: "exbond.png",
+  AO4: "ao4.png"
+};
+
+// One outline icon per default-roster procedure code. These remain supported
+// fallbacks, including standalone legacy SED.
 const procedureIconsByCode = {
   CON: "magnifier",
   EXT: "forceps",
@@ -794,7 +813,14 @@ const procedureIconSvgs = {
 
 function renderProcedureIcon(procedure) {
   const iconName = typeof procedure === "string" ? procedure : procedure?.icon;
-  const code = typeof procedure === "string" ? "" : String(procedure?.code || "").toUpperCase();
+  const rawCode = typeof procedure === "string" ? "" : String(procedure?.code || "");
+  const code = rawCode.replace(/\s+/g, "").replace(/\+SED$/i, "").toUpperCase();
+  const pngAsset = procedurePngAssetsByCode[code];
+  if (pngAsset) {
+    const assetRoot = "/assets/procedure-icons";
+    return `<img class="procedure-icon procedure-icon--png" src="${assetRoot}/64/${pngAsset}" srcset="${assetRoot}/32/${pngAsset} 32w, ${assetRoot}/64/${pngAsset} 64w, ${assetRoot}/256/${pngAsset} 256w" sizes="112px" width="64" height="64" alt="" aria-hidden="true">`;
+  }
+
   const key = procedureIconsByCode[code] || legacyIconAliases[iconName] || iconName;
   return procedureIconSvgs[key] || renderEmptyIcon();
 }

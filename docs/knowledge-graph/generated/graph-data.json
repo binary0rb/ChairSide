@@ -927,6 +927,12 @@
                       "path":  "tests/javascript/page-context-state.test.mjs"
                   },
                   {
+                      "id":  "file:tests/javascript/procedure-icons.test.mjs",
+                      "label":  "tests/javascript/procedure-icons.test.mjs",
+                      "type":  "File",
+                      "path":  "tests/javascript/procedure-icons.test.mjs"
+                  },
+                  {
                       "id":  "file:tests/javascript/realtime-polling.test.mjs",
                       "label":  "tests/javascript/realtime-polling.test.mjs",
                       "type":  "File",
@@ -4675,6 +4681,11 @@
                   {
                       "from":  "repo:chairside",
                       "to":  "file:tests/javascript/page-context-state.test.mjs",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:tests/javascript/procedure-icons.test.mjs",
                       "label":  "contains"
                   },
                   {

@@ -31,6 +31,7 @@ export function createRoomCardPresentation({
     const procedureLabel = procedureDisplayCode
       ? procedure.formatCode(procedureDisplayCode)
       : state === "empty" ? "OPEN" : "PROCEDURE PENDING";
+    const procedureName = displayedProcedure?.label || "";
     const assignmentSummary = roomAssignmentSummary(room, display, state);
     const addOnBadge = display.isAddOn
       ? '<span class="room-case-modifier-badge">ADD-ON</span>'
@@ -49,6 +50,7 @@ export function createRoomCardPresentation({
         <div class="procedure-lockup${displayedProcedure ? " procedure-lockup--chip" : state === "empty" ? "" : " procedure-lockup--pending"}">
           ${displayedProcedure ? procedure.renderIcon(displayedProcedure) : procedure.renderEmptyIcon()}
           <span>${escapeHtml(procedureLabel)}</span>
+          ${procedureName ? `<small class="room-procedure-label">${escapeHtml(procedureName)}</small>` : ""}
         </div>
         ${addOnBadge}
         ${assignmentSummary ? `<small class="room-assignment-summary">${escapeHtml(assignmentSummary)}</small>` : ""}
@@ -85,14 +87,16 @@ export function createRoomCardPresentation({
   }
 
   function renderRoomStatusBadge(presentation) {
-    if (!presentation.readyUrgency) {
+    if (presentation.primaryState !== "ready-for-doctor") {
       return `<span class="room-state-badge">${stateBadge(presentation.primaryState)}</span>`;
     }
 
-    const urgency = presentation.readyUrgency;
-    return `<span class="ready-status-stack" aria-label="Ready for Doctor, ${urgency} urgency">
+    const timerState = presentation.readyUrgency || "on-time";
+    const timerLabel = timerState === "on-time" ? "ON TIME" : timerState.toUpperCase();
+    const accessibleTimerLabel = timerState === "on-time" ? "on time" : `${timerState} urgency`;
+    return `<span class="ready-status-stack" aria-label="Ready for Doctor, ${accessibleTimerLabel}">
       <span class="ready-primary-badge">READY</span>
-      <span class="ready-urgency-badge ${urgency}">${urgency.toUpperCase()}</span>
+      <span class="ready-urgency-badge ready-timer-badge ${timerState}">${timerLabel}</span>
     </span>`;
   }
 

@@ -160,6 +160,7 @@ This file is mechanical output from `tools/knowledge-graph/New-ChairSideKnowledg
 | `tests/javascript/connection-status.test.mjs` | JavaScript | functions: initialApp, importModule, createFakeDom, expectedDetails | - |
 | `tests/javascript/leaf-utilities.test.mjs` | JavaScript | - | - |
 | `tests/javascript/page-context-state.test.mjs` | JavaScript | - | - |
+| `tests/javascript/procedure-icons.test.mjs` | JavaScript | - | - |
 | `tests/javascript/realtime-polling.test.mjs` | JavaScript | functions: initialApp, importModule, connectionHarness, callbackHarness, flushPromises | - |
 | `tests/javascript/report-data.test.mjs` | JavaScript | functions: response, deferred, createHarness | - |
 | `tests/javascript/reports.test.mjs` | JavaScript | functions: wirePressInterruptionGuard, adminRequestHeaders, clearAdminToken, storeAdminToken, readErrorMessage, recordDomMutation, targetFor, allocation | - |
