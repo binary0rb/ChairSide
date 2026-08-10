@@ -1,7 +1,7 @@
 ﻿{
     "generatedStamp":  "deterministic",
     "root":  ".",
-    "fileCount":  165,
+    "fileCount":  166,
     "files":  [
                   {
                       "path":  ".github/pull_request_template.md",
@@ -513,7 +513,7 @@
                   {
                       "path":  "docs/knowledge/workflow/room-lifecycle.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  9519,
+                      "sizeBytes":  9520,
                       "typeSymbols":  [
 
                                       ],
@@ -922,7 +922,7 @@
                   {
                       "path":  "README.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  38919,
+                      "sizeBytes":  39696,
                       "typeSymbols":  [
 
                                       ],
@@ -2720,7 +2720,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/board.js",
                       "kind":  "JavaScript",
-                      "sizeBytes":  35637,
+                      "sizeBytes":  36564,
                       "typeSymbols":  [
 
                                       ],
@@ -3310,7 +3310,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/room-card.js",
                       "kind":  "JavaScript",
-                      "sizeBytes":  11056,
+                      "sizeBytes":  11444,
                       "typeSymbols":  [
 
                                       ],
@@ -3471,7 +3471,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/styles.css",
                       "kind":  "Css",
-                      "sizeBytes":  92312,
+                      "sizeBytes":  94873,
                       "typeSymbols":  [
 
                                       ],
@@ -5630,6 +5630,32 @@
                                    ]
                   },
                   {
+                      "path":  "tests/javascript/procedure-icons.test.mjs",
+                      "kind":  "JavaScript",
+                      "sizeBytes":  3408,
+                      "typeSymbols":  [
+
+                                      ],
+                      "methodSymbols":  [
+
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
                       "path":  "tests/javascript/realtime-polling.test.mjs",
                       "kind":  "JavaScript",
                       "sizeBytes":  14667,
@@ -5759,7 +5785,7 @@
                   {
                       "path":  "tests/javascript/room-card.test.mjs",
                       "kind":  "JavaScript",
-                      "sizeBytes":  5455,
+                      "sizeBytes":  6323,
                       "typeSymbols":  [
 
                                       ],

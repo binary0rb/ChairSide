@@ -99,14 +99,23 @@ Room cards preserve doctor identity while using status labels, badges, and borde
 
 The room panel is touch-first for tablet use. Doctor and procedure choices render as large selectable tiles with configured doctor names/colors, procedure icons, procedure codes, and procedure labels. Lifecycle buttons are large touch targets and remain keyboard/mouse compatible.
 
-Procedure icons are high-contrast inline SVGs used consistently across legends, room cards, room panels, and reports:
+Approved active procedures use transparent PNG artwork consistently across legends, room cards, room panels, and reports. The existing inline SVG set remains the fallback for legacy, custom, and unknown procedure entries. Standalone legacy `SED` continues to use its crescent-moon SVG.
 
-- `CON` = Consult, speech bubble
-- `EXT` = Extraction, tooth/dental extraction
-- `SED` = Sedation, crescent moon
-- `POST` = Post-op, checkmark document
-- `IMP` = Implant, screw/post
-- `BX` = Biopsy, vial/sample
+- `CON` = Consult, magnifying glass examining a tooth
+- `EXT` = Extraction, dental extraction forceps
+- `POST` = Post-op, instruction sheet with checkmark
+- `IMP` = Implant, dental implant screw with crown
+- `BX` = Biopsy, specimen vial with tissue sample
+- `MISC` = Misc, dental instrument tray
+- `POE` = Periodic Exam, dental examination mirror
+- `IMPRES` = Impressions, dental impression tray
+- `INTCK` = Integration Check, integrated implant with checkmark
+- `BXPOST` = Biopsy Post-op, specimen vial with checkmark
+- `IMPRM` = Implant Removal, forceps removing an implant screw
+- `PCOC` = Phone to Office Consult, telephone with tooth speech bubble
+- `UNCOV` = Uncover, exposed implant healing cap
+- `EXBOND` = Expose and Bond, bracket and short gold chain
+- `AO4` = All on Four, dental arch supported by four implant posts
 
 Full doctor names remain visible in the doctor legend, room panel tiles, reports, and configuration-facing context. Master board and doctor-view room cards use compact last names without the `Dr.` prefix, such as `Pledger` and `Schroeder`, to keep room cards readable.
 
