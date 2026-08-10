@@ -126,6 +126,21 @@ test("active procedure markup exposes the configured label beneath its code", ()
   assert.match(html, /<small class="room-procedure-label">Extraction<\/small>/);
 });
 
+test("large Room card preserves canonical procedure, assignment, doctor, and timer details", () => {
+  const html = presentation.renderRoomTile(readyRoom("None"), true);
+
+  assert.match(html, /class="room-tile ready-for-doctor[^"]*\blarge\b/);
+  assert.match(html, />Room 4<\/strong>/);
+  assert.match(html, /<span class="ready-primary-badge">READY<\/span>/);
+  assert.match(html, /<svg data-icon="forceps"><\/svg>/);
+  assert.match(html, />EXT \+ SED<\/span>/);
+  assert.match(html, /<small class="room-procedure-label">Extraction<\/small>/);
+  assert.match(html, /Sedation on \| 4 units confirmed/);
+  assert.match(html, />Dr\. Pledger<\/span>/);
+  assert.match(html, />Room time<\/span>/);
+  assert.match(html, />30:45<\/strong>/);
+});
+
 test("Add-on badge renders only for flagged canonical assignments", () => {
   assert.match(presentation.renderRoomTile(readyRoom("None", true)), />ADD-ON</);
   assert.doesNotMatch(presentation.renderRoomTile(readyRoom("None", false)), />ADD-ON</);

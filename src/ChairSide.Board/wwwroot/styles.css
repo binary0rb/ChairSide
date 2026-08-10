@@ -3579,6 +3579,52 @@ body[data-view="room"] .panel-status .room-tile.large .room-topline strong {
   line-height: 1;
 }
 
+body[data-view="room"] .panel-status .room-tile.large .procedure-lockup--chip {
+  display: grid;
+  grid-template-columns: 76px minmax(0, 1fr);
+  grid-template-rows: repeat(2, auto);
+  column-gap: 12px;
+  row-gap: 3px;
+  align-items: center;
+  justify-content: start;
+  min-height: 84px;
+  margin: 8px 0;
+  padding: 4px 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+body[data-view="room"] .panel-status .room-tile.large .procedure-lockup--chip .procedure-icon {
+  grid-column: 1;
+  grid-row: 1 / span 2;
+  width: 76px;
+  height: 76px;
+  padding: 3px;
+  border: 1px solid color-mix(in srgb, var(--procedure-accent, var(--line)) 40%, var(--line));
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--procedure-accent, var(--ink)) 10%, #ffffff);
+}
+
+body[data-view="room"] .panel-status .room-tile.large .procedure-lockup--chip > span {
+  grid-column: 2;
+  grid-row: 1;
+  align-self: end;
+  font-size: clamp(19px, 2vw, 24px);
+  line-height: 1;
+}
+
+body[data-view="room"] .panel-status .room-tile.large .procedure-lockup--chip .room-procedure-label {
+  display: block;
+  grid-column: 2;
+  grid-row: 2;
+  align-self: start;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 750;
+  line-height: 1.15;
+}
+
 body[data-view="room"] .panel-status .room-tile.large .room-topline > .room-state-badge,
 body[data-view="room"] .panel-status .room-tile.large .room-topline > .ready-status-stack span {
   min-height: 26px;
