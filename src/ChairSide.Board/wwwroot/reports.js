@@ -8,7 +8,6 @@ import {
   storeAdminToken
 } from "./request-utils.js";
 
-const trendMinimumComparisonCases = 3;
 const trendAboutSameThresholdSeconds = 60;
 const MAX_UNRESOLVED_REPORT_ACTIONS = 10;
 const REPORT_ACTION_CAPACITY_KEY = "report-action-capacity";
@@ -24,8 +23,9 @@ export function createReports({
   request = (...args) => fetch(...args)
 }) {
   const state = {
-    reportFilters: { sedation: "all", grouping: "base" },
+    reportFilters: { sedation: "All", grouping: "Family" },
     reportDoctorId: null,
+    reportScopeDoctors: new Map(),
     reportDoctorTab: "overview",
     reportPressActive: false
   };
@@ -49,7 +49,7 @@ export function createReports({
   }
 
   syncDateRangeControls();
-  await reportData.reload();
+  await reportData.reloadAfterCurrent();
 }
 
   async function applyCustomDateRange() {
@@ -64,7 +64,7 @@ export function createReports({
   clearCompletedReportAction();
   reportData.setDateRange({ preset: "custom", start, end });
   syncDateRangeControls();
-  await reportData.reload();
+  await reportData.reloadAfterCurrent();
 }
 
 // Reflects reportData.getDateRange() onto the static controls so a re-render never desyncs the chips/inputs.
@@ -122,13 +122,28 @@ export function createReports({
 
   const label = r && r.rangeLabel ? r.rangeLabel : "All time";
   const total = r ? (r.totalCompletedCycleCount ?? 0) : 0;
+  const query = r?.query;
+  const scopeLabel = query?.scope === "Doctor"
+    ? `Doctor: ${query.doctorId ? getDoctorName(query.doctorId) : "Not selected"}`
+    : "Practice";
+  const sedationLabel = query?.sedation === "Sedation"
+    ? "Sedation"
+    : query?.sedation === "NonSedation"
+      ? "Non-sedation"
+      : "All sedation states";
+  const groupingLabel = query?.procedureGrouping === "DetailedVariant"
+    ? "Detailed variant"
+    : "Procedure family";
+  const scopeContext = query
+    ? ` Scope: ${scopeLabel}; ${sedationLabel}. Grouping: ${groupingLabel}.`
+    : "";
   if (label === "All time") {
-    el.textContent = `Showing all completed cases (${total} total)`;
+    el.textContent = `Showing all completed cases (${total} total).${scopeContext}`;
     return;
   }
 
   const shown = r ? (r.completedRoomCyclesCount ?? 0) : 0;
-  el.textContent = `Showing completed cases from ${label} (${shown} of ${total} all-time)`;
+  el.textContent = `Showing completed cases from ${label} (${shown} of ${total} all-time).${scopeContext}`;
 }
 
   function renderDoctorCockpit(doctor) {
@@ -146,7 +161,7 @@ export function createReports({
     return;
   }
 
-  const allDoctors = aggregateAllocationByDoctor(r.doctorSummaries || []);
+  const allDoctors = aggregateAllocationByDoctor(r.doctorSummaries || [], r);
   const agg = allDoctors.find(item => item.doctorId === doctor.id)
     || { doctorId: doctor.id, count: 0, net: 0, over: 0, under: 0, at: 0, adjusted: 0 };
   const identity = getDoctorIdentity(doctor.id, doctor.name);
@@ -183,6 +198,13 @@ export function createReports({
   }
 
   const r = reportData.getReports();
+  if (r.query) {
+    state.reportFilters.sedation = r.query.sedation || "All";
+    state.reportFilters.grouping = r.query.procedureGrouping || "Family";
+  }
+  if (r.query?.doctorId) {
+    state.reportDoctorId = r.query.doctorId;
+  }
   const hasData = (r.completedRoomCyclesCount || 0) > 0;
 
   renderReportActionFeedback();
@@ -193,13 +215,13 @@ export function createReports({
   renderReportTrendCards(r);
   renderDoctorReportDashboard(r, hasData);
   syncReportFilterButtons();
-  renderReportFilterBar(hasData);
+  renderReportFilterBar();
   renderAllocationReports(r);
   renderGroupedInsights(r, hasData);
   renderFullMetrics(r, hasData);
 
-  const completedCycles = filterCyclesBySedation(r.recentCompletedCycles || []);
-  const exceptionCycles = filterCyclesBySedation(r.exceptionReviewRecords || r.exceptionCycles || []);
+  const completedCycles = r.recentCompletedCycles || [];
+  const exceptionCycles = r.exceptionReviewRecords || r.exceptionCycles || [];
   const focusTransfer = captureReportActionFocusBeforeRender(
     completedCycles,
     exceptionCycles);
@@ -208,7 +230,7 @@ export function createReports({
   if (focusTransfer) {
     queueMicrotask(() => completeReportActionFocusAfterRender(focusTransfer));
   }
-  renderProcedureSummaries(filterSummariesBySedation(r.procedureSummaries || []));
+  renderProcedureSummaries(r.procedureSummaries || []);
 }
 
 // Headline band: curated cards when data exists, friendly empty-state when not.
@@ -222,7 +244,7 @@ export function createReports({
     headline.classList.add("is-empty");
     headline.innerHTML = `
       <article class="report-empty-state">
-        <h2>No completed cycles yet</h2>
+        <h2>No observation</h2>
         <p>Operational metrics will appear here as rooms complete their cycle. Exceptions and audit detail remain available below.</p>
       </article>
     `;
@@ -232,21 +254,53 @@ export function createReports({
   headline.classList.remove("is-empty");
   const exceptions = (r.exceptionReviewRecords || r.exceptionCycles || []).length;
   headline.innerHTML = [
-    renderHeadlineCard("Completed Cases", String(r.completedRoomCyclesCount ?? 0)),
-    renderHeadlineCard("Avg Total to Doctor", formatDuration(r.averageSeatedToDoctorSeconds)),
-    renderHeadlineCard("Avg Doctor Time", formatDuration(r.averageDoctorInRoomSeconds)),
+    renderHeadlineCard("Completed Cases", String(r.completedRoomCyclesCount ?? 0), null, r.samples?.completedCases),
+    renderHeadlineCard("Avg Total to Doctor", formatDuration(r.averageSeatedToDoctorSeconds), null, r.samples?.seatedToDoctor),
+    renderHeadlineCard("Avg Doctor Time", formatDuration(r.averageDoctorInRoomSeconds), null, r.samples?.doctorTime),
     renderHeadlineCard("Exceptions to Review", String(exceptions), "Encounter records excluded or flagged because they require administrative review."),
-    renderHeadlineCard("Sedation Cases", `${r.sedationCaseCount ?? 0} / ${r.completedRoomCyclesCount ?? 0}`, "Separates cases where sedation was selected from non-sedation cases for reporting context.")
+    renderHeadlineCard("Sedation Cases", `${r.sedationCaseCount ?? 0} / ${r.includedCompletedCycleCount ?? 0}`, "Separates cases where sedation was selected from non-sedation cases for reporting context.", r.samples?.includedCompletedCases)
   ].join("");
 }
 
-  function renderHeadlineCard(label, value, helpText) {
+  function renderHeadlineCard(label, value, helpText, sample = null) {
+  const presentation = sampledPresentation(sample, value);
   return `
     <article class="metric-card headline-card">
       <span>${escapeHtml(label)}</span>${helpText ? renderHelpIcon(helpText) : ""}
-      <strong>${escapeHtml(value)}</strong>
+      <strong>${escapeHtml(presentation.value)}</strong>
+      ${renderSampleContext(presentation)}
     </article>
   `;
+}
+
+  function sampledPresentation(sample, measuredValue) {
+  if (!sample) {
+    return { value: String(measuredValue), state: null, detail: "" };
+  }
+
+  if (sample.state === "Empty") {
+    return { value: "No observation", state: "Empty", detail: "N=0" };
+  }
+  if (sample.state === "Unavailable") {
+    return {
+      value: "Unavailable",
+      state: "Unavailable",
+      detail: `0 of ${sample.populationCount || 0} contributors`
+    };
+  }
+
+  return {
+    value: String(measuredValue),
+    state: sample.state,
+    detail: `N=${sample.contributingCount || 0}`
+  };
+}
+
+  function renderSampleContext(presentation) {
+  if (!presentation.state) {
+    return "";
+  }
+  return `<small class="metric-sample metric-sample--${escapeAttribute(presentation.state.toLowerCase())}">${escapeHtml(`${presentation.state} - ${presentation.detail}`)}</small>`;
 }
 
   function renderReportTrendCards(r) {
@@ -285,6 +339,7 @@ export function createReports({
   const previous = buckets.length > 1 ? buckets[buckets.length - 2] : null;
   const comparison = describeTrendComparison(latest, previous, {
     countField: "completedCycleCount",
+    sampleField: "completedSample",
     medianField: "medianSeatedToDoctorSeconds",
     noPreviousText: "Not enough prior trend data for a week-to-week comparison yet.",
     lowSampleText: "More cases are needed for a reliable week-to-week comparison.",
@@ -303,6 +358,7 @@ export function createReports({
     latest,
     previous,
     countField: "completedCycleCount",
+    sampleField: "completedSample",
     countLabel: "Cases in bucket",
     comparisonLabel: "Compared with previous week with cases",
     comparison
@@ -332,6 +388,7 @@ export function createReports({
   const previous = buckets.length > 1 ? buckets[buckets.length - 2] : null;
   const comparison = describeTrendComparison(latest, previous, {
     countField: "turnoverCycleCount",
+    sampleField: "turnoverSample",
     medianField: "medianTurnoverSeconds",
     noPreviousText: "Not enough prior turnover trend data for a week-to-week comparison yet.",
     lowSampleText: "More turnover cases are needed for a reliable week-to-week comparison.",
@@ -350,6 +407,7 @@ export function createReports({
     latest,
     previous,
     countField: "turnoverCycleCount",
+    sampleField: "turnoverSample",
     countLabel: "Turnover cases in bucket",
     comparisonLabel: "Compared with previous week with turnover cases",
     comparison,
@@ -360,6 +418,7 @@ export function createReports({
   function renderTrendCard(options) {
   const latestRange = formatTrendBucketRange(options.latest);
   const previousRange = options.previous ? formatTrendBucketRange(options.previous) : "";
+  const presentation = sampledPresentation(options.latest[options.sampleField], options.value);
   return `
     <article class="report-card report-trend-card ${escapeAttribute(options.cardClass || "")}">
       <div class="report-trend-header">
@@ -368,7 +427,10 @@ export function createReports({
           <h2>${escapeHtml(options.title)}</h2>
           <p>${escapeHtml(options.description)}</p>
         </div>
-        <strong class="report-trend-value">${escapeHtml(options.value)}</strong>
+        <div class="report-trend-result">
+          <strong class="report-trend-value">${escapeHtml(presentation.value)}</strong>
+          ${renderSampleContext(presentation)}
+        </div>
       </div>
       <dl class="report-trend-facts">
         <div>
@@ -412,9 +474,9 @@ export function createReports({
     };
   }
 
-  const latestCount = Number(latest[options.countField] || 0);
-  const previousCount = Number(previous[options.countField] || 0);
-  if (latestCount < trendMinimumComparisonCases || previousCount < trendMinimumComparisonCases) {
+  const latestSample = latest[options.sampleField];
+  const previousSample = previous[options.sampleField];
+  if (latestSample?.state !== "Sufficient" || previousSample?.state !== "Sufficient") {
     return {
       tone: "is-neutral",
       text: options.lowSampleText
@@ -496,7 +558,7 @@ export function createReports({
     return;
   }
 
-  const doctors = aggregateAllocationByDoctor(r.doctorSummaries || []);
+  const doctors = aggregateAllocationByDoctor(r.doctorSummaries || [], r);
   section.hidden = !hasData && doctors.length === 0;
   if (section.hidden) {
     grid.innerHTML = "";
@@ -561,7 +623,7 @@ export function createReports({
 
   const pill = `<span class="layer-pill layer-pill--allocation">Allocation Logic</span>`;
   const a = r.allocationVariance;
-  if (!a || (a.allocationVarianceCycleCount || 0) === 0) {
+  if (!a) {
     card.innerHTML = `
       ${pill}
       <h3>Overall Allocation Balance${renderHelpIcon("Planned time budget based on the selected procedure mix and allocation settings.")}</h3>
@@ -570,15 +632,20 @@ export function createReports({
   }
 
   const count = a.allocationVarianceCycleCount;
+  const sample = r.samples?.scheduleFit;
+  const samplePresentation = sampledPresentation(sample, String(count));
+  const comparisonAvailable = sampleSupportsComparison(sample);
   card.innerHTML = `
     ${pill}
     <h3>Overall Allocation Balance</h3>
-    <p class="allocation-lead">${count} ${count === 1 ? "case" : "cases"} measured against expected allocation across included cases in this report view.</p>
-    <p class="allocation-net">Net ${renderVarianceBadge(a.netAllocationVarianceMinutes)} across included cases.</p>
-    <p>Average ${renderAverageVarianceBadge(a.averageAllocationVarianceMinutes)}.</p>
-    <p class="allocation-breakdown-line">${a.casesOverExpectedAllocation} over expected · ${a.casesUnderExpectedAllocation} under expected · ${a.casesAtExpectedAllocation} at expected</p>
-    <p class="allocation-context">${a.adjustedAllocationCycleCount} adjusted allocation ${a.adjustedAllocationCycleCount === 1 ? "case" : "cases"} · ${a.totalExpectedAllocationMinutes} min expected · ${a.totalMeasuredCaseFlowMinutes} min measured</p>
-    <p class="allocation-footnote">Practice-wide aggregate. Only includes completed cases that have an expected allocation snapshot and a Doctor Complete timestamp, so this can be fewer than total completed cases.</p>`;
+    <p class="allocation-lead">${escapeHtml(samplePresentation.value)}${samplePresentation.state === "Limited" || samplePresentation.state === "Sufficient" ? ` ${count === 1 ? "case" : "cases"} measured against expected allocation across included cases in this report view.` : ""}</p>
+    ${renderSampleContext(samplePresentation)}
+    ${comparisonAvailable ? `
+      <p class="allocation-net">Net ${renderVarianceBadge(a.netAllocationVarianceMinutes)} across included cases.</p>
+      <p>Average ${renderAverageVarianceBadge(a.averageAllocationVarianceMinutes)}.</p>
+      <p class="allocation-breakdown-line">${a.casesOverExpectedAllocation} over expected · ${a.casesUnderExpectedAllocation} under expected · ${a.casesAtExpectedAllocation} at expected</p>` : renderAllocationComparisonNotice(sample)}
+    ${sample?.state === "Limited" || sample?.state === "Sufficient" ? `<p class="allocation-context">${a.adjustedAllocationCycleCount} adjusted allocation ${a.adjustedAllocationCycleCount === 1 ? "case" : "cases"} · ${a.totalExpectedAllocationMinutes} min expected · ${a.totalMeasuredCaseFlowMinutes} min measured</p>` : ""}
+    <p class="allocation-footnote">Current analytical scope. Only includes completed cases that have an expected allocation snapshot and a Doctor Complete timestamp, so this can be fewer than total completed cases.</p>`;
 }
 
   function renderDataQualityCard(r) {
@@ -611,17 +678,19 @@ export function createReports({
     return;
   }
 
-  const aggregated = aggregateAllocationByDoctor(r.doctorSummaries || []);
+  const aggregated = aggregateAllocationByDoctor(r.doctorSummaries || [], r);
   list.classList.remove("doctor-report-card-grid");
   list.innerHTML = aggregated.length
-    ? aggregated.map(renderDoctorAllocationRow).join("")
+    ? aggregated.map(agg => renderDoctorAllocationRow(agg)).join("")
     : `<p class="allocation-empty">No doctor allocation data for this range.</p>`;
 }
 
 // Sums each doctor's allocation across the returned (per-month) summaries so a doctor appears
 // once. Ordered by the doctor roster - never by variance, to avoid implying a ranking.
-  function aggregateAllocationByDoctor(summaries) {
+  function aggregateAllocationByDoctor(summaries, report) {
   const byDoctor = new Map();
+  const samplesByDoctor = new Map((report?.doctorAllocationSamples || [])
+    .map(item => [item.doctorId, item.sample]));
   for (const summary of summaries) {
     const a = summary.allocation;
     if (!a) {
@@ -644,7 +713,12 @@ export function createReports({
     return index === -1 ? Number.MAX_SAFE_INTEGER : index;
   };
 
-  const rosterCards = (getSnapshot()?.doctors || []).map(doctor => ({
+  const doctorScope = report?.query?.scope === "Doctor";
+  const scopedDoctorId = doctorScope ? report.query.doctorId : null;
+  const roster = doctorScope
+    ? (scopedDoctorId ? [{ id: scopedDoctorId }] : [])
+    : (getSnapshot()?.doctors || []);
+  const rosterCards = roster.map(doctor => ({
     doctorId: doctor.id,
     count: 0,
     net: 0,
@@ -652,11 +726,16 @@ export function createReports({
     under: 0,
     at: 0,
     adjusted: 0,
+    sample: samplesByDoctor.get(doctor.id),
     ...byDoctor.get(doctor.id)
   }));
+  if (doctorScope) {
+    return rosterCards;
+  }
   const rosterIds = new Set(rosterCards.map(item => item.doctorId));
   const historicalCards = [...byDoctor.values()]
     .filter(item => !rosterIds.has(item.doctorId))
+    .map(item => ({ ...item, sample: samplesByDoctor.get(item.doctorId) }))
     .sort((x, y) => rank(x.doctorId) - rank(y.doctorId));
 
   return [...rosterCards, ...historicalCards];
@@ -667,35 +746,43 @@ export function createReports({
   function renderDoctorCardBody(agg, report, name, identity) {
   const count = agg.count || 0;
   const average = count > 0 ? agg.net / count : Number.NaN;
+  const doctorSample = agg.sample || fallbackSampleForObservedCount(count);
+  const comparisonAvailable = sampleSupportsComparison(doctorSample);
+  const countPresentation = sampledPresentation(doctorSample, String(count));
   const sparkPoints = (report?.doctorDailyAllocationSeries || []).find(item => item.doctorId === agg.doctorId)?.points;
   return `
     <header class="doctor-report-card-head">
       <span class="doctor-report-initials" aria-hidden="true">${escapeHtml(identity.initials)}</span>
       <div class="doctor-report-identity">
         <h4>${escapeHtml(name)}</h4>
-        <p>${escapeHtml(doctorAllocationSummary(agg))}</p>
+        <p>${escapeHtml(doctorAllocationSummary(agg, doctorSample))}</p>
       </div>
     </header>
     <dl class="doctor-report-metrics">
       <div>
         <dt>Cases</dt>
-        <dd>${escapeHtml(String(count))}</dd>
+        <dd>${escapeHtml(countPresentation.value)}${renderSampleContext(countPresentation)}</dd>
       </div>
-      <div>
-        <dt>Balance</dt>
-        <dd class="${escapeAttribute(varianceClass(agg.net))}">${escapeHtml(formatSignedMinutes(agg.net))}</dd>
-      </div>
-      <div>
-        <dt>Avg</dt>
-        <dd class="${escapeAttribute(varianceClass(average))}">${escapeHtml(formatSignedMinutes(average))}</dd>
-      </div>
-      <div class="doctor-card-metric--help-corner">
-        <dt>O / U / A</dt>
-        <dd>${escapeHtml(`${agg.over} / ${agg.under} / ${agg.at}`)}</dd>
-        ${renderHelpIcon("O/U/A means Over, Under, or At target compared with expected procedure allocation.", "corner")}
-      </div>
+      ${comparisonAvailable ? `
+        <div>
+          <dt>Balance</dt>
+          <dd class="${escapeAttribute(varianceClass(agg.net))}">${escapeHtml(formatSignedMinutes(agg.net))}</dd>
+        </div>
+        <div>
+          <dt>Avg</dt>
+          <dd class="${escapeAttribute(varianceClass(average))}">${escapeHtml(formatSignedMinutes(average))}</dd>
+        </div>
+        <div class="doctor-card-metric--help-corner">
+          <dt>O / U / A</dt>
+          <dd>${escapeHtml(`${agg.over} / ${agg.under} / ${agg.at}`)}</dd>
+          ${renderHelpIcon("O/U/A means Over, Under, or At target compared with expected procedure allocation.", "corner")}
+        </div>` : `
+        <div>
+          <dt>Comparison</dt>
+          <dd class="is-unavailable">${escapeHtml(allocationComparisonValue(doctorSample))}</dd>
+        </div>`}
     </dl>
-    ${renderDoctorSparkline(sparkPoints)}`;
+    ${comparisonAvailable ? renderDoctorSparkline(sparkPoints) : ""}`;
 }
 
 // The whole card is the selection control (role="button", focusable). The "View details" affordance
@@ -759,10 +846,16 @@ export function createReports({
   return `${open}${baseline}<polyline points="${coords}" fill="none" stroke="var(--doctor-color)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke" opacity="0.85"/></svg>`;
 }
 
-  function doctorAllocationSummary(agg) {
+  function doctorAllocationSummary(agg, sample = agg.sample || fallbackSampleForObservedCount(agg.count || 0)) {
   const count = agg.count || 0;
-  if (count === 0) {
+  if (sample?.state === "Empty") {
     return "No allocation variance cases in this report range.";
+  }
+  if (sample?.state === "Unavailable") {
+    return "Allocation values are unavailable for this nonempty report population.";
+  }
+  if (!sampleSupportsComparison(sample)) {
+    return `${count} allocation ${count === 1 ? "contributor" : "contributors"}. Comparison is not shown for a Limited sample.`;
   }
   if (agg.net === 0) {
     return `Measured case flow stayed at expected allocation across ${count} ${count === 1 ? "case" : "cases"}.`;
@@ -897,6 +990,9 @@ export function createReports({
   function renderSelectedDoctorOverview(r, agg) {
   const count = agg.count || 0;
   const average = count > 0 ? agg.net / count : Number.NaN;
+  const sample = agg.sample || fallbackSampleForObservedCount(count);
+  const samplePresentation = sampledPresentation(sample, String(count));
+  const comparisonAvailable = sampleSupportsComparison(sample);
   return `
     <section class="selected-doctor-overview">
       <div class="selected-doctor-summary">
@@ -905,10 +1001,12 @@ export function createReports({
         <p class="allocation-footnote">Uses existing doctor allocation aggregates for ${escapeHtml(r.rangeLabel || "the selected range")}.</p>
       </div>
       <dl class="selected-doctor-kpis">
-        <div><dt>Cases</dt><dd>${escapeHtml(String(count))}</dd></div>
-        <div><dt>Net balance</dt><dd class="${escapeAttribute(varianceClass(agg.net))}">${escapeHtml(formatSignedMinutes(agg.net))}</dd></div>
-        <div><dt>Average variance</dt><dd class="${escapeAttribute(varianceClass(average))}">${escapeHtml(formatSignedMinutes(average))}</dd></div>
-        <div><dt>Pressure point</dt><dd>${escapeHtml(mainPressurePoint(agg))}</dd></div>
+        <div><dt>Cases</dt><dd>${escapeHtml(samplePresentation.value)}${renderSampleContext(samplePresentation)}</dd></div>
+        ${comparisonAvailable ? `
+          <div><dt>Net balance</dt><dd class="${escapeAttribute(varianceClass(agg.net))}">${escapeHtml(formatSignedMinutes(agg.net))}</dd></div>
+          <div><dt>Average variance</dt><dd class="${escapeAttribute(varianceClass(average))}">${escapeHtml(formatSignedMinutes(average))}</dd></div>
+          <div><dt>Pressure point</dt><dd>${escapeHtml(mainPressurePoint(agg))}</dd></div>` : `
+          <div><dt>Comparison</dt><dd class="is-unavailable">${escapeHtml(allocationComparisonValue(sample))}</dd></div>`}
       </dl>
     </section>`;
 }
@@ -1125,11 +1223,16 @@ export function createReports({
 
   function renderDoctorAllocationRow(agg) {
   const name = getDoctorName(agg.doctorId);
-  if (agg.count === 0) {
+  const sample = agg.sample || fallbackSampleForObservedCount(agg.count || 0);
+  const presentation = sampledPresentation(sample, String(agg.count || 0));
+  if (!sampleSupportsComparison(sample)) {
     return `
       <div class="allocation-row">
         <span class="allocation-row-name">${escapeHtml(name)}</span>
-        <span class="allocation-row-detail allocation-empty">No allocation variance cases.</span>
+        <span class="allocation-row-detail allocation-empty">
+          ${escapeHtml(presentation.value)}${renderSampleContext(presentation)}
+          <small>${escapeHtml(allocationComparisonNoticeText(sample))}</small>
+        </span>
       </div>`;
   }
 
@@ -1151,7 +1254,7 @@ export function createReports({
 
   // Procedure family (base) summaries only - sedation variants roll up under their family.
   const families = (r.baseProcedureSummaries || [])
-    .filter(summary => summary.allocation && (summary.allocation.allocationVarianceCycleCount || 0) > 0);
+    .filter(summary => summary.allocation);
 
   list.innerHTML = families.length
     ? families.map(renderProcedureAllocationRow).join("")
@@ -1161,6 +1264,18 @@ export function createReports({
   function renderProcedureAllocationRow(summary) {
   const a = summary.allocation;
   const label = summary.procedureLabel || summary.procedureCode || "Unknown";
+  const sample = summary.samples?.allocation || fallbackSampleForObservedCount(a.allocationVarianceCycleCount || 0);
+  const presentation = sampledPresentation(sample, String(a.allocationVarianceCycleCount || 0));
+  if (!sampleSupportsComparison(sample)) {
+    return `
+      <div class="allocation-row">
+        <span class="allocation-row-name">${escapeHtml(label)}</span>
+        <span class="allocation-row-detail allocation-empty">
+          ${escapeHtml(presentation.value)}${renderSampleContext(presentation)}
+          <small>${escapeHtml(allocationComparisonNoticeText(sample))}</small>
+        </span>
+      </div>`;
+  }
   return `
     <div class="allocation-row">
       <span class="allocation-row-name">${escapeHtml(label)}</span>
@@ -1224,49 +1339,144 @@ export function createReports({
   return `<span class="variance ${varianceClass(rounded)}">${escapeHtml(formatAverageVariancePerCase(averageMinutes))}</span>`;
 }
 
-  function renderReportFilterBar(hasData) {
+  function renderReportFilterBar() {
   const bar = document.getElementById("reportFilterBar");
   if (bar) {
-    bar.hidden = !hasData;
+    bar.hidden = false;
   }
+}
+
+  function fallbackSampleForObservedCount(count) {
+  const threshold = 5;
+  const state = count === 0 ? "Empty" : count < threshold ? "Limited" : "Sufficient";
+  return {
+    populationCount: count,
+    contributingCount: count,
+    state,
+    limitedSampleThreshold: threshold,
+    supportsComparison: state === "Sufficient"
+  };
+}
+
+  function sampleSupportsComparison(sample) {
+  return sample?.state === "Sufficient" && sample.supportsComparison !== false;
+}
+
+  function allocationComparisonValue(sample) {
+  if (sample?.state === "Empty") {
+    return "No observation";
+  }
+  if (sample?.state === "Unavailable") {
+    return "Unavailable";
+  }
+  return "Not shown";
+}
+
+  function allocationComparisonNoticeText(sample) {
+  if (sample?.state === "Empty") {
+    return "No allocation observation in this population.";
+  }
+  if (sample?.state === "Unavailable") {
+    return "Allocation comparison is unavailable because this population has no contributing allocation observations.";
+  }
+  return "Comparison is not shown for a Limited sample.";
+}
+
+  function renderAllocationComparisonNotice(sample) {
+  return `<p class="allocation-note">${escapeHtml(allocationComparisonNoticeText(sample))}</p>`;
 }
 
 // Reflects state.reportFilters onto the static filter chips so re-renders never desync the
 // pressed state from the stored filter.
   function syncReportFilterButtons() {
+  const query = reportData.getQuery?.() || {
+    scope: "Practice",
+    doctorId: null
+  };
   document.querySelectorAll("#reportFilterBar .report-filter-chip").forEach(chip => {
-    const active = state.reportFilters[chip.dataset.filterGroup] === chip.dataset.filterValue;
+    const value = normalizeReportFilterValue(chip.dataset.filterGroup, chip.dataset.filterValue);
+    const active = state.reportFilters[chip.dataset.filterGroup] === value;
     chip.setAttribute("aria-pressed", String(active));
     chip.classList.toggle("is-active", active);
   });
+  document.querySelectorAll("#reportFilterBar [data-report-scope]").forEach(chip => {
+    const active = query.scope === chip.dataset.reportScope;
+    chip.setAttribute("aria-pressed", String(active));
+    chip.classList.toggle("is-active", active);
+  });
+
+  syncDoctorScopeControl(reportData.getReports());
 }
 
-// Chooses the summaries for the grouped-insights section using only backend-provided
-// aggregates - never recomputing or recombining on the client. For a sedation-only or
-// non-sedation-only filter, base and variant groupings coincide (each base has exactly one
-// sedation and one non-sedation variant), so the variant summaries are the correct, accurate
-// answer for both grouping modes. Only the unfiltered "all" view distinguishes base vs variant.
+  function normalizeReportFilterValue(group, value) {
+  if (group === "sedation") {
+    if (value === "sedation") return "Sedation";
+    if (value === "non-sedation") return "NonSedation";
+    return value === "Sedation" || value === "NonSedation" ? value : "All";
+  }
+  if (group === "grouping") {
+    return value === "variant" || value === "DetailedVariant" ? "DetailedVariant" : "Family";
+  }
+  return value;
+}
+
+  function syncDoctorScopeControl(r) {
+  for (const doctor of getSnapshot()?.doctors || []) {
+    state.reportScopeDoctors.set(doctor.id, doctor.name);
+  }
+  for (const summary of r?.doctorSummaries || []) {
+    if (summary.assignedDoctor) {
+      state.reportScopeDoctors.set(summary.assignedDoctor, getDoctorName(summary.assignedDoctor));
+    }
+  }
+  for (const row of r?.doctorProcedureMix || []) {
+    if (row.doctorId) {
+      state.reportScopeDoctors.set(row.doctorId, getDoctorName(row.doctorId));
+    }
+  }
+  if (r?.query?.doctorId) {
+    state.reportScopeDoctors.set(r.query.doctorId, getDoctorName(r.query.doctorId));
+  }
+
+  const field = document.getElementById("reportScopeDoctorField");
+  const select = document.getElementById("reportScopeDoctor");
+  const query = reportData.getQuery?.() || {
+    scope: "Practice",
+    doctorId: null
+  };
+  if (field) {
+    field.hidden = query.scope !== "Doctor";
+  }
+  if (!select) {
+    return;
+  }
+
+  const selected = query.doctorId || state.reportDoctorId || "";
+  select.innerHTML = [...state.reportScopeDoctors.entries()]
+    .map(([id, name]) => `<option value="${escapeAttribute(id)}">${escapeHtml(name)}</option>`)
+    .join("");
+  if (selected && state.reportScopeDoctors.has(selected)) {
+    select.value = selected;
+  }
+}
+
+// Chooses between backend-provided grouping projections. Doctor and sedation filters have already
+// selected the analytical population on the server; grouping only changes its aggregation lens.
   function getInsightSummaries(r) {
   const variants = r.procedureSummaries || [];
-  if (state.reportFilters.sedation === "sedation") {
-    return variants.filter(summary => summary.isSedationCase);
-  }
-  if (state.reportFilters.sedation === "non-sedation") {
-    return variants.filter(summary => !summary.isSedationCase);
-  }
-  return state.reportFilters.grouping === "base"
+  return state.reportFilters.grouping === "Family"
     ? (r.baseProcedureSummaries || [])
     : variants;
 }
 
   function insightsHeadingText() {
-  if (state.reportFilters.sedation === "sedation") {
+  if (state.reportFilters.sedation === "Sedation") {
     return "Sedation cases by procedure";
   }
-  if (state.reportFilters.sedation === "non-sedation") {
+  if (state.reportFilters.sedation === "NonSedation") {
     return "Non-sedation cases by procedure";
   }
-  return state.reportFilters.grouping === "base"
+  return state.reportFilters.grouping === "Family"
     ? "Procedure insights — procedure family"
     : "Procedure insights — detailed variant";
 }
@@ -1313,11 +1523,11 @@ export function createReports({
       </div>
       <h3 class="insight-label">${escapeHtml(label)}</h3>
       <dl class="insight-metrics">
-        <div><dt>Cases</dt><dd>${escapeHtml(String(summary.completedCycleCount))}</dd></div>
-        <div><dt>Avg Total</dt><dd>${escapeHtml(formatDuration(summary.averageTotalSeconds))}</dd></div>
-        <div><dt>Median Total</dt><dd>${escapeHtml(formatDuration(summary.medianTotalSeconds))}</dd></div>
-        <div><dt>Avg Doctor Time</dt><dd>${escapeHtml(formatDuration(summary.averageDoctorTimeSeconds))}</dd></div>
-        <div><dt>Avg Ready-to-Doctor</dt><dd>${escapeHtml(formatDuration(summary.averageReadyToDoctorSeconds))}</dd></div>
+        ${renderInsightMetric("Cases", String(summary.completedCycleCount), summary.samples?.completedCases)}
+        ${renderInsightMetric("Avg Total", formatDuration(summary.averageTotalSeconds), summary.samples?.total)}
+        ${renderInsightMetric("Median Total", formatDuration(summary.medianTotalSeconds), summary.samples?.total)}
+        ${renderInsightMetric("Avg Doctor Time", formatDuration(summary.averageDoctorTimeSeconds), summary.samples?.doctorTime)}
+        ${renderInsightMetric("Avg Ready-to-Doctor", formatDuration(summary.averageReadyToDoctorSeconds), summary.samples?.readyWait)}
       </dl>
     </article>
   `;
@@ -1331,28 +1541,28 @@ export function createReports({
     return;
   }
 
-  const dur = seconds => (hasData ? formatDuration(seconds) : "—");
+  const dur = seconds => (hasData ? formatDuration(seconds) : "No observation");
   summary.innerHTML = [
-    renderMetric("Completed Cycles", r.completedRoomCyclesCount, "Room cycles that reached completion and are available for reporting."),
-    renderMetric("Sedation Cases", r.sedationCaseCount),
-    renderMetric("Non-sedation Cases", r.nonSedationCaseCount),
+    renderMetric("Completed Cycles", r.completedRoomCyclesCount, "Room cycles that reached completion and are available for reporting.", r.samples?.completedCases),
+    renderMetric("Sedation Cases", r.sedationCaseCount, null, r.samples?.includedCompletedCases),
+    renderMetric("Non-sedation Cases", r.nonSedationCaseCount, null, r.samples?.includedCompletedCases),
     renderMetric("Exceptions Requiring Review", (r.exceptionCycles || []).length),
-    renderMetric("Avg Prep Time", dur(r.averagePrepSeconds)),
-    renderMetric("Median Prep Time", dur(r.medianPrepSeconds)),
-    renderMetric("Avg Ready-to-Doctor Wait", dur(r.averageReadyToDoctorSeconds)),
-    renderMetric("Median Ready-to-Doctor Wait", dur(r.medianReadyToDoctorSeconds)),
-    renderMetric("Avg Doctor Occupied Wait", dur(r.averageDoctorOccupiedWaitSeconds), "Time a patient was ready while the doctor was already active in another room."),
-    renderMetric("Median Doctor Occupied Wait", dur(r.medianDoctorOccupiedWaitSeconds)),
-    renderMetric("Avg Doctor Available Wait", dur(r.averageDoctorAvailableWaitSeconds), "Time a patient was ready while the doctor was not occupied in another active room."),
-    renderMetric("Median Doctor Available Wait", dur(r.medianDoctorAvailableWaitSeconds)),
-    renderMetric("Avg Total to Doctor", dur(r.averageSeatedToDoctorSeconds)),
-    renderMetric("Median Total to Doctor", dur(r.medianSeatedToDoctorSeconds)),
-    renderMetric("Avg In Room", dur(r.averageDoctorInRoomSeconds)),
-    renderMetric("Median In Room", dur(r.medianDoctorInRoomSeconds)),
-    renderMetric("Avg Turnover", dur(r.averageTurnoverSeconds), "Time from Doctor Complete until the room is marked Available."),
-    renderMetric("Median Turnover", dur(r.medianTurnoverSeconds)),
-    renderMetric("Aging Events", r.agingEventCount, "Ready-room wait has crossed the aging threshold and may need attention."),
-    renderMetric("Stale Events", r.staleEventCount, "Ready-room wait has crossed the stale threshold and should be treated as higher priority.")
+    renderMetric("Avg Prep Time", dur(r.averagePrepSeconds), null, r.samples?.prep),
+    renderMetric("Median Prep Time", dur(r.medianPrepSeconds), null, r.samples?.prep),
+    renderMetric("Avg Ready-to-Doctor Wait", dur(r.averageReadyToDoctorSeconds), null, r.samples?.readyWait),
+    renderMetric("Median Ready-to-Doctor Wait", dur(r.medianReadyToDoctorSeconds), null, r.samples?.readyWait),
+    renderMetric("Avg Doctor Occupied Wait", dur(r.averageDoctorOccupiedWaitSeconds), "Time a patient was ready while the doctor was already active in another room.", r.samples?.doctorOccupiedWait),
+    renderMetric("Median Doctor Occupied Wait", dur(r.medianDoctorOccupiedWaitSeconds), null, r.samples?.doctorOccupiedWait),
+    renderMetric("Avg Doctor Available Wait", dur(r.averageDoctorAvailableWaitSeconds), "Time a patient was ready while the doctor was not occupied in another active room.", r.samples?.doctorAvailableWait),
+    renderMetric("Median Doctor Available Wait", dur(r.medianDoctorAvailableWaitSeconds), null, r.samples?.doctorAvailableWait),
+    renderMetric("Avg Total to Doctor", dur(r.averageSeatedToDoctorSeconds), null, r.samples?.seatedToDoctor),
+    renderMetric("Median Total to Doctor", dur(r.medianSeatedToDoctorSeconds), null, r.samples?.seatedToDoctor),
+    renderMetric("Avg In Room", dur(r.averageDoctorInRoomSeconds), null, r.samples?.doctorTime),
+    renderMetric("Median In Room", dur(r.medianDoctorInRoomSeconds), null, r.samples?.doctorTime),
+    renderMetric("Avg Turnover", dur(r.averageTurnoverSeconds), "Time from Doctor Complete until the room is marked Available.", r.samples?.turnover),
+    renderMetric("Median Turnover", dur(r.medianTurnoverSeconds), null, r.samples?.turnover),
+    renderMetric("Aging Events", r.agingEventCount, "Ready-room wait has crossed the aging threshold and may need attention.", r.samples?.includedCompletedCases),
+    renderMetric("Stale Events", r.staleEventCount, "Ready-room wait has crossed the stale threshold and should be treated as higher priority.", r.samples?.includedCompletedCases)
   ].join("");
 }
 
@@ -1365,7 +1575,7 @@ export function createReports({
   // Token covers every client-side input that affects cycle row HTML:
   //   reportsVersion — new payload arrived; sedation — filter changes visible rows.
   // grouping does not affect cycle rows (it only affects insight summaries).
-  const token = `${reportData.getVersion()}|${state.reportFilters.sedation}`;
+  const token = String(reportData.getVersion());
   if (body.dataset.renderKey === token) {
     return;
   }
@@ -1433,34 +1643,9 @@ export function createReports({
   }
 }
 
-// True for composite "+SED" codes and bare legacy standalone "SED".
-  function isSedationProcedureCodeClient(code) {
-  return procedure.hasSedationModifier(code) || String(code || "").toUpperCase() === "SED";
-}
-
-  function filterCyclesBySedation(cycles) {
-  if (state.reportFilters.sedation === "sedation") {
-    return cycles.filter(cycle => isSedationProcedureCodeClient(cycle.procedureCode));
-  }
-  if (state.reportFilters.sedation === "non-sedation") {
-    return cycles.filter(cycle => !isSedationProcedureCodeClient(cycle.procedureCode));
-  }
-  return cycles;
-}
-
-  function filterSummariesBySedation(summaries) {
-  if (state.reportFilters.sedation === "sedation") {
-    return summaries.filter(summary => summary.isSedationCase);
-  }
-  if (state.reportFilters.sedation === "non-sedation") {
-    return summaries.filter(summary => !summary.isSedationCase);
-  }
-  return summaries;
-}
-
-// Empty-row copy that reflects whether an active sedation filter (not "all") is hiding rows.
+// Empty-row copy that reflects the selected server-side analytical scope.
   function noMatchMessage(defaultMessage) {
-  return state.reportFilters.sedation === "all"
+  return state.reportFilters.sedation === "All"
     ? defaultMessage
     : "No rows match the selected sedation filter.";
 }
@@ -1471,7 +1656,7 @@ export function createReports({
     return;
   }
 
-  const token = `${reportData.getVersion()}|${state.reportFilters.sedation}`;
+  const token = String(reportData.getVersion());
   if (body.dataset.renderKey === token) {
     return;
   }
@@ -1485,13 +1670,13 @@ export function createReports({
   return `
     <tr>
       <td>${escapeHtml(summary.procedureLabel || "Unknown")}</td>
-      <td>${summary.completedCycleCount}</td>
-      <td>${formatDuration(summary.averageTotalSeconds)}</td>
-      <td>${formatDuration(summary.medianTotalSeconds)}</td>
-      <td>${formatDuration(summary.averageReadyToDoctorSeconds)}</td>
-      <td>${formatDuration(summary.averageDoctorTimeSeconds)}</td>
-      <td>${formatDuration(summary.averageDoctorAvailableWaitSeconds)}</td>
-      <td>${formatDuration(summary.averageDoctorOccupiedWaitSeconds)}</td>
+      <td>${renderTableSampledValue(summary.samples?.completedCases, String(summary.completedCycleCount))}</td>
+      <td>${renderTableSampledValue(summary.samples?.total, formatDuration(summary.averageTotalSeconds))}</td>
+      <td>${renderTableSampledValue(summary.samples?.total, formatDuration(summary.medianTotalSeconds))}</td>
+      <td>${renderTableSampledValue(summary.samples?.readyWait, formatDuration(summary.averageReadyToDoctorSeconds))}</td>
+      <td>${renderTableSampledValue(summary.samples?.doctorTime, formatDuration(summary.averageDoctorTimeSeconds))}</td>
+      <td>${renderTableSampledValue(summary.samples?.doctorAvailableWait, formatDuration(summary.averageDoctorAvailableWaitSeconds))}</td>
+      <td>${renderTableSampledValue(summary.samples?.doctorOccupiedWait, formatDuration(summary.averageDoctorOccupiedWaitSeconds))}</td>
     </tr>
   `;
 }
@@ -2203,7 +2388,7 @@ export function createReports({
     return;
   }
 
-  const token = `${reportData.getVersion()}|${state.reportFilters.sedation}`;
+  const token = String(reportData.getVersion());
   if (body.dataset.renderKey === token) {
     return;
   }
@@ -2213,7 +2398,7 @@ export function createReports({
   body.dataset.renderKey = token;
   body.innerHTML = exceptions.length
     ? exceptions.map(renderExceptionRow).join("")
-    : `<tr><td colspan="12">${escapeHtml(noMatchMessage("No exceptions requiring review."))}</td></tr>`;
+    : `<tr><td colspan="12">No exceptions requiring review.</td></tr>`;
 }
 
   function renderExceptionRow(cycle) {
@@ -2281,7 +2466,7 @@ export function createReports({
   }
   // Only act when the focused element is the card itself (it carries the doctor id and tabindex).
   const card = event.target.closest(".doctor-report-card[data-report-doctor-id]");
-  if (!card || card !== event.target) {
+  if (!card || card !== event.target || !isDoctorCardInCurrentScope(card.dataset.reportDoctorId)) {
     return;
   }
   event.preventDefault();
@@ -2292,32 +2477,77 @@ export function createReports({
   }
 }
 
-// Wires the static filter chips. Filter state lives in state.reportFilters (not the DOM), so a
-// SignalR/poll-driven re-render preserves the user's selection; we just re-render the views.
+// Wires report-query controls. Every analytical-scope or grouping change reloads the server-owned
+// report population; the Review Queue remains window-global in that response.
   function wireReportFilters() {
   const bar = document.getElementById("reportFilterBar");
   if (!bar) {
     return;
   }
 
-  bar.addEventListener("click", event => {
-    const chip = event.target.closest(".report-filter-chip");
+  bar.addEventListener("click", async event => {
+    const scopeChip = event.target.closest("[data-report-scope]");
+    if (scopeChip) {
+      const scope = scopeChip.dataset.reportScope;
+      const select = document.getElementById("reportScopeDoctor");
+      const doctorId = select?.value || state.reportDoctorId || state.reportScopeDoctors.keys().next().value;
+      if (scope === "Doctor" && !doctorId) {
+        return;
+      }
+      reportData.setScope(scope, doctorId);
+      syncReportFilterButtons();
+      clearCompletedReportAction();
+      await reportData.reloadAfterCurrent();
+      return;
+    }
+
+    const chip = event.target.closest("[data-filter-group]")
+      || event.target.closest(".report-filter-chip");
     if (!chip) {
       return;
     }
 
     const group = chip.dataset.filterGroup;
-    const value = chip.dataset.filterValue;
+    const value = normalizeReportFilterValue(group, chip.dataset.filterValue);
     if (!group || !value || state.reportFilters[group] === value) {
       return;
     }
 
+    if (group === "sedation") {
+      reportData.setSedation?.(value);
+    } else if (group === "grouping") {
+      reportData.setProcedureGrouping?.(value);
+    }
     state.reportFilters[group] = value;
     syncReportFilterButtons();
-    if (reportData.getReports()) {
-      renderReports();
-    }
+    clearCompletedReportAction();
+    await reportData.reloadAfterCurrent();
   });
+
+  document.getElementById("reportScopeDoctor")?.addEventListener("change", async event => {
+    const doctorId = event.target.value;
+    if (!doctorId || reportData.getQuery?.().scope !== "Doctor") {
+      return;
+    }
+    reportData.setScope("Doctor", doctorId);
+    clearCompletedReportAction();
+    await reportData.reloadAfterCurrent();
+  });
+}
+
+  function isDoctorCardInCurrentScope(doctorId) {
+  const query = reportData.getReports()?.query || reportData.getQuery?.();
+  return query?.scope !== "Doctor" || query.doctorId === doctorId;
+}
+
+  function renderTableSampledValue(sample, value) {
+  const presentation = sampledPresentation(sample, value);
+  return `${escapeHtml(presentation.value)}${renderSampleContext(presentation)}`;
+}
+
+  function renderInsightMetric(label, value, sample) {
+  const presentation = sampledPresentation(sample, value);
+  return `<div><dt>${escapeHtml(label)}</dt><dd>${escapeHtml(presentation.value)}${renderSampleContext(presentation)}</dd></div>`;
 }
 
 // Sets state.reportPressActive while a pointer is held on an interactive reports element
@@ -2400,6 +2630,9 @@ export function createReports({
 
   const doctorButton = event.target.closest("[data-report-doctor-id]");
   if (doctorButton) {
+    if (!isDoctorCardInCurrentScope(doctorButton.dataset.reportDoctorId)) {
+      return;
+    }
     state.reportDoctorId = doctorButton.dataset.reportDoctorId;
     state.reportDoctorTab = "overview";
     if (reportData.getReports()) {
@@ -2584,11 +2817,13 @@ export function createReports({
   });
 }
 
-  function renderMetric(label, value, helpText) {
+  function renderMetric(label, value, helpText, sample = null) {
+  const presentation = sampledPresentation(sample, value);
   return `
     <article class="metric-card">
       <span>${escapeHtml(label)}</span>${helpText ? renderHelpIcon(helpText) : ""}
-      <strong>${escapeHtml(value)}</strong>
+      <strong>${escapeHtml(presentation.value)}</strong>
+      ${renderSampleContext(presentation)}
     </article>
   `;
 }
@@ -2643,14 +2878,14 @@ export function createReports({
       <td>${formatDateTime(cycle.doctorArrivedAt)}</td>
       <td>${formatDateTime(cycle.doctorCompleteAt)}</td>
       <td>${formatDateTime(cycle.roomAvailableAt)}</td>
-      <td>${formatDuration(cycle.prepSeconds)}</td>
-      <td>${formatDuration(cycle.readyToDoctorSeconds)}</td>
-      <td>${formatDuration(cycle.doctorOccupiedWaitSeconds)}</td>
-      <td>${formatDuration(cycle.doctorAvailableWaitSeconds)}</td>
-      <td>${formatDuration(cycle.seatedToDoctorSeconds)}</td>
-      <td>${formatDuration(cycle.doctorInRoomSeconds)}</td>
-      <td>${formatDuration(cycle.turnoverSeconds)}</td>
-      <td>${formatDuration(cycle.totalRoomCycleSeconds)}</td>
+      <td>${formatObservedDuration(cycle.prepSeconds)}</td>
+      <td>${formatObservedDuration(cycle.readyToDoctorSeconds)}</td>
+      <td>${formatObservedDuration(cycle.doctorOccupiedWaitSeconds)}</td>
+      <td>${formatObservedDuration(cycle.doctorAvailableWaitSeconds)}</td>
+      <td>${formatObservedDuration(cycle.seatedToDoctorSeconds)}</td>
+      <td>${formatObservedDuration(cycle.doctorInRoomSeconds)}</td>
+      <td>${formatObservedDuration(cycle.turnoverSeconds)}</td>
+      <td>${formatObservedDuration(cycle.totalRoomCycleSeconds)}</td>
       <td>${formatAllocationMinutes(cycle.expectedAllocationMinutes)}</td>
       <td>${formatAllocationMinutes(cycle.measuredCaseFlowMinutes)}</td>
       <td>${renderVarianceBadge(cycle.allocationVarianceMinutes)}</td>
@@ -2672,6 +2907,10 @@ export function createReports({
       </td>
     </tr>
   `;
+}
+
+  function formatObservedDuration(seconds) {
+  return Number.isFinite(seconds) ? formatDuration(seconds) : "--";
 }
 
 

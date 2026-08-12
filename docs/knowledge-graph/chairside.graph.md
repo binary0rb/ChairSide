@@ -163,6 +163,9 @@ flowchart LR
 - Doctor Working elapsed time uses wall-clock unions of Doctor Arrived -> Doctor Complete intervals. Concurrency buckets partition the same wall-clock span without double-counting.
 - Unstructured Time is the span remainder with no active Doctor Working interval and must not be described as idle, available, unused, absent, unscheduled, or recoverable time.
 - Procedure Mix exists at Practice and Doctor scope with counts, percentages, and the current scoped included population as denominator.
+- Report queries separate whole-day UTC Window, Practice or historical/current Doctor plus Sedation Scope, and Procedure Family or Detailed Variant grouping. Grouping changes aggregation, not population membership.
+- General descriptive samples are Empty at `N = 0`, Limited at `N = 1-4`, and Sufficient at `N >= 5`; zero contributors within a nonempty population are Unavailable, and comparisons require all populations to be Sufficient.
+- The action-required Review Queue remains global within its selected date window, while analytical Case Audit inherits Doctor and Sedation scope. Valid reversed ranges normalize; malformed dates remain graceful.
 - Schedule Fit preserves compatible expected-vs-observed case-flow semantics, keeps slack and debt separate, and evaluates the scheduling model rather than the doctor.
 - Calibration Insights are neutral, sample-supported review callouts and never mutate expected allocation automatically.
 - Healthy Data Quality stays quiet; exclusions and review exceptions remain visible through progressive disclosure and audit evidence.

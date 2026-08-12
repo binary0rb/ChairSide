@@ -16,6 +16,18 @@ last_verified_commit: ca75b09
 
 `standardCompletedCycles` remains the shared denominator for standard throughput, procedure, sedation, allocation, schedule-fit, trend, observed-day, and doctor procedure-mix calculations. Phase-complete timing surfaces retain their existing deliberately broader rules.
 
+## Reusable report query and sample state
+
+`ReportQuery` keeps three responsibilities distinct:
+
+- `Window` selects whole UTC report days.
+- Practice or historical/current Doctor plus Sedation scope selects the analytical population.
+- Procedure Family or Detailed Variant selects aggregation without filtering population membership.
+
+Doctor scopes accept historical doctor IDs independently of the active assignment roster. The analytical Case Audit follows Doctor and Sedation scope. The action-required Review Queue ignores analytical scope and remains global within the selected date window.
+
+`ReportSampleContext` carries population count, contributing count, state, threshold, and comparison eligibility. Empty is `N = 0`, Limited is `N = 1-4`, and Sufficient is `N >= 5`. A metric with a nonempty population and zero contributors is Unavailable. Comparison language requires every compared population to be Sufficient. Calibration Insights retain separate, stricter evidence rules under #219.
+
 ## Assignment and handoff attribution
 
 The accepted Ready handoff is the finalized reporting assignment. Doctor Arrived accepts the current Active handoff; its immutable assignment supplies doctor, procedure, sedation, and confirmed expected allocation attribution. A withdrawn handoff remains auditable but never becomes accepted attribution and does not contribute its Ready interval to accepted Ready-to-arrival metrics.
@@ -39,3 +51,5 @@ Legacy completed cycles continue to use their existing finalized assignment data
 - `tests/ChairSide.Board.Tests/DurableFailureInjectionTests.cs` - transaction rollback at cancellation and expiration boundaries.
 
 Reporting date filters remain whole UTC calendar days, weekly buckets remain Monday-start UTC, and completed-cycle windows remain anchored on `DoctorCompleteAt`.
+
+The report UI exposes Today, Last 7 Days, Last 30 Days, Month to Date, Custom, and All Time. Reversed valid ranges normalize and return normalized metadata; malformed date text keeps graceful legacy behavior.

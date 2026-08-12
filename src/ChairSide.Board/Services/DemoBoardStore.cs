@@ -1105,24 +1105,24 @@ public sealed class DemoBoardStore
         }
     }
 
-    public ReportsSnapshot GetReports() => GetReports(ReportDateRange.AllTime);
+    public ReportsSnapshot GetReports() => GetReports(ReportQuery.Default);
+
+    public ReportsSnapshot GetReports(ReportDateRange range) =>
+        GetReports(ReportQuery.Default with { Window = range });
 
     /// <summary>
-    /// Builds the report snapshot over completed cycles whose completion anchor (DoctorCompleteAt -
-    /// the established end of the measured case flow) falls within <paramref name="range"/>. The date
-    /// filter is applied to the source population first, so every downstream count, hygiene
-    /// classification, allocation-variance aggregate, doctor/procedure summary, and the recent-cycle
-    /// list all reflect the selected window. An all-time range is a no-op filter (identical to the
-    /// historical behavior). Cycles without a DoctorCompleteAt (in-progress or force-expired) have no
-    /// completion date and are therefore only present in the unbounded all-time range.
+    /// Builds the report snapshot for the normalized window and analytical scope in
+    /// <paramref name="query"/>. Doctor and sedation narrow analytical populations; procedure grouping
+    /// changes aggregation only. The action-required review projection stays global within the query
+    /// window. Completed-cycle windows retain the established DoctorCompleteAt anchor.
     /// </summary>
-    public ReportsSnapshot GetReports(ReportDateRange range)
+    public ReportsSnapshot GetReports(ReportQuery query)
     {
         lock (_syncRoot)
         {
             var completedCycles = _completedCycles.ToArray();
             var abortedAssignments = _repository.LoadAbortedAssignments().ToArray();
-            return _reportsSnapshotBuilder.Build(completedCycles, abortedAssignments, range);
+            return _reportsSnapshotBuilder.Build(completedCycles, abortedAssignments, query);
         }
     }
 
@@ -3266,7 +3266,19 @@ public sealed record ReportsSnapshot(
     // Unified pending-review projection. Completed exceptions retain their completed-cycle identity;
     // pre-arrival after-hours exceptions retain aborted-assignment identity and nullable lifecycle
     // timestamps instead of being forced into the completed-cycle reporting model.
-    IReadOnlyList<ExceptionReviewRecord>? ExceptionReviewRecords = null);
+    IReadOnlyList<ExceptionReviewRecord>? ExceptionReviewRecords = null,
+    // Normalized analytical query metadata. ReviewQueue remains window-global; doctor and sedation
+    // scope apply to analytical populations and Case Audit only. ProcedureGrouping chooses an
+    // aggregation lens and never changes population membership.
+    ReportQueryContext? Query = null,
+    // Reusable population/contributor context. Existing numeric aggregate fields remain additive-
+    // compatible; consumers use these states to avoid rendering missing observations as zero.
+    ReportMetricSampleContext? Samples = null,
+    // Procedure rows for the active grouping lens over the scoped included completed population.
+    IReadOnlyList<ScopedProcedureGroup>? ScopedProcedureGroups = null,
+    // Per-doctor allocation sample contexts over each represented doctor's exact population.
+    // Doctor scope returns only the requested doctor, including an explicit Empty context.
+    IReadOnlyList<ReportDoctorAllocationSampleContext>? DoctorAllocationSamples = null);
 
 public sealed record DoctorProcedureMixRow(
     string DoctorId,
@@ -3553,7 +3565,8 @@ public sealed record ProcedureCycleSummary(
     double AverageDoctorAvailableWaitSeconds,
     double MedianDoctorOccupiedWaitSeconds,
     double MedianDoctorAvailableWaitSeconds,
-    AllocationVarianceSummary Allocation);
+    AllocationVarianceSummary Allocation,
+    ReportProcedureMetricSampleContext? Samples = null);
 
 public sealed record DemoSeedPattern(
     string DoctorId,

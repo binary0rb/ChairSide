@@ -134,13 +134,19 @@ This file records decisions that should survive across tasks, PRs, and debugging
 
 **Decision:** Procedure Mix exists at Practice and Doctor scope with counts and percentages over the current scoped included completed-case population. Sedation remains a procedure modifier, not an additional timed case.
 
+**Decision:** The reusable report query separates Window, analytical Scope, and Procedure Grouping. Scope is Practice or Doctor plus All, Sedation, or Non-sedation; Procedure Family versus Detailed Variant changes aggregation without changing population membership. Historical doctor IDs remain valid reporting scopes independently of the current active assignment roster.
+
+**Decision:** The general descriptive sample guardrail is Empty at `N = 0`, Limited at `N = 1-4`, and Sufficient at `N >= 5`. A metric with a nonempty population and zero contributors is Unavailable. Comparisons require every compared population to be Sufficient. These rules are not statistical significance and do not replace #219 Calibration Insight evidence rules.
+
+**Decision:** The action-required Review Queue remains global within the selected reporting date window, while analytical Case Audit inherits Doctor and Sedation scope. Reversed valid date ranges normalize and return normalized metadata; malformed date input retains graceful legacy behavior without a new HTTP 400 response.
+
 **Decision:** Schedule Fit evaluates the scheduling model. The first-version observed basis remains Seated to Doctor Complete measured case flow, which is not interchangeable with Doctor Time. Slack and debt stay separate, signed net variance remains visible, and population coverage must be exposed. Calibration Insights may surface sufficiently supported directional patterns for human review but never mutate expected allocation automatically.
 
 **Decision:** Healthy Data Quality remains quiet; exclusions, limited samples, and pending review use progressive disclosure while audit remains the evidence layer behind calculations and insights. Provider ranking, efficiency scoring, attendance inference, idle-time reporting, grades, quotas, and punitive staff metrics are prohibited.
 
 **Rationale:** The reporting redesign must explain observed operational flow and scheduling-model fit without converting incomplete observation into judgments about doctors or staff. Precise shared semantics prevent later report slices from inventing incompatible denominators, time intervals, or interpretation language.
 
-**Deferred parameters:** General limited-sample rules belong to #213; Typical Observed Range quantiles belong to #218; Calibration Insight sample, deviation, directional-consistency, tolerance, and multi-period persistence rules belong to #219.
+**Deferred parameters:** Typical Observed Range quantiles belong to #218; Calibration Insight sample, deviation, directional-consistency, tolerance, and multi-period persistence rules belong to #219.
 
 ## Reporting UI philosophy
 

@@ -7,6 +7,8 @@ namespace ChairSide.Board.Services;
 /// </summary>
 internal sealed record ReportsSnapshotComposition
 {
+    public required ReportQueryContext Query { get; init; }
+    public required ReportMetricSampleContext Samples { get; init; }
     public required ReportPopulationSection Population { get; init; }
     public required ReportWindowSection Window { get; init; }
     public required ReportTimingSection Timing { get; init; }
@@ -74,6 +76,7 @@ internal sealed record ReportProcedureSection
     public required int SedationCaseCount { get; init; }
     public required int NonSedationCaseCount { get; init; }
     public required IReadOnlyList<ProcedureCycleSummary> BaseProcedureSummaries { get; init; }
+    public required IReadOnlyList<ScopedProcedureGroup> ScopedProcedureGroups { get; init; }
 }
 
 /// <summary>
@@ -92,6 +95,7 @@ internal sealed record ReportAllocationSection
 internal sealed record ReportDoctorDetailSection
 {
     public required IReadOnlyList<DoctorCycleSummary> DoctorSummaries { get; init; }
+    public required IReadOnlyList<ReportDoctorAllocationSampleContext> DoctorAllocationSamples { get; init; }
     public required IReadOnlyList<ObservedDoctorDay>? ObservedDoctorDays { get; init; }
     public required IReadOnlyList<DoctorProcedureMixRow>? DoctorProcedureMix { get; init; }
 }
@@ -154,6 +158,10 @@ internal static class ReportsSnapshotAdapter
             Trends: composition.Timing.Trends,
             ObservedDoctorDays: composition.DoctorDetail.ObservedDoctorDays,
             DoctorProcedureMix: composition.DoctorDetail.DoctorProcedureMix,
-            ExceptionReviewRecords: composition.ReviewQueue.ExceptionReviewRecords);
+            ExceptionReviewRecords: composition.ReviewQueue.ExceptionReviewRecords,
+            Query: composition.Query,
+            Samples: composition.Samples,
+            ScopedProcedureGroups: composition.Procedures.ScopedProcedureGroups,
+            DoctorAllocationSamples: composition.DoctorDetail.DoctorAllocationSamples);
     }
 }

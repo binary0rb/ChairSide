@@ -352,11 +352,31 @@ function targetFor(matches) {
 function allocation(count, net = 0) {
   return {
     allocationVarianceCycleCount: count,
+    totalExpectedAllocationMinutes: count * 30,
+    totalMeasuredCaseFlowMinutes: count * 30 + net,
     netAllocationVarianceMinutes: net,
+    averageAllocationVarianceMinutes: count ? net / count : 0,
     casesOverExpectedAllocation: net > 0 ? count : 0,
     casesUnderExpectedAllocation: net < 0 ? count : 0,
     casesAtExpectedAllocation: net === 0 ? count : 0,
     adjustedAllocationCycleCount: 0
+  };
+}
+
+function sample(populationCount, contributingCount = populationCount) {
+  const state = populationCount === 0
+    ? "Empty"
+    : contributingCount === 0
+      ? "Unavailable"
+      : contributingCount < 5
+        ? "Limited"
+        : "Sufficient";
+  return {
+    populationCount,
+    contributingCount,
+    state,
+    limitedSampleThreshold: 5,
+    supportsComparison: state === "Sufficient"
   };
 }
 
@@ -378,11 +398,21 @@ function reportPayload({
         allocation: allocation(pledgerCases, pledgerCases ? -3 : 0)
       }
     ],
+    doctorAllocationSamples: [
+      { doctorId: "otte", sample: sample(otteCases) },
+      { doctorId: "pledger", sample: sample(pledgerCases) }
+    ],
     recentCompletedCycles: [],
     exceptionReviewRecords: [],
     procedureSummaries: [],
     baseProcedureSummaries: [],
-    rangeLabel: "Jul 1 - Jul 29"
+    rangeLabel: "Jul 1 - Jul 29",
+    query: {
+      scope: "Practice",
+      doctorId: null,
+      sedation: "All",
+      procedureGrouping: "Family"
+    }
   };
 }
 
@@ -403,9 +433,16 @@ function createHarness({
   const ids = context.isReports
     ? [
         "reportFilterBar",
+        "reportTrendPanel",
         "doctorReportDashboard",
         "doctorReportCards",
         "selectedDoctorPanel",
+        "allocationBalanceCard",
+        "dataQualityCard",
+        "doctorAllocationList",
+        "procedureAllocationList",
+        "reportScopeDoctorField",
+        "reportScopeDoctor",
         "reportHeadline",
         "reportsMain",
         "reportDateRange",
@@ -480,9 +517,16 @@ function createHarness({
     start: "2026-07-23",
     end: "2026-07-29"
   };
+  let query = {
+    scope: payload.query?.scope || "Practice",
+    doctorId: payload.query?.doctorId || null,
+    sedation: payload.query?.sedation || "All",
+    procedureGrouping: payload.query?.procedureGrouping || "Family"
+  };
   let reloadCount = 0;
   let renderPageCount = 0;
   const requests = [];
+  const reloadQueries = [];
   const alerts = [];
   const confirmations = [];
   const domMutations = [];
@@ -498,6 +542,7 @@ function createHarness({
     filterChips,
     pressGuards: [],
     requests,
+    reloadQueries,
     storedTokens: []
   };
   globalThis.__chairsideReportsHarness = harness;
@@ -523,6 +568,7 @@ function createHarness({
     getDateRange: () => dateRange,
     getReports: () => reportsPayload,
     getVersion: () => version,
+    getQuery: () => ({ ...query, window: { ...dateRange } }),
     load: async () => {
       reloadCount += 1;
     },
@@ -531,6 +577,7 @@ function createHarness({
     },
     reloadAfterCurrent: async () => {
       reloadCount += 1;
+      reloadQueries.push({ ...query, window: { ...dateRange } });
       const requestRange = { ...dateRange };
       const result = reloadResponses.shift();
       if (result instanceof Error) {
@@ -547,6 +594,19 @@ function createHarness({
     },
     setDateRange: value => {
       dateRange = { ...value };
+    },
+    setScope: (scope, doctorId = null) => {
+      query = {
+        ...query,
+        scope: scope === "Doctor" ? "Doctor" : "Practice",
+        doctorId: scope === "Doctor" ? doctorId : null
+      };
+    },
+    setSedation: sedation => {
+      query = { ...query, sedation };
+    },
+    setProcedureGrouping: procedureGrouping => {
+      query = { ...query, procedureGrouping };
     },
     getRangeSignature: range => requestContextForRange(range).rangeSignature,
     usePreset: preset => {
@@ -606,6 +666,14 @@ function createHarness({
     },
     setPayload(value) {
       reportsPayload = value;
+      if (value.query) {
+        query = {
+          scope: value.query.scope || "Practice",
+          doctorId: value.query.doctorId || null,
+          sedation: value.query.sedation || "All",
+          procedureGrouping: value.query.procedureGrouping || "Family"
+        };
+      }
       version += 1;
     }
   };
@@ -690,6 +758,43 @@ function selectedCard(html, doctorId) {
   return pattern.test(html);
 }
 
+function allocationPayload(populationCount, contributingCount) {
+  const net = contributingCount >= 5 ? 10 : contributingCount > 0 ? 4 : 0;
+  const context = sample(populationCount, contributingCount);
+  return {
+    ...reportPayload({ otteCases: contributingCount, pledgerCases: 0 }),
+    completedRoomCyclesCount: populationCount,
+    includedCompletedCycleCount: populationCount,
+    allocationVariance: allocation(contributingCount, net),
+    doctorSummaries: [{
+      assignedDoctor: "otte",
+      allocation: allocation(contributingCount, net)
+    }],
+    doctorAllocationSamples: [{ doctorId: "otte", sample: context }],
+    samples: {
+      completedCases: sample(populationCount),
+      includedCompletedCases: sample(populationCount),
+      scheduleFit: context
+    },
+    baseProcedureSummaries: [{
+      procedureCode: "EXT",
+      procedureLabel: "Extraction",
+      allocation: allocation(contributingCount, net),
+      samples: { allocation: context }
+    }]
+  };
+}
+
+function allocationSurfaceHtml(harness) {
+  return [
+    "allocationBalanceCard",
+    "doctorReportCards",
+    "selectedDoctorPanel",
+    "doctorAllocationList",
+    "procedureAllocationList"
+  ].map(id => harness.elements.get(id).innerHTML).join("\n");
+}
+
 test("wire initializes only the applicable Reports or Doctor interaction surface", () => {
   const reportsHarness = createHarness();
   reportsHarness.reports.wire();
@@ -747,11 +852,19 @@ test("filter, doctor, and tab state survive ordinary rerenders and refreshed pay
     ]))
   });
 
-  harness.setPayload(reportPayload({
-    otteCases: 1,
-    pledgerCases: 3,
-    marker: "refreshed"
-  }));
+  harness.setPayload({
+    ...reportPayload({
+      otteCases: 1,
+      pledgerCases: 3,
+      marker: "refreshed"
+    }),
+    query: {
+      scope: "Practice",
+      doctorId: null,
+      sedation: "Sedation",
+      procedureGrouping: "DetailedVariant"
+    }
+  });
   harness.reports.render();
 
   assert.equal(harness.filterChips[1].getAttribute("aria-pressed"), "true");
@@ -777,6 +890,200 @@ test("default doctor selection uses first doctor with cases then first roster do
   assert.equal(
     selectedCard(withoutCases.elements.get("doctorReportCards").innerHTML, "otte"),
     true);
+});
+
+test("nonempty allocation populations with zero contributors render Unavailable, not Empty", () => {
+  const harness = createHarness({ payload: allocationPayload(6, 0) });
+
+  harness.reports.render();
+  const html = allocationSurfaceHtml(harness);
+
+  assert.match(html, /Unavailable/);
+  assert.match(html, /0 of 6 contributors/);
+  assert.doesNotMatch(harness.elements.get("allocationBalanceCard").innerHTML, /0 min expected|0 min measured/);
+  for (const id of ["allocationBalanceCard", "selectedDoctorPanel", "procedureAllocationList"]) {
+    assert.doesNotMatch(harness.elements.get(id).innerHTML, /No observation/);
+  }
+});
+
+test("Limited allocation samples retain N while suppressing comparison language", () => {
+  const harness = createHarness({ payload: allocationPayload(3, 3) });
+
+  harness.reports.render();
+  const html = allocationSurfaceHtml(harness);
+
+  assert.match(html, /Limited - N=3/);
+  assert.match(html, /3 allocation contributors/);
+  assert.doesNotMatch(html, /\bNet\b|\bAvg\b|O \/ U \/ A|over expected|under expected/i);
+});
+
+test("Sufficient allocation samples retain supported descriptive comparison language", () => {
+  const harness = createHarness({ payload: allocationPayload(5, 5) });
+
+  harness.reports.render();
+  const html = allocationSurfaceHtml(harness);
+
+  assert.match(html, /Sufficient - N=5/);
+  assert.match(html, /\bNet\b/);
+  assert.match(html, /over expected/);
+  assert.match(html, /O \/ U \/ A/);
+});
+
+test("Doctor scope exposes only its requested doctor until the scope control reloads another doctor", async () => {
+  const activePayload = {
+    ...reportPayload({ otteCases: 5, pledgerCases: 0 }),
+    query: {
+      scope: "Doctor",
+      doctorId: "otte",
+      sedation: "All",
+      procedureGrouping: "Family"
+    },
+    doctorSummaries: [{ assignedDoctor: "otte", allocation: allocation(5, 5) }],
+    doctorAllocationSamples: [{ doctorId: "otte", sample: sample(5) }]
+  };
+  const nextPayload = {
+    ...reportPayload({ otteCases: 0, pledgerCases: 5 }),
+    query: {
+      scope: "Doctor",
+      doctorId: "pledger",
+      sedation: "All",
+      procedureGrouping: "Family"
+    },
+    doctorSummaries: [{ assignedDoctor: "pledger", allocation: allocation(5, -5) }],
+    doctorAllocationSamples: [{ doctorId: "pledger", sample: sample(5) }]
+  };
+  const responseGate = deferred();
+  let harness;
+  harness = createHarness({
+    payload: activePayload,
+    reloadResponses: [async () => {
+      await responseGate.promise;
+      harness.setPayload(nextPayload);
+      harness.reports.render();
+    }]
+  });
+  harness.reports.wire();
+  harness.reports.render();
+
+  const grid = harness.elements.get("doctorReportCards");
+  assert.match(grid.innerHTML, /data-report-doctor-id="otte"/);
+  assert.doesNotMatch(grid.innerHTML, /data-report-doctor-id="pledger"/);
+
+  const offScopeCard = new FakeElement();
+  offScopeCard.dataset.reportDoctorId = "pledger";
+  await harness.document.dispatch("click", {
+    target: targetFor(new Map([["[data-report-doctor-id]", offScopeCard]]))
+  });
+  assert.match(grid.innerHTML, /data-report-doctor-id="otte"/);
+  assert.doesNotMatch(grid.innerHTML, /data-report-doctor-id="pledger"/);
+
+  const select = harness.elements.get("reportScopeDoctor");
+  select.value = "pledger";
+  const changingScope = select.dispatch("change", { target: select });
+
+  assert.equal(harness.reloadQueries.length, 1);
+  assert.equal(harness.reloadQueries[0].scope, "Doctor");
+  assert.equal(harness.reloadQueries[0].doctorId, "pledger");
+  assert.doesNotMatch(grid.innerHTML, /data-report-doctor-id="pledger"/);
+
+  responseGate.resolve();
+  await changingScope;
+  assert.match(grid.innerHTML, /data-report-doctor-id="pledger"/);
+  assert.doesNotMatch(grid.innerHTML, /data-report-doctor-id="otte"/);
+});
+
+test("headline metrics distinguish Limited and Unavailable samples from measured zero", () => {
+  const limited = {
+    populationCount: 3,
+    contributingCount: 3,
+    state: "Limited",
+    limitedSampleThreshold: 5,
+    supportsComparison: false
+  };
+  const unavailable = {
+    populationCount: 3,
+    contributingCount: 0,
+    state: "Unavailable",
+    limitedSampleThreshold: 5,
+    supportsComparison: false
+  };
+  const payload = {
+    ...reportPayload({ otteCases: 1, pledgerCases: 2 }),
+    averageSeatedToDoctorSeconds: 0,
+    averageDoctorInRoomSeconds: 900,
+    samples: {
+      completedCases: limited,
+      seatedToDoctor: unavailable,
+      doctorTime: limited
+    }
+  };
+  const harness = createHarness({ payload });
+
+  harness.reports.render();
+
+  const headline = harness.elements.get("reportHeadline").innerHTML;
+  assert.match(headline, /Limited - N=3/);
+  assert.match(headline, /Unavailable/);
+  assert.doesNotMatch(headline, />00:00</);
+});
+
+test("trend comparison requires every compared population to be Sufficient", () => {
+  const sample = (count, state) => ({
+    populationCount: count,
+    contributingCount: count,
+    state,
+    limitedSampleThreshold: 5,
+    supportsComparison: state === "Sufficient"
+  });
+  const bucket = (startDate, count, state, median) => ({
+    startDate,
+    endDate: startDate === "2026-07-06" ? "2026-07-13" : "2026-07-20",
+    completedCycleCount: count,
+    medianSeatedToDoctorSeconds: median,
+    completedSample: sample(count, state),
+    turnoverCycleCount: count,
+    medianTurnoverSeconds: median,
+    turnoverSample: sample(count, state)
+  });
+  const harness = createHarness({
+    payload: {
+      ...reportPayload({ otteCases: 2, pledgerCases: 3 }),
+      trends: {
+        buckets: [
+          bucket("2026-07-06", 5, "Sufficient", 600),
+          bucket("2026-07-13", 4, "Limited", 300)
+        ]
+      }
+    }
+  });
+
+  harness.reports.render();
+
+  const panel = harness.elements.get("reportTrendPanel").innerHTML;
+  assert.match(panel, /More cases are needed for a reliable week-to-week comparison/);
+  assert.match(panel, /Limited - N=4/);
+  assert.doesNotMatch(panel, /improved by/);
+});
+
+test("empty analytical population uses the No observation state", () => {
+  const harness = createHarness({
+    payload: {
+      ...reportPayload({ otteCases: 0, pledgerCases: 0 }),
+      samples: {
+        completedCases: {
+          populationCount: 0,
+          contributingCount: 0,
+          state: "Empty",
+          limitedSampleThreshold: 5,
+          supportsComparison: false
+        }
+      }
+    }
+  });
+
+  harness.reports.render();
+
+  assert.match(harness.elements.get("reportHeadline").innerHTML, /No observation/);
 });
 
 test("Doctor View stays pinned to the route doctor while its selected tab survives refresh", async () => {

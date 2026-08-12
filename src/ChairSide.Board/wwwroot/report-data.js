@@ -10,7 +10,14 @@ export function createReportData(adapter = {}) {
   let guaranteedReloadBatch = null;
   let reportsVersion = 0;
   let lastSuccessfulLoad = null;
-  let dateRange = { preset: "last7", start: null, end: null };
+  const initialRange = computePresetRange("last7", currentDate());
+  let dateRange = { preset: "last7", start: initialRange.start, end: initialRange.end };
+  let analyticalScope = {
+    scope: "Practice",
+    doctorId: null,
+    sedation: "All",
+    procedureGrouping: "Family"
+  };
 
   function getReports() {
     return reports;
@@ -28,12 +35,38 @@ export function createReportData(adapter = {}) {
     return dateRange;
   }
 
+  function getQuery() {
+    return { ...analyticalScope, window: { ...dateRange } };
+  }
+
   function getRangeSignature(range = dateRange) {
     return createReportRequestContext(range).rangeSignature;
   }
 
   function setDateRange(nextRange) {
     dateRange = { ...nextRange };
+  }
+
+  function setScope(scope, doctorId = null) {
+    analyticalScope = {
+      ...analyticalScope,
+      scope: scope === "Doctor" ? "Doctor" : "Practice",
+      doctorId: scope === "Doctor" && doctorId ? String(doctorId).trim() : null
+    };
+  }
+
+  function setSedation(sedation) {
+    analyticalScope = {
+      ...analyticalScope,
+      sedation: sedation === "Sedation" || sedation === "NonSedation" ? sedation : "All"
+    };
+  }
+
+  function setProcedureGrouping(procedureGrouping) {
+    analyticalScope = {
+      ...analyticalScope,
+      procedureGrouping: procedureGrouping === "DetailedVariant" ? "DetailedVariant" : "Family"
+    };
   }
 
   function useLastSevenDays() {
@@ -53,8 +86,7 @@ export function createReportData(adapter = {}) {
     dateRange = { preset, start: resolved.start, end: resolved.end };
   }
 
-  function startLoad() {
-    const requestContext = createReportRequestContext(dateRange);
+  function startLoad(requestContext = createReportRequestContext(dateRange, analyticalScope)) {
     reportsInFlight = true;
     const operation = (async () => {
       const response = await request(reportsRequestUrl(requestContext), {
@@ -77,6 +109,7 @@ export function createReportData(adapter = {}) {
       }
 
       reports = await response.json();
+      applyNormalizedQuery(reports?.query);
       reportsVersion++;
       lastSuccessfulLoad = Object.freeze({
         payload: reports,
@@ -110,12 +143,14 @@ export function createReportData(adapter = {}) {
 
   function reloadAfterCurrent() {
     if (guaranteedReloadBatch && !guaranteedReloadBatch.started) {
+      guaranteedReloadBatch.requestContext = createReportRequestContext(dateRange, analyticalScope);
       return guaranteedReloadBatch.promise;
     }
 
     const predecessor = guaranteedReloadBatch?.promise || Promise.resolve();
     const batch = {
       started: false,
+      requestContext: createReportRequestContext(dateRange, analyticalScope),
       promise: null
     };
 
@@ -135,7 +170,7 @@ export function createReportData(adapter = {}) {
         }
       }
 
-      return startLoad();
+      return startLoad(batch.requestContext);
     })().finally(() => {
       if (guaranteedReloadBatch === batch) {
         guaranteedReloadBatch = null;
@@ -153,6 +188,18 @@ export function createReportData(adapter = {}) {
     }
     if (requestContext.to) {
       params.set("to", requestContext.to);
+    }
+    if (requestContext.scope !== "Practice") {
+      params.set("scope", requestContext.scope);
+    }
+    if (requestContext.doctorId) {
+      params.set("doctorId", requestContext.doctorId);
+    }
+    if (requestContext.sedation !== "All") {
+      params.set("sedation", requestContext.sedation);
+    }
+    if (requestContext.procedureGrouping !== "Family") {
+      params.set("procedureGrouping", requestContext.procedureGrouping);
     }
 
     const query = params.toString();
@@ -184,9 +231,32 @@ export function createReportData(adapter = {}) {
     return adapter.now ? new Date(adapter.now()) : new Date();
   }
 
+  function applyNormalizedQuery(query) {
+    if (!query || typeof query !== "object") {
+      return;
+    }
+
+    dateRange = {
+      ...dateRange,
+      start: query.rangeStartDate || null,
+      end: query.rangeEndDate || null
+    };
+    analyticalScope = {
+      scope: query.scope === "Doctor" ? "Doctor" : "Practice",
+      doctorId: query.scope === "Doctor" && query.doctorId ? String(query.doctorId) : null,
+      sedation: query.sedation === "Sedation" || query.sedation === "NonSedation"
+        ? query.sedation
+        : "All",
+      procedureGrouping: query.procedureGrouping === "DetailedVariant"
+        ? "DetailedVariant"
+        : "Family"
+    };
+  }
+
   return {
     getDateRange,
     getLastSuccessfulLoad,
+    getQuery,
     getRangeSignature,
     getReports,
     getVersion,
@@ -194,6 +264,9 @@ export function createReportData(adapter = {}) {
     reload,
     reloadAfterCurrent,
     setDateRange,
+    setProcedureGrouping,
+    setScope,
+    setSedation,
     useLastSevenDays,
     useLastThirtyDays,
     useMonthToDate,
@@ -201,14 +274,34 @@ export function createReportData(adapter = {}) {
   };
 }
 
-function createReportRequestContext(range) {
+function createReportRequestContext(range, scope) {
   const allTime = range?.preset === "all";
   const from = allTime ? null : range?.start || null;
   const to = allTime ? null : range?.end || null;
+  const normalizedScope = scope?.scope === "Doctor" ? "Doctor" : "Practice";
+  const doctorId = normalizedScope === "Doctor" ? scope?.doctorId || null : null;
+  const sedation = scope?.sedation === "Sedation" || scope?.sedation === "NonSedation"
+    ? scope.sedation
+    : "All";
+  const procedureGrouping = scope?.procedureGrouping === "DetailedVariant"
+    ? "DetailedVariant"
+    : "Family";
   return Object.freeze({
     from,
     to,
-    rangeSignature: JSON.stringify([from, to])
+    scope: normalizedScope,
+    doctorId,
+    sedation,
+    procedureGrouping,
+    rangeSignature: JSON.stringify([from, to]),
+    querySignature: JSON.stringify([
+      from,
+      to,
+      normalizedScope,
+      doctorId,
+      sedation,
+      procedureGrouping
+    ])
   });
 }
 
@@ -218,6 +311,9 @@ function utcDateString(date) {
 
 function computePresetRange(preset, now) {
   const today = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+  if (preset === "all") {
+    return { start: null, end: null };
+  }
   if (preset === "today") {
     return { start: utcDateString(today), end: utcDateString(today) };
   }

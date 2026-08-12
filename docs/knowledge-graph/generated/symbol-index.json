@@ -1,7 +1,7 @@
 ﻿{
     "generatedStamp":  "deterministic",
     "root":  ".",
-    "fileCount":  167,
+    "fileCount":  169,
     "files":  [
                   {
                       "path":  ".github/pull_request_template.md",
@@ -59,7 +59,7 @@
                   {
                       "path":  "AGENTS.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  18887,
+                      "sizeBytes":  19132,
                       "typeSymbols":  [
 
                                       ],
@@ -198,7 +198,7 @@
                   {
                       "path":  "docs/design/reporting-design.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  27332,
+                      "sizeBytes":  28775,
                       "typeSymbols":  [
 
                                       ],
@@ -434,7 +434,7 @@
                   {
                       "path":  "docs/knowledge/reports/procedure-mix.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  3331,
+                      "sizeBytes":  3601,
                       "typeSymbols":  [
 
                                       ],
@@ -466,7 +466,7 @@
                   {
                       "path":  "docs/knowledge/reports/reporting-population.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  3084,
+                      "sizeBytes":  4293,
                       "typeSymbols":  [
 
                                       ],
@@ -488,6 +488,7 @@
                       "headings":  [
                                        "Reporting population",
                                        "Population funnel",
+                                       "Reusable report query and sample state",
                                        "Assignment and handoff attribution",
                                        "Termination populations",
                                        "Source and test anchors"
@@ -655,7 +656,7 @@
                   {
                       "path":  "docs/knowledge-graph/chairside.graph.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  16606,
+                      "sizeBytes":  17256,
                       "typeSymbols":  [
 
                                       ],
@@ -686,7 +687,7 @@
                   {
                       "path":  "docs/knowledge-graph/decisions.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  19315,
+                      "sizeBytes":  20338,
                       "typeSymbols":  [
 
                                       ],
@@ -1543,7 +1544,7 @@
                   {
                       "path":  "src/ChairSide.Board/Program.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  72805,
+                      "sizeBytes":  73052,
                       "typeSymbols":  [
                                           "LegacyRoomOneRedirect",
                                           "BeginPrestageRequest",
@@ -1797,7 +1798,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/DemoBoardStore.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  185809,
+                      "sizeBytes":  186644,
                       "typeSymbols":  [
                                           "ExceptionReasons",
                                           "ReportingExceptionReasons",
@@ -2295,9 +2296,52 @@
                                    ]
                   },
                   {
+                      "path":  "src/ChairSide.Board/Services/ReportQuery.cs",
+                      "kind":  "CSharp",
+                      "sizeBytes":  7033,
+                      "typeSymbols":  [
+                                          "ReportScopeKinds",
+                                          "ReportSedationSegments",
+                                          "ReportProcedureGroupings",
+                                          "ReportSampleStates",
+                                          "struct",
+                                          "ReportQueryContext",
+                                          "ReportSampleContext",
+                                          "ReportMetricSampleContext",
+                                          "ReportProcedureMetricSampleContext",
+                                          "ReportDoctorAllocationSampleContext",
+                                          "ScopedProcedureGroup"
+                                      ],
+                      "methodSymbols":  [
+                                            "FromStrings",
+                                            "IncludesAnalyticalCycle",
+                                            "ToContext",
+                                            "NormalizeChoice",
+                                            "NormalizeDoctorId",
+                                            "IsSedationProcedureCode",
+                                            "Create",
+                                            "ForPopulation"
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
                       "path":  "src/ChairSide.Board/Services/ReportsSnapshotBuilder.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  41671,
+                      "sizeBytes":  49875,
                       "typeSymbols":  [
                                           "ReportsSnapshotBuilder"
                                       ],
@@ -2309,12 +2353,15 @@
                                             "AverageSeconds",
                                             "MedianSeconds",
                                             "BuildDoctorSummaries",
+                                            "BuildDoctorAllocationSamples",
                                             "BuildDoctorDailyAllocationSeries",
                                             "BuildObservedDoctorDays",
                                             "BuildObservedRoomConcurrency",
                                             "ObservedLoadWholeMinutesBetween",
                                             "BuildProcedureSummaries",
                                             "BuildBaseProcedureSummaries",
+                                            "BuildScopedProcedureGroups",
+                                            "BuildProcedureSamples",
                                             "BuildDoctorProcedureMix",
                                             "ResolveProcedureLabel",
                                             "AnnotateReportingExceptions",
@@ -2356,7 +2403,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/ReportsSnapshotComposition.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  8597,
+                      "sizeBytes":  9161,
                       "typeSymbols":  [
                                           "ReportsSnapshotComposition",
                                           "ReportPopulationSection",
@@ -2390,7 +2437,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/ReportTrendSnapshot.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  3942,
+                      "sizeBytes":  4193,
                       "typeSymbols":  [
                                           "ReportTrendSnapshot",
                                           "ReportTrendBucket",
@@ -3155,7 +3202,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/report-data.js",
                       "kind":  "JavaScript",
-                      "sizeBytes":  5903,
+                      "sizeBytes":  8937,
                       "typeSymbols":  [
 
                                       ],
@@ -3177,8 +3224,12 @@
                                               "getVersion",
                                               "getLastSuccessfulLoad",
                                               "getDateRange",
+                                              "getQuery",
                                               "getRangeSignature",
                                               "setDateRange",
+                                              "setScope",
+                                              "setSedation",
+                                              "setProcedureGrouping",
                                               "useLastSevenDays",
                                               "useMonthToDate",
                                               "useLastThirtyDays",
@@ -3192,6 +3243,7 @@
                                               "currentAdminHeaders",
                                               "clearRejectedToken",
                                               "currentDate",
+                                              "applyNormalizedQuery",
                                               "createReportRequestContext",
                                               "utcDateString",
                                               "computePresetRange"
@@ -3203,7 +3255,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/reports.html",
                       "kind":  "Html",
-                      "sizeBytes":  10414,
+                      "sizeBytes":  11419,
                       "typeSymbols":  [
 
                                       ],
@@ -3229,7 +3281,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/reports.js",
                       "kind":  "JavaScript",
-                      "sizeBytes":  103717,
+                      "sizeBytes":  114056,
                       "typeSymbols":  [
 
                                       ],
@@ -3256,6 +3308,8 @@
                                               "renderReports",
                                               "renderReportHeadline",
                                               "renderHeadlineCard",
+                                              "sampledPresentation",
+                                              "renderSampleContext",
                                               "renderReportTrendCards",
                                               "renderWaitTrendCard",
                                               "renderTurnoverTrendCard",
@@ -3301,7 +3355,14 @@
                                               "renderVarianceBadge",
                                               "renderAverageVarianceBadge",
                                               "renderReportFilterBar",
+                                              "fallbackSampleForObservedCount",
+                                              "sampleSupportsComparison",
+                                              "allocationComparisonValue",
+                                              "allocationComparisonNoticeText",
+                                              "renderAllocationComparisonNotice",
                                               "syncReportFilterButtons",
+                                              "normalizeReportFilterValue",
+                                              "syncDoctorScopeControl",
                                               "getInsightSummaries",
                                               "insightsHeadingText",
                                               "renderGroupedInsights",
@@ -3313,19 +3374,10 @@
                                               "formatApproxDurationMinutes",
                                               "formatAllocationVariance",
                                               "revealReportDisclosures",
-                                              "isSedationProcedureCodeClient",
-                                              "filterCyclesBySedation",
-                                              "filterSummariesBySedation",
                                               "noMatchMessage",
                                               "renderProcedureSummaries",
                                               "renderProcedureSummaryRow",
-                                              "completedRecordKey",
-                                              "reviewRecordKey",
-                                              "reportRangeSignature",
-                                              "currentReportAction",
-                                              "normalizeReportIdentityTimestamp",
-                                              "isUnresolvedReportAction",
-                                              "unresolvedReportActionCount"
+                                              "completedRecordKey"
                                           ],
                       "headings":  [
 
@@ -3552,7 +3604,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/styles.css",
                       "kind":  "Css",
-                      "sizeBytes":  96603,
+                      "sizeBytes":  97593,
                       "typeSymbols":  [
 
                                       ],
@@ -4080,7 +4132,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/BoardStoreReadinessTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  13891,
+                      "sizeBytes":  13900,
                       "typeSymbols":  [
                                           "BoardStoreTests"
                                       ],
@@ -5093,9 +5145,36 @@
                                    ]
                   },
                   {
+                      "path":  "tests/ChairSide.Board.Tests/ReportQueryTests.cs",
+                      "kind":  "CSharp",
+                      "sizeBytes":  2115,
+                      "typeSymbols":  [
+                                          "ReportQueryTests"
+                                      ],
+                      "methodSymbols":  [
+                                            "Sample_context_uses_the_approved_general_descriptive_guardrail",
+                                            "Query_normalizes_reversed_valid_dates_and_preserves_graceful_malformed_dates"
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
                       "path":  "tests/ChairSide.Board.Tests/ReportsSnapshotBuilderTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  23956,
+                      "sizeBytes":  30218,
                       "typeSymbols":  [
                                           "ReportsSnapshotBuilderTests"
                                       ],
@@ -5103,7 +5182,10 @@
                                             "Compose_characterizes_all_reporting_populations_without_mutating_source_history",
                                             "Adapter_preserves_every_named_section_value_in_flat_contract",
                                             "Build_applies_completion_window_before_every_population_and_keeps_all_time_total",
-                                            "Reports_snapshot_web_json_property_contract_remains_unchanged",
+                                            "Reports_snapshot_web_json_property_contract_appends_doctor_allocation_samples",
+                                            "Build_applies_historical_doctor_and_sedation_scope_without_treating_grouping_as_a_filter",
+                                            "Build_preserves_unavailable_doctor_allocation_when_population_has_no_contributors",
+                                            "Build_keeps_review_queue_global_to_analytical_scope_but_bounded_by_window",
                                             "CreateBuilder",
                                             "Cycle",
                                             "SecondsBetween",
@@ -5769,7 +5851,7 @@
                   {
                       "path":  "tests/javascript/report-data.test.mjs",
                       "kind":  "JavaScript",
-                      "sizeBytes":  14631,
+                      "sizeBytes":  18637,
                       "typeSymbols":  [
 
                                       ],
@@ -5797,7 +5879,7 @@
                   {
                       "path":  "tests/javascript/reports.test.mjs",
                       "kind":  "JavaScript",
-                      "sizeBytes":  67775,
+                      "sizeBytes":  77747,
                       "typeSymbols":  [
 
                                       ],
@@ -5822,6 +5904,7 @@
                                               "recordDomMutation",
                                               "targetFor",
                                               "allocation",
+                                              "sample",
                                               "reportPayload",
                                               "createFilterChip",
                                               "createHarness",
@@ -5831,7 +5914,9 @@
                                               "feedbackEntry",
                                               "completedCycle",
                                               "deferred",
-                                              "selectedCard"
+                                              "selectedCard",
+                                              "allocationPayload",
+                                              "allocationSurfaceHtml"
                                           ],
                       "headings":  [
 

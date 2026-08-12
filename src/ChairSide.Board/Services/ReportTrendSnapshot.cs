@@ -21,7 +21,9 @@ public sealed record ReportTrendBucket(
     double AverageSeatedToDoctorSeconds,
     int TurnoverCycleCount,
     double MedianTurnoverSeconds,
-    double AverageTurnoverSeconds);
+    double AverageTurnoverSeconds,
+    ReportSampleContext? CompletedSample = null,
+    ReportSampleContext? TurnoverSample = null);
 
 /// <summary>
 /// Builds report trend snapshots over a caller-supplied standard/included completed-cycle population.
@@ -71,7 +73,9 @@ public static class ReportTrendSnapshotBuilder
                     Average(waitValues),
                     turnoverValues.Count,
                     Median(turnoverValues),
-                    Average(turnoverValues));
+                    Average(turnoverValues),
+                    ReportSampleContext.ForPopulation(waitValues.Count),
+                    ReportSampleContext.Create(waitValues.Count, turnoverValues.Count));
             })
             .ToList();
 
