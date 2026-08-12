@@ -522,6 +522,65 @@ public sealed class ReportsSnapshotBuilderTests
         var doctorSample = Assert.Single(snapshot.DoctorAllocationSamples!);
         Assert.Equal("former-doctor", doctorSample.DoctorId);
         Assert.Equal(ReportSampleStates.Limited, doctorSample.Sample.State);
+        var trend = Assert.Single(snapshot.Trends!.Buckets);
+        Assert.Equal(1, trend.ReadyWaitSample!.PopulationCount);
+        Assert.Equal(1, trend.ReadyWaitSample.ContributingCount);
+        Assert.Equal(ReportSampleStates.Limited, trend.ReadyWaitSample.State);
+    }
+
+    [Fact]
+    public void Build_keeps_broader_completed_count_while_timing_uses_truthful_ready_contributors()
+    {
+        var truthfulZero = Cycle(
+            1, 1, "EXT",
+            Utc(2026, 8, 10, 8, 0), Utc(2026, 8, 10, 8, 5), Utc(2026, 8, 10, 8, 5),
+            Utc(2026, 8, 10, 8, 30), Utc(2026, 8, 10, 8, 40), 30);
+        var legacyMissingReady = Cycle(
+            2, 2, "CON",
+            Utc(2026, 8, 10, 9, 0), Utc(2026, 8, 10, 9, 5), Utc(2026, 8, 10, 9, 10),
+            Utc(2026, 8, 10, 9, 30), Utc(2026, 8, 10, 9, 40), 30);
+        legacyMissingReady.ReadyForDoctorAt = null;
+        legacyMissingReady.ReadyToDoctorSeconds = null;
+        var reportingExcluded = Cycle(
+            3, 3, "SED",
+            Utc(2026, 8, 10, 10, 0), Utc(2026, 8, 10, 10, 5), Utc(2026, 8, 10, 10, 10),
+            Utc(2026, 8, 10, 10, 30), Utc(2026, 8, 10, 10, 40), 30);
+
+        var snapshot = CreateBuilder().Build(
+            [truthfulZero, legacyMissingReady, reportingExcluded],
+            [],
+            ReportQuery.Default);
+
+        Assert.Equal(3, snapshot.CompletedRoomCyclesCount);
+        Assert.Equal(2, snapshot.IncludedCompletedCycleCount);
+        Assert.Equal(1, snapshot.ExcludedCompletedCycleCount);
+        Assert.Equal(0, snapshot.MedianReadyToDoctorSeconds);
+        Assert.Equal(2, snapshot.Samples!.ReadyWait.PopulationCount);
+        Assert.Equal(1, snapshot.Samples.ReadyWait.ContributingCount);
+        Assert.Equal(ReportSampleStates.Limited, snapshot.Samples.ReadyWait.State);
+        var trend = Assert.Single(snapshot.Trends!.Buckets);
+        Assert.Equal(2, trend.ReadyWaitSample!.PopulationCount);
+        Assert.Equal(1, trend.ReadyWaitSample.ContributingCount);
+        Assert.Equal(0, trend.MedianReadyWaitSeconds);
+    }
+
+    [Fact]
+    public void Build_marks_weekly_ready_wait_unavailable_when_completed_population_has_no_ready_observation()
+    {
+        var legacyMissingReady = Cycle(
+            1, 1, "EXT",
+            Utc(2026, 8, 10, 8, 0), Utc(2026, 8, 10, 8, 5), Utc(2026, 8, 10, 8, 10),
+            Utc(2026, 8, 10, 8, 30), Utc(2026, 8, 10, 8, 40), 30);
+        legacyMissingReady.ReadyForDoctorAt = null;
+        legacyMissingReady.ReadyToDoctorSeconds = null;
+
+        var snapshot = CreateBuilder().Build([legacyMissingReady], [], ReportQuery.Default);
+
+        Assert.Equal(ReportSampleStates.Unavailable, snapshot.Samples!.ReadyWait.State);
+        Assert.Equal(0, snapshot.MedianReadyToDoctorSeconds);
+        var trend = Assert.Single(snapshot.Trends!.Buckets);
+        Assert.Null(trend.MedianReadyWaitSeconds);
+        Assert.Equal(ReportSampleStates.Unavailable, trend.ReadyWaitSample!.State);
     }
 
     [Fact]

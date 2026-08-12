@@ -545,6 +545,47 @@ public sealed partial class BoardStoreTests
         Assert.Equal(1, bucket.TurnoverCycleCount);
     }
 
+    [Fact]
+    public void Reports_ready_wait_trend_uses_reissued_accepted_ready_not_withdrawn_interval()
+    {
+        using var workspace = TestWorkspace.Create();
+        var start = Utc(2026, 6, 10, 8);
+        var clock = new ManualTimeProvider(start);
+        var context = StoreContext.Create(
+            workspace,
+            environmentName: Environments.Production,
+            timeProvider: clock);
+        var assignment = RoomAssignmentContract.Create(
+            "otte",
+            "CON",
+            SedationContract.UnavailableProcedureIneligible(),
+            ExpectedAllocationContract.ConfirmedSuggestedValue(3));
+
+        Assert.NotNull(context.Store.BeginPrestage(1));
+        Assert.NotNull(context.Store.SaveAssignmentDetails(1, assignment));
+        clock.SetUtcNow(start.AddMinutes(1));
+        Assert.NotNull(context.Store.SeatRoomCanonical(1, null).Room);
+        clock.SetUtcNow(start.AddMinutes(2));
+        Assert.NotNull(context.Store.MarkReadyForDoctor(1));
+        clock.SetUtcNow(start.AddMinutes(12));
+        Assert.NotNull(context.Store.WithdrawReady(1));
+        clock.SetUtcNow(start.AddMinutes(20));
+        Assert.NotNull(context.Store.MarkReadyForDoctor(1));
+        clock.SetUtcNow(start.AddMinutes(23));
+        Assert.NotNull(context.Store.MarkDoctorArrived(1));
+        clock.SetUtcNow(start.AddMinutes(40));
+        Assert.NotNull(context.Store.MarkDoctorComplete(1));
+        clock.SetUtcNow(start.AddMinutes(45));
+        Assert.NotNull(context.Store.MarkRoomAvailable(1));
+
+        var reports = context.Store.GetReports();
+        Assert.Equal(180, reports.MedianReadyToDoctorSeconds);
+        var bucket = Assert.Single(reports.Trends!.Buckets);
+        Assert.Equal(180, bucket.MedianReadyWaitSeconds);
+        Assert.Equal(1, bucket.ReadyWaitSample!.ContributingCount);
+        Assert.Equal(ReportSampleStates.Limited, bucket.ReadyWaitSample.State);
+    }
+
     // -------------------------------------------------------------------------
     // Schedule-fit read model exposed on the report snapshot
     //

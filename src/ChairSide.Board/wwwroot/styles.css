@@ -1693,6 +1693,14 @@ body[data-view="reports"] .report-trend-card.turnover-trend-card {
   border-left-color: #0f766e;
 }
 
+body[data-view="reports"] .report-trend-card.seated-to-doctor-trend-card {
+  border-left-color: #64748b;
+}
+
+body[data-view="reports"] .report-trend-card.is-secondary {
+  grid-column: 1 / -1;
+}
+
 body[data-view="reports"] .report-trend-card.is-empty {
   border-left-color: var(--line);
 }

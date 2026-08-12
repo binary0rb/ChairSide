@@ -118,6 +118,106 @@ public sealed class ReportTrendSnapshotTests
     }
 
     [Fact]
+    public void Ready_wait_median_uses_only_truthful_weekly_contributors()
+    {
+        var snapshot = ReportTrendSnapshotBuilder.BuildWeekly(
+        [
+            Cycle(completeAt: Utc(2026, 6, 8, 9), seatedToDoctorSeconds: 300, readyToDoctorSeconds: 300),
+            Cycle(completeAt: Utc(2026, 6, 9, 9), seatedToDoctorSeconds: 600, readyToDoctorSeconds: null),
+            Cycle(completeAt: Utc(2026, 6, 10, 9), seatedToDoctorSeconds: 900, readyToDoctorSeconds: 0)
+        ]);
+
+        var bucket = Assert.Single(snapshot.Buckets);
+        Assert.Equal(2, bucket.ReadyWaitCycleCount);
+        Assert.Equal(150, bucket.MedianReadyWaitSeconds);
+        Assert.Equal(3, bucket.ReadyWaitSample!.PopulationCount);
+        Assert.Equal(2, bucket.ReadyWaitSample.ContributingCount);
+        Assert.Equal(ReportSampleStates.Limited, bucket.ReadyWaitSample.State);
+    }
+
+    [Fact]
+    public void Ready_wait_is_unavailable_for_nonempty_week_without_truthful_ready_observations()
+    {
+        var snapshot = ReportTrendSnapshotBuilder.BuildWeekly(
+        [
+            Cycle(completeAt: Utc(2026, 6, 8, 9), seatedToDoctorSeconds: 300, readyToDoctorSeconds: null),
+            Cycle(completeAt: Utc(2026, 6, 9, 9), seatedToDoctorSeconds: 600, readyToDoctorSeconds: null)
+        ]);
+
+        var bucket = Assert.Single(snapshot.Buckets);
+        Assert.Equal(0, bucket.ReadyWaitCycleCount);
+        Assert.Null(bucket.MedianReadyWaitSeconds);
+        Assert.Equal(2, bucket.ReadyWaitSample!.PopulationCount);
+        Assert.Equal(0, bucket.ReadyWaitSample.ContributingCount);
+        Assert.Equal(ReportSampleStates.Unavailable, bucket.ReadyWaitSample.State);
+    }
+
+    [Fact]
+    public void Truthful_zero_ready_wait_remains_an_observed_value()
+    {
+        var bucket = Assert.Single(ReportTrendSnapshotBuilder.BuildWeekly(
+        [
+            Cycle(completeAt: Utc(2026, 6, 8, 9), seatedToDoctorSeconds: 0, readyToDoctorSeconds: 0)
+        ]).Buckets);
+
+        Assert.Equal(0, bucket.MedianReadyWaitSeconds);
+        Assert.Equal(1, bucket.ReadyWaitSample!.ContributingCount);
+        Assert.Equal(ReportSampleStates.Limited, bucket.ReadyWaitSample.State);
+    }
+
+    [Fact]
+    public void Weekly_samples_use_one_population_and_metric_specific_contributors()
+    {
+        var snapshot = ReportTrendSnapshotBuilder.BuildWeekly(
+        [
+            Cycle(completeAt: Utc(2026, 6, 8, 9), seatedToDoctorSeconds: 300, readyToDoctorSeconds: 60, turnoverSeconds: 120),
+            Cycle(completeAt: Utc(2026, 6, 9, 9), seatedToDoctorSeconds: 600, readyToDoctorSeconds: 120, turnoverSeconds: null),
+            Cycle(completeAt: Utc(2026, 6, 10, 9), seatedToDoctorSeconds: 900, readyToDoctorSeconds: 180, turnoverSeconds: null),
+            Cycle(completeAt: Utc(2026, 6, 11, 9), seatedToDoctorSeconds: 1200, readyToDoctorSeconds: 240, turnoverSeconds: null),
+            Cycle(completeAt: Utc(2026, 6, 12, 9), seatedToDoctorSeconds: -1, readyToDoctorSeconds: 300, turnoverSeconds: null)
+        ]);
+
+        var bucket = Assert.Single(snapshot.Buckets);
+        Assert.Equal(4, bucket.CompletedCycleCount);
+        Assert.Equal(5, bucket.SeatedToDoctorSample!.PopulationCount);
+        Assert.Equal(4, bucket.SeatedToDoctorSample.ContributingCount);
+        Assert.Equal(ReportSampleStates.Limited, bucket.SeatedToDoctorSample.State);
+        Assert.Equal(5, bucket.ReadyWaitSample!.ContributingCount);
+        Assert.Equal(ReportSampleStates.Sufficient, bucket.ReadyWaitSample.State);
+        Assert.Equal(1, bucket.TurnoverSample!.ContributingCount);
+        Assert.Equal(ReportSampleStates.Limited, bucket.TurnoverSample.State);
+    }
+
+    [Fact]
+    public void Compatibility_completed_sample_keeps_eligible_count_while_metric_samples_use_weekly_population()
+    {
+        var snapshot = ReportTrendSnapshotBuilder.BuildWeekly(
+        [
+            Cycle(
+                completeAt: Utc(2026, 6, 8, 9),
+                seatedToDoctorSeconds: 300,
+                readyToDoctorSeconds: 60,
+                turnoverSeconds: 120),
+            Cycle(
+                completeAt: Utc(2026, 6, 9, 9),
+                seatedToDoctorSeconds: -1,
+                readyToDoctorSeconds: null,
+                turnoverSeconds: null)
+        ]);
+
+        var bucket = Assert.Single(snapshot.Buckets);
+        Assert.Equal(1, bucket.CompletedCycleCount);
+        Assert.Equal(1, bucket.CompletedSample!.PopulationCount);
+        Assert.Equal(1, bucket.CompletedSample.ContributingCount);
+        Assert.Equal(2, bucket.SeatedToDoctorSample!.PopulationCount);
+        Assert.Equal(1, bucket.SeatedToDoctorSample.ContributingCount);
+        Assert.Equal(2, bucket.ReadyWaitSample!.PopulationCount);
+        Assert.Equal(1, bucket.ReadyWaitSample.ContributingCount);
+        Assert.Equal(2, bucket.TurnoverSample!.PopulationCount);
+        Assert.Equal(1, bucket.TurnoverSample.ContributingCount);
+    }
+
+    [Fact]
     public void Completed_cycle_count_per_bucket_is_the_eligible_cycle_count()
     {
         var snapshot = ReportTrendSnapshotBuilder.BuildWeekly(
@@ -222,11 +322,14 @@ public sealed class ReportTrendSnapshotTests
     private static CompletedRoomCycle Cycle(
         DateTimeOffset completeAt,
         int seatedToDoctorSeconds,
-        int? turnoverSeconds = null) =>
+        int? turnoverSeconds = null,
+        int? readyToDoctorSeconds = 180) =>
         new()
         {
             DoctorCompleteAt = completeAt,
+            DoctorArrivedAt = completeAt.AddMinutes(-10),
             SeatedToDoctorSeconds = seatedToDoctorSeconds,
+            ReadyToDoctorSeconds = readyToDoctorSeconds,
             TurnoverSeconds = turnoverSeconds
         };
 

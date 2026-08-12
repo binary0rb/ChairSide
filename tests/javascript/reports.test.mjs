@@ -385,9 +385,26 @@ function reportPayload({
   pledgerCases = 2,
   marker = "initial"
 } = {}) {
+  const completedCount = otteCases + pledgerCases;
   return {
     marker,
-    completedRoomCyclesCount: otteCases + pledgerCases,
+    completedRoomCyclesCount: completedCount,
+    includedCompletedCycleCount: completedCount,
+    excludedCompletedCycleCount: 0,
+    medianReadyToDoctorSeconds: 120,
+    medianSeatedToDoctorSeconds: 300,
+    medianTurnoverSeconds: 600,
+    averageDoctorInRoomSeconds: 900,
+    sedationCaseCount: 1,
+    nonSedationCaseCount: Math.max(0, completedCount - 1),
+    samples: {
+      completedCases: sample(completedCount),
+      includedCompletedCases: sample(completedCount),
+      readyWait: sample(completedCount),
+      seatedToDoctor: sample(completedCount),
+      turnover: sample(completedCount),
+      doctorTime: sample(completedCount)
+    },
     doctorSummaries: [
       {
         assignedDoctor: "otte",
@@ -444,6 +461,11 @@ function createHarness({
         "reportScopeDoctorField",
         "reportScopeDoctor",
         "reportHeadline",
+        "reportSummary",
+        "reportDetail",
+        "reportInsights",
+        "reportInsightsGrid",
+        "reportInsightsHeading",
         "reportsMain",
         "reportDateRange",
         "reportActionFeedback",
@@ -836,6 +858,8 @@ test("filter, doctor, and tab state survive ordinary rerenders and refreshed pay
       [".report-filter-chip", harness.filterChips[4]]
     ]))
   });
+  assert.equal(harness.reloadQueries[0].sedation, "Sedation");
+  assert.equal(harness.reloadQueries[1].procedureGrouping, "DetailedVariant");
 
   const otteCard = new FakeElement();
   otteCard.dataset.reportDoctorId = "otte";
@@ -992,29 +1016,21 @@ test("Doctor scope exposes only its requested doctor until the scope control rel
   assert.doesNotMatch(grid.innerHTML, /data-report-doctor-id="otte"/);
 });
 
-test("headline metrics distinguish Limited and Unavailable samples from measured zero", () => {
-  const limited = {
-    populationCount: 3,
-    contributingCount: 3,
-    state: "Limited",
-    limitedSampleThreshold: 5,
-    supportsComparison: false
-  };
-  const unavailable = {
-    populationCount: 3,
-    contributingCount: 0,
-    state: "Unavailable",
-    limitedSampleThreshold: 5,
-    supportsComparison: false
-  };
+test("Practice Overview renders exactly four median-first headline cards from authoritative populations", () => {
   const payload = {
     ...reportPayload({ otteCases: 1, pledgerCases: 2 }),
-    averageSeatedToDoctorSeconds: 0,
+    completedRoomCyclesCount: 7,
+    includedCompletedCycleCount: 3,
+    medianReadyToDoctorSeconds: 0,
+    medianSeatedToDoctorSeconds: 300,
+    medianTurnoverSeconds: 600,
     averageDoctorInRoomSeconds: 900,
     samples: {
-      completedCases: limited,
-      seatedToDoctor: unavailable,
-      doctorTime: limited
+      completedCases: sample(7),
+      readyWait: sample(3, 1),
+      seatedToDoctor: sample(3, 0),
+      turnover: sample(3, 3),
+      doctorTime: sample(3)
     }
   };
   const harness = createHarness({ payload });
@@ -1022,36 +1038,43 @@ test("headline metrics distinguish Limited and Unavailable samples from measured
   harness.reports.render();
 
   const headline = harness.elements.get("reportHeadline").innerHTML;
-  assert.match(headline, /Limited - N=3/);
+  assert.equal((headline.match(/headline-card/g) || []).length, 4);
+  assert.match(headline, /Completed Cases[\s\S]*<strong>7<\/strong>/);
+  assert.match(headline, /Median Ready Wait[\s\S]*<strong>00:00<\/strong>/);
+  assert.match(headline, /Median Seated -&gt; Doctor/);
+  assert.match(headline, /Median Turnover/);
+  assert.match(headline, /Limited - N=1/);
   assert.match(headline, /Unavailable/);
-  assert.doesNotMatch(headline, />00:00</);
+  assert.doesNotMatch(headline, /Avg Total|Avg Doctor|Sedation Cases|Exceptions to Review/);
 });
 
-test("trend comparison requires every compared population to be Sufficient", () => {
-  const sample = (count, state) => ({
-    populationCount: count,
-    contributingCount: count,
-    state,
-    limitedSampleThreshold: 5,
-    supportsComparison: state === "Sufficient"
-  });
-  const bucket = (startDate, count, state, median) => ({
+function trendBucket(startDate, populationCount, contributingCount, median) {
+  const metricSample = sample(populationCount, contributingCount);
+  return {
     startDate,
     endDate: startDate === "2026-07-06" ? "2026-07-13" : "2026-07-20",
-    completedCycleCount: count,
+    completedCycleCount: contributingCount,
     medianSeatedToDoctorSeconds: median,
-    completedSample: sample(count, state),
-    turnoverCycleCount: count,
+    completedSample: metricSample,
+    seatedToDoctorSample: metricSample,
+    readyWaitCycleCount: contributingCount,
+    medianReadyWaitSeconds: contributingCount ? median : null,
+    readyWaitSample: metricSample,
+    turnoverCycleCount: contributingCount,
     medianTurnoverSeconds: median,
-    turnoverSample: sample(count, state)
-  });
+    turnoverSample: metricSample
+  };
+}
+
+test("trend cards preserve priority order and do not skip the latest unavailable population", () => {
+  const latest = trendBucket("2026-07-13", 4, 0, null);
   const harness = createHarness({
     payload: {
       ...reportPayload({ otteCases: 2, pledgerCases: 3 }),
       trends: {
         buckets: [
-          bucket("2026-07-06", 5, "Sufficient", 600),
-          bucket("2026-07-13", 4, "Limited", 300)
+          trendBucket("2026-07-06", 5, 5, 600),
+          latest
         ]
       }
     }
@@ -1060,9 +1083,147 @@ test("trend comparison requires every compared population to be Sufficient", () 
   harness.reports.render();
 
   const panel = harness.elements.get("reportTrendPanel").innerHTML;
-  assert.match(panel, /More cases are needed for a reliable week-to-week comparison/);
+  assert.ok(panel.indexOf("Ready Wait trend") < panel.indexOf("Turnover trend"));
+  assert.ok(panel.indexOf("Turnover trend") < panel.indexOf("Seated -&gt; Doctor trend"));
+  assert.match(panel, /ready-wait-trend-card is-primary/);
+  assert.match(panel, /turnover-trend-card is-primary/);
+  assert.match(panel, /seated-to-doctor-trend-card is-secondary/);
+  assert.match(panel, /Ready Wait trend[\s\S]*Unavailable[\s\S]*Jul 13 - Jul 19/);
+  assert.match(panel, /0 of 4 contributors/);
+  const readyCard = panel.slice(0, panel.indexOf("turnover-trend-card"));
+  assert.doesNotMatch(readyCard, /0 min/);
+});
+
+test("Limited weekly samples retain values and N while suppressing directional language", () => {
+  const harness = createHarness({
+    payload: {
+      ...reportPayload({ otteCases: 2, pledgerCases: 3 }),
+      trends: {
+        buckets: [
+          trendBucket("2026-07-06", 5, 5, 600),
+          trendBucket("2026-07-13", 4, 4, 300)
+        ]
+      }
+    }
+  });
+
+  harness.reports.render();
+
+  const panel = harness.elements.get("reportTrendPanel").innerHTML;
   assert.match(panel, /Limited - N=4/);
-  assert.doesNotMatch(panel, /improved by/);
+  assert.match(panel, /Comparison is not shown unless both weekly Ready Wait samples are Sufficient/);
+  assert.doesNotMatch(panel, /Ready Wait (?:increased|decreased) by/);
+});
+
+test("Sufficient weekly samples show supported direction and apply the exact 60-second threshold", () => {
+  const harness = createHarness({
+    payload: {
+      ...reportPayload({ otteCases: 2, pledgerCases: 3 }),
+      trends: {
+        buckets: [
+          trendBucket("2026-07-06", 5, 5, 300),
+          trendBucket("2026-07-13", 5, 5, 360)
+        ]
+      }
+    }
+  });
+
+  harness.reports.render();
+
+  const panel = harness.elements.get("reportTrendPanel").innerHTML;
+  assert.match(panel, /Sufficient - N=5/);
+  assert.match(panel, /Median Ready Wait increased by 1 min compared with the previous week/);
+});
+
+test("Sufficient weekly movement under 60 seconds remains descriptively about the same", () => {
+  const harness = createHarness({
+    payload: {
+      ...reportPayload({ otteCases: 2, pledgerCases: 3 }),
+      trends: {
+        buckets: [
+          trendBucket("2026-07-06", 5, 5, 300),
+          trendBucket("2026-07-13", 5, 5, 359)
+        ]
+      }
+    }
+  });
+
+  harness.reports.render();
+
+  assert.match(
+    harness.elements.get("reportTrendPanel").innerHTML,
+    /Median Ready Wait was about the same as the previous week/);
+});
+
+test("healthy data quality stays quiet and the All Metrics view omits the duplicate review KPI", () => {
+  const harness = createHarness({
+    payload: {
+      ...reportPayload({ otteCases: 2, pledgerCases: 3 }),
+      baseProcedureSummaries: [{
+        procedureCode: "EXT",
+        procedureLabel: "Extraction",
+        completedCycleCount: 5,
+        averageTotalSeconds: 1200,
+        medianTotalSeconds: 1140,
+        averageDoctorTimeSeconds: 900,
+        averageReadyToDoctorSeconds: 240,
+        samples: {
+          completedCases: sample(5),
+          total: sample(5),
+          doctorTime: sample(5),
+          readyWait: sample(5)
+        }
+      }]
+    }
+  });
+
+  harness.reports.render();
+
+  assert.equal(harness.elements.get("dataQualityCard").hidden, true);
+  assert.equal(harness.elements.get("dataQualityCard").innerHTML, "");
+  const allMetrics = harness.elements.get("reportSummary").innerHTML;
+  assert.doesNotMatch(allMetrics, /Exceptions Requiring Review/);
+  assert.match(allMetrics, /Sedation Cases/);
+  assert.match(allMetrics, /Avg In Room/);
+  assert.match(harness.elements.get("reportInsightsGrid").innerHTML, /Avg Doctor Time/);
+});
+
+test("actionable data quality summarizes the unified queue and opens the existing review detail", async () => {
+  const payload = {
+    ...reportPayload({ otteCases: 2, pledgerCases: 3 }),
+    excludedCompletedCycleCount: 1,
+    exceptionReviewRecords: [
+      {
+        sourceType: "CompletedCycle",
+        reviewRecordId: 42,
+        completedCycleId: 42,
+        roomId: 3,
+        seatedAt: "2026-07-29T12:00:00Z"
+      },
+      {
+        sourceType: "AbortedAssignment",
+        reviewRecordId: 84,
+        abortedAssignmentId: 84,
+        roomId: 4,
+        seatedAt: "2026-07-29T13:00:00Z"
+      }
+    ]
+  };
+  const harness = createHarness({ payload });
+  harness.reports.wire();
+  harness.reports.render();
+
+  const card = harness.elements.get("dataQualityCard");
+  assert.equal(card.hidden, false);
+  assert.match(card.innerHTML, /2 items require review in the action queue/);
+  assert.match(card.innerHTML, /data-action="open-review-queue"/);
+  assert.doesNotMatch(card.innerHTML, /All completed records|No reporting exceptions/);
+
+  const button = new FakeElement();
+  button.actionSelector = "[data-action='open-review-queue']";
+  await dispatchAction(harness, button);
+
+  assert.equal(harness.elements.get("reportDetail").open, true);
 });
 
 test("empty analytical population uses the No observation state", () => {
