@@ -5,6 +5,9 @@ import test from "node:test";
 const moduleUrl = new URL(
   "../../src/ChairSide.Board/wwwroot/reports.js",
   import.meta.url);
+const reportsHtmlUrl = new URL(
+  "../../src/ChairSide.Board/wwwroot/reports.html",
+  import.meta.url);
 const boardUrl = new URL(
   "../../src/ChairSide.Board/wwwroot/board.js",
   import.meta.url);
@@ -18,6 +21,7 @@ const formatUtilsUrl = new URL(
   "../../src/ChairSide.Board/wwwroot/format-utils.js",
   import.meta.url);
 const moduleSource = await readFile(moduleUrl, "utf8");
+const reportsHtmlSource = await readFile(reportsHtmlUrl, "utf8");
 const boardSource = await readFile(boardUrl, "utf8");
 const applicationStateSource = await readFile(applicationStateUrl, "utf8");
 const domUtilsSource = await readFile(domUtilsUrl, "utf8");
@@ -423,6 +427,18 @@ function reportPayload({
     exceptionReviewRecords: [],
     procedureSummaries: [],
     baseProcedureSummaries: [],
+    scopedProcedureGroups: completedCount > 0
+      ? [{
+          procedureCode: "EXT",
+          procedureLabel: "Extraction",
+          baseProcedureCode: "EXT",
+          isSedationCase: null,
+          caseCount: completedCount,
+          scopedPopulationCount: completedCount,
+          shareOfScopedCases: 1,
+          sample: sample(completedCount)
+        }]
+      : [],
     rangeLabel: "Jul 1 - Jul 29",
     query: {
       scope: "Practice",
@@ -450,6 +466,7 @@ function createHarness({
   const ids = context.isReports
     ? [
         "reportFilterBar",
+        "reportProcedureMix",
         "reportTrendPanel",
         "doctorReportDashboard",
         "doctorReportCards",
@@ -780,6 +797,16 @@ function selectedCard(html, doctorId) {
   return pattern.test(html);
 }
 
+async function openDoctorProceduresTab(harness) {
+  const proceduresTab = new FakeElement();
+  proceduresTab.dataset.reportDoctorTab = "procedures";
+  await harness.document.dispatch("click", {
+    target: targetFor(new Map([
+      ["[data-report-doctor-tab]", proceduresTab]
+    ]))
+  });
+}
+
 function allocationPayload(populationCount, contributingCount) {
   const net = contributingCount >= 5 ? 10 : contributingCount > 0 ? 4 : 0;
   const context = sample(populationCount, contributingCount);
@@ -914,6 +941,144 @@ test("default doctor selection uses first doctor with cases then first roster do
   assert.equal(
     selectedCard(withoutCases.elements.get("doctorReportCards").innerHTML, "otte"),
     true);
+});
+
+test("first-class Procedure Mix renders the server total, shares, labels, and row order", () => {
+  const payload = {
+    ...reportPayload({ otteCases: 1, pledgerCases: 3 }),
+    scopedProcedureGroups: [
+      {
+        procedureCode: "EXT",
+        procedureLabel: "Extraction",
+        baseProcedureCode: "EXT",
+        isSedationCase: null,
+        caseCount: 1,
+        scopedPopulationCount: 4,
+        shareOfScopedCases: 0.37,
+        sample: sample(1)
+      },
+      {
+        procedureCode: "CON",
+        procedureLabel: "Consult",
+        baseProcedureCode: "CON",
+        isSedationCase: null,
+        caseCount: 3,
+        scopedPopulationCount: 4,
+        shareOfScopedCases: 0.63,
+        sample: sample(3)
+      }
+    ]
+  };
+  const harness = createHarness({ payload });
+
+  harness.reports.render();
+
+  const html = harness.elements.get("reportProcedureMix").innerHTML;
+  assert.match(html, /4<\/strong><span>completed cases in scope/);
+  assert.match(html, /Extraction/);
+  assert.match(html, /Consult/);
+  assert.match(html, /37%/);
+  assert.match(html, /63%/);
+  assert.ok(html.indexOf("Extraction") < html.indexOf("Consult"));
+  assert.doesNotMatch(html, /25%/);
+  assert.doesNotMatch(html, /ranking|performance|score/i);
+});
+
+test("Procedure Mix keeps Limited composition descriptive and empty scope truthful", () => {
+  const limitedHarness = createHarness({
+    payload: {
+      ...reportPayload({ otteCases: 1, pledgerCases: 2 }),
+      scopedProcedureGroups: [{
+        procedureCode: "EXT+SED",
+        procedureLabel: "Extraction + Sedation",
+        baseProcedureCode: "EXT",
+        isSedationCase: true,
+        caseCount: 3,
+        scopedPopulationCount: 3,
+        shareOfScopedCases: 1,
+        sample: sample(3)
+      }]
+    }
+  });
+  limitedHarness.reports.render();
+  const limitedHtml = limitedHarness.elements.get("reportProcedureMix").innerHTML;
+  assert.match(limitedHtml, /Limited - N=3/);
+  assert.match(limitedHtml, /Extraction \+ Sedation/);
+  assert.match(limitedHtml, /100%/);
+  assert.doesNotMatch(limitedHtml, /warning|alarm/i);
+
+  const emptyHarness = createHarness({
+    payload: reportPayload({ otteCases: 0, pledgerCases: 0 })
+  });
+  emptyHarness.reports.render();
+  const emptyHtml = emptyHarness.elements.get("reportProcedureMix").innerHTML;
+  assert.match(emptyHtml, /No observation/);
+  assert.doesNotMatch(emptyHtml, /<table/);
+  assert.doesNotMatch(emptyHtml, /0%/);
+});
+
+test("Procedure Mix static section follows filters and precedes allocation and insights", () => {
+  const filterIndex = reportsHtmlSource.indexOf('id="reportFilterBar"');
+  const mixIndex = reportsHtmlSource.indexOf('id="reportProcedureMix"');
+  const allocationIndex = reportsHtmlSource.indexOf('id="reportAllocation"');
+  const insightsIndex = reportsHtmlSource.indexOf('id="reportInsights"');
+
+  assert.ok(filterIndex >= 0);
+  assert.ok(filterIndex < mixIndex);
+  assert.ok(mixIndex < allocationIndex);
+  assert.ok(allocationIndex < insightsIndex);
+});
+
+test("matching Doctor scope reuses canonical Procedure Mix markup in the Doctor Procedures tab", async () => {
+  const payload = {
+    ...reportPayload({ otteCases: 3, pledgerCases: 0 }),
+    query: {
+      scope: "Doctor",
+      doctorId: "otte",
+      sedation: "Sedation",
+      procedureGrouping: "DetailedVariant"
+    },
+    scopedProcedureGroups: [{
+      procedureCode: "EXT+SED",
+      procedureLabel: "Extraction + Sedation",
+      baseProcedureCode: "EXT",
+      isSedationCase: true,
+      caseCount: 3,
+      scopedPopulationCount: 3,
+      shareOfScopedCases: 1,
+      sample: sample(3)
+    }]
+  };
+  const harness = createHarness({ payload });
+  harness.reports.wire();
+  harness.reports.render();
+
+  await openDoctorProceduresTab(harness);
+
+  const mainTable = harness.elements.get("reportProcedureMix").innerHTML.match(/<table class="procedure-mix-table">[\s\S]*?<\/table>/)?.[0];
+  const doctorTable = harness.elements.get("selectedDoctorPanel").innerHTML.match(/<table class="procedure-mix-table">[\s\S]*?<\/table>/)?.[0];
+  assert.ok(mainTable);
+  assert.equal(doctorTable, mainTable);
+  assert.match(harness.elements.get("selectedDoctorPanel").innerHTML, /Limited - N=3/);
+  assert.match(moduleSource, /return renderProcedureMixMarkup\(r, \{ headingTag: "h3", compact: true \}\);/);
+  assert.doesNotMatch(
+    moduleSource.slice(
+      moduleSource.indexOf("function renderSelectedDoctorProcedures"),
+      moduleSource.indexOf("function formatProcedureShare")),
+    /doctorProcedureMix|\.sort\(|\.reduce\(/);
+});
+
+test("Practice scope Doctor Procedures guidance does not mutate scope or reuse Practice mix", async () => {
+  const harness = createHarness({ payload: reportPayload({ otteCases: 0, pledgerCases: 2 }) });
+  harness.reports.wire();
+  harness.reports.render();
+
+  await openDoctorProceduresTab(harness);
+
+  const panel = harness.elements.get("selectedDoctorPanel").innerHTML;
+  assert.match(panel, /Select Doctor scope to view this doctor&#39;s Procedure Mix with the current filters/);
+  assert.doesNotMatch(panel, /Extraction/);
+  assert.equal(harness.reloadCount, 0);
 });
 
 test("nonempty allocation populations with zero contributors render Unavailable, not Empty", () => {

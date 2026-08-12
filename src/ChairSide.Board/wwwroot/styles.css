@@ -1929,6 +1929,140 @@ body[data-view="reports"] .report-range-window {
   font-weight: 700;
 }
 
+body[data-view="reports"] .report-procedure-mix {
+  min-width: 0;
+}
+
+.procedure-mix-card {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel);
+  box-shadow: var(--shadow-soft);
+}
+
+.procedure-mix-card.is-compact {
+  box-shadow: none;
+}
+
+.procedure-mix-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.procedure-mix-head h2,
+.procedure-mix-head h3 {
+  margin: 6px 0 4px;
+  letter-spacing: 0;
+}
+
+.procedure-mix-head h2 {
+  font-size: 22px;
+}
+
+.procedure-mix-head h3 {
+  font-size: 18px;
+}
+
+.procedure-mix-head p,
+.procedure-mix-note,
+.procedure-mix-empty {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.procedure-mix-total {
+  flex: 0 0 auto;
+  min-width: 170px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--bg);
+}
+
+.procedure-mix-total strong,
+.procedure-mix-total span {
+  display: block;
+}
+
+.procedure-mix-total strong {
+  color: var(--ink);
+  font-size: 20px;
+  font-variant-numeric: tabular-nums;
+}
+
+.procedure-mix-total span {
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.procedure-mix-card .metric-sample--limited {
+  color: var(--muted);
+}
+
+.procedure-mix-table-wrap {
+  overflow-x: auto;
+  max-width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+
+.procedure-mix-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.procedure-mix-table th,
+.procedure-mix-table td {
+  padding: 11px 12px;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+}
+
+.procedure-mix-table th {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.procedure-mix-table td {
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 750;
+}
+
+.procedure-mix-table th:nth-child(n + 2),
+.procedure-mix-table td:nth-child(n + 2) {
+  width: 92px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.procedure-mix-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+@media (max-width: 640px) {
+  .procedure-mix-head {
+    flex-direction: column;
+  }
+
+  .procedure-mix-total {
+    width: 100%;
+  }
+}
+
 body[data-view="reports"] .report-insights {
   display: grid;
   gap: 12px;

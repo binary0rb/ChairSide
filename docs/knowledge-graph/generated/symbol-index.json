@@ -2341,7 +2341,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/ReportsSnapshotBuilder.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  50100,
+                      "sizeBytes":  50095,
                       "typeSymbols":  [
                                           "ReportsSnapshotBuilder"
                                       ],
@@ -2437,7 +2437,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/ReportTrendSnapshot.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  5278,
+                      "sizeBytes":  5337,
                       "typeSymbols":  [
                                           "ReportTrendSnapshot",
                                           "ReportTrendBucket",
@@ -3256,7 +3256,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/reports.html",
                       "kind":  "Html",
-                      "sizeBytes":  11447,
+                      "sizeBytes":  11573,
                       "typeSymbols":  [
 
                                       ],
@@ -3282,7 +3282,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/reports.js",
                       "kind":  "JavaScript",
-                      "sizeBytes":  117009,
+                      "sizeBytes":  118562,
                       "typeSymbols":  [
 
                                       ],
@@ -3344,6 +3344,8 @@
                                               "renderSelectedDoctorFlow",
                                               "formatObservedDayDate",
                                               "describePeakActiveLoad",
+                                              "renderProcedureMix",
+                                              "renderProcedureMixMarkup",
                                               "renderSelectedDoctorProcedures",
                                               "formatProcedureShare",
                                               "renderSelectedDoctorAudit",
@@ -3376,9 +3378,7 @@
                                               "formatDurationMinutes",
                                               "formatApproxDurationMinutes",
                                               "formatAllocationVariance",
-                                              "revealReportDisclosures",
-                                              "noMatchMessage",
-                                              "renderProcedureSummaries"
+                                              "revealReportDisclosures"
                                           ],
                       "headings":  [
 
@@ -3605,7 +3605,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/styles.css",
                       "kind":  "Css",
-                      "sizeBytes":  97844,
+                      "sizeBytes":  100096,
                       "typeSymbols":  [
 
                                       ],
@@ -4233,7 +4233,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/BoardStoreReportingTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  40615,
+                      "sizeBytes":  41193,
                       "typeSymbols":  [
                                           "BoardStoreTests"
                                       ],
@@ -5176,7 +5176,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/ReportsSnapshotBuilderTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  33316,
+                      "sizeBytes":  42639,
                       "typeSymbols":  [
                                           "ReportsSnapshotBuilderTests"
                                       ],
@@ -5186,11 +5186,19 @@
                                             "Build_applies_completion_window_before_every_population_and_keeps_all_time_total",
                                             "Reports_snapshot_web_json_property_contract_appends_doctor_allocation_samples",
                                             "Build_applies_historical_doctor_and_sedation_scope_without_treating_grouping_as_a_filter",
+                                            "Build_scoped_procedure_groups_reconcile_family_and_detailed_variant_populations",
+                                            "Build_scoped_procedure_groups_recompute_sedation_populations_and_shares",
+                                            "Build_excludes_blank_unmapped_and_manual_review_cycles_from_procedure_mix_but_keeps_audit_history",
+                                            "Build_procedure_mix_samples_keep_empty_and_limited_populations_truthful",
+                                            "Scoped_procedure_group_web_json_contract_uses_existing_camel_case_fields",
                                             "Build_keeps_broader_completed_count_while_timing_uses_truthful_ready_contributors",
                                             "Build_marks_weekly_ready_wait_unavailable_when_completed_population_has_no_ready_observation",
                                             "Build_preserves_unavailable_doctor_allocation_when_population_has_no_contributors",
                                             "Build_keeps_review_queue_global_to_analytical_scope_but_bounded_by_window",
                                             "CreateBuilder",
+                                            "BuildScoped",
+                                            "AssertProcedureGroup",
+                                            "CompletedCycle",
                                             "Cycle",
                                             "SecondsBetween",
                                             "Utc"
@@ -5214,7 +5222,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/ReportTrendSnapshotTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  12523,
+                      "sizeBytes":  12642,
                       "typeSymbols":  [
                                           "ReportTrendSnapshotTests"
                                       ],
@@ -5888,7 +5896,7 @@
                   {
                       "path":  "tests/javascript/reports.test.mjs",
                       "kind":  "JavaScript",
-                      "sizeBytes":  84019,
+                      "sizeBytes":  90218,
                       "typeSymbols":  [
 
                                       ],
@@ -5924,6 +5932,7 @@
                                               "completedCycle",
                                               "deferred",
                                               "selectedCard",
+                                              "openDoctorProceduresTab",
                                               "allocationPayload",
                                               "allocationSurfaceHtml",
                                               "trendBucket"

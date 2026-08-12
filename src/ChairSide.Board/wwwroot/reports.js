@@ -216,6 +216,7 @@ export function createReports({
   renderDoctorReportDashboard(r, hasData);
   syncReportFilterButtons();
   renderReportFilterBar();
+  renderProcedureMix(r);
   renderAllocationReports(r);
   renderGroupedInsights(r, hasData);
   renderFullMetrics(r, hasData);
@@ -1173,50 +1174,87 @@ export function createReports({
   return "3+ rooms active";
 }
 
-// Selected-doctor Procedure Mix: the doctor's completed-case procedure breakdown for the range,
-// filtered from the additive doctorProcedureMix payload. Rows are variant-level (sedation shown as
-// a modifier chip, not a separate procedure); Share is each procedure's portion of this doctor's
-// completed cases. Light by design - a summary line plus a compact table, no charts.
+  function renderProcedureMix(r) {
+  const container = document.getElementById("reportProcedureMix");
+  if (!container) {
+    return;
+  }
+
+  container.hidden = false;
+  container.innerHTML = renderProcedureMixMarkup(r, {
+    headingTag: "h2",
+    headingId: "reportProcedureMixHeading"
+  });
+}
+
+// Shared Procedure Mix presentation. The report response already owns scope, grouping, filtering,
+// denominator, shares, and row order; this renderer deliberately performs no analytical work.
+  function renderProcedureMixMarkup(r, { headingTag = "h2", headingId = null, compact = false } = {}) {
+  const rows = Array.isArray(r?.scopedProcedureGroups) ? r.scopedProcedureGroups : [];
+  const totalCases = Number.isFinite(r?.includedCompletedCycleCount)
+    ? r.includedCompletedCycleCount
+    : 0;
+  const overallSample = r?.samples?.includedCompletedCases;
+  const sampleContext = overallSample
+    ? renderSampleContext(sampledPresentation(overallSample, String(totalCases)))
+    : "";
+  const scopeLabel = r?.query?.scope === "Doctor" ? "Doctor" : "Practice";
+  const safeHeadingTag = headingTag === "h3" ? "h3" : "h2";
+  const headingAttribute = headingId ? ` id="${escapeAttribute(headingId)}"` : "";
+  const totalMarkup = totalCases === 0
+    ? `<strong>No observation</strong><span>No completed cases in scope</span>${sampleContext}`
+    : `<strong>${escapeHtml(String(totalCases))}</strong><span>completed case${totalCases === 1 ? "" : "s"} in scope</span>${sampleContext}`;
+  const bodyMarkup = totalCases === 0
+    ? `<p class="procedure-mix-empty">No observation. No standard included completed cases match the current filters.</p>`
+    : rows.length === 0
+      ? `<p class="procedure-mix-empty">No procedure details were returned for the current completed population.</p>`
+      : `
+        <div class="procedure-mix-table-wrap">
+          <table class="procedure-mix-table">
+            <thead>
+              <tr>
+                <th>Procedure</th>
+                <th>Cases</th>
+                <th>Share</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rows.map(row => `
+                <tr>
+                  <td>${escapeHtml(row.procedureLabel || "Procedure")}</td>
+                  <td>${escapeHtml(Number.isFinite(row.caseCount) ? String(row.caseCount) : "--")}</td>
+                  <td>${escapeHtml(formatProcedureShare(row.shareOfScopedCases))}</td>
+                </tr>
+              `).join("")}
+            </tbody>
+          </table>
+        </div>`;
+
+  return `
+    <article class="procedure-mix-card${compact ? " is-compact" : ""}">
+      <div class="procedure-mix-head">
+        <div>
+          <span class="layer-pill layer-pill--population">Scoped composition</span>
+          <${safeHeadingTag}${headingAttribute}>Procedure Mix</${safeHeadingTag}>
+          <p>Completed work in the current ${escapeHtml(scopeLabel)} scope and selected filters.</p>
+        </div>
+        <div class="procedure-mix-total">${totalMarkup}</div>
+      </div>
+      ${bodyMarkup}
+      <p class="procedure-mix-note">Sedation is a modifier of the primary procedure, not a separate case.</p>
+    </article>`;
+}
+
   function renderSelectedDoctorProcedures(r, agg) {
-  const rows = (r.doctorProcedureMix || []).filter(row => row.doctorId === agg.doctorId);
-  if (!rows.length) {
+  if (r?.query?.scope !== "Doctor" || r.query.doctorId !== agg.doctorId) {
     return renderSelectedDoctorEmptyState(
       "Procedure Mix",
-      "No procedure mix is available for this doctor in the current report range. This usually means there are no completed cases for this doctor/date selection yet.",
-      "Share is each procedure's portion of this doctor's completed cases in the selected range."
+      "Select Doctor scope to view this doctor's Procedure Mix with the current filters.",
+      "Doctor Procedure Mix uses the server-owned Doctor scope and never reconstructs a doctor denominator from Practice results."
     );
   }
 
-  const totalCases = rows[0].doctorCompletedCaseCount || rows.reduce((sum, row) => sum + (row.caseCount || 0), 0);
-  const distinct = rows.length;
-
-  return `
-    <section class="selected-doctor-overview">
-      <div class="selected-doctor-summary">
-        <h3>Procedure Mix${renderHelpIcon("Share is each procedure's portion of this doctor's completed cases in the selected range. Sedation is shown as a modifier of the base procedure, not a separate procedure.")}</h3>
-        <p>${escapeHtml(String(totalCases))} completed case${totalCases === 1 ? "" : "s"} across ${escapeHtml(String(distinct))} procedure type${distinct === 1 ? "" : "s"} for this doctor in the selected range.</p>
-      </div>
-    </section>
-    <div class="selected-doctor-audit">
-      <table class="report-table">
-        <thead>
-          <tr>
-            <th>Procedure</th>
-            <th>Cases</th>
-            <th>Share</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${rows.map(row => `
-            <tr>
-              <td>${escapeHtml(row.procedureLabel || row.procedureCode || "Unknown")}${row.isSedationCase ? ` <span class="sedation-chip">Sedation</span>` : ""}</td>
-              <td>${escapeHtml(String(row.caseCount ?? 0))}</td>
-              <td>${escapeHtml(formatProcedureShare(row.shareOfDoctorCases))}</td>
-            </tr>
-          `).join("")}
-        </tbody>
-      </table>
-    </div>`;
+  return renderProcedureMixMarkup(r, { headingTag: "h3", compact: true });
 }
 
   function formatProcedureShare(share) {
@@ -2855,7 +2893,7 @@ export function createReports({
     focusDestination: document.getElementById("reportAccessToken")
       || document.getElementById("reportAccessHeading")
   });
-  ["reportTrendPanel", "reportFilterBar", "reportInsights", "reportMetrics", "reportDetail"].forEach(id => {
+  ["reportTrendPanel", "reportFilterBar", "reportProcedureMix", "reportInsights", "reportMetrics", "reportDetail"].forEach(id => {
     const element = document.getElementById(id);
     if (element) {
       element.hidden = true;

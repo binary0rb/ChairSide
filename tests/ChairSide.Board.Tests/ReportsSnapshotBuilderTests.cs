@@ -518,7 +518,10 @@ public sealed class ReportsSnapshotBuilderTests
         var group = Assert.Single(snapshot.ScopedProcedureGroups!);
         Assert.Equal("EXT+SED", group.ProcedureCode);
         Assert.True(group.IsSedationCase);
+        Assert.Equal(1, group.CaseCount);
+        Assert.Equal(snapshot.IncludedCompletedCycleCount, group.ScopedPopulationCount);
         Assert.Equal(1d, group.ShareOfScopedCases);
+        Assert.Equal(ReportSampleStates.Limited, snapshot.Samples!.IncludedCompletedCases.State);
         var doctorSample = Assert.Single(snapshot.DoctorAllocationSamples!);
         Assert.Equal("former-doctor", doctorSample.DoctorId);
         Assert.Equal(ReportSampleStates.Limited, doctorSample.Sample.State);
@@ -526,6 +529,166 @@ public sealed class ReportsSnapshotBuilderTests
         Assert.Equal(1, trend.ReadyWaitSample!.PopulationCount);
         Assert.Equal(1, trend.ReadyWaitSample.ContributingCount);
         Assert.Equal(ReportSampleStates.Limited, trend.ReadyWaitSample.State);
+    }
+
+    [Fact]
+    public void Build_scoped_procedure_groups_reconcile_family_and_detailed_variant_populations()
+    {
+        CompletedRoomCycle[] cycles =
+        [
+            CompletedCycle(1, "EXT"),
+            CompletedCycle(2, "EXT"),
+            CompletedCycle(3, "EXT+SED"),
+            CompletedCycle(4, "CON"),
+            CompletedCycle(5, "BX")
+        ];
+
+        var family = CreateBuilder().Build(
+            cycles,
+            [],
+            ReportQuery.FromStrings(null, null, null, null, null, ReportProcedureGroupings.Family));
+        var detailed = CreateBuilder().Build(
+            cycles,
+            [],
+            ReportQuery.FromStrings(null, null, null, null, null, ReportProcedureGroupings.DetailedVariant));
+
+        Assert.Equal(5, family.IncludedCompletedCycleCount);
+        Assert.Equal(ReportSampleStates.Sufficient, family.Samples!.IncludedCompletedCases.State);
+        Assert.Collection(
+            family.ScopedProcedureGroups!,
+            row => AssertProcedureGroup(row, "EXT", "Extraction", 3, 5, 0.6d, null),
+            row => AssertProcedureGroup(row, "BX", "Biopsy", 1, 5, 0.2d, null),
+            row => AssertProcedureGroup(row, "CON", "Consult", 1, 5, 0.2d, null));
+        Assert.Equal(
+            family.IncludedCompletedCycleCount,
+            family.ScopedProcedureGroups!.Sum(row => row.CaseCount));
+        Assert.Equal(1d, family.ScopedProcedureGroups!.Sum(row => row.ShareOfScopedCases), precision: 10);
+
+        Assert.Equal(family.IncludedCompletedCycleCount, detailed.IncludedCompletedCycleCount);
+        Assert.Collection(
+            detailed.ScopedProcedureGroups!,
+            row => AssertProcedureGroup(row, "EXT", "Extraction", 2, 5, 0.4d, false),
+            row => AssertProcedureGroup(row, "BX", "Biopsy", 1, 5, 0.2d, false),
+            row => AssertProcedureGroup(row, "CON", "Consult", 1, 5, 0.2d, false),
+            row => AssertProcedureGroup(row, "EXT+SED", "Extraction + Sedation", 1, 5, 0.2d, true));
+        Assert.Equal(
+            detailed.IncludedCompletedCycleCount,
+            detailed.ScopedProcedureGroups!.Sum(row => row.CaseCount));
+        Assert.Equal(1d, detailed.ScopedProcedureGroups!.Sum(row => row.ShareOfScopedCases), precision: 10);
+    }
+
+    [Fact]
+    public void Build_scoped_procedure_groups_recompute_sedation_populations_and_shares()
+    {
+        CompletedRoomCycle[] cycles =
+        [
+            CompletedCycle(1, "EXT"),
+            CompletedCycle(2, "EXT+SED"),
+            CompletedCycle(3, "CON")
+        ];
+
+        var all = BuildScoped(cycles, ReportSedationSegments.All);
+        var sedation = BuildScoped(cycles, ReportSedationSegments.Sedation);
+        var nonSedation = BuildScoped(cycles, ReportSedationSegments.NonSedation);
+
+        Assert.Equal(3, all.IncludedCompletedCycleCount);
+        Assert.Equal(3, all.ScopedProcedureGroups!.Sum(row => row.CaseCount));
+        Assert.Equal(1d, all.ScopedProcedureGroups!.Sum(row => row.ShareOfScopedCases), precision: 10);
+
+        var sedationRow = Assert.Single(sedation.ScopedProcedureGroups!);
+        Assert.Equal(1, sedation.IncludedCompletedCycleCount);
+        AssertProcedureGroup(sedationRow, "EXT+SED", "Extraction + Sedation", 1, 1, 1d, true);
+
+        Assert.Equal(2, nonSedation.IncludedCompletedCycleCount);
+        Assert.Collection(
+            nonSedation.ScopedProcedureGroups!,
+            row => AssertProcedureGroup(row, "CON", "Consult", 1, 2, 0.5d, false),
+            row => AssertProcedureGroup(row, "EXT", "Extraction", 1, 2, 0.5d, false));
+    }
+
+    [Fact]
+    public void Build_excludes_blank_unmapped_and_manual_review_cycles_from_procedure_mix_but_keeps_audit_history()
+    {
+        var included = CompletedCycle(1, "EXT");
+        var blank = CompletedCycle(2, "   ");
+        var unmapped = CompletedCycle(3, "MYSTERY");
+        var manualReview = CompletedCycle(4, "CON");
+        manualReview.IsException = true;
+        manualReview.RequiresReview = true;
+        manualReview.ExceptionReason = ExceptionReasons.ManualReview;
+
+        var snapshot = CreateBuilder().Build(
+            [included, blank, unmapped, manualReview],
+            [],
+            ReportQuery.Default);
+
+        Assert.Equal(3, snapshot.CompletedRoomCyclesCount);
+        Assert.Equal(1, snapshot.IncludedCompletedCycleCount);
+        Assert.Equal(2, snapshot.ExcludedCompletedCycleCount);
+        var group = Assert.Single(snapshot.ScopedProcedureGroups!);
+        Assert.Equal("EXT", group.ProcedureCode);
+        Assert.Equal(1, group.CaseCount);
+
+        var blankAudit = Assert.Single(snapshot.RecentCompletedCycles, cycle => cycle.CompletedCycleId == blank.CompletedCycleId);
+        Assert.True(blankAudit.IsUnmappedProcedure);
+        Assert.True(blankAudit.IsExcludedFromStandardMetrics);
+        Assert.Contains(ReportingExceptionReasons.UnmappedProcedure, blankAudit.ReportingExceptionReasons);
+        Assert.Equal("Unknown (Unmapped)", blankAudit.DisplayProcedureLabel);
+
+        var unmappedAudit = Assert.Single(snapshot.RecentCompletedCycles, cycle => cycle.CompletedCycleId == unmapped.CompletedCycleId);
+        Assert.True(unmappedAudit.IsUnmappedProcedure);
+        Assert.DoesNotContain(snapshot.ScopedProcedureGroups!, row => row.ProcedureLabel == "Unknown");
+        Assert.Single(snapshot.ExceptionCycles);
+    }
+
+    [Fact]
+    public void Build_procedure_mix_samples_keep_empty_and_limited_populations_truthful()
+    {
+        var empty = CreateBuilder().Build([], [], ReportQuery.Default);
+        var limited = CreateBuilder().Build([CompletedCycle(1, "EXT")], [], ReportQuery.Default);
+
+        Assert.Equal(0, empty.IncludedCompletedCycleCount);
+        Assert.Equal(ReportSampleStates.Empty, empty.Samples!.IncludedCompletedCases.State);
+        Assert.Empty(empty.ScopedProcedureGroups!);
+
+        Assert.Equal(1, limited.IncludedCompletedCycleCount);
+        Assert.Equal(ReportSampleStates.Limited, limited.Samples!.IncludedCompletedCases.State);
+        var row = Assert.Single(limited.ScopedProcedureGroups!);
+        Assert.Equal(1, row.CaseCount);
+        Assert.Equal(ReportSampleStates.Limited, row.Sample.State);
+        Assert.Equal(1d, row.ShareOfScopedCases);
+    }
+
+    [Fact]
+    public void Scoped_procedure_group_web_json_contract_uses_existing_camel_case_fields()
+    {
+        var snapshot = CreateBuilder().Build([CompletedCycle(1, "EXT+SED")], [], ReportQuery.Default);
+        var json = JsonSerializer.SerializeToElement(
+            snapshot,
+            new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        var group = json.GetProperty("scopedProcedureGroups")[0];
+
+        Assert.Equal(
+            [
+                "procedureCode",
+                "procedureLabel",
+                "baseProcedureCode",
+                "isSedationCase",
+                "caseCount",
+                "scopedPopulationCount",
+                "shareOfScopedCases",
+                "sample"
+            ],
+            group.EnumerateObject().Select(property => property.Name).ToArray());
+        Assert.Equal(
+            [
+                "populationCount",
+                "contributingCount",
+                "state",
+                "limitedSampleThreshold",
+                "supportsComparison"
+            ],
+            group.GetProperty("sample").EnumerateObject().Select(property => property.Name).ToArray());
     }
 
     [Fact]
@@ -657,10 +820,60 @@ public sealed class ReportsSnapshotBuilderTests
         [
             new("extraction", "EXT", "Extraction", "forceps", SedationEligible: true),
             new("consult", "CON", "Consult", "message-circle"),
-            new("sedation", "SED", "Sedation", "moon", SedationEligible: true)
+            new("sedation", "SED", "Sedation", "moon", SedationEligible: true),
+            new("biopsy", "BX", "Biopsy", "vial")
         ];
-        ProcedureCategory[] activeProcedures = [procedures[0], procedures[1]];
+        ProcedureCategory[] activeProcedures = [procedures[0], procedures[1], procedures[3]];
         return new ReportsSnapshotBuilder(doctors, procedures, activeProcedures);
+    }
+
+    private static ReportsSnapshot BuildScoped(
+        IReadOnlyList<CompletedRoomCycle> cycles,
+        string sedation) =>
+        CreateBuilder().Build(
+            cycles,
+            [],
+            ReportQuery.FromStrings(
+                null,
+                null,
+                ReportScopeKinds.Practice,
+                null,
+                sedation,
+                ReportProcedureGroupings.DetailedVariant));
+
+    private static void AssertProcedureGroup(
+        ScopedProcedureGroup row,
+        string procedureCode,
+        string procedureLabel,
+        int caseCount,
+        int scopedPopulationCount,
+        double share,
+        bool? isSedationCase)
+    {
+        Assert.Equal(procedureCode, row.ProcedureCode);
+        Assert.Equal(procedureLabel, row.ProcedureLabel);
+        Assert.Equal(caseCount, row.CaseCount);
+        Assert.Equal(scopedPopulationCount, row.ScopedPopulationCount);
+        Assert.Equal(share, row.ShareOfScopedCases, precision: 10);
+        Assert.Equal(isSedationCase, row.IsSedationCase);
+    }
+
+    private static CompletedRoomCycle CompletedCycle(long id, string procedureCode, string doctorId = "otte")
+    {
+        var hour = 8 + (int)(id % 8);
+        var seatedAt = Utc(2026, 8, 10, hour, 0);
+        var cycle = Cycle(
+            id,
+            (int)((id - 1) % 12) + 1,
+            procedureCode,
+            seatedAt,
+            seatedAt.AddMinutes(5),
+            seatedAt.AddMinutes(10),
+            seatedAt.AddMinutes(30),
+            seatedAt.AddMinutes(40),
+            30);
+        cycle.AssignedDoctor = doctorId;
+        return cycle;
     }
 
     private static CompletedRoomCycle Cycle(
