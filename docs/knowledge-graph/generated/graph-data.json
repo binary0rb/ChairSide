@@ -2157,6 +2157,12 @@
                       "path":  "src/ChairSide.Board/Services/ReportsSnapshotComposition.cs"
                   },
                   {
+                      "id":  "symbol:type:ReportDoctorAllocationSampleContext",
+                      "label":  "ReportDoctorAllocationSampleContext",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/ReportQuery.cs"
+                  },
+                  {
                       "id":  "symbol:type:ReportDoctorDetailSection",
                       "label":  "ReportDoctorDetailSection",
                       "type":  "CodeType",
@@ -3464,6 +3470,11 @@
                   {
                       "from":  "file:src/ChairSide.Board/Services/ReadyHandoffPersistenceRecords.cs",
                       "to":  "symbol:type:ReadyHandoffTerminationKinds",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/ReportQuery.cs",
+                      "to":  "symbol:type:ReportDoctorAllocationSampleContext",
                       "label":  "declares"
                   },
                   {

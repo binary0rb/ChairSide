@@ -218,6 +218,7 @@ internal sealed class ReportsSnapshotBuilder
             DoctorDetail = new ReportDoctorDetailSection
             {
                 DoctorSummaries = BuildDoctorSummaries(scopedStandardCycles),
+                DoctorAllocationSamples = BuildDoctorAllocationSamples(scopedStandardCycles, query),
                 ObservedDoctorDays = BuildObservedDoctorDays(standardCompletedCycles),
                 DoctorProcedureMix = BuildDoctorProcedureMix(standardCompletedCycles)
             },
@@ -357,6 +358,34 @@ internal sealed class ReportsSnapshotBuilder
             .OrderByDescending(summary => summary.Month)
             .ThenBy(summary => summary.AssignedDoctor)
             .ToList();
+
+    private IReadOnlyList<ReportDoctorAllocationSampleContext> BuildDoctorAllocationSamples(
+        IReadOnlyList<CompletedRoomCycle> cycles,
+        ReportQuery query)
+    {
+        var representedCycles = cycles
+            .Where(cycle => cycle.DoctorArrivedAt.HasValue && !string.IsNullOrWhiteSpace(cycle.AssignedDoctor))
+            .ToList();
+        var doctorIds = query.Scope == ReportScopeKinds.Doctor
+            ? new[] { query.DoctorId }.Where(id => !string.IsNullOrWhiteSpace(id)).Select(id => id!)
+            : _doctors.Select(doctor => doctor.Id)
+                .Concat(representedCycles.Select(cycle => cycle.AssignedDoctor!));
+
+        return doctorIds
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Select(doctorId =>
+            {
+                var population = representedCycles
+                    .Where(cycle => string.Equals(cycle.AssignedDoctor, doctorId, StringComparison.OrdinalIgnoreCase))
+                    .ToList();
+                return new ReportDoctorAllocationSampleContext(
+                    doctorId,
+                    ReportSampleContext.Create(
+                        population.Count,
+                        population.Count(cycle => cycle.AllocationVarianceMinutes.HasValue)));
+            })
+            .ToList();
+    }
 
     private static IReadOnlyList<DoctorDailyAllocation> BuildDoctorDailyAllocationSeries(
         IReadOnlyList<CompletedRoomCycle> cycles) =>

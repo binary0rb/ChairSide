@@ -3275,7 +3275,10 @@ public sealed record ReportsSnapshot(
     // compatible; consumers use these states to avoid rendering missing observations as zero.
     ReportMetricSampleContext? Samples = null,
     // Procedure rows for the active grouping lens over the scoped included completed population.
-    IReadOnlyList<ScopedProcedureGroup>? ScopedProcedureGroups = null);
+    IReadOnlyList<ScopedProcedureGroup>? ScopedProcedureGroups = null,
+    // Per-doctor allocation sample contexts over each represented doctor's exact population.
+    // Doctor scope returns only the requested doctor, including an explicit Empty context.
+    IReadOnlyList<ReportDoctorAllocationSampleContext>? DoctorAllocationSamples = null);
 
 public sealed record DoctorProcedureMixRow(
     string DoctorId,

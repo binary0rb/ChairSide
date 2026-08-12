@@ -10,7 +10,8 @@ export function createReportData(adapter = {}) {
   let guaranteedReloadBatch = null;
   let reportsVersion = 0;
   let lastSuccessfulLoad = null;
-  let dateRange = { preset: "last7", start: null, end: null };
+  const initialRange = computePresetRange("last7", currentDate());
+  let dateRange = { preset: "last7", start: initialRange.start, end: initialRange.end };
   let analyticalScope = {
     scope: "Practice",
     doctorId: null,
@@ -85,8 +86,7 @@ export function createReportData(adapter = {}) {
     dateRange = { preset, start: resolved.start, end: resolved.end };
   }
 
-  function startLoad() {
-    const requestContext = createReportRequestContext(dateRange, analyticalScope);
+  function startLoad(requestContext = createReportRequestContext(dateRange, analyticalScope)) {
     reportsInFlight = true;
     const operation = (async () => {
       const response = await request(reportsRequestUrl(requestContext), {
@@ -143,12 +143,14 @@ export function createReportData(adapter = {}) {
 
   function reloadAfterCurrent() {
     if (guaranteedReloadBatch && !guaranteedReloadBatch.started) {
+      guaranteedReloadBatch.requestContext = createReportRequestContext(dateRange, analyticalScope);
       return guaranteedReloadBatch.promise;
     }
 
     const predecessor = guaranteedReloadBatch?.promise || Promise.resolve();
     const batch = {
       started: false,
+      requestContext: createReportRequestContext(dateRange, analyticalScope),
       promise: null
     };
 
@@ -168,7 +170,7 @@ export function createReportData(adapter = {}) {
         }
       }
 
-      return startLoad();
+      return startLoad(batch.requestContext);
     })().finally(() => {
       if (guaranteedReloadBatch === batch) {
         guaranteedReloadBatch = null;

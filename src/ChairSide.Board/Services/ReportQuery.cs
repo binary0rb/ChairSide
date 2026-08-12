@@ -197,6 +197,13 @@ public sealed record ReportProcedureMetricSampleContext(
     ReportSampleContext Allocation);
 
 /// <summary>
+/// Allocation population/contributor context for one doctor in the current analytical scope.
+/// </summary>
+public sealed record ReportDoctorAllocationSampleContext(
+    string DoctorId,
+    ReportSampleContext Sample);
+
+/// <summary>
 /// One procedure aggregation row over the current scoped included completed population.
 /// Family grouping folds sedation variants without changing the population selected by the query.
 /// </summary>

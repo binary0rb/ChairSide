@@ -1798,7 +1798,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/DemoBoardStore.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  186370,
+                      "sizeBytes":  186644,
                       "typeSymbols":  [
                                           "ExceptionReasons",
                                           "ReportingExceptionReasons",
@@ -2298,7 +2298,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/ReportQuery.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  6797,
+                      "sizeBytes":  7033,
                       "typeSymbols":  [
                                           "ReportScopeKinds",
                                           "ReportSedationSegments",
@@ -2309,6 +2309,7 @@
                                           "ReportSampleContext",
                                           "ReportMetricSampleContext",
                                           "ReportProcedureMetricSampleContext",
+                                          "ReportDoctorAllocationSampleContext",
                                           "ScopedProcedureGroup"
                                       ],
                       "methodSymbols":  [
@@ -2340,7 +2341,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/ReportsSnapshotBuilder.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  48481,
+                      "sizeBytes":  49875,
                       "typeSymbols":  [
                                           "ReportsSnapshotBuilder"
                                       ],
@@ -2352,6 +2353,7 @@
                                             "AverageSeconds",
                                             "MedianSeconds",
                                             "BuildDoctorSummaries",
+                                            "BuildDoctorAllocationSamples",
                                             "BuildDoctorDailyAllocationSeries",
                                             "BuildObservedDoctorDays",
                                             "BuildObservedRoomConcurrency",
@@ -2401,7 +2403,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/ReportsSnapshotComposition.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  8969,
+                      "sizeBytes":  9161,
                       "typeSymbols":  [
                                           "ReportsSnapshotComposition",
                                           "ReportPopulationSection",
@@ -3200,7 +3202,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/report-data.js",
                       "kind":  "JavaScript",
-                      "sizeBytes":  8666,
+                      "sizeBytes":  8937,
                       "typeSymbols":  [
 
                                       ],
@@ -3279,7 +3281,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/reports.js",
                       "kind":  "JavaScript",
-                      "sizeBytes":  110318,
+                      "sizeBytes":  114056,
                       "typeSymbols":  [
 
                                       ],
@@ -3353,7 +3355,11 @@
                                               "renderVarianceBadge",
                                               "renderAverageVarianceBadge",
                                               "renderReportFilterBar",
-                                              "sampleForObservedCount",
+                                              "fallbackSampleForObservedCount",
+                                              "sampleSupportsComparison",
+                                              "allocationComparisonValue",
+                                              "allocationComparisonNoticeText",
+                                              "renderAllocationComparisonNotice",
                                               "syncReportFilterButtons",
                                               "normalizeReportFilterValue",
                                               "syncDoctorScopeControl",
@@ -3371,11 +3377,7 @@
                                               "noMatchMessage",
                                               "renderProcedureSummaries",
                                               "renderProcedureSummaryRow",
-                                              "completedRecordKey",
-                                              "reviewRecordKey",
-                                              "reportRangeSignature",
-                                              "currentReportAction",
-                                              "normalizeReportIdentityTimestamp"
+                                              "completedRecordKey"
                                           ],
                       "headings":  [
 
@@ -5172,7 +5174,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/ReportsSnapshotBuilderTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  28298,
+                      "sizeBytes":  30218,
                       "typeSymbols":  [
                                           "ReportsSnapshotBuilderTests"
                                       ],
@@ -5180,8 +5182,9 @@
                                             "Compose_characterizes_all_reporting_populations_without_mutating_source_history",
                                             "Adapter_preserves_every_named_section_value_in_flat_contract",
                                             "Build_applies_completion_window_before_every_population_and_keeps_all_time_total",
-                                            "Reports_snapshot_web_json_property_contract_remains_unchanged",
+                                            "Reports_snapshot_web_json_property_contract_appends_doctor_allocation_samples",
                                             "Build_applies_historical_doctor_and_sedation_scope_without_treating_grouping_as_a_filter",
+                                            "Build_preserves_unavailable_doctor_allocation_when_population_has_no_contributors",
                                             "Build_keeps_review_queue_global_to_analytical_scope_but_bounded_by_window",
                                             "CreateBuilder",
                                             "Cycle",
@@ -5848,7 +5851,7 @@
                   {
                       "path":  "tests/javascript/report-data.test.mjs",
                       "kind":  "JavaScript",
-                      "sizeBytes":  16569,
+                      "sizeBytes":  18637,
                       "typeSymbols":  [
 
                                       ],
@@ -5876,7 +5879,7 @@
                   {
                       "path":  "tests/javascript/reports.test.mjs",
                       "kind":  "JavaScript",
-                      "sizeBytes":  70502,
+                      "sizeBytes":  77747,
                       "typeSymbols":  [
 
                                       ],
@@ -5901,6 +5904,7 @@
                                               "recordDomMutation",
                                               "targetFor",
                                               "allocation",
+                                              "sample",
                                               "reportPayload",
                                               "createFilterChip",
                                               "createHarness",
@@ -5910,7 +5914,9 @@
                                               "feedbackEntry",
                                               "completedCycle",
                                               "deferred",
-                                              "selectedCard"
+                                              "selectedCard",
+                                              "allocationPayload",
+                                              "allocationSurfaceHtml"
                                           ],
                       "headings":  [
 

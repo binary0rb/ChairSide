@@ -102,6 +102,24 @@ test("UTC presets and custom ranges preserve the established date boundaries", (
   });
 });
 
+test("first default load requests the visible Last 7 Days UTC window", async () => {
+  const harness = createHarness();
+
+  assert.deepEqual(harness.controller.getDateRange(), {
+    preset: "last7",
+    start: "2026-07-23",
+    end: "2026-07-29"
+  });
+
+  const result = await harness.controller.load();
+  assert.equal(
+    harness.calls[0].url,
+    "/api/reports?from=2026-07-23&to=2026-07-29");
+  assert.equal(
+    result.requestContext.rangeSignature,
+    "[\"2026-07-23\",\"2026-07-29\"]");
+});
+
 test("report GET preserves URL, admin headers, no-store cache, payload replacement, and versioning", async () => {
   const payloads = [{ marker: "first" }, { marker: "second" }];
   const harness = createHarness({
@@ -339,7 +357,7 @@ test("guaranteed fresh reload waits for an active GET and resolves from a second
   assert.equal(guaranteedSettled, true);
   assert.deepEqual(harness.controller.getReports(), { marker: "fresh" });
   assert.equal(harness.controller.getVersion(), 2);
-  assert.equal(guaranteedResult.requestContext.rangeSignature, "[null,null]");
+  assert.equal(guaranteedResult.requestContext.rangeSignature, "[\"2026-07-23\",\"2026-07-29\"]");
 });
 
 test("a failed active GET does not prevent the guaranteed fresh GET", async () => {
@@ -433,7 +451,7 @@ test("overlapping guaranteed fresh callers coalesce while waiting for the same p
   const [firstResult, secondResult] = await Promise.all([first, second]);
   assert.equal(harness.calls.length, 2);
   assert.equal(firstResult, secondResult);
-  assert.equal(firstResult.requestContext.rangeSignature, "[null,null]");
+  assert.equal(firstResult.requestContext.rangeSignature, "[\"2026-07-23\",\"2026-07-29\"]");
   assert.deepEqual(
     harness.controller.getReports(),
     { marker: "coalesced-fresh" });
@@ -511,4 +529,55 @@ test("analytical scope is encoded independently from procedure grouping and serv
       end: "2026-08-12"
     }
   });
+});
+
+test("query change during an active request runs a guaranteed fresh request with the newer query", async () => {
+  const active = deferred();
+  const fresh = deferred();
+  let attempt = 0;
+  const harness = createHarness({
+    fetch: async () => ++attempt === 1 ? active.promise : fresh.promise
+  });
+
+  const first = harness.controller.load();
+  harness.controller.setScope("Doctor", "pledger");
+  harness.controller.setSedation("Sedation");
+  const second = harness.controller.reloadAfterCurrent();
+
+  active.resolve(response(200, {
+    marker: "practice-a",
+    query: {
+      scope: "Practice",
+      doctorId: null,
+      sedation: "All",
+      procedureGrouping: "Family",
+      rangeStartDate: "2026-07-23",
+      rangeEndDate: "2026-07-29"
+    }
+  }));
+  await first;
+  await Promise.resolve();
+
+  assert.equal(harness.calls.length, 2);
+  assert.equal(
+    harness.calls[1].url,
+    "/api/reports?from=2026-07-23&to=2026-07-29&scope=Doctor&doctorId=pledger&sedation=Sedation");
+
+  fresh.resolve(response(200, {
+    marker: "doctor-b",
+    query: {
+      scope: "Doctor",
+      doctorId: "pledger",
+      sedation: "Sedation",
+      procedureGrouping: "Family",
+      rangeStartDate: "2026-07-23",
+      rangeEndDate: "2026-07-29"
+    }
+  }));
+  await second;
+
+  assert.equal(harness.controller.getReports().marker, "doctor-b");
+  assert.equal(harness.controller.getQuery().scope, "Doctor");
+  assert.equal(harness.controller.getQuery().doctorId, "pledger");
+  assert.equal(harness.controller.getQuery().sedation, "Sedation");
 });

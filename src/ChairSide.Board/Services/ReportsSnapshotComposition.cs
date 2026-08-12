@@ -95,6 +95,7 @@ internal sealed record ReportAllocationSection
 internal sealed record ReportDoctorDetailSection
 {
     public required IReadOnlyList<DoctorCycleSummary> DoctorSummaries { get; init; }
+    public required IReadOnlyList<ReportDoctorAllocationSampleContext> DoctorAllocationSamples { get; init; }
     public required IReadOnlyList<ObservedDoctorDay>? ObservedDoctorDays { get; init; }
     public required IReadOnlyList<DoctorProcedureMixRow>? DoctorProcedureMix { get; init; }
 }
@@ -160,6 +161,7 @@ internal static class ReportsSnapshotAdapter
             ExceptionReviewRecords: composition.ReviewQueue.ExceptionReviewRecords,
             Query: composition.Query,
             Samples: composition.Samples,
-            ScopedProcedureGroups: composition.Procedures.ScopedProcedureGroups);
+            ScopedProcedureGroups: composition.Procedures.ScopedProcedureGroups,
+            DoctorAllocationSamples: composition.DoctorDetail.DoctorAllocationSamples);
     }
 }

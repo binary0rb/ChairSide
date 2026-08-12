@@ -120,6 +120,10 @@ public sealed class ReportsSnapshotBuilderTests
         Assert.NotNull(composition.Allocation.ScheduleFit);
 
         Assert.Single(composition.DoctorDetail.DoctorSummaries);
+        var doctorAllocationSample = Assert.Single(composition.DoctorDetail.DoctorAllocationSamples);
+        Assert.Equal(3, doctorAllocationSample.Sample.PopulationCount);
+        Assert.Equal(2, doctorAllocationSample.Sample.ContributingCount);
+        Assert.Equal(ReportSampleStates.Limited, doctorAllocationSample.Sample.State);
         Assert.Single(composition.DoctorDetail.ObservedDoctorDays!);
         Assert.Equal(2, composition.DoctorDetail.DoctorProcedureMix!.Count);
 
@@ -187,6 +191,7 @@ public sealed class ReportsSnapshotBuilderTests
         var trends = new ReportTrendSnapshot("Sentinel", []);
         var observedDoctorDays = new List<ObservedDoctorDay>();
         var doctorProcedureMix = new List<DoctorProcedureMixRow>();
+        var doctorAllocationSamples = new List<ReportDoctorAllocationSampleContext>();
         var exceptionReviewRecords = new List<ExceptionReviewRecord>();
         var query = ReportQuery.Default.ToContext();
         var samples = new ReportMetricSampleContext(
@@ -258,6 +263,7 @@ public sealed class ReportsSnapshotBuilderTests
             DoctorDetail = new ReportDoctorDetailSection
             {
                 DoctorSummaries = doctorSummaries,
+                DoctorAllocationSamples = doctorAllocationSamples,
                 ObservedDoctorDays = observedDoctorDays,
                 DoctorProcedureMix = doctorProcedureMix
             },
@@ -342,6 +348,9 @@ public sealed class ReportsSnapshotBuilderTests
         Assert.Same(composition.Query, snapshot.Query);
         Assert.Same(composition.Samples, snapshot.Samples);
         Assert.Same(composition.Procedures.ScopedProcedureGroups, snapshot.ScopedProcedureGroups);
+        Assert.Same(
+            composition.DoctorDetail.DoctorAllocationSamples,
+            snapshot.DoctorAllocationSamples);
     }
 
     [Fact]
@@ -404,7 +413,7 @@ public sealed class ReportsSnapshotBuilderTests
     }
 
     [Fact]
-    public void Reports_snapshot_web_json_property_contract_remains_unchanged()
+    public void Reports_snapshot_web_json_property_contract_appends_doctor_allocation_samples()
     {
         var snapshot = CreateBuilder().Build([], [], ReportDateRange.AllTime);
 
@@ -455,7 +464,8 @@ public sealed class ReportsSnapshotBuilderTests
             "exceptionReviewRecords",
             "query",
             "samples",
-            "scopedProcedureGroups"
+            "scopedProcedureGroups",
+            "doctorAllocationSamples"
         ],
             actualNames);
 
@@ -470,6 +480,7 @@ public sealed class ReportsSnapshotBuilderTests
         Assert.Equal(JsonValueKind.Object, json.GetProperty("query").ValueKind);
         Assert.Equal(JsonValueKind.Object, json.GetProperty("samples").ValueKind);
         Assert.Equal(JsonValueKind.Array, json.GetProperty("scopedProcedureGroups").ValueKind);
+        Assert.Equal(JsonValueKind.Array, json.GetProperty("doctorAllocationSamples").ValueKind);
     }
 
     [Fact]
@@ -508,6 +519,33 @@ public sealed class ReportsSnapshotBuilderTests
         Assert.Equal("EXT+SED", group.ProcedureCode);
         Assert.True(group.IsSedationCase);
         Assert.Equal(1d, group.ShareOfScopedCases);
+        var doctorSample = Assert.Single(snapshot.DoctorAllocationSamples!);
+        Assert.Equal("former-doctor", doctorSample.DoctorId);
+        Assert.Equal(ReportSampleStates.Limited, doctorSample.Sample.State);
+    }
+
+    [Fact]
+    public void Build_preserves_unavailable_doctor_allocation_when_population_has_no_contributors()
+    {
+        var incomplete = Cycle(
+            1, 1, "EXT",
+            Utc(2026, 8, 10, 8, 0), Utc(2026, 8, 10, 8, 5), Utc(2026, 8, 10, 8, 10),
+            null, null, 30);
+        var query = ReportQuery.FromStrings(
+            null,
+            null,
+            ReportScopeKinds.Doctor,
+            "otte",
+            ReportSedationSegments.All,
+            ReportProcedureGroupings.Family);
+
+        var snapshot = CreateBuilder().Build([incomplete], [], query);
+
+        var doctorSample = Assert.Single(snapshot.DoctorAllocationSamples!);
+        Assert.Equal(1, doctorSample.Sample.PopulationCount);
+        Assert.Equal(0, doctorSample.Sample.ContributingCount);
+        Assert.Equal(ReportSampleStates.Unavailable, doctorSample.Sample.State);
+        Assert.False(doctorSample.Sample.SupportsComparison);
     }
 
     [Fact]

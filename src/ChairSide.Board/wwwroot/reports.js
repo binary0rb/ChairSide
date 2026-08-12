@@ -49,7 +49,7 @@ export function createReports({
   }
 
   syncDateRangeControls();
-  await reportData.reload();
+  await reportData.reloadAfterCurrent();
 }
 
   async function applyCustomDateRange() {
@@ -64,7 +64,7 @@ export function createReports({
   clearCompletedReportAction();
   reportData.setDateRange({ preset: "custom", start, end });
   syncDateRangeControls();
-  await reportData.reload();
+  await reportData.reloadAfterCurrent();
 }
 
 // Reflects reportData.getDateRange() onto the static controls so a re-render never desyncs the chips/inputs.
@@ -161,7 +161,7 @@ export function createReports({
     return;
   }
 
-  const allDoctors = aggregateAllocationByDoctor(r.doctorSummaries || []);
+  const allDoctors = aggregateAllocationByDoctor(r.doctorSummaries || [], r);
   const agg = allDoctors.find(item => item.doctorId === doctor.id)
     || { doctorId: doctor.id, count: 0, net: 0, over: 0, under: 0, at: 0, adjusted: 0 };
   const identity = getDoctorIdentity(doctor.id, doctor.name);
@@ -558,7 +558,7 @@ export function createReports({
     return;
   }
 
-  const doctors = aggregateAllocationByDoctor(r.doctorSummaries || []);
+  const doctors = aggregateAllocationByDoctor(r.doctorSummaries || [], r);
   section.hidden = !hasData && doctors.length === 0;
   if (section.hidden) {
     grid.innerHTML = "";
@@ -623,7 +623,7 @@ export function createReports({
 
   const pill = `<span class="layer-pill layer-pill--allocation">Allocation Logic</span>`;
   const a = r.allocationVariance;
-  if (!a || (a.allocationVarianceCycleCount || 0) === 0) {
+  if (!a) {
     card.innerHTML = `
       ${pill}
       <h3>Overall Allocation Balance${renderHelpIcon("Planned time budget based on the selected procedure mix and allocation settings.")}</h3>
@@ -632,18 +632,19 @@ export function createReports({
   }
 
   const count = a.allocationVarianceCycleCount;
-  const samplePresentation = sampledPresentation(
-    sampleForObservedCount(count, r.samples?.scheduleFit),
-    String(count));
+  const sample = r.samples?.scheduleFit;
+  const samplePresentation = sampledPresentation(sample, String(count));
+  const comparisonAvailable = sampleSupportsComparison(sample);
   card.innerHTML = `
     ${pill}
     <h3>Overall Allocation Balance</h3>
-    <p class="allocation-lead">${count} ${count === 1 ? "case" : "cases"} measured against expected allocation across included cases in this report view.</p>
+    <p class="allocation-lead">${escapeHtml(samplePresentation.value)}${samplePresentation.state === "Limited" || samplePresentation.state === "Sufficient" ? ` ${count === 1 ? "case" : "cases"} measured against expected allocation across included cases in this report view.` : ""}</p>
     ${renderSampleContext(samplePresentation)}
-    <p class="allocation-net">Net ${renderVarianceBadge(a.netAllocationVarianceMinutes)} across included cases.</p>
-    <p>Average ${renderAverageVarianceBadge(a.averageAllocationVarianceMinutes)}.</p>
-    <p class="allocation-breakdown-line">${a.casesOverExpectedAllocation} over expected · ${a.casesUnderExpectedAllocation} under expected · ${a.casesAtExpectedAllocation} at expected</p>
-    <p class="allocation-context">${a.adjustedAllocationCycleCount} adjusted allocation ${a.adjustedAllocationCycleCount === 1 ? "case" : "cases"} · ${a.totalExpectedAllocationMinutes} min expected · ${a.totalMeasuredCaseFlowMinutes} min measured</p>
+    ${comparisonAvailable ? `
+      <p class="allocation-net">Net ${renderVarianceBadge(a.netAllocationVarianceMinutes)} across included cases.</p>
+      <p>Average ${renderAverageVarianceBadge(a.averageAllocationVarianceMinutes)}.</p>
+      <p class="allocation-breakdown-line">${a.casesOverExpectedAllocation} over expected · ${a.casesUnderExpectedAllocation} under expected · ${a.casesAtExpectedAllocation} at expected</p>` : renderAllocationComparisonNotice(sample)}
+    ${sample?.state === "Limited" || sample?.state === "Sufficient" ? `<p class="allocation-context">${a.adjustedAllocationCycleCount} adjusted allocation ${a.adjustedAllocationCycleCount === 1 ? "case" : "cases"} · ${a.totalExpectedAllocationMinutes} min expected · ${a.totalMeasuredCaseFlowMinutes} min measured</p>` : ""}
     <p class="allocation-footnote">Current analytical scope. Only includes completed cases that have an expected allocation snapshot and a Doctor Complete timestamp, so this can be fewer than total completed cases.</p>`;
 }
 
@@ -677,17 +678,19 @@ export function createReports({
     return;
   }
 
-  const aggregated = aggregateAllocationByDoctor(r.doctorSummaries || []);
+  const aggregated = aggregateAllocationByDoctor(r.doctorSummaries || [], r);
   list.classList.remove("doctor-report-card-grid");
   list.innerHTML = aggregated.length
-    ? aggregated.map(renderDoctorAllocationRow).join("")
+    ? aggregated.map(agg => renderDoctorAllocationRow(agg)).join("")
     : `<p class="allocation-empty">No doctor allocation data for this range.</p>`;
 }
 
 // Sums each doctor's allocation across the returned (per-month) summaries so a doctor appears
 // once. Ordered by the doctor roster - never by variance, to avoid implying a ranking.
-  function aggregateAllocationByDoctor(summaries) {
+  function aggregateAllocationByDoctor(summaries, report) {
   const byDoctor = new Map();
+  const samplesByDoctor = new Map((report?.doctorAllocationSamples || [])
+    .map(item => [item.doctorId, item.sample]));
   for (const summary of summaries) {
     const a = summary.allocation;
     if (!a) {
@@ -710,7 +713,12 @@ export function createReports({
     return index === -1 ? Number.MAX_SAFE_INTEGER : index;
   };
 
-  const rosterCards = (getSnapshot()?.doctors || []).map(doctor => ({
+  const doctorScope = report?.query?.scope === "Doctor";
+  const scopedDoctorId = doctorScope ? report.query.doctorId : null;
+  const roster = doctorScope
+    ? (scopedDoctorId ? [{ id: scopedDoctorId }] : [])
+    : (getSnapshot()?.doctors || []);
+  const rosterCards = roster.map(doctor => ({
     doctorId: doctor.id,
     count: 0,
     net: 0,
@@ -718,11 +726,16 @@ export function createReports({
     under: 0,
     at: 0,
     adjusted: 0,
+    sample: samplesByDoctor.get(doctor.id),
     ...byDoctor.get(doctor.id)
   }));
+  if (doctorScope) {
+    return rosterCards;
+  }
   const rosterIds = new Set(rosterCards.map(item => item.doctorId));
   const historicalCards = [...byDoctor.values()]
     .filter(item => !rosterIds.has(item.doctorId))
+    .map(item => ({ ...item, sample: samplesByDoctor.get(item.doctorId) }))
     .sort((x, y) => rank(x.doctorId) - rank(y.doctorId));
 
   return [...rosterCards, ...historicalCards];
@@ -733,8 +746,8 @@ export function createReports({
   function renderDoctorCardBody(agg, report, name, identity) {
   const count = agg.count || 0;
   const average = count > 0 ? agg.net / count : Number.NaN;
-  const doctorSample = sampleForObservedCount(count, report?.samples?.includedCompletedCases);
-  const comparisonAvailable = doctorSample.state === "Sufficient";
+  const doctorSample = agg.sample || fallbackSampleForObservedCount(count);
+  const comparisonAvailable = sampleSupportsComparison(doctorSample);
   const countPresentation = sampledPresentation(doctorSample, String(count));
   const sparkPoints = (report?.doctorDailyAllocationSeries || []).find(item => item.doctorId === agg.doctorId)?.points;
   return `
@@ -742,7 +755,7 @@ export function createReports({
       <span class="doctor-report-initials" aria-hidden="true">${escapeHtml(identity.initials)}</span>
       <div class="doctor-report-identity">
         <h4>${escapeHtml(name)}</h4>
-        <p>${escapeHtml(doctorAllocationSummary(agg))}</p>
+        <p>${escapeHtml(doctorAllocationSummary(agg, doctorSample))}</p>
       </div>
     </header>
     <dl class="doctor-report-metrics">
@@ -750,21 +763,26 @@ export function createReports({
         <dt>Cases</dt>
         <dd>${escapeHtml(countPresentation.value)}${renderSampleContext(countPresentation)}</dd>
       </div>
-      <div>
-        <dt>Balance</dt>
-        <dd class="${escapeAttribute(comparisonAvailable ? varianceClass(agg.net) : "is-unavailable")}">${escapeHtml(comparisonAvailable ? formatSignedMinutes(agg.net) : "Unavailable")}</dd>
-      </div>
-      <div>
-        <dt>Avg</dt>
-        <dd class="${escapeAttribute(comparisonAvailable ? varianceClass(average) : "is-unavailable")}">${escapeHtml(comparisonAvailable ? formatSignedMinutes(average) : "Unavailable")}</dd>
-      </div>
-      <div class="doctor-card-metric--help-corner">
-        <dt>O / U / A</dt>
-        <dd>${escapeHtml(`${agg.over} / ${agg.under} / ${agg.at}`)}</dd>
-        ${renderHelpIcon("O/U/A means Over, Under, or At target compared with expected procedure allocation.", "corner")}
-      </div>
+      ${comparisonAvailable ? `
+        <div>
+          <dt>Balance</dt>
+          <dd class="${escapeAttribute(varianceClass(agg.net))}">${escapeHtml(formatSignedMinutes(agg.net))}</dd>
+        </div>
+        <div>
+          <dt>Avg</dt>
+          <dd class="${escapeAttribute(varianceClass(average))}">${escapeHtml(formatSignedMinutes(average))}</dd>
+        </div>
+        <div class="doctor-card-metric--help-corner">
+          <dt>O / U / A</dt>
+          <dd>${escapeHtml(`${agg.over} / ${agg.under} / ${agg.at}`)}</dd>
+          ${renderHelpIcon("O/U/A means Over, Under, or At target compared with expected procedure allocation.", "corner")}
+        </div>` : `
+        <div>
+          <dt>Comparison</dt>
+          <dd class="is-unavailable">${escapeHtml(allocationComparisonValue(doctorSample))}</dd>
+        </div>`}
     </dl>
-    ${renderDoctorSparkline(sparkPoints)}`;
+    ${comparisonAvailable ? renderDoctorSparkline(sparkPoints) : ""}`;
 }
 
 // The whole card is the selection control (role="button", focusable). The "View details" affordance
@@ -828,10 +846,16 @@ export function createReports({
   return `${open}${baseline}<polyline points="${coords}" fill="none" stroke="var(--doctor-color)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke" opacity="0.85"/></svg>`;
 }
 
-  function doctorAllocationSummary(agg) {
+  function doctorAllocationSummary(agg, sample = agg.sample || fallbackSampleForObservedCount(agg.count || 0)) {
   const count = agg.count || 0;
-  if (count === 0) {
+  if (sample?.state === "Empty") {
     return "No allocation variance cases in this report range.";
+  }
+  if (sample?.state === "Unavailable") {
+    return "Allocation values are unavailable for this nonempty report population.";
+  }
+  if (!sampleSupportsComparison(sample)) {
+    return `${count} allocation ${count === 1 ? "contributor" : "contributors"}. Comparison is not shown for a Limited sample.`;
   }
   if (agg.net === 0) {
     return `Measured case flow stayed at expected allocation across ${count} ${count === 1 ? "case" : "cases"}.`;
@@ -966,6 +990,9 @@ export function createReports({
   function renderSelectedDoctorOverview(r, agg) {
   const count = agg.count || 0;
   const average = count > 0 ? agg.net / count : Number.NaN;
+  const sample = agg.sample || fallbackSampleForObservedCount(count);
+  const samplePresentation = sampledPresentation(sample, String(count));
+  const comparisonAvailable = sampleSupportsComparison(sample);
   return `
     <section class="selected-doctor-overview">
       <div class="selected-doctor-summary">
@@ -974,10 +1001,12 @@ export function createReports({
         <p class="allocation-footnote">Uses existing doctor allocation aggregates for ${escapeHtml(r.rangeLabel || "the selected range")}.</p>
       </div>
       <dl class="selected-doctor-kpis">
-        <div><dt>Cases</dt><dd>${escapeHtml(String(count))}</dd></div>
-        <div><dt>Net balance</dt><dd class="${escapeAttribute(varianceClass(agg.net))}">${escapeHtml(formatSignedMinutes(agg.net))}</dd></div>
-        <div><dt>Average variance</dt><dd class="${escapeAttribute(varianceClass(average))}">${escapeHtml(formatSignedMinutes(average))}</dd></div>
-        <div><dt>Pressure point</dt><dd>${escapeHtml(mainPressurePoint(agg))}</dd></div>
+        <div><dt>Cases</dt><dd>${escapeHtml(samplePresentation.value)}${renderSampleContext(samplePresentation)}</dd></div>
+        ${comparisonAvailable ? `
+          <div><dt>Net balance</dt><dd class="${escapeAttribute(varianceClass(agg.net))}">${escapeHtml(formatSignedMinutes(agg.net))}</dd></div>
+          <div><dt>Average variance</dt><dd class="${escapeAttribute(varianceClass(average))}">${escapeHtml(formatSignedMinutes(average))}</dd></div>
+          <div><dt>Pressure point</dt><dd>${escapeHtml(mainPressurePoint(agg))}</dd></div>` : `
+          <div><dt>Comparison</dt><dd class="is-unavailable">${escapeHtml(allocationComparisonValue(sample))}</dd></div>`}
       </dl>
     </section>`;
 }
@@ -1194,11 +1223,16 @@ export function createReports({
 
   function renderDoctorAllocationRow(agg) {
   const name = getDoctorName(agg.doctorId);
-  if (agg.count === 0) {
+  const sample = agg.sample || fallbackSampleForObservedCount(agg.count || 0);
+  const presentation = sampledPresentation(sample, String(agg.count || 0));
+  if (!sampleSupportsComparison(sample)) {
     return `
       <div class="allocation-row">
         <span class="allocation-row-name">${escapeHtml(name)}</span>
-        <span class="allocation-row-detail allocation-empty">No allocation variance cases.</span>
+        <span class="allocation-row-detail allocation-empty">
+          ${escapeHtml(presentation.value)}${renderSampleContext(presentation)}
+          <small>${escapeHtml(allocationComparisonNoticeText(sample))}</small>
+        </span>
       </div>`;
   }
 
@@ -1220,7 +1254,7 @@ export function createReports({
 
   // Procedure family (base) summaries only - sedation variants roll up under their family.
   const families = (r.baseProcedureSummaries || [])
-    .filter(summary => summary.allocation && (summary.allocation.allocationVarianceCycleCount || 0) > 0);
+    .filter(summary => summary.allocation);
 
   list.innerHTML = families.length
     ? families.map(renderProcedureAllocationRow).join("")
@@ -1230,6 +1264,18 @@ export function createReports({
   function renderProcedureAllocationRow(summary) {
   const a = summary.allocation;
   const label = summary.procedureLabel || summary.procedureCode || "Unknown";
+  const sample = summary.samples?.allocation || fallbackSampleForObservedCount(a.allocationVarianceCycleCount || 0);
+  const presentation = sampledPresentation(sample, String(a.allocationVarianceCycleCount || 0));
+  if (!sampleSupportsComparison(sample)) {
+    return `
+      <div class="allocation-row">
+        <span class="allocation-row-name">${escapeHtml(label)}</span>
+        <span class="allocation-row-detail allocation-empty">
+          ${escapeHtml(presentation.value)}${renderSampleContext(presentation)}
+          <small>${escapeHtml(allocationComparisonNoticeText(sample))}</small>
+        </span>
+      </div>`;
+  }
   return `
     <div class="allocation-row">
       <span class="allocation-row-name">${escapeHtml(label)}</span>
@@ -1300,8 +1346,8 @@ export function createReports({
   }
 }
 
-  function sampleForObservedCount(count, contractSample) {
-  const threshold = Number(contractSample?.limitedSampleThreshold) || 5;
+  function fallbackSampleForObservedCount(count) {
+  const threshold = 5;
   const state = count === 0 ? "Empty" : count < threshold ? "Limited" : "Sufficient";
   return {
     populationCount: count,
@@ -1310,6 +1356,34 @@ export function createReports({
     limitedSampleThreshold: threshold,
     supportsComparison: state === "Sufficient"
   };
+}
+
+  function sampleSupportsComparison(sample) {
+  return sample?.state === "Sufficient" && sample.supportsComparison !== false;
+}
+
+  function allocationComparisonValue(sample) {
+  if (sample?.state === "Empty") {
+    return "No observation";
+  }
+  if (sample?.state === "Unavailable") {
+    return "Unavailable";
+  }
+  return "Not shown";
+}
+
+  function allocationComparisonNoticeText(sample) {
+  if (sample?.state === "Empty") {
+    return "No allocation observation in this population.";
+  }
+  if (sample?.state === "Unavailable") {
+    return "Allocation comparison is unavailable because this population has no contributing allocation observations.";
+  }
+  return "Comparison is not shown for a Limited sample.";
+}
+
+  function renderAllocationComparisonNotice(sample) {
+  return `<p class="allocation-note">${escapeHtml(allocationComparisonNoticeText(sample))}</p>`;
 }
 
 // Reflects state.reportFilters onto the static filter chips so re-renders never desync the
@@ -2392,7 +2466,7 @@ export function createReports({
   }
   // Only act when the focused element is the card itself (it carries the doctor id and tabindex).
   const card = event.target.closest(".doctor-report-card[data-report-doctor-id]");
-  if (!card || card !== event.target) {
+  if (!card || card !== event.target || !isDoctorCardInCurrentScope(card.dataset.reportDoctorId)) {
     return;
   }
   event.preventDefault();
@@ -2423,7 +2497,7 @@ export function createReports({
       reportData.setScope(scope, doctorId);
       syncReportFilterButtons();
       clearCompletedReportAction();
-      await reportData.reload();
+      await reportData.reloadAfterCurrent();
       return;
     }
 
@@ -2447,7 +2521,7 @@ export function createReports({
     state.reportFilters[group] = value;
     syncReportFilterButtons();
     clearCompletedReportAction();
-    await reportData.reload();
+    await reportData.reloadAfterCurrent();
   });
 
   document.getElementById("reportScopeDoctor")?.addEventListener("change", async event => {
@@ -2455,11 +2529,15 @@ export function createReports({
     if (!doctorId || reportData.getQuery?.().scope !== "Doctor") {
       return;
     }
-    state.reportDoctorId = doctorId;
     reportData.setScope("Doctor", doctorId);
     clearCompletedReportAction();
-    await reportData.reload();
+    await reportData.reloadAfterCurrent();
   });
+}
+
+  function isDoctorCardInCurrentScope(doctorId) {
+  const query = reportData.getReports()?.query || reportData.getQuery?.();
+  return query?.scope !== "Doctor" || query.doctorId === doctorId;
 }
 
   function renderTableSampledValue(sample, value) {
@@ -2552,6 +2630,9 @@ export function createReports({
 
   const doctorButton = event.target.closest("[data-report-doctor-id]");
   if (doctorButton) {
+    if (!isDoctorCardInCurrentScope(doctorButton.dataset.reportDoctorId)) {
+      return;
+    }
     state.reportDoctorId = doctorButton.dataset.reportDoctorId;
     state.reportDoctorTab = "overview";
     if (reportData.getReports()) {
