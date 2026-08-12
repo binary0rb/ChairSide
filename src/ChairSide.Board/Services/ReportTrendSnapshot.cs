@@ -89,7 +89,7 @@ public static class ReportTrendSnapshotBuilder
                     turnoverValues.Count,
                     Median(turnoverValues),
                     Average(turnoverValues),
-                    ReportSampleContext.Create(population.Count, seatedToDoctorValues.Count),
+                    ReportSampleContext.ForPopulation(seatedToDoctorValues.Count),
                     ReportSampleContext.Create(population.Count, turnoverValues.Count),
                     readyWaitValues.Count,
                     MedianOrNull(readyWaitValues),

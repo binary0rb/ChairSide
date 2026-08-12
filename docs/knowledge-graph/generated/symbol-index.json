@@ -2437,7 +2437,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/ReportTrendSnapshot.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  5289,
+                      "sizeBytes":  5278,
                       "typeSymbols":  [
                                           "ReportTrendSnapshot",
                                           "ReportTrendBucket",
@@ -5214,7 +5214,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/ReportTrendSnapshotTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  11271,
+                      "sizeBytes":  12523,
                       "typeSymbols":  [
                                           "ReportTrendSnapshotTests"
                                       ],
@@ -5231,6 +5231,7 @@
                                             "Ready_wait_is_unavailable_for_nonempty_week_without_truthful_ready_observations",
                                             "Truthful_zero_ready_wait_remains_an_observed_value",
                                             "Weekly_samples_use_one_population_and_metric_specific_contributors",
+                                            "Compatibility_completed_sample_keeps_eligible_count_while_metric_samples_use_weekly_population",
                                             "Completed_cycle_count_per_bucket_is_the_eligible_cycle_count",
                                             "Public_model_does_not_expose_projection_capacity_or_ranking_names",
                                             "Public_model_does_not_expose_patient_like_field_names",

@@ -189,6 +189,35 @@ public sealed class ReportTrendSnapshotTests
     }
 
     [Fact]
+    public void Compatibility_completed_sample_keeps_eligible_count_while_metric_samples_use_weekly_population()
+    {
+        var snapshot = ReportTrendSnapshotBuilder.BuildWeekly(
+        [
+            Cycle(
+                completeAt: Utc(2026, 6, 8, 9),
+                seatedToDoctorSeconds: 300,
+                readyToDoctorSeconds: 60,
+                turnoverSeconds: 120),
+            Cycle(
+                completeAt: Utc(2026, 6, 9, 9),
+                seatedToDoctorSeconds: -1,
+                readyToDoctorSeconds: null,
+                turnoverSeconds: null)
+        ]);
+
+        var bucket = Assert.Single(snapshot.Buckets);
+        Assert.Equal(1, bucket.CompletedCycleCount);
+        Assert.Equal(1, bucket.CompletedSample!.PopulationCount);
+        Assert.Equal(1, bucket.CompletedSample.ContributingCount);
+        Assert.Equal(2, bucket.SeatedToDoctorSample!.PopulationCount);
+        Assert.Equal(1, bucket.SeatedToDoctorSample.ContributingCount);
+        Assert.Equal(2, bucket.ReadyWaitSample!.PopulationCount);
+        Assert.Equal(1, bucket.ReadyWaitSample.ContributingCount);
+        Assert.Equal(2, bucket.TurnoverSample!.PopulationCount);
+        Assert.Equal(1, bucket.TurnoverSample.ContributingCount);
+    }
+
+    [Fact]
     public void Completed_cycle_count_per_bucket_is_the_eligible_cycle_count()
     {
         var snapshot = ReportTrendSnapshotBuilder.BuildWeekly(
