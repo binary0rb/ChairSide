@@ -122,6 +122,26 @@ This file records decisions that should survive across tasks, PRs, and debugging
 
 **Rationale:** Metrics become misleading if draft assignment, withdrawn intent, incomplete cycles, exception cycles, and completed populations are mixed.
 
+## Canonical reporting semantics
+
+**Decision:** `docs/design/reporting-design.md` is the canonical reporting design authority for the #211 redesign. It consumes the existing lifecycle and accepted Ready-handoff facts rather than redefining them.
+
+**Decision:** Practice Overview `Completed Cases` preserves the normal completed count and reconciles to included plus reporting-excluded completed cases. Reporting exclusions change analytical calculations, not the historical fact that a case completed. Segmented analytical denominators use the corresponding standard included completed population unless explicitly labeled otherwise.
+
+**Decision:** Prominent operational timing is median-first. Ready Wait is accepted Ready to Doctor Arrived and remains distinct from Seated to Doctor. No-observation populations are never rendered as measured zero values.
+
+**Decision:** An Observed Doctor Day exists only when a doctor has qualifying same-day Ready-anchored observed flow. Observed Clinical Span is first qualifying accepted Ready to last same-day Doctor Complete. Doctor Working elapsed time and concurrency use wall-clock unions of Doctor Arrived to Doctor Complete intervals. Unstructured Time is the remainder of the span with no active Doctor Working interval and must not be framed as idle, available, unused, absent, unscheduled, or recoverable time.
+
+**Decision:** Procedure Mix exists at Practice and Doctor scope with counts and percentages over the current scoped included completed-case population. Sedation remains a procedure modifier, not an additional timed case.
+
+**Decision:** Schedule Fit evaluates the scheduling model. The first-version observed basis remains Seated to Doctor Complete measured case flow, which is not interchangeable with Doctor Time. Slack and debt stay separate, signed net variance remains visible, and population coverage must be exposed. Calibration Insights may surface sufficiently supported directional patterns for human review but never mutate expected allocation automatically.
+
+**Decision:** Healthy Data Quality remains quiet; exclusions, limited samples, and pending review use progressive disclosure while audit remains the evidence layer behind calculations and insights. Provider ranking, efficiency scoring, attendance inference, idle-time reporting, grades, quotas, and punitive staff metrics are prohibited.
+
+**Rationale:** The reporting redesign must explain observed operational flow and scheduling-model fit without converting incomplete observation into judgments about doctors or staff. Precise shared semantics prevent later report slices from inventing incompatible denominators, time intervals, or interpretation language.
+
+**Deferred parameters:** General limited-sample rules belong to #213; Typical Observed Range quantiles belong to #218; Calibration Insight sample, deviation, directional-consistency, tolerance, and multi-period persistence rules belong to #219.
+
 ## Reporting UI philosophy
 
 **Decision:** Reporting favors summary cards, plain-English interpretation, progressive disclosure, and operational questions over dense rankings or punitive comparisons.
