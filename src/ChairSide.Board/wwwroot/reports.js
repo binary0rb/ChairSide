@@ -252,13 +252,11 @@ export function createReports({
   }
 
   headline.classList.remove("is-empty");
-  const exceptions = (r.exceptionReviewRecords || r.exceptionCycles || []).length;
   headline.innerHTML = [
     renderHeadlineCard("Completed Cases", String(r.completedRoomCyclesCount ?? 0), null, r.samples?.completedCases),
-    renderHeadlineCard("Avg Total to Doctor", formatDuration(r.averageSeatedToDoctorSeconds), null, r.samples?.seatedToDoctor),
-    renderHeadlineCard("Avg Doctor Time", formatDuration(r.averageDoctorInRoomSeconds), null, r.samples?.doctorTime),
-    renderHeadlineCard("Exceptions to Review", String(exceptions), "Encounter records excluded or flagged because they require administrative review."),
-    renderHeadlineCard("Sedation Cases", `${r.sedationCaseCount ?? 0} / ${r.includedCompletedCycleCount ?? 0}`, "Separates cases where sedation was selected from non-sedation cases for reporting context.", r.samples?.includedCompletedCases)
+    renderHeadlineCard("Median Ready Wait", formatObservedDuration(r.medianReadyToDoctorSeconds), "Accepted Ready to Doctor Arrived.", r.samples?.readyWait),
+    renderHeadlineCard("Median Seated -> Doctor", formatObservedDuration(r.medianSeatedToDoctorSeconds), "Total observed interval from Seated to Doctor Arrived.", r.samples?.seatedToDoctor),
+    renderHeadlineCard("Median Turnover", formatObservedDuration(r.medianTurnoverSeconds), "Doctor Complete to Room Available.", r.samples?.turnover)
   ].join("");
 }
 
@@ -311,74 +309,69 @@ export function createReports({
 
   panel.hidden = false;
   panel.innerHTML = [
-    renderWaitTrendCard(r),
-    renderTurnoverTrendCard(r)
+    renderReadyWaitTrendCard(r),
+    renderTurnoverTrendCard(r),
+    renderSeatedToDoctorTrendCard(r)
   ].join("");
 }
 
-  function renderWaitTrendCard(r) {
-  const buckets = trendBucketsWithCases(r?.trends?.buckets, {
-    countField: "completedCycleCount",
-    medianField: "medianSeatedToDoctorSeconds"
-  });
+  function renderReadyWaitTrendCard(r) {
+  const buckets = chronologicalTrendBuckets(r?.trends?.buckets);
   const latest = buckets[buckets.length - 1];
 
   if (!latest) {
     return `
-      <article class="report-card report-trend-card is-empty">
+      <article class="report-card report-trend-card ready-wait-trend-card is-primary is-empty">
         <div>
-          <span class="layer-pill layer-pill--population">Wait Trend</span>
-          <h2>Wait trend</h2>
-          <p>Not enough trend data yet.</p>
+          <span class="layer-pill layer-pill--population">Ready Wait Trend</span>
+          <h2>Ready Wait trend</h2>
+          <p>No observation.</p>
         </div>
-        <p class="report-trend-note">Weekly median seated-to-doctor waits will appear here as completed room cycles accumulate.</p>
+        <p class="report-trend-note">Weekly median accepted Ready to Doctor Arrived waits will appear here as completed room cycles accumulate.</p>
       </article>
     `;
   }
 
   const previous = buckets.length > 1 ? buckets[buckets.length - 2] : null;
   const comparison = describeTrendComparison(latest, previous, {
-    countField: "completedCycleCount",
-    sampleField: "completedSample",
-    medianField: "medianSeatedToDoctorSeconds",
+    sampleField: "readyWaitSample",
+    medianField: "medianReadyWaitSeconds",
     noPreviousText: "Not enough prior trend data for a week-to-week comparison yet.",
-    lowSampleText: "More cases are needed for a reliable week-to-week comparison.",
-    missingText: "Not enough trend data yet.",
-    aboutSameText: "Median seated-to-doctor was about the same compared with the previous week with cases.",
-    improvedPrefix: "Median seated-to-doctor improved by",
-    increasedPrefix: "Median seated-to-doctor increased by",
-    comparisonSuffix: "compared with the previous week with cases."
+    lowSampleText: "Comparison is not shown unless both weekly Ready Wait samples are Sufficient.",
+    missingText: "Ready Wait comparison is unavailable for these weekly buckets.",
+    aboutSameText: "Median Ready Wait was about the same as the previous week.",
+    improvedPrefix: "Median Ready Wait decreased by",
+    increasedPrefix: "Median Ready Wait increased by",
+    comparisonSuffix: "compared with the previous week."
   });
 
   return renderTrendCard({
-    title: "Wait trend",
-    eyebrow: "Wait Trend",
-    description: "Median seated-to-doctor for the latest weekly bucket.",
-    value: formatTrendMinutes(latest.medianSeatedToDoctorSeconds),
+    title: "Ready Wait trend",
+    eyebrow: "Ready Wait Trend",
+    description: "Median accepted Ready to Doctor Arrived for the latest weekly bucket.",
+    value: formatTrendMinutes(latest.medianReadyWaitSeconds),
     latest,
     previous,
-    countField: "completedCycleCount",
-    sampleField: "completedSample",
-    countLabel: "Cases in bucket",
-    comparisonLabel: "Compared with previous week with cases",
-    comparison
+    countField: "readyWaitCycleCount",
+    sampleField: "readyWaitSample",
+    countLabel: "Ready Wait contributors",
+    comparisonLabel: "Previous weekly bucket",
+    comparison,
+    cardClass: "ready-wait-trend-card is-primary"
   });
 }
 
   function renderTurnoverTrendCard(r) {
-  const buckets = trendBucketsWithCases(r?.trends?.buckets, {
-    countField: "turnoverCycleCount",
-    medianField: "medianTurnoverSeconds"
-  });
+  const buckets = chronologicalTrendBuckets(r?.trends?.buckets);
   const latest = buckets[buckets.length - 1];
 
   if (!latest) {
     return `
-      <article class="report-card report-trend-card turnover-trend-card is-empty">
+      <article class="report-card report-trend-card turnover-trend-card is-primary is-empty">
         <div>
           <span class="layer-pill layer-pill--population">Turnover Trend</span>
           <h2>Turnover trend</h2>
-          <p>Not enough turnover trend data yet.</p>
+          <p>No observation.</p>
         </div>
         <p class="report-trend-note">Weekly median room reset / handoff flow will appear here as completed room cycles accumulate.</p>
       </article>
@@ -391,12 +384,12 @@ export function createReports({
     sampleField: "turnoverSample",
     medianField: "medianTurnoverSeconds",
     noPreviousText: "Not enough prior turnover trend data for a week-to-week comparison yet.",
-    lowSampleText: "More turnover cases are needed for a reliable week-to-week comparison.",
-    missingText: "Not enough turnover trend data yet.",
-    aboutSameText: "Median turnover was about the same compared with the previous week with turnover cases.",
-    improvedPrefix: "Median turnover improved by",
+    lowSampleText: "Comparison is not shown unless both weekly Turnover samples are Sufficient.",
+    missingText: "Turnover comparison is unavailable for these weekly buckets.",
+    aboutSameText: "Median Turnover was about the same as the previous week.",
+    improvedPrefix: "Median Turnover decreased by",
     increasedPrefix: "Median turnover increased by",
-    comparisonSuffix: "compared with the previous week with turnover cases."
+    comparisonSuffix: "compared with the previous week."
   });
 
   return renderTrendCard({
@@ -409,16 +402,66 @@ export function createReports({
     countField: "turnoverCycleCount",
     sampleField: "turnoverSample",
     countLabel: "Turnover cases in bucket",
-    comparisonLabel: "Compared with previous week with turnover cases",
+    comparisonLabel: "Previous weekly bucket",
     comparison,
-    cardClass: "turnover-trend-card"
+    cardClass: "turnover-trend-card is-primary"
+  });
+}
+
+  function renderSeatedToDoctorTrendCard(r) {
+  const buckets = chronologicalTrendBuckets(r?.trends?.buckets);
+  const latest = buckets[buckets.length - 1];
+
+  if (!latest) {
+    return `
+      <article class="report-card report-trend-card seated-to-doctor-trend-card is-secondary is-empty">
+        <div>
+          <span class="layer-pill layer-pill--population">Seated -> Doctor Trend</span>
+          <h2>Seated -> Doctor trend</h2>
+          <p>No observation.</p>
+        </div>
+        <p class="report-trend-note">Weekly median Seated to Doctor Arrived intervals will appear here as completed room cycles accumulate.</p>
+      </article>
+    `;
+  }
+
+  const previous = buckets.length > 1 ? buckets[buckets.length - 2] : null;
+  const comparison = describeTrendComparison(latest, previous, {
+    sampleField: "seatedToDoctorSample",
+    fallbackSampleField: "completedSample",
+    medianField: "medianSeatedToDoctorSeconds",
+    noPreviousText: "Not enough prior trend data for a week-to-week comparison yet.",
+    lowSampleText: "Comparison is not shown unless both weekly Seated -> Doctor samples are Sufficient.",
+    missingText: "Seated -> Doctor comparison is unavailable for these weekly buckets.",
+    aboutSameText: "Median Seated -> Doctor was about the same as the previous week.",
+    improvedPrefix: "Median Seated -> Doctor decreased by",
+    increasedPrefix: "Median Seated -> Doctor increased by",
+    comparisonSuffix: "compared with the previous week."
+  });
+
+  return renderTrendCard({
+    title: "Seated -> Doctor trend",
+    eyebrow: "Seated -> Doctor Trend",
+    description: "Median Seated to Doctor Arrived for the latest weekly bucket.",
+    value: formatTrendMinutes(latest.medianSeatedToDoctorSeconds),
+    latest,
+    previous,
+    countField: "completedCycleCount",
+    sampleField: "seatedToDoctorSample",
+    fallbackSampleField: "completedSample",
+    countLabel: "Seated -> Doctor contributors",
+    comparisonLabel: "Previous weekly bucket",
+    comparison,
+    cardClass: "seated-to-doctor-trend-card is-secondary"
   });
 }
 
   function renderTrendCard(options) {
   const latestRange = formatTrendBucketRange(options.latest);
   const previousRange = options.previous ? formatTrendBucketRange(options.previous) : "";
-  const presentation = sampledPresentation(options.latest[options.sampleField], options.value);
+  const presentation = sampledPresentation(
+    trendSample(options.latest, options.sampleField, options.fallbackSampleField),
+    options.value);
   return `
     <article class="report-card report-trend-card ${escapeAttribute(options.cardClass || "")}">
       <div class="report-trend-header">
@@ -451,19 +494,19 @@ export function createReports({
   `;
 }
 
-  function trendBucketsWithCases(buckets, options) {
+  function chronologicalTrendBuckets(buckets) {
   if (!Array.isArray(buckets)) {
     return [];
   }
 
   return buckets
-    .filter(bucket => {
-      const count = Number(bucket?.[options.countField]);
-      const median = Number(bucket?.[options.medianField]);
-      return count > 0 && Number.isFinite(median) && median >= 0;
-    })
+    .filter(bucket => parseReportDateOnly(bucket?.startDate))
     .slice()
     .sort((a, b) => String(a.startDate || "").localeCompare(String(b.startDate || "")));
+}
+
+  function trendSample(bucket, sampleField, fallbackSampleField = null) {
+  return bucket?.[sampleField] || (fallbackSampleField ? bucket?.[fallbackSampleField] : null);
 }
 
   function describeTrendComparison(latest, previous, options) {
@@ -474,9 +517,9 @@ export function createReports({
     };
   }
 
-  const latestSample = latest[options.sampleField];
-  const previousSample = previous[options.sampleField];
-  if (latestSample?.state !== "Sufficient" || previousSample?.state !== "Sufficient") {
+  const latestSample = trendSample(latest, options.sampleField, options.fallbackSampleField);
+  const previousSample = trendSample(previous, options.sampleField, options.fallbackSampleField);
+  if (!sampleSupportsComparison(latestSample) || !sampleSupportsComparison(previousSample)) {
     return {
       tone: "is-neutral",
       text: options.lowSampleText
@@ -511,7 +554,14 @@ export function createReports({
 }
 
   function formatTrendMinutes(totalSeconds) {
-  const seconds = Math.max(0, Number(totalSeconds) || 0);
+  if (totalSeconds === null || totalSeconds === undefined || totalSeconds === "") {
+    return "Unavailable";
+  }
+  const numericSeconds = Number(totalSeconds);
+  if (!Number.isFinite(numericSeconds) || numericSeconds < 0) {
+    return "Unavailable";
+  }
+  const seconds = Math.max(0, numericSeconds);
   const roundedMinutes = Math.round((seconds / 60) * 10) / 10;
   return Number.isInteger(roundedMinutes)
     ? `${roundedMinutes.toFixed(0)} min`
@@ -656,19 +706,29 @@ export function createReports({
 
   const included = r.includedCompletedCycleCount || 0;
   const excluded = r.excludedCompletedCycleCount || 0;
-  const exceptions = r.exceptionCount || 0;
+  const reviewCount = (r.exceptionReviewRecords || r.exceptionCycles || []).length;
 
-  const detail = excluded === 0 && exceptions === 0
-    ? `<p class="allocation-ok">All completed records in this range are included in standard metrics.</p>
-       <p class="allocation-ok">No reporting exceptions found in this date range.</p>`
-    : `<p class="allocation-note">${excluded} ${excluded === 1 ? "record" : "records"} excluded from standard metrics.</p>
-       <p class="allocation-note">${exceptions} reporting ${exceptions === 1 ? "exception" : "exceptions"} flagged. Excluded records remain visible below with badges and reasons.</p>`;
+  if (excluded === 0 && reviewCount === 0) {
+    card.hidden = true;
+    card.innerHTML = "";
+    return;
+  }
+
+  card.hidden = false;
+  const exclusionDetail = excluded > 0
+    ? `<p class="allocation-note">${excluded} ${excluded === 1 ? "record is" : "records are"} excluded from standard metrics.</p>`
+    : "";
+  const reviewDetail = reviewCount > 0
+    ? `<p class="allocation-note">${reviewCount} ${reviewCount === 1 ? "item requires" : "items require"} review in the action queue.</p>
+       <button type="button" class="secondary-button utility-button" data-action="open-review-queue" aria-controls="reportDetail">Open review queue</button>`
+    : "";
 
   card.innerHTML = `
     <span class="layer-pill layer-pill--data-quality">Data Quality</span>
     <h3>Data Quality</h3>
     <p class="allocation-counts">${included} included · ${excluded} excluded</p>
-    ${detail}
+    ${exclusionDetail}
+    ${reviewDetail}
     <p class="allocation-footnote">Included/excluded records are a separate layer from allocation-calculable cases above.</p>`;
 }
 
@@ -1546,7 +1606,6 @@ export function createReports({
     renderMetric("Completed Cycles", r.completedRoomCyclesCount, "Room cycles that reached completion and are available for reporting.", r.samples?.completedCases),
     renderMetric("Sedation Cases", r.sedationCaseCount, null, r.samples?.includedCompletedCases),
     renderMetric("Non-sedation Cases", r.nonSedationCaseCount, null, r.samples?.includedCompletedCases),
-    renderMetric("Exceptions Requiring Review", (r.exceptionCycles || []).length),
     renderMetric("Avg Prep Time", dur(r.averagePrepSeconds), null, r.samples?.prep),
     renderMetric("Median Prep Time", dur(r.medianPrepSeconds), null, r.samples?.prep),
     renderMetric("Avg Ready-to-Doctor Wait", dur(r.averageReadyToDoctorSeconds), null, r.samples?.readyWait),
@@ -2609,6 +2668,16 @@ export function createReports({
 }
 
   async function handleReportsActionClick(event) {
+  const openReviewQueueButton = event.target.closest("[data-action='open-review-queue']");
+  if (openReviewQueueButton) {
+    const detail = document.getElementById("reportDetail");
+    if (detail) {
+      detail.open = true;
+    }
+    document.getElementById("exceptionCyclesBody")?.focus();
+    return;
+  }
+
   const mutationRetryButton = event.target.closest("[data-action='retry-report-mutation']");
   if (mutationRetryButton) {
     const entry = currentReportAction(mutationRetryButton.dataset.recordKey);

@@ -23,7 +23,11 @@ public sealed record ReportTrendBucket(
     double MedianTurnoverSeconds,
     double AverageTurnoverSeconds,
     ReportSampleContext? CompletedSample = null,
-    ReportSampleContext? TurnoverSample = null);
+    ReportSampleContext? TurnoverSample = null,
+    int ReadyWaitCycleCount = 0,
+    double? MedianReadyWaitSeconds = null,
+    ReportSampleContext? ReadyWaitSample = null,
+    ReportSampleContext? SeatedToDoctorSample = null);
 
 /// <summary>
 /// Builds report trend snapshots over a caller-supplied standard/included completed-cycle population.
@@ -45,7 +49,7 @@ public static class ReportTrendSnapshotBuilder
         var eligible = new List<CompletedRoomCycle>();
         foreach (var cycle in cycles)
         {
-            if (cycle is null || cycle.DoctorCompleteAt is null || cycle.SeatedToDoctorSeconds < 0)
+            if (cycle is null || cycle.DoctorCompleteAt is null)
             {
                 continue;
             }
@@ -58,7 +62,18 @@ public static class ReportTrendSnapshotBuilder
             .OrderBy(group => group.Key)
             .Select(group =>
             {
-                var waitValues = group.Select(cycle => cycle.SeatedToDoctorSeconds).Order().ToList();
+                var population = group.ToList();
+                var seatedToDoctorValues = population
+                    .Where(cycle => cycle.DoctorArrivedAt.HasValue && cycle.SeatedToDoctorSeconds >= 0)
+                    .Select(cycle => cycle.SeatedToDoctorSeconds)
+                    .Order()
+                    .ToList();
+                var readyWaitValues = population
+                    .Select(cycle => cycle.ReadyToDoctorSeconds)
+                    .Where(value => value is >= 0)
+                    .Select(value => value!.Value)
+                    .Order()
+                    .ToList();
                 var turnoverValues = group
                     .Select(cycle => cycle.TurnoverSeconds)
                     .Where(value => value is >= 0)
@@ -68,14 +83,18 @@ public static class ReportTrendSnapshotBuilder
                 return new ReportTrendBucket(
                     FormatDate(group.Key),
                     FormatDate(group.Key.AddDays(7)),
-                    waitValues.Count,
-                    Median(waitValues),
-                    Average(waitValues),
+                    seatedToDoctorValues.Count,
+                    Median(seatedToDoctorValues),
+                    Average(seatedToDoctorValues),
                     turnoverValues.Count,
                     Median(turnoverValues),
                     Average(turnoverValues),
-                    ReportSampleContext.ForPopulation(waitValues.Count),
-                    ReportSampleContext.Create(waitValues.Count, turnoverValues.Count));
+                    ReportSampleContext.Create(population.Count, seatedToDoctorValues.Count),
+                    ReportSampleContext.Create(population.Count, turnoverValues.Count),
+                    readyWaitValues.Count,
+                    MedianOrNull(readyWaitValues),
+                    ReportSampleContext.Create(population.Count, readyWaitValues.Count),
+                    ReportSampleContext.Create(population.Count, seatedToDoctorValues.Count));
             })
             .ToList();
 
@@ -106,4 +125,7 @@ public static class ReportTrendSnapshotBuilder
             ? orderedValues[middle]
             : (orderedValues[middle - 1] + orderedValues[middle]) / 2.0;
     }
+
+    private static double? MedianOrNull(IReadOnlyList<int> orderedValues) =>
+        orderedValues.Count == 0 ? null : Median(orderedValues);
 }

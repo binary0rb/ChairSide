@@ -59,7 +59,7 @@
                   {
                       "path":  "AGENTS.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  19132,
+                      "sizeBytes":  19133,
                       "typeSymbols":  [
 
                                       ],
@@ -198,7 +198,7 @@
                   {
                       "path":  "docs/design/reporting-design.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  28775,
+                      "sizeBytes":  28803,
                       "typeSymbols":  [
 
                                       ],
@@ -434,7 +434,7 @@
                   {
                       "path":  "docs/knowledge/reports/procedure-mix.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  3601,
+                      "sizeBytes":  3606,
                       "typeSymbols":  [
 
                                       ],
@@ -466,7 +466,7 @@
                   {
                       "path":  "docs/knowledge/reports/reporting-population.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  4293,
+                      "sizeBytes":  4309,
                       "typeSymbols":  [
 
                                       ],
@@ -656,7 +656,7 @@
                   {
                       "path":  "docs/knowledge-graph/chairside.graph.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  17256,
+                      "sizeBytes":  17261,
                       "typeSymbols":  [
 
                                       ],
@@ -687,7 +687,7 @@
                   {
                       "path":  "docs/knowledge-graph/decisions.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  20338,
+                      "sizeBytes":  20346,
                       "typeSymbols":  [
 
                                       ],
@@ -1544,7 +1544,7 @@
                   {
                       "path":  "src/ChairSide.Board/Program.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  73052,
+                      "sizeBytes":  73070,
                       "typeSymbols":  [
                                           "LegacyRoomOneRedirect",
                                           "BeginPrestageRequest",
@@ -1798,7 +1798,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/DemoBoardStore.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  186644,
+                      "sizeBytes":  186671,
                       "typeSymbols":  [
                                           "ExceptionReasons",
                                           "ReportingExceptionReasons",
@@ -2298,7 +2298,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/ReportQuery.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  7033,
+                      "sizeBytes":  7251,
                       "typeSymbols":  [
                                           "ReportScopeKinds",
                                           "ReportSedationSegments",
@@ -2341,7 +2341,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/ReportsSnapshotBuilder.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  49875,
+                      "sizeBytes":  50100,
                       "typeSymbols":  [
                                           "ReportsSnapshotBuilder"
                                       ],
@@ -2403,7 +2403,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/ReportsSnapshotComposition.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  9161,
+                      "sizeBytes":  9185,
                       "typeSymbols":  [
                                           "ReportsSnapshotComposition",
                                           "ReportPopulationSection",
@@ -2437,7 +2437,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/ReportTrendSnapshot.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  4193,
+                      "sizeBytes":  5289,
                       "typeSymbols":  [
                                           "ReportTrendSnapshot",
                                           "ReportTrendBucket",
@@ -2448,7 +2448,8 @@
                                             "WeekStart",
                                             "FormatDate",
                                             "Average",
-                                            "Median"
+                                            "Median",
+                                            "MedianOrNull"
                                         ],
                       "routes":  [
 
@@ -3202,7 +3203,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/report-data.js",
                       "kind":  "JavaScript",
-                      "sizeBytes":  8937,
+                      "sizeBytes":  9074,
                       "typeSymbols":  [
 
                                       ],
@@ -3255,7 +3256,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/reports.html",
                       "kind":  "Html",
-                      "sizeBytes":  11419,
+                      "sizeBytes":  11447,
                       "typeSymbols":  [
 
                                       ],
@@ -3281,7 +3282,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/reports.js",
                       "kind":  "JavaScript",
-                      "sizeBytes":  114056,
+                      "sizeBytes":  117009,
                       "typeSymbols":  [
 
                                       ],
@@ -3311,10 +3312,12 @@
                                               "sampledPresentation",
                                               "renderSampleContext",
                                               "renderReportTrendCards",
-                                              "renderWaitTrendCard",
+                                              "renderReadyWaitTrendCard",
                                               "renderTurnoverTrendCard",
+                                              "renderSeatedToDoctorTrendCard",
                                               "renderTrendCard",
-                                              "trendBucketsWithCases",
+                                              "chronologicalTrendBuckets",
+                                              "trendSample",
                                               "describeTrendComparison",
                                               "formatTrendMinutes",
                                               "formatTrendBucketRange",
@@ -3375,9 +3378,7 @@
                                               "formatAllocationVariance",
                                               "revealReportDisclosures",
                                               "noMatchMessage",
-                                              "renderProcedureSummaries",
-                                              "renderProcedureSummaryRow",
-                                              "completedRecordKey"
+                                              "renderProcedureSummaries"
                                           ],
                       "headings":  [
 
@@ -3604,7 +3605,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/styles.css",
                       "kind":  "Css",
-                      "sizeBytes":  97593,
+                      "sizeBytes":  97844,
                       "typeSymbols":  [
 
                                       ],
@@ -4132,7 +4133,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/BoardStoreReadinessTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  13900,
+                      "sizeBytes":  13904,
                       "typeSymbols":  [
                                           "BoardStoreTests"
                                       ],
@@ -4232,7 +4233,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/BoardStoreReportingTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  38702,
+                      "sizeBytes":  40615,
                       "typeSymbols":  [
                                           "BoardStoreTests"
                                       ],
@@ -4261,6 +4262,7 @@
                                             "Reports_expose_weekly_wait_trends_over_standard_completed_population",
                                             "Reports_wait_trends_respect_date_range_filter",
                                             "Reports_wait_trends_exclude_reporting_exception_cycles",
+                                            "Reports_ready_wait_trend_uses_reissued_accepted_ready_not_withdrawn_interval",
                                             "Reports_expose_schedule_fit_over_standard_completed_population",
                                             "Reports_schedule_fit_present_and_zero_when_no_completed_cycles",
                                             "Reports_schedule_fit_respects_date_range_filter",
@@ -5147,7 +5149,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/ReportQueryTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  2115,
+                      "sizeBytes":  2171,
                       "typeSymbols":  [
                                           "ReportQueryTests"
                                       ],
@@ -5174,7 +5176,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/ReportsSnapshotBuilderTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  30218,
+                      "sizeBytes":  33316,
                       "typeSymbols":  [
                                           "ReportsSnapshotBuilderTests"
                                       ],
@@ -5184,6 +5186,8 @@
                                             "Build_applies_completion_window_before_every_population_and_keeps_all_time_total",
                                             "Reports_snapshot_web_json_property_contract_appends_doctor_allocation_samples",
                                             "Build_applies_historical_doctor_and_sedation_scope_without_treating_grouping_as_a_filter",
+                                            "Build_keeps_broader_completed_count_while_timing_uses_truthful_ready_contributors",
+                                            "Build_marks_weekly_ready_wait_unavailable_when_completed_population_has_no_ready_observation",
                                             "Build_preserves_unavailable_doctor_allocation_when_population_has_no_contributors",
                                             "Build_keeps_review_queue_global_to_analytical_scope_but_bounded_by_window",
                                             "CreateBuilder",
@@ -5210,7 +5214,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/ReportTrendSnapshotTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  7474,
+                      "sizeBytes":  11271,
                       "typeSymbols":  [
                                           "ReportTrendSnapshotTests"
                                       ],
@@ -5223,6 +5227,10 @@
                                             "Median_turnover_is_correct",
                                             "Average_turnover_is_correct",
                                             "Turnover_count_uses_only_cycles_with_usable_turnover_values",
+                                            "Ready_wait_median_uses_only_truthful_weekly_contributors",
+                                            "Ready_wait_is_unavailable_for_nonempty_week_without_truthful_ready_observations",
+                                            "Truthful_zero_ready_wait_remains_an_observed_value",
+                                            "Weekly_samples_use_one_population_and_metric_specific_contributors",
                                             "Completed_cycle_count_per_bucket_is_the_eligible_cycle_count",
                                             "Public_model_does_not_expose_projection_capacity_or_ranking_names",
                                             "Public_model_does_not_expose_patient_like_field_names",
@@ -5851,7 +5859,7 @@
                   {
                       "path":  "tests/javascript/report-data.test.mjs",
                       "kind":  "JavaScript",
-                      "sizeBytes":  18637,
+                      "sizeBytes":  18792,
                       "typeSymbols":  [
 
                                       ],
@@ -5879,7 +5887,7 @@
                   {
                       "path":  "tests/javascript/reports.test.mjs",
                       "kind":  "JavaScript",
-                      "sizeBytes":  77747,
+                      "sizeBytes":  84019,
                       "typeSymbols":  [
 
                                       ],
@@ -5916,7 +5924,8 @@
                                               "deferred",
                                               "selectedCard",
                                               "allocationPayload",
-                                              "allocationSurfaceHtml"
+                                              "allocationSurfaceHtml",
+                                              "trendBucket"
                                           ],
                       "headings":  [
 
