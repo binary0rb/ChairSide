@@ -12,12 +12,13 @@ This file is mechanical output from `tools/knowledge-graph/New-ChairSideKnowledg
 | `ChairSide.Board.sln` | Solution | - | - |
 | `CLAUDE.md` | Markdown | headings: Claude Code note | - |
 | `docs/design/prestage-assignment-lifecycle.md` | Markdown | headings: Prestaging Assignment Lifecycle, Status and traceability, Primary lifecycle, Assignment completeness, Ready boundary, Canonical HTTP contract, Capability and integrity authority, Ready urgency, withdrawal, and acceptance | - |
+| `docs/design/reporting-design.md` | Markdown | headings: ChairSide Canonical Reporting Design, Status and authority, Governing principles, Approved information hierarchy, Practice Overview, Practice Trends, Procedure Mix, Doctor Reporting | - |
 | `docs/executive-summary.md` | Markdown | headings: Executive Summary | - |
 | `docs/knowledge/_meta/tag-dictionary.md` | Markdown | headings: ChairSide Knowledge Tag Dictionary, 1. Title and purpose, 2. Agent reading order, 3. Source-truth relationship, 4. Canonical tag rules, 5. Canonical project-area tags, 6. Canonical domain-concept tags, 7. Canonical artifact/status tags | - |
 | `docs/knowledge/product/environment-maintenance-preflight.md` | Markdown | headings: Environment and maintenance preflight, Recognized environments, Runtime posture, Database path isolation, Database deployment identity, Maintenance posture, Verified Training deployment status, Source and test anchors | - |
 | `docs/knowledge/product/non-phi-boundary.md` | Markdown | headings: Non-PHI boundary, Intent, Constraints, Source anchors, Verification notes | - |
-| `docs/knowledge/reports/observed-load.md` | Markdown | headings: Observed load, Intent, What it reports, Constraints, Source anchors, Verification notes | - |
-| `docs/knowledge/reports/procedure-mix.md` | Markdown | headings: Procedure mix, Intent, What it reports, Constraints, Source anchors, Verification notes | - |
+| `docs/knowledge/reports/observed-load.md` | Markdown | headings: Observed load, Intent, Approved redesign boundary, What it reports, Constraints, Source anchors, Verification notes | - |
+| `docs/knowledge/reports/procedure-mix.md` | Markdown | headings: Procedure mix, Intent, Approved redesign boundary, What it reports, Constraints, Source anchors, Verification notes | - |
 | `docs/knowledge/reports/reporting-population.md` | Markdown | headings: Reporting population, Population funnel, Assignment and handoff attribution, Termination populations, Source and test anchors | - |
 | `docs/knowledge/reports/sedation-as-modifier.md` | Markdown | headings: Sedation as a modifier, Intent, How it is represented, Constraints, Source anchors, Verification notes | - |
 | `docs/knowledge/tests/deterministic-stress-fixtures.md` | Markdown | headings: Deterministic stress fixtures, Intent, Canonical live-room representation, Profiles, Atomic reset contract, Source and test anchors | - |

@@ -231,44 +231,30 @@ Room lifecycle mutation should occur from the room-local tablet/panel only. When
 
 ## Metrics and reporting
 
-The primary metric is:
+`docs/design/reporting-design.md` is the canonical design authority for approved reporting semantics. It consumes the lifecycle and accepted Ready-handoff facts defined by `docs/design/prestage-assignment-lifecycle.md` and issue #111; reporting work must not redefine those lifecycle facts independently.
 
-- Seated-to-doctor time
+Core reporting rules:
 
-Definition:
+- ChairSide reports only what its room events actually observe. Do not infer attendance, productivity, availability, scheduled hours, or unobserved activity.
+- Ready for Doctor is the formal handoff boundary for canonical reporting attribution.
+- `Ready Wait` is accepted Ready -> Doctor Arrived. `Seated -> Doctor` remains the distinct total seated interval before Doctor Arrived.
+- Prominent operational timing is median-first. Averages may remain as secondary/detail context.
+- An Observed Doctor Day exists only when qualifying ChairSide activity is observed for that doctor on that UTC calendar date. No-observation days are omitted and never zero-filled.
+- Observed Clinical Span is first qualifying accepted Ready -> last same-day Doctor Complete.
+- Doctor Working wall-clock calculations use the union of Doctor Arrived -> Doctor Complete intervals so overlap is never double-counted.
+- Unstructured Time is the portion of Observed Clinical Span with no active Doctor Working interval. It must not be described as idle, unproductive, unused, available, absent, unscheduled, or recoverable time.
+- Procedure Mix exists at Practice and Doctor scope. Percentages always use the current scoped included completed-case population as their denominator, and counts plus sample size remain visible.
+- Sedation remains a modifier of the primary procedure, not a second case or separately timed procedure.
+- Schedule Fit compares the confirmed scheduling allocation with compatible observed case-flow timing. The approved first-version measured basis remains Seated -> Doctor Complete; Doctor Time is not interchangeable with that interval.
+- Schedule Fit reports expected, observed, slack, debt, signed net variance, and population coverage while evaluating the scheduling model rather than the doctor.
+- Calibration Insights may surface sufficiently supported over- or under-allocation patterns for human review, but never change scheduling assumptions automatically.
+- Weak samples suppress unsupported comparisons or insight language. Empty and unobserved populations are distinct from truthful observed zero values.
+- Healthy Data Quality stays quiet; exclusions and pending review become visible only when context or action is needed. Audit detail remains the evidence layer behind metrics and insights.
+- No doctor efficiency score, provider grade, leaderboard, attendance inference, idle-time report, quota, best/worst framing, or punitive staff metric is allowed.
 
-- The elapsed time between when a room is seated and when the doctor physically arrives.
+Existing whole UTC report days, Monday-start UTC weeks, `DoctorCompleteAt` completed-window anchoring, accepted Ready attribution, withdrawn-handoff exclusion, legacy no-fabrication behavior, and completed/exception population partitions remain authoritative.
 
-Track:
-
-- SeatedAt
-- ReadyForDoctorAt
-- AgingStartedAt
-- StaleStartedAt
-- DoctorArrivedAt
-- DoctorCompleteAt
-- RoomAvailableAt
-- Total seated-to-doctor duration
-- Prep duration
-- Ready-to-doctor duration
-- Doctor-in-room duration
-- Turnover duration
-- Total room-cycle duration
-
-Reports should eventually include:
-
-- Average seated-to-doctor time
-- Median seated-to-doctor time
-- Aging event count
-- Stale event count
-- Total above-threshold wait time
-- Trends by doctor, room, procedure, and time of day
-
-The accepted Ready handoff is the finalized reporting assignment. Withdrawn handoffs do not become accepted attribution, pre-arrival aborts stay outside throughput, and post-arrival expiration belongs only to the review-required exception population.
-
-Reports should be operational, non-punitive, and team-process oriented. Avoid doctor or staff rankings, best/worst framing, scoreboards, awards, shame language, or productivity theater. Use summary cards, median/average timing context, plain-English explanations, progressive disclosure, and operational questions.
-
-Workshop and projection language should frame outputs as scenario exploration, not prediction. Do not imply ChairSide can perfectly predict capacity or that observed slack is automatically recoverable time.
+Exact general sample-size guardrails belong to #213. Typical Observed Range quantiles belong to #218. Calibration Insight sample, deviation, directional-consistency, tolerance, and persistence rules belong to #219. Do not silently hard-code those deferred design choices.
 
 ## Data Analytics skills for reporting work
 

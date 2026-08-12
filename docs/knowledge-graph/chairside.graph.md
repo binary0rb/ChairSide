@@ -68,6 +68,20 @@ flowchart LR
     WithdrawnHandoff --> AuditOnly["DesignDecision: Not accepted attribution"]
     Aborts --> OutsideThroughput["DesignDecision: Outside throughput"]
 
+    Reports --> ReportingDesign["DesignDecision: Canonical reporting design"]
+    AcceptedHandoff --> ReadyWait["ReportMetric: Accepted Ready Wait"]
+    ReportingDesign --> SeatedDoctor["ReportMetric: Seated to Doctor"]
+    ReportingDesign --> MedianFirst["DesignDecision: Median-first prominent timing"]
+    ReportingDesign --> ObservedDoctorDay["ReportMetric: Observed Doctor Day"]
+    ObservedDoctorDay --> ObservedClinicalSpan["ReportMetric: Observed Clinical Span"]
+    ObservedClinicalSpan --> DoctorWorkingUnion["ReportMetric: Doctor Working wall-clock union"]
+    DoctorWorkingUnion --> ConcurrencyBuckets["ReportMetric: Doctor Working concurrency buckets"]
+    ObservedClinicalSpan --> UnstructuredTime["ReportMetric: Unstructured Time"]
+    StandardPopulation --> ProcedureMix["ReportMetric: Practice and doctor Procedure Mix"]
+    StandardPopulation --> ScheduleFit["ReportMetric: Schedule Fit"]
+    ScheduleFit --> CalibrationInsights["UiSurface: Calibration Insights"]
+    Reports --> DataQualityAudit["UiSurface: Data Quality and case audit"]
+
     DoctorRoster["ConfigOption: Doctor roster"] --> CanonicalAssignment
     ProcedureRoster["ConfigOption: Procedure roster"] --> CanonicalAssignment
     SedationModifier["DomainConcept: Sedation modifier"] --> CanonicalAssignment
@@ -138,10 +152,21 @@ flowchart LR
 
 ## Reporting semantics
 
-- Accepted Ready handoff is finalized assignment attribution.
-- Withdrawn handoffs are audit history and never accepted attribution.
+- `docs/design/reporting-design.md` is the canonical reporting-semantics design authority; lifecycle and accepted Ready-handoff truth remain owned by the lifecycle design and issue #111.
+- Accepted Ready handoff is finalized assignment attribution. Withdrawn handoffs are audit history and never accepted attribution.
 - Whole UTC days, Monday-start UTC weeks, and `DoctorCompleteAt` completed-window anchoring remain unchanged.
-- Standard completed metrics exclude incomplete cycles and exception populations.
+- Standard completed metrics exclude incomplete cycles and exception populations while truthful phase-complete metrics retain their metric-specific eligibility.
+- Ready Wait is accepted Ready -> Doctor Arrived; Seated -> Doctor remains a distinct total seated interval.
+- Prominent operational timing is median-first, with averages secondary/detail.
+- Observed Doctor Days exist only for qualifying same-day Ready-anchored observed flow and are never zero-filled for unobserved dates.
+- Observed Clinical Span is first qualifying accepted Ready -> last same-day Doctor Complete.
+- Doctor Working elapsed time uses wall-clock unions of Doctor Arrived -> Doctor Complete intervals. Concurrency buckets partition the same wall-clock span without double-counting.
+- Unstructured Time is the span remainder with no active Doctor Working interval and must not be described as idle, available, unused, absent, unscheduled, or recoverable time.
+- Procedure Mix exists at Practice and Doctor scope with counts, percentages, and the current scoped included population as denominator.
+- Schedule Fit preserves compatible expected-vs-observed case-flow semantics, keeps slack and debt separate, and evaluates the scheduling model rather than the doctor.
+- Calibration Insights are neutral, sample-supported review callouts and never mutate expected allocation automatically.
+- Healthy Data Quality stays quiet; exclusions and review exceptions remain visible through progressive disclosure and audit evidence.
+- Provider ranking, efficiency scoring, attendance inference, idle-time reporting, and punitive metrics are prohibited.
 - Ready urgency threshold flags are captured without newly persisting Aging/Stale primary states.
 
 ## Completed follow-up work

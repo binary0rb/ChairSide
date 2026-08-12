@@ -1,7 +1,7 @@
 ﻿{
     "generatedStamp":  "deterministic",
     "root":  ".",
-    "fileCount":  166,
+    "fileCount":  167,
     "files":  [
                   {
                       "path":  ".github/pull_request_template.md",
@@ -59,7 +59,7 @@
                   {
                       "path":  "AGENTS.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  17001,
+                      "sizeBytes":  18887,
                       "typeSymbols":  [
 
                                       ],
@@ -196,6 +196,83 @@
                                    ]
                   },
                   {
+                      "path":  "docs/design/reporting-design.md",
+                      "kind":  "Markdown",
+                      "sizeBytes":  27332,
+                      "typeSymbols":  [
+
+                                      ],
+                      "methodSymbols":  [
+
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+                                       "ChairSide Canonical Reporting Design",
+                                       "Status and authority",
+                                       "Governing principles",
+                                       "Approved information hierarchy",
+                                       "Practice Overview",
+                                       "Practice Trends",
+                                       "Procedure Mix",
+                                       "Doctor Reporting",
+                                       "Procedure Intelligence",
+                                       "Schedule Fit and Calibration Insights",
+                                       "Data Quality and audit",
+                                       "Reporting time and attribution foundations",
+                                       "Report windows",
+                                       "Accepted Ready handoff",
+                                       "Legacy completed cases",
+                                       "Reporting populations",
+                                       "Practice Completed Cases",
+                                       "Analytical denominators",
+                                       "Core operational metrics",
+                                       "Ready Wait",
+                                       "Seated -\u003e Doctor",
+                                       "Doctor Time",
+                                       "Turnover",
+                                       "Median and average prominence",
+                                       "Observed Doctor Day model",
+                                       "Purpose",
+                                       "Qualifying observed-flow case",
+                                       "Observed Doctor Day",
+                                       "Observed Clinical Span",
+                                       "Doctor Working intervals",
+                                       "Wall-clock union and concurrency",
+                                       "Unstructured Time",
+                                       "Procedure Mix and Procedure Intelligence",
+                                       "Procedure Mix denominator",
+                                       "Procedure family, detailed variant, and sedation",
+                                       "Schedule Fit",
+                                       "Expected allocation basis",
+                                       "Observed measurement basis",
+                                       "Contributing population",
+                                       "Variance, slack, debt, and net",
+                                       "Blocks and coverage",
+                                       "Calibration Insights",
+                                       "Sample size and no-observation behavior",
+                                       "Healthy state",
+                                       "Limited or excluded state",
+                                       "Action-required state",
+                                       "Audit evidence",
+                                       "Non-punitive interpretation constraints",
+                                       "Current implementation compatibility and known gaps",
+                                       "Deferred design and future reporting",
+                                       "Implementation and test derivation rules",
+                                       "Delivery relationship"
+                                   ]
+                  },
+                  {
                       "path":  "docs/executive-summary.md",
                       "kind":  "Markdown",
                       "sizeBytes":  58,
@@ -325,7 +402,7 @@
                   {
                       "path":  "docs/knowledge/reports/observed-load.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  2785,
+                      "sizeBytes":  3580,
                       "typeSymbols":  [
 
                                       ],
@@ -347,6 +424,7 @@
                       "headings":  [
                                        "Observed load",
                                        "Intent",
+                                       "Approved redesign boundary",
                                        "What it reports",
                                        "Constraints",
                                        "Source anchors",
@@ -356,7 +434,7 @@
                   {
                       "path":  "docs/knowledge/reports/procedure-mix.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  2925,
+                      "sizeBytes":  3331,
                       "typeSymbols":  [
 
                                       ],
@@ -378,6 +456,7 @@
                       "headings":  [
                                        "Procedure mix",
                                        "Intent",
+                                       "Approved redesign boundary",
                                        "What it reports",
                                        "Constraints",
                                        "Source anchors",
@@ -576,7 +655,7 @@
                   {
                       "path":  "docs/knowledge-graph/chairside.graph.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  13792,
+                      "sizeBytes":  16606,
                       "typeSymbols":  [
 
                                       ],
@@ -607,7 +686,7 @@
                   {
                       "path":  "docs/knowledge-graph/decisions.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  16346,
+                      "sizeBytes":  19315,
                       "typeSymbols":  [
 
                                       ],
@@ -644,6 +723,7 @@
                                        "Maintenance reset",
                                        "Environment and maintenance preflight",
                                        "Reporting population semantics",
+                                       "Canonical reporting semantics",
                                        "Reporting UI philosophy",
                                        "Completed follow-up work"
                                    ]
@@ -3285,7 +3365,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/room.html",
                       "kind":  "Html",
-                      "sizeBytes":  6681,
+                      "sizeBytes":  6701,
                       "typeSymbols":  [
 
                                       ],
@@ -3472,7 +3552,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/styles.css",
                       "kind":  "Css",
-                      "sizeBytes":  96590,
+                      "sizeBytes":  96603,
                       "typeSymbols":  [
 
                                       ],
@@ -3663,7 +3743,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/BoardReadyPresentationTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  29390,
+                      "sizeBytes":  29410,
                       "typeSymbols":  [
                                           "BoardReadyPresentationTests"
                                       ],
