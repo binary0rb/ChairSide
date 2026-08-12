@@ -39,6 +39,12 @@
                       "path":  "docs/design/prestage-assignment-lifecycle.md"
                   },
                   {
+                      "id":  "file:docs/design/reporting-design.md",
+                      "label":  "docs/design/reporting-design.md",
+                      "type":  "File",
+                      "path":  "docs/design/reporting-design.md"
+                  },
+                  {
                       "id":  "file:docs/executive-summary.md",
                       "label":  "docs/executive-summary.md",
                       "type":  "File",
@@ -3941,6 +3947,11 @@
                   {
                       "from":  "repo:chairside",
                       "to":  "file:docs/design/prestage-assignment-lifecycle.md",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:docs/design/reporting-design.md",
                       "label":  "contains"
                   },
                   {
