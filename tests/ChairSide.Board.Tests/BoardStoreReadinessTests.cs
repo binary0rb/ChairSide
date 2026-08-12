@@ -250,7 +250,7 @@ public sealed partial class BoardStoreTests
         var reportsScript = File.ReadAllText(Path.Combine(root, "src", "ChairSide.Board", "wwwroot", "reports.js"));
 
         Assert.Contains("<span>${escapeHtml(label)}</span>", reportsScript);
-        Assert.Contains("<strong>${escapeHtml(value)}</strong>", reportsScript);
+        Assert.Contains("<strong>${escapeHtml(presentation.value)}</strong>", reportsScript);
     }
 
     [Fact]

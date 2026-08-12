@@ -417,6 +417,12 @@
                       "path":  "src/ChairSide.Board/Services/ReadyHandoffPersistenceRecords.cs"
                   },
                   {
+                      "id":  "file:src/ChairSide.Board/Services/ReportQuery.cs",
+                      "label":  "src/ChairSide.Board/Services/ReportQuery.cs",
+                      "type":  "File",
+                      "path":  "src/ChairSide.Board/Services/ReportQuery.cs"
+                  },
+                  {
                       "id":  "file:src/ChairSide.Board/Services/ReportsSnapshotBuilder.cs",
                       "label":  "src/ChairSide.Board/Services/ReportsSnapshotBuilder.cs",
                       "type":  "File",
@@ -817,6 +823,12 @@
                       "label":  "tests/ChairSide.Board.Tests/ReadyHandoffPersistenceTests.cs",
                       "type":  "File",
                       "path":  "tests/ChairSide.Board.Tests/ReadyHandoffPersistenceTests.cs"
+                  },
+                  {
+                      "id":  "file:tests/ChairSide.Board.Tests/ReportQueryTests.cs",
+                      "label":  "tests/ChairSide.Board.Tests/ReportQueryTests.cs",
+                      "type":  "File",
+                      "path":  "tests/ChairSide.Board.Tests/ReportQueryTests.cs"
                   },
                   {
                       "id":  "file:tests/ChairSide.Board.Tests/ReportsSnapshotBuilderTests.cs",
@@ -2157,10 +2169,28 @@
                       "path":  "src/ChairSide.Board/Services/DemoBoardStore.cs"
                   },
                   {
+                      "id":  "symbol:type:ReportMetricSampleContext",
+                      "label":  "ReportMetricSampleContext",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/ReportQuery.cs"
+                  },
+                  {
                       "id":  "symbol:type:ReportPopulationSection",
                       "label":  "ReportPopulationSection",
                       "type":  "CodeType",
                       "path":  "src/ChairSide.Board/Services/ReportsSnapshotComposition.cs"
+                  },
+                  {
+                      "id":  "symbol:type:ReportProcedureGroupings",
+                      "label":  "ReportProcedureGroupings",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/ReportQuery.cs"
+                  },
+                  {
+                      "id":  "symbol:type:ReportProcedureMetricSampleContext",
+                      "label":  "ReportProcedureMetricSampleContext",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/ReportQuery.cs"
                   },
                   {
                       "id":  "symbol:type:ReportProcedureSection",
@@ -2169,10 +2199,46 @@
                       "path":  "src/ChairSide.Board/Services/ReportsSnapshotComposition.cs"
                   },
                   {
+                      "id":  "symbol:type:ReportQueryContext",
+                      "label":  "ReportQueryContext",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/ReportQuery.cs"
+                  },
+                  {
+                      "id":  "symbol:type:ReportQueryTests",
+                      "label":  "ReportQueryTests",
+                      "type":  "CodeType",
+                      "path":  "tests/ChairSide.Board.Tests/ReportQueryTests.cs"
+                  },
+                  {
                       "id":  "symbol:type:ReportReviewQueueSection",
                       "label":  "ReportReviewQueueSection",
                       "type":  "CodeType",
                       "path":  "src/ChairSide.Board/Services/ReportsSnapshotComposition.cs"
+                  },
+                  {
+                      "id":  "symbol:type:ReportSampleContext",
+                      "label":  "ReportSampleContext",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/ReportQuery.cs"
+                  },
+                  {
+                      "id":  "symbol:type:ReportSampleStates",
+                      "label":  "ReportSampleStates",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/ReportQuery.cs"
+                  },
+                  {
+                      "id":  "symbol:type:ReportScopeKinds",
+                      "label":  "ReportScopeKinds",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/ReportQuery.cs"
+                  },
+                  {
+                      "id":  "symbol:type:ReportSedationSegments",
+                      "label":  "ReportSedationSegments",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/ReportQuery.cs"
                   },
                   {
                       "id":  "symbol:type:ReportsSnapshot",
@@ -2431,6 +2497,12 @@
                       "label":  "ScheduleFitResult",
                       "type":  "CodeType",
                       "path":  "src/ChairSide.Board/Services/ScheduleFitCalculator.cs"
+                  },
+                  {
+                      "id":  "symbol:type:ScopedProcedureGroup",
+                      "label":  "ScopedProcedureGroup",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/ReportQuery.cs"
                   },
                   {
                       "id":  "symbol:type:SeatRoomActionRequest",
@@ -3395,6 +3467,56 @@
                       "label":  "declares"
                   },
                   {
+                      "from":  "file:src/ChairSide.Board/Services/ReportQuery.cs",
+                      "to":  "symbol:type:ReportMetricSampleContext",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/ReportQuery.cs",
+                      "to":  "symbol:type:ReportProcedureGroupings",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/ReportQuery.cs",
+                      "to":  "symbol:type:ReportProcedureMetricSampleContext",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/ReportQuery.cs",
+                      "to":  "symbol:type:ReportQueryContext",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/ReportQuery.cs",
+                      "to":  "symbol:type:ReportSampleContext",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/ReportQuery.cs",
+                      "to":  "symbol:type:ReportSampleStates",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/ReportQuery.cs",
+                      "to":  "symbol:type:ReportScopeKinds",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/ReportQuery.cs",
+                      "to":  "symbol:type:ReportSedationSegments",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/ReportQuery.cs",
+                      "to":  "symbol:type:ScopedProcedureGroup",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/ReportQuery.cs",
+                      "to":  "symbol:type:struct",
+                      "label":  "declares"
+                  },
+                  {
                       "from":  "file:src/ChairSide.Board/Services/ReportsSnapshotBuilder.cs",
                       "to":  "symbol:type:ReportsSnapshotBuilder",
                       "label":  "declares"
@@ -3827,6 +3949,11 @@
                   {
                       "from":  "file:tests/ChairSide.Board.Tests/ReadyHandoffPersistenceTests.cs",
                       "to":  "symbol:type:RoomSnapshot",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:tests/ChairSide.Board.Tests/ReportQueryTests.cs",
+                      "to":  "symbol:type:ReportQueryTests",
                       "label":  "declares"
                   },
                   {
@@ -4266,6 +4393,11 @@
                   },
                   {
                       "from":  "repo:chairside",
+                      "to":  "file:src/ChairSide.Board/Services/ReportQuery.cs",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
                       "to":  "file:src/ChairSide.Board/Services/ReportsSnapshotBuilder.cs",
                       "label":  "contains"
                   },
@@ -4597,6 +4729,11 @@
                   {
                       "from":  "repo:chairside",
                       "to":  "file:tests/ChairSide.Board.Tests/ReadyHandoffPersistenceTests.cs",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:tests/ChairSide.Board.Tests/ReportQueryTests.cs",
                       "label":  "contains"
                   },
                   {

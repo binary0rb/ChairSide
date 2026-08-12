@@ -162,7 +162,12 @@ test("request context represents effective server bounds independently of preset
   assert.deepEqual(custom.requestContext, {
     from: "2026-07-01",
     to: "2026-07-07",
-    rangeSignature: "[\"2026-07-01\",\"2026-07-07\"]"
+    scope: "Practice",
+    doctorId: null,
+    sedation: "All",
+    procedureGrouping: "Family",
+    rangeSignature: "[\"2026-07-01\",\"2026-07-07\"]",
+    querySignature: "[\"2026-07-01\",\"2026-07-07\",\"Practice\",null,\"All\",\"Family\"]"
   });
 
   const different = await loadRange({
@@ -190,7 +195,12 @@ test("request context represents effective server bounds independently of preset
   assert.deepEqual(allTime.requestContext, {
     from: null,
     to: null,
-    rangeSignature: "[null,null]"
+    scope: "Practice",
+    doctorId: null,
+    sedation: "All",
+    procedureGrouping: "Family",
+    rangeSignature: "[null,null]",
+    querySignature: "[null,null,\"Practice\",null,\"All\",\"Family\"]"
   });
 });
 
@@ -284,7 +294,12 @@ test("guaranteed fresh reload starts one GET when no request is active", async (
     requestContext: {
       from: "2026-07-01",
       to: "2026-07-15",
-      rangeSignature: "[\"2026-07-01\",\"2026-07-15\"]"
+      scope: "Practice",
+      doctorId: null,
+      sedation: "All",
+      procedureGrouping: "Family",
+      rangeSignature: "[\"2026-07-01\",\"2026-07-15\"]",
+      querySignature: "[\"2026-07-01\",\"2026-07-15\",\"Practice\",null,\"All\",\"Family\"]"
     }
   });
   assert.equal(harness.controller.getLastSuccessfulLoad(), result);
@@ -450,4 +465,50 @@ test("module owns transport state without importing presentation or application 
   assert.doesNotMatch(moduleSource, /\b(document|renderReports|renderDoctorCockpit)\b/);
   assert.match(moduleSource, /cache: "no-store"/);
   assert.match(moduleSource, /reportsVersion\+\+/);
+});
+
+test("analytical scope is encoded independently from procedure grouping and server normalization is retained", async () => {
+  const harness = createHarness({
+    fetch: async () => response(200, {
+      query: {
+        scope: "Doctor",
+        doctorId: "historical-doctor",
+        sedation: "Sedation",
+        procedureGrouping: "DetailedVariant",
+        rangeStartDate: "2026-07-04",
+        rangeEndDate: "2026-08-12",
+        rangeLabel: "normalized"
+      }
+    })
+  });
+  harness.controller.setDateRange({
+    preset: "custom",
+    start: "2026-08-12",
+    end: "2026-07-04"
+  });
+  harness.controller.setScope("Doctor", "historical-doctor");
+  harness.controller.setSedation("Sedation");
+  harness.controller.setProcedureGrouping("DetailedVariant");
+
+  await harness.controller.load();
+
+  assert.equal(
+    harness.calls[0].url,
+    "/api/reports?from=2026-08-12&to=2026-07-04&scope=Doctor&doctorId=historical-doctor&sedation=Sedation&procedureGrouping=DetailedVariant");
+  assert.deepEqual(harness.controller.getDateRange(), {
+    preset: "custom",
+    start: "2026-07-04",
+    end: "2026-08-12"
+  });
+  assert.deepEqual(harness.controller.getQuery(), {
+    scope: "Doctor",
+    doctorId: "historical-doctor",
+    sedation: "Sedation",
+    procedureGrouping: "DetailedVariant",
+    window: {
+      preset: "custom",
+      start: "2026-07-04",
+      end: "2026-08-12"
+    }
+  });
 });

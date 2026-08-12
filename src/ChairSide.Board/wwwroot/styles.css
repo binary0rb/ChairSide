@@ -1562,6 +1562,25 @@ body[data-view="doctor"] .doctor-current-rooms-frame .doctor-list.room-count-1 {
   font-variant-numeric: tabular-nums;
 }
 
+body[data-view="reports"] .metric-sample {
+  display: block;
+  margin-top: 5px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1.3;
+}
+
+body[data-view="reports"] .metric-sample--limited,
+body[data-view="reports"] .metric-sample--unavailable {
+  color: #9a5b08;
+}
+
+body[data-view="reports"] td .metric-sample,
+body[data-view="reports"] .insight-metrics .metric-sample {
+  white-space: nowrap;
+}
+
 .report-table-section {
   padding-bottom: 28px;
 }
@@ -1570,6 +1589,13 @@ body[data-view="doctor"] .doctor-current-rooms-frame .doctor-list.room-count-1 {
   margin: 0 0 10px;
   font-size: 24px;
   letter-spacing: 0;
+}
+
+.report-table-context {
+  margin: -2px 0 10px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
 }
 
 .report-table-wrap {
@@ -1701,6 +1727,11 @@ body[data-view="reports"] .report-trend-value {
   white-space: nowrap;
 }
 
+body[data-view="reports"] .report-trend-result {
+  display: grid;
+  justify-items: end;
+}
+
 body[data-view="reports"] .report-trend-facts {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -1769,6 +1800,24 @@ body[data-view="reports"] .report-filter-group {
   display: inline-flex;
   align-items: center;
   gap: 6px;
+}
+
+body[data-view="reports"] .report-scope-doctor {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+body[data-view="reports"] .report-scope-doctor select {
+  min-height: 40px;
+  max-width: 220px;
+  padding: 0 34px 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--bg);
+  color: var(--ink);
+  font: inherit;
+  font-weight: 800;
 }
 
 body[data-view="reports"] .report-filter-label {

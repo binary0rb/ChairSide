@@ -254,7 +254,7 @@ Core reporting rules:
 
 Existing whole UTC report days, Monday-start UTC weeks, `DoctorCompleteAt` completed-window anchoring, accepted Ready attribution, withdrawn-handoff exclusion, legacy no-fabrication behavior, and completed/exception population partitions remain authoritative.
 
-Exact general sample-size guardrails belong to #213. Typical Observed Range quantiles belong to #218. Calibration Insight sample, deviation, directional-consistency, tolerance, and persistence rules belong to #219. Do not silently hard-code those deferred design choices.
+General descriptive sample states are Empty at `N = 0`, Limited at `N = 1-4`, and Sufficient at `N >= 5`; zero contributors within a nonempty population are Unavailable, and comparisons require every population to be Sufficient. These are not statistical-significance or Calibration Insight rules. Typical Observed Range quantiles belong to #218. Calibration Insight sample, deviation, directional-consistency, tolerance, and persistence rules belong to #219. Do not silently hard-code those deferred design choices.
 
 ## Data Analytics skills for reporting work
 

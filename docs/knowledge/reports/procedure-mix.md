@@ -14,7 +14,7 @@ Procedure mix shows the breakdown of a doctor's completed cases by procedure var
 
 This note describes the currently implemented doctor-scoped Procedure Mix read model. The approved target semantics for the reporting redesign are canonical in `docs/design/reporting-design.md`.
 
-Under issues #213 and #215:
+Issue #213 established the reusable query and aggregation contract while #215 still owns the Procedure Mix presentation redesign:
 
 - Procedure Mix exists at both Practice and Doctor scope;
 - each percentage uses the current scoped standard included completed-case population as its denominator;
@@ -22,7 +22,7 @@ Under issues #213 and #215:
 - Procedure Family and Detailed Variant grouping remain distinct lenses;
 - Sedation remains a modifier/filter context rather than a separate procedure case.
 
-Until those issues land, keep this note as implementation truth and use the canonical reporting design as target semantic truth.
+Procedure Family versus Detailed Variant is aggregation behavior, not a population filter. Doctor and Sedation select the population first, then the selected grouping partitions that same scoped denominator.
 
 ## What it reports
 
@@ -50,4 +50,4 @@ Population: built over `standardCompletedCycles`, the same standard completed-cy
 
 ## Verification notes
 
-Verified at `f74561c`: the current `DoctorProcedureMixRow` builder still groups by doctor plus detailed procedure variant over `standardCompletedCycles` and uses a per-doctor denominator. Practice-scope Procedure Mix is intentionally deferred to #215.
+The current `DoctorProcedureMixRow` builder still groups by doctor plus detailed procedure variant over the scoped `standardCompletedCycles` population and uses a per-doctor denominator. `ScopedProcedureGroup` adds the query-selected Practice or Doctor, Sedation, and grouping projection without changing the existing presentation owned by #215.

@@ -403,6 +403,7 @@ function createHarness({
   const ids = context.isReports
     ? [
         "reportFilterBar",
+        "reportTrendPanel",
         "doctorReportDashboard",
         "doctorReportCards",
         "selectedDoctorPanel",
@@ -777,6 +778,100 @@ test("default doctor selection uses first doctor with cases then first roster do
   assert.equal(
     selectedCard(withoutCases.elements.get("doctorReportCards").innerHTML, "otte"),
     true);
+});
+
+test("headline metrics distinguish Limited and Unavailable samples from measured zero", () => {
+  const limited = {
+    populationCount: 3,
+    contributingCount: 3,
+    state: "Limited",
+    limitedSampleThreshold: 5,
+    supportsComparison: false
+  };
+  const unavailable = {
+    populationCount: 3,
+    contributingCount: 0,
+    state: "Unavailable",
+    limitedSampleThreshold: 5,
+    supportsComparison: false
+  };
+  const payload = {
+    ...reportPayload({ otteCases: 1, pledgerCases: 2 }),
+    averageSeatedToDoctorSeconds: 0,
+    averageDoctorInRoomSeconds: 900,
+    samples: {
+      completedCases: limited,
+      seatedToDoctor: unavailable,
+      doctorTime: limited
+    }
+  };
+  const harness = createHarness({ payload });
+
+  harness.reports.render();
+
+  const headline = harness.elements.get("reportHeadline").innerHTML;
+  assert.match(headline, /Limited - N=3/);
+  assert.match(headline, /Unavailable/);
+  assert.doesNotMatch(headline, />00:00</);
+});
+
+test("trend comparison requires every compared population to be Sufficient", () => {
+  const sample = (count, state) => ({
+    populationCount: count,
+    contributingCount: count,
+    state,
+    limitedSampleThreshold: 5,
+    supportsComparison: state === "Sufficient"
+  });
+  const bucket = (startDate, count, state, median) => ({
+    startDate,
+    endDate: startDate === "2026-07-06" ? "2026-07-13" : "2026-07-20",
+    completedCycleCount: count,
+    medianSeatedToDoctorSeconds: median,
+    completedSample: sample(count, state),
+    turnoverCycleCount: count,
+    medianTurnoverSeconds: median,
+    turnoverSample: sample(count, state)
+  });
+  const harness = createHarness({
+    payload: {
+      ...reportPayload({ otteCases: 2, pledgerCases: 3 }),
+      trends: {
+        buckets: [
+          bucket("2026-07-06", 5, "Sufficient", 600),
+          bucket("2026-07-13", 4, "Limited", 300)
+        ]
+      }
+    }
+  });
+
+  harness.reports.render();
+
+  const panel = harness.elements.get("reportTrendPanel").innerHTML;
+  assert.match(panel, /More cases are needed for a reliable week-to-week comparison/);
+  assert.match(panel, /Limited - N=4/);
+  assert.doesNotMatch(panel, /improved by/);
+});
+
+test("empty analytical population uses the No observation state", () => {
+  const harness = createHarness({
+    payload: {
+      ...reportPayload({ otteCases: 0, pledgerCases: 0 }),
+      samples: {
+        completedCases: {
+          populationCount: 0,
+          contributingCount: 0,
+          state: "Empty",
+          limitedSampleThreshold: 5,
+          supportsComparison: false
+        }
+      }
+    }
+  });
+
+  harness.reports.render();
+
+  assert.match(harness.elements.get("reportHeadline").innerHTML, /No observation/);
 });
 
 test("Doctor View stays pinned to the route doctor while its selected tab survives refresh", async () => {

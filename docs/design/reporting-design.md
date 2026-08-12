@@ -98,7 +98,7 @@ Existing reporting-window semantics remain unchanged unless a later approved iss
 - completed-cycle windows remain anchored on `DoctorCompleteAt`;
 - weekly trend buckets use Monday-start UTC weeks.
 
-Issue #213 may add or align user-facing date presets, but it must preserve these underlying whole-day semantics.
+The reusable report window offers exactly six user-facing choices: Today, Last 7 Days, Last 30 Days, Month to Date, Custom, and All Time. Reversed valid Custom bounds are normalized before evaluation and the normalized bounds are returned to the client. Malformed dates retain the existing graceful behavior and do not produce an HTTP 400 response.
 
 ### Accepted Ready handoff
 
@@ -173,6 +173,14 @@ The standard included completed population remains the default denominator for a
 - completed-case trends.
 
 Doctor- or procedure-scoped analytical `Completed Cases` counts use the corresponding scoped standard included population unless a surface explicitly labels a broader audit/completed population.
+
+The reusable report query separates population selection from aggregation:
+
+- `Window` selects the whole-day UTC reporting window.
+- `Scope` selects Practice or a Doctor ID, plus All, Sedation, or Non-sedation cases.
+- `ProcedureGrouping` selects Procedure Family or Detailed Variant without changing population membership.
+
+Historical doctor IDs remain valid Doctor scopes even when the doctor is no longer active in the current assignment roster. Historical report accessibility must not depend on current assignment eligibility.
 
 A truthfully completed phase may contribute to a phase-duration metric once its truthful endpoint exists when existing reporting semantics already allow that. It must not be promoted into completed throughput merely because an earlier phase finished.
 
@@ -370,7 +378,7 @@ Preserve both recognized grouping lenses:
 
 Sedation remains a modifier of the primary procedure, never a second case and never a separately timed procedure.
 
-Issue #213 owns reusable grouping and Sedation filter controls. Issue #215 owns Practice and Doctor Procedure Mix presentation.
+The reusable report query owns Procedure Family versus Detailed Variant as aggregation behavior and Sedation as a population filter. Issue #215 owns Practice and Doctor Procedure Mix presentation.
 
 ### Procedure Intelligence
 
@@ -492,7 +500,13 @@ General rules:
 - raw descriptive counts may remain visible when truthful even when a population is too small for interpretive language;
 - weak samples suppress unsupported comparisons and insights rather than manufacturing certainty.
 
-Issue #213 owns the reusable limited-sample state and any general sample-size guardrail.
+The general descriptive sample guardrail is:
+
+- `N = 0`: Empty, rendered to users as `No observation`;
+- `N = 1-4`: Limited;
+- `N >= 5`: Sufficient.
+
+A metric with a nonempty wider scoped population but zero contributing observations is Unavailable, not a measured zero. Every population in a comparison must be Sufficient before comparison language is shown. This rule is a descriptive presentation guardrail, not a statistical-significance claim.
 
 Calibration Insight sample rules remain separately owned by #219 because their evidentiary threshold may be stricter than ordinary descriptive reporting.
 
@@ -517,6 +531,8 @@ Calibration Insight sample rules remain separately owned by #219 because their e
 ### Audit evidence
 
 Case audit is the evidence layer behind summary metrics and insights.
+
+The action-required Review Queue remains global within the selected reporting date window. Doctor and Sedation analytical scope do not hide unresolved review items. The analytical Case Audit does inherit the selected Practice or Doctor and Sedation scope.
 
 Drill-down must preserve the scope that produced a metric or insight so the user can inspect contributing cases without silently changing date, doctor, procedure, sedation, or inclusion context.
 

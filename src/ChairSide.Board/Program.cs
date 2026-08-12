@@ -182,11 +182,24 @@ app.MapHub<BoardHub>("/boardHub");
 
 app.MapGet("/api/board", (DemoBoardStore store) => store.GetSnapshot());
 
-// Optional ISO yyyy-MM-dd `from`/`to` query params bound the completed-cycle population by
-// completion date (DoctorCompleteAt) before any report calculation. Missing/invalid dates degrade
-// to an all-time window; a reversed pair is normalized.
-app.MapGet("/api/reports", (DemoBoardStore store, string? from, string? to) =>
-    store.GetReports(ReportDateRange.FromDateStrings(from, to)));
+// Optional ISO yyyy-MM-dd `from`/`to` parameters select the whole-day completion window. Scope and
+// sedation narrow analytical populations; procedureGrouping changes aggregation only. Invalid dates
+// retain graceful all-time behavior and reversed valid bounds normalize in the returned query metadata.
+app.MapGet("/api/reports", (
+    DemoBoardStore store,
+    string? from,
+    string? to,
+    string? scope,
+    string? doctorId,
+    string? sedation,
+    string? procedureGrouping) =>
+    store.GetReports(ReportQuery.FromStrings(
+        from,
+        to,
+        scope,
+        doctorId,
+        sedation,
+        procedureGrouping)));
 
 // Development-only: populate deterministic, non-PHI synthetic completed cycles for local
 // reporting smoke tests. Training and Production never map this endpoint.

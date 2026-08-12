@@ -41,10 +41,11 @@
       <div class="report-filter-group" role="group" aria-label="Date range presets">
         <span class="report-filter-label">Range</span>
         <button type="button" class="report-range-chip" data-range-preset="today" aria-pressed="false">Today</button>
-        <button type="button" class="report-range-chip" data-range-preset="last7" aria-pressed="true">Last 7 days</button>
-        <button type="button" class="report-range-chip" data-range-preset="last30" aria-pressed="false">Last 30 days</button>
-        <button type="button" class="report-range-chip" data-range-preset="all" aria-pressed="false">All time</button>
+        <button type="button" class="report-range-chip" data-range-preset="last7" aria-pressed="true">Last 7 Days</button>
+        <button type="button" class="report-range-chip" data-range-preset="last30" aria-pressed="false">Last 30 Days</button>
+        <button type="button" class="report-range-chip" data-range-preset="mtd" aria-pressed="false">Month to Date</button>
         <button type="button" class="report-range-chip" data-range-preset="custom" aria-pressed="false">Custom</button>
+        <button type="button" class="report-range-chip" data-range-preset="all" aria-pressed="false">All Time</button>
       </div>
       <div class="report-range-custom" id="reportRangeCustom" hidden>
         <label class="report-range-field">From <input type="date" id="reportRangeStart"></label>
@@ -72,18 +73,27 @@
     <section class="selected-doctor-panel" id="selectedDoctorPanel" aria-label="Selected doctor report" hidden></section>
 
     <section class="report-filter-bar" id="reportFilterBar" aria-label="Report filters" hidden>
+      <div class="report-filter-group" role="group" aria-label="Analytical scope">
+        <span class="report-filter-label">Scope</span>
+        <button type="button" class="report-filter-chip" data-report-scope="Practice" aria-pressed="true">Practice</button>
+        <button type="button" class="report-filter-chip" data-report-scope="Doctor" aria-pressed="false">Doctor</button>
+        <label class="report-scope-doctor" id="reportScopeDoctorField" hidden>
+          <span class="report-filter-label">Doctor</span>
+          <select id="reportScopeDoctor" aria-label="Doctor reporting scope"></select>
+        </label>
+      </div>
       <div class="report-filter-group" role="group" aria-label="Grouping mode">
         <span class="report-filter-label">Group by</span>
-        <button type="button" class="report-filter-chip" data-filter-group="grouping" data-filter-value="base" aria-pressed="true">Procedure family</button>
-        <button type="button" class="report-filter-chip" data-filter-group="grouping" data-filter-value="variant" aria-pressed="false">Detailed variant</button>
+        <button type="button" class="report-filter-chip" data-filter-group="grouping" data-filter-value="Family" aria-pressed="true">Procedure family</button>
+        <button type="button" class="report-filter-chip" data-filter-group="grouping" data-filter-value="DetailedVariant" aria-pressed="false">Detailed variant</button>
       </div>
       <details class="report-advanced-filters">
         <summary>Modifier filters</summary>
         <div class="report-filter-group" role="group" aria-label="Sedation modifier">
           <span class="report-filter-label">Sedation modifier</span>
-          <button type="button" class="report-filter-chip" data-filter-group="sedation" data-filter-value="all" aria-pressed="true">All</button>
-          <button type="button" class="report-filter-chip" data-filter-group="sedation" data-filter-value="sedation" aria-pressed="false">Sedation only</button>
-          <button type="button" class="report-filter-chip" data-filter-group="sedation" data-filter-value="non-sedation" aria-pressed="false">Non-sedation</button>
+          <button type="button" class="report-filter-chip" data-filter-group="sedation" data-filter-value="All" aria-pressed="true">All</button>
+          <button type="button" class="report-filter-chip" data-filter-group="sedation" data-filter-value="Sedation" aria-pressed="false">Sedation only</button>
+          <button type="button" class="report-filter-chip" data-filter-group="sedation" data-filter-value="NonSedation" aria-pressed="false">Non-sedation</button>
         </div>
       </details>
     </section>
@@ -156,6 +166,7 @@
       </section>
       <section class="report-table-section">
         <h2>Exceptions Requiring Review</h2>
+        <p class="report-table-context">Action-required review items remain global within the selected date window.</p>
         <div class="report-table-wrap">
           <table class="report-table">
             <thead>
@@ -180,6 +191,7 @@
       </section>
       <section class="report-table-section">
         <h2>Recent Completed Cycles</h2>
+        <p class="report-table-context">This analytical Case Audit follows the selected Practice or Doctor and sedation scope.</p>
         <div class="report-table-wrap">
           <table class="report-table">
             <thead>

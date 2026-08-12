@@ -188,9 +188,24 @@ public sealed class ReportsSnapshotBuilderTests
         var observedDoctorDays = new List<ObservedDoctorDay>();
         var doctorProcedureMix = new List<DoctorProcedureMixRow>();
         var exceptionReviewRecords = new List<ExceptionReviewRecord>();
+        var query = ReportQuery.Default.ToContext();
+        var samples = new ReportMetricSampleContext(
+            ReportSampleContext.ForPopulation(1),
+            ReportSampleContext.ForPopulation(2),
+            ReportSampleContext.ForPopulation(3),
+            ReportSampleContext.ForPopulation(4),
+            ReportSampleContext.ForPopulation(5),
+            ReportSampleContext.ForPopulation(6),
+            ReportSampleContext.ForPopulation(7),
+            ReportSampleContext.ForPopulation(8),
+            ReportSampleContext.ForPopulation(9),
+            ReportSampleContext.ForPopulation(10));
+        var scopedProcedureGroups = new List<ScopedProcedureGroup>();
 
         var composition = new ReportsSnapshotComposition
         {
+            Query = query,
+            Samples = samples,
             Population = new ReportPopulationSection
             {
                 CompletedRoomCyclesCount = 101,
@@ -231,7 +246,8 @@ public sealed class ReportsSnapshotBuilderTests
                 ProcedureSummaries = procedureSummaries,
                 SedationCaseCount = 108,
                 NonSedationCaseCount = 109,
-                BaseProcedureSummaries = baseProcedureSummaries
+                BaseProcedureSummaries = baseProcedureSummaries,
+                ScopedProcedureGroups = scopedProcedureGroups
             },
             Allocation = new ReportAllocationSection
             {
@@ -323,6 +339,9 @@ public sealed class ReportsSnapshotBuilderTests
         Assert.Same(
             composition.ReviewQueue.ExceptionReviewRecords,
             snapshot.ExceptionReviewRecords);
+        Assert.Same(composition.Query, snapshot.Query);
+        Assert.Same(composition.Samples, snapshot.Samples);
+        Assert.Same(composition.Procedures.ScopedProcedureGroups, snapshot.ScopedProcedureGroups);
     }
 
     [Fact]
@@ -433,7 +452,10 @@ public sealed class ReportsSnapshotBuilderTests
             "trends",
             "observedDoctorDays",
             "doctorProcedureMix",
-            "exceptionReviewRecords"
+            "exceptionReviewRecords",
+            "query",
+            "samples",
+            "scopedProcedureGroups"
         ],
             actualNames);
 
@@ -445,6 +467,87 @@ public sealed class ReportsSnapshotBuilderTests
         Assert.Equal(JsonValueKind.Array, json.GetProperty("observedDoctorDays").ValueKind);
         Assert.Equal(JsonValueKind.Array, json.GetProperty("doctorProcedureMix").ValueKind);
         Assert.Equal(JsonValueKind.Array, json.GetProperty("exceptionReviewRecords").ValueKind);
+        Assert.Equal(JsonValueKind.Object, json.GetProperty("query").ValueKind);
+        Assert.Equal(JsonValueKind.Object, json.GetProperty("samples").ValueKind);
+        Assert.Equal(JsonValueKind.Array, json.GetProperty("scopedProcedureGroups").ValueKind);
+    }
+
+    [Fact]
+    public void Build_applies_historical_doctor_and_sedation_scope_without_treating_grouping_as_a_filter()
+    {
+        var formerSedation = Cycle(
+            1, 1, "EXT+SED",
+            Utc(2026, 8, 10, 8, 0), Utc(2026, 8, 10, 8, 5), Utc(2026, 8, 10, 8, 10),
+            Utc(2026, 8, 10, 8, 30), Utc(2026, 8, 10, 8, 40), 30);
+        formerSedation.AssignedDoctor = "former-doctor";
+        var formerNonSedation = Cycle(
+            2, 2, "EXT",
+            Utc(2026, 8, 10, 9, 0), Utc(2026, 8, 10, 9, 5), Utc(2026, 8, 10, 9, 10),
+            Utc(2026, 8, 10, 9, 30), Utc(2026, 8, 10, 9, 40), 30);
+        formerNonSedation.AssignedDoctor = "former-doctor";
+        var rosteredSedation = Cycle(
+            3, 3, "CON+SED",
+            Utc(2026, 8, 10, 10, 0), Utc(2026, 8, 10, 10, 5), Utc(2026, 8, 10, 10, 10),
+            Utc(2026, 8, 10, 10, 30), Utc(2026, 8, 10, 10, 40), 30);
+
+        var query = ReportQuery.FromStrings(
+            null,
+            null,
+            ReportScopeKinds.Doctor,
+            "former-doctor",
+            ReportSedationSegments.Sedation,
+            ReportProcedureGroupings.DetailedVariant);
+        var snapshot = CreateBuilder().Build(
+            [formerSedation, formerNonSedation, rosteredSedation],
+            [],
+            query);
+
+        Assert.Equal(1, snapshot.IncludedCompletedCycleCount);
+        Assert.Equal("former-doctor", snapshot.Query!.DoctorId);
+        var group = Assert.Single(snapshot.ScopedProcedureGroups!);
+        Assert.Equal("EXT+SED", group.ProcedureCode);
+        Assert.True(group.IsSedationCase);
+        Assert.Equal(1d, group.ShareOfScopedCases);
+    }
+
+    [Fact]
+    public void Build_keeps_review_queue_global_to_analytical_scope_but_bounded_by_window()
+    {
+        var inWindow = new AbortedRoomAssignment
+        {
+            AbortedAssignmentId = 1,
+            EpisodeId = "aborted-1",
+            RoomId = 1,
+            AssignedDoctor = "other-doctor",
+            ProcedureCode = "CON",
+            TerminatedAt = Utc(2026, 8, 10, 12, 0),
+            IsException = true,
+            RequiresReview = true
+        };
+        var outOfWindow = new AbortedRoomAssignment
+        {
+            AbortedAssignmentId = 2,
+            EpisodeId = "aborted-2",
+            RoomId = 2,
+            AssignedDoctor = "other-doctor",
+            ProcedureCode = "CON",
+            TerminatedAt = Utc(2026, 8, 9, 12, 0),
+            IsException = true,
+            RequiresReview = true
+        };
+        var query = ReportQuery.FromStrings(
+            "2026-08-10",
+            "2026-08-10",
+            ReportScopeKinds.Doctor,
+            "otte",
+            ReportSedationSegments.Sedation,
+            ReportProcedureGroupings.Family);
+
+        var snapshot = CreateBuilder().Build([], [inWindow, outOfWindow], query);
+
+        var review = Assert.Single(snapshot.ExceptionReviewRecords!);
+        Assert.Equal(1, review.AbortedAssignmentId);
+        Assert.Empty(snapshot.RecentCompletedCycles);
     }
 
     private static ReportsSnapshotBuilder CreateBuilder()
