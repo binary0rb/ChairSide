@@ -372,7 +372,7 @@ public sealed class BoardReadyPresentationTests
         {
             Assert.Contains($"class=\"secondary-button\" id=\"{id}\"", genericRoom, StringComparison.Ordinal);
         });
-        Assert.Contains("/styles.css?v=20260804-add-on-interaction", genericRoom, StringComparison.Ordinal);
+        Assert.Contains("/styles.css?v=20260810-room-sidebar-procedure-card", genericRoom, StringComparison.Ordinal);
         Assert.Contains("createRoomWorkflow", boardScript, StringComparison.Ordinal);
         Assert.Contains("function roomCapabilities(room)", roomWorkflowScript, StringComparison.Ordinal);
         Assert.Contains("function setNextPrimaryAction(room)", roomWorkflowScript, StringComparison.Ordinal);

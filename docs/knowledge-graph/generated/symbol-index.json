@@ -922,7 +922,7 @@
                   {
                       "path":  "README.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  39696,
+                      "sizeBytes":  39713,
                       "typeSymbols":  [
 
                                       ],
@@ -2720,7 +2720,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/board.js",
                       "kind":  "JavaScript",
-                      "sizeBytes":  36564,
+                      "sizeBytes":  36601,
                       "typeSymbols":  [
 
                                       ],
@@ -3284,7 +3284,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/room.html",
                       "kind":  "Html",
-                      "sizeBytes":  6680,
+                      "sizeBytes":  6688,
                       "typeSymbols":  [
 
                                       ],
@@ -3310,7 +3310,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/room-card.js",
                       "kind":  "JavaScript",
-                      "sizeBytes":  11444,
+                      "sizeBytes":  11466,
                       "typeSymbols":  [
 
                                       ],
@@ -3471,7 +3471,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/styles.css",
                       "kind":  "Css",
-                      "sizeBytes":  94873,
+                      "sizeBytes":  96375,
                       "typeSymbols":  [
 
                                       ],
@@ -3662,7 +3662,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/BoardReadyPresentationTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  28498,
+                      "sizeBytes":  28506,
                       "typeSymbols":  [
                                           "BoardReadyPresentationTests"
                                       ],
@@ -5632,7 +5632,7 @@
                   {
                       "path":  "tests/javascript/procedure-icons.test.mjs",
                       "kind":  "JavaScript",
-                      "sizeBytes":  3408,
+                      "sizeBytes":  3485,
                       "typeSymbols":  [
 
                                       ],
@@ -5785,7 +5785,7 @@
                   {
                       "path":  "tests/javascript/room-card.test.mjs",
                       "kind":  "JavaScript",
-                      "sizeBytes":  6323,
+                      "sizeBytes":  7082,
                       "typeSymbols":  [
 
                                       ],
