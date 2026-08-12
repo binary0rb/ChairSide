@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>ChairSide Board - Room Panel</title>
-  <link rel="stylesheet" href="/styles.css?v=20260810-room-sidebar-procedure-card">
+  <link rel="stylesheet" href="/styles.css?v=20260812-room-primary-workflow-left-rail">
 </head>
 <body data-view="room">
   <header class="app-header compact">
@@ -44,6 +44,17 @@
           <button class="secondary-button utility-button" id="discardChangesButton" type="button" hidden>Discard Changes</button>
           <button class="secondary-button utility-button" id="withdrawReadyButton" type="button" hidden>Withdraw Ready</button>
           <button class="danger-button utility-button" id="cancelSeatingButton" type="button">Cancel Seating</button>
+        </div>
+      </section>
+      <section class="primary-workflow-panel" aria-labelledby="primaryWorkflowLabel">
+        <span class="control-label primary-workflow-label" id="primaryWorkflowLabel">Primary workflow</span>
+        <div class="primary-action-grid">
+          <button class="secondary-button" id="beginPrestageButton" type="button">Begin Prestage</button>
+          <button class="secondary-button" id="seatButton" type="button">Seat Room</button>
+          <button class="secondary-button" id="readyForDoctorButton" type="button">Ready for Doctor</button>
+          <button class="secondary-button" id="doctorArrivedButton" type="button">Doctor Arrived</button>
+          <button class="secondary-button" id="doctorCompleteButton" type="button">Doctor Complete</button>
+          <button class="secondary-button" id="roomAvailableButton" type="button">Room Available</button>
         </div>
       </section>
     </div>
@@ -93,17 +104,6 @@
       <div class="demo-timer-control" hidden>
         <label for="demoElapsedSelect">Demo Timer</label>
         <select id="demoElapsedSelect"></select>
-      </div>
-      <div class="primary-workflow-panel" aria-labelledby="primaryWorkflowLabel">
-        <span class="control-label primary-workflow-label" id="primaryWorkflowLabel">Primary workflow</span>
-        <div class="primary-action-grid">
-          <button class="secondary-button" id="beginPrestageButton" type="button">Begin Prestage</button>
-          <button class="secondary-button" id="seatButton" type="button">Seat Room</button>
-          <button class="secondary-button" id="readyForDoctorButton" type="button">Ready for Doctor</button>
-          <button class="secondary-button" id="doctorArrivedButton" type="button">Doctor Arrived</button>
-          <button class="secondary-button" id="doctorCompleteButton" type="button">Doctor Complete</button>
-          <button class="secondary-button" id="roomAvailableButton" type="button">Room Available</button>
-        </div>
       </div>
     </section>
   </main>

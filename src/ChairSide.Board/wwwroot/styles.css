@@ -1087,11 +1087,17 @@ label,
 }
 
 .primary-workflow-panel {
-  padding-top: 2px;
+  padding: 14px;
+  border: 1px solid #d8dee8;
+  border-radius: 10px;
+  background: var(--panel);
+  box-shadow: var(--shadow-soft);
 }
 
 .primary-workflow-label {
   margin-bottom: 0;
+  padding-bottom: 6px;
+  border-bottom: 1px solid #d8dee8;
   color: #172033;
   font-size: 14px;
   letter-spacing: 0.08em;
