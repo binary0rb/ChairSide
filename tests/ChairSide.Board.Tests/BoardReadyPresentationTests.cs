@@ -372,7 +372,15 @@ public sealed class BoardReadyPresentationTests
         {
             Assert.Contains($"class=\"secondary-button\" id=\"{id}\"", genericRoom, StringComparison.Ordinal);
         });
-        Assert.Contains("/styles.css?v=20260810-room-sidebar-procedure-card", genericRoom, StringComparison.Ordinal);
+        var statusIndex = genericRoom.IndexOf("class=\"panel-status\"", StringComparison.Ordinal);
+        var correctionsIndex = genericRoom.IndexOf("class=\"corrections-panel\"", StringComparison.Ordinal);
+        var workflowIndex = genericRoom.IndexOf("class=\"primary-workflow-panel\"", StringComparison.Ordinal);
+        var setupIndex = genericRoom.IndexOf("class=\"touch-controls\"", StringComparison.Ordinal);
+
+        Assert.True(statusIndex >= 0 && statusIndex < correctionsIndex);
+        Assert.True(correctionsIndex < workflowIndex);
+        Assert.True(workflowIndex < setupIndex);
+        Assert.Contains("/styles.css?v=20260812-room-primary-workflow-left-rail", genericRoom, StringComparison.Ordinal);
         Assert.Contains("createRoomWorkflow", boardScript, StringComparison.Ordinal);
         Assert.Contains("function roomCapabilities(room)", roomWorkflowScript, StringComparison.Ordinal);
         Assert.Contains("function setNextPrimaryAction(room)", roomWorkflowScript, StringComparison.Ordinal);
@@ -391,6 +399,12 @@ public sealed class BoardReadyPresentationTests
             StringComparison.Ordinal);
         Assert.Matches(
             "(?s)\\.primary-action-grid \\.is-next-action:not\\(:disabled\\)\\s*\\{[^}]*border-color:\\s*#15803d;[^}]*background:\\s*#15803d;[^}]*color:\\s*#ffffff;",
+            styles);
+        Assert.Matches(
+            "(?s)\\.panel-left-column\\s*\\{[^}]*display:\\s*grid;[^}]*gap:\\s*14px;",
+            styles);
+        Assert.Matches(
+            "(?s)\\.primary-workflow-panel\\s*\\{[^}]*padding:\\s*14px;[^}]*background:\\s*var\\(--panel\\);",
             styles);
         Assert.Matches(
             "(?s)button:disabled\\s*\\{[^}]*opacity:\\s*0\\.55;",

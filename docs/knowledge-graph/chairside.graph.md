@@ -8,7 +8,11 @@ This hand-authored map records ChairSide's important concepts and relationships.
 flowchart LR
     LightBoardReplacement["DomainConcept: Replace light board / pager"] --> BoardUi["UiSurface: ChairSide board"]
     BoardUi --> RoomCards["UiSurface: Room cards"]
+    BoardUi --> RoomPanel["UiSurface: Room panel"]
     BoardUi --> DoctorView["UiSurface: Doctor read-only view"]
+    RoomPanel --> RoomStatusContext["UiSurface: Room status and correction context"]
+    RoomStatusContext --> PrimaryWorkflowPanel["UiSurface: Primary workflow panel below status"]
+    RoomPanel --> AssignmentSetup["UiSurface: Assignment setup controls"]
 
     RoomLifecycle["DomainConcept: Room episode lifecycle"] --> BeginPrestage["LifecycleEvent: Begin Prestage"]
     RoomLifecycle --> SaveDetails["LifecycleEvent: Save Details"]
@@ -97,6 +101,7 @@ flowchart LR
 ## Core invariants
 
 - ChairSide tracks rooms, never patients, and remains non-PHI.
+- The Room panel uses a normal-flow left rail: dynamic status and correction context first, then the existing primary progression controls. Assignment setup remains in the main content area.
 - Begin Prestage creates an episode without requiring assignment. Prestaging and Seated allow absent, partial, or complete canonical assignment.
 - For an eligible procedure, sedation is an optional modifier: unchecked canonical room drafts normalize to durable `EligibleNo` when saved, seated, or made Ready, while `EligibleUnresolved` remains readable for partial or legacy state.
 - Ready requires a complete, valid assignment, persisted either before or atomically with Ready, and is the immutable handoff/assignment-lock boundary.

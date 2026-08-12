@@ -76,6 +76,12 @@ This file records decisions that should survive across tasks, PRs, and debugging
 
 **Rationale:** One server projection prevents the browser from drifting into a parallel lifecycle matrix while preserving the distinction between durable server state and an unsubmitted browser draft. Capability projection is advisory, not authorization.
 
+## Room panel workflow placement
+
+**Decision:** The Room panel left rail is a normal-flow vertical stack. The dynamic room status and its correction context come first, followed by the existing Primary Workflow controls. Assignment setup stays in the main content area. The workflow panel must move naturally when status or correction content changes height; it does not use absolute positioning, fixed offsets, sticky behavior, or JavaScript height calculations.
+
+**Rationale:** Untrained users need the next lifecycle action visible near the room's current status before they encounter doctor and procedure setup controls. Keeping progression controls separate from correction controls preserves the distinction between moving the room forward and repairing its current state without changing lifecycle semantics.
+
 ## Room integrity authority
 
 **Decision:** `DemoBoardStore.DeriveIntegrityFaults` is the production authority for room-integrity projection. It evaluates canonical assignment facts together with repository-backed Active or Accepted handoff context. The context-free `RoomIntegrityFaultEvaluator` was unused by production and was removed.
