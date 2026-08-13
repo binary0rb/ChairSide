@@ -2,6 +2,8 @@ using ChairSide.Board.Services;
 
 using Microsoft.Extensions.Hosting;
 
+using System.Text.Json;
+
 namespace ChairSide.Board.Tests;
 
 public sealed class ScheduleFitReportTests
@@ -105,6 +107,32 @@ public sealed class ScheduleFitReportTests
         Assert.Equal(2.0, report.Overall.TotalExpectedBlocks, precision: 6);
         Assert.Equal(3.0, report.Overall.TotalActualBlocks, precision: 6);
         Assert.Equal(1.0, report.Overall.TotalVarianceBlocks, precision: 6);
+    }
+
+    [Fact]
+    public void Additive_reports_fields_do_not_change_legacy_overall_values_or_serialization_names()
+    {
+        var report = ScheduleFitReportBuilder.Build(
+        [
+            Cycle(expectedMinutes: 30, measuredMinutes: 41),
+            Cycle(expectedMinutes: 20, measuredMinutes: 14)
+        ]);
+        var json = JsonSerializer.SerializeToElement(report, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        var overall = json.GetProperty("overall");
+
+        Assert.Equal(2, overall.GetProperty("cycleCount").GetInt32());
+        Assert.Equal(50, overall.GetProperty("totalExpectedMinutes").GetInt32());
+        Assert.Equal(55, overall.GetProperty("totalMeasuredMinutes").GetInt32());
+        Assert.Equal(5, overall.GetProperty("totalVarianceMinutes").GetInt32());
+        Assert.Equal(6, overall.GetProperty("totalSlackMinutes").GetInt32());
+        Assert.Equal(11, overall.GetProperty("totalDebtMinutes").GetInt32());
+        Assert.Equal(1.1d, overall.GetProperty("utilizationRatio").GetDouble(), precision: 10);
+        Assert.Equal(2, json.GetProperty("includedCycleCount").GetInt32());
+        Assert.Equal(2, json.GetProperty("scheduleFitCycleCount").GetInt32());
+        Assert.Equal(JsonValueKind.Null, json.GetProperty("practice").ValueKind);
+        Assert.Equal(JsonValueKind.Null, json.GetProperty("procedureSegments").ValueKind);
+        Assert.Equal(JsonValueKind.Null, json.GetProperty("doctorSummaries").ValueKind);
+        Assert.Equal(JsonValueKind.Null, json.GetProperty("rules").ValueKind);
     }
 
     [Theory]

@@ -1,7 +1,7 @@
 ﻿{
     "generatedStamp":  "deterministic",
     "root":  ".",
-    "fileCount":  175,
+    "fileCount":  178,
     "files":  [
                   {
                       "path":  ".github/pull_request_template.md",
@@ -60,7 +60,7 @@
                   {
                       "path":  "AGENTS.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  20756,
+                      "sizeBytes":  21069,
                       "typeSymbols":  [
 
                                       ],
@@ -200,7 +200,7 @@
                   {
                       "path":  "docs/design/reporting-design.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  31184,
+                      "sizeBytes":  34459,
                       "typeSymbols":  [
 
                                       ],
@@ -439,7 +439,7 @@
                   {
                       "path":  "docs/knowledge/reports/procedure-intelligence.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  4646,
+                      "sizeBytes":  5007,
                       "typeSymbols":  [
 
                                       ],
@@ -504,7 +504,7 @@
                   {
                       "path":  "docs/knowledge/reports/reporting-population.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  4694,
+                      "sizeBytes":  4818,
                       "typeSymbols":  [
 
                                       ],
@@ -530,6 +530,38 @@
                                        "Assignment and handoff attribution",
                                        "Termination populations",
                                        "Source and test anchors"
+                                   ]
+                  },
+                  {
+                      "path":  "docs/knowledge/reports/schedule-fit.md",
+                      "kind":  "Markdown",
+                      "sizeBytes":  5925,
+                      "typeSymbols":  [
+
+                                      ],
+                      "methodSymbols":  [
+
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+                                       "Schedule Fit and Calibration Insights",
+                                       "Intent",
+                                       "Shared population and observed timing",
+                                       "Historical assigned Schedule Fit",
+                                       "Current-default Calibration",
+                                       "Evidence and safety",
+                                       "Source anchors"
                                    ]
                   },
                   {
@@ -694,7 +726,7 @@
                   {
                       "path":  "docs/knowledge-graph/chairside.graph.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  18142,
+                      "sizeBytes":  19555,
                       "typeSymbols":  [
 
                                       ],
@@ -725,7 +757,7 @@
                   {
                       "path":  "docs/knowledge-graph/decisions.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  21603,
+                      "sizeBytes":  22955,
                       "typeSymbols":  [
 
                                       ],
@@ -1739,6 +1771,53 @@
                                    ]
                   },
                   {
+                      "path":  "src/ChairSide.Board/Services/CalibrationInsightReport.cs",
+                      "kind":  "CSharp",
+                      "sizeBytes":  14060,
+                      "typeSymbols":  [
+                                          "ScheduleFitToleranceClassifications",
+                                          "CalibrationRawDirections",
+                                          "CalibrationDecisions",
+                                          "CalibrationInsightDirections",
+                                          "CalibrationBaselineSources",
+                                          "CalibrationRuleSet",
+                                          "ScheduleFitSummary",
+                                          "CalibrationEvidenceCase",
+                                          "CalibrationInsight",
+                                          "CalibrationEvaluation",
+                                          "DoctorScheduleFitSegment",
+                                          "ScheduleFitSegment",
+                                          "DoctorScheduleFitSummary",
+                                          "ExactScheduleFitCalculator",
+                                          "HistoricalPair",
+                                          "CalibrationPair"
+                                      ],
+                      "methodSymbols":  [
+                                            "TruthfulObservedCaseFlowSeconds",
+                                            "BuildHistoricalAssignedSummary",
+                                            "EvaluateCurrentDefault",
+                                            "RawDirection",
+                                            "ToleranceClassification",
+                                            "Median",
+                                            "IsMaterialInCandidateDirection"
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
                       "path":  "src/ChairSide.Board/Services/ClientErrorRateLimiter.cs",
                       "kind":  "CSharp",
                       "sizeBytes":  2255,
@@ -1870,7 +1949,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/DemoBoardStore.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  189557,
+                      "sizeBytes":  189565,
                       "typeSymbols":  [
                                           "ExceptionReasons",
                                           "ReportingExceptionReasons",
@@ -2297,7 +2376,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/ProcedureIntelligenceReport.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  4649,
+                      "sizeBytes":  4779,
                       "typeSymbols":  [
                                           "ProcedureIntelligenceRangeMethods",
                                           "ProcedureAllocationValueCount",
@@ -2488,7 +2567,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/ReportsSnapshotBuilder.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  69509,
+                      "sizeBytes":  74567,
                       "typeSymbols":  [
                                           "ReportsSnapshotBuilder",
                                           "ScopedProcedurePopulation"
@@ -2523,17 +2602,17 @@
                                             "BuildScopedProcedurePopulations",
                                             "BuildScopedProcedureGroups",
                                             "BuildProcedureIntelligenceRows",
+                                            "BuildScheduleFitProcedureSegments",
+                                            "BuildDoctorScheduleFitSegments",
+                                            "BuildDoctorScheduleFitSummaries",
+                                            "OrderedRepresentedDoctorIds",
                                             "BuildDoctorProcedureIntelligence",
                                             "BuildProcedureIntelligenceMetrics",
                                             "BuildAllocationValueCounts",
                                             "BuildProcedureSamples",
                                             "BuildDoctorProcedureMix",
                                             "ResolveProcedureLabel",
-                                            "AnnotateReportingExceptions",
-                                            "HasExtremeDuration",
-                                            "CrossesCalendarDay",
-                                            "BuildDisplayProcedureLabel",
-                                            "AnnotateAllocationVariance"
+                                            "AnnotateReportingExceptions"
                                         ],
                       "routes":  [
 
@@ -2554,7 +2633,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/ReportsSnapshotComposition.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  9878,
+                      "sizeBytes":  9893,
                       "typeSymbols":  [
                                           "ReportsSnapshotComposition",
                                           "ReportPopulationSection",
@@ -2808,7 +2887,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/ScheduleFitReport.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  2951,
+                      "sizeBytes":  2858,
                       "typeSymbols":  [
                                           "ScheduleFitReport",
                                           "ScheduleFitReportBuilder"
@@ -3407,7 +3486,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/reports.html",
                       "kind":  "Html",
-                      "sizeBytes":  11735,
+                      "sizeBytes":  11702,
                       "typeSymbols":  [
 
                                       ],
@@ -3433,7 +3512,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/reports.js",
                       "kind":  "JavaScript",
-                      "sizeBytes":  135510,
+                      "sizeBytes":  134272,
                       "typeSymbols":  [
 
                                       ],
@@ -3480,7 +3559,7 @@
                                               "renderAllocationBalanceCard",
                                               "renderDataQualityCard",
                                               "renderDoctorAllocation",
-                                              "aggregateAllocationByDoctor",
+                                              "renderDoctorScheduleFitRow",
                                               "canonicalDoctorFlowSummaries",
                                               "canonicalDoctorFlowTrends",
                                               "emptyDoctorFlowSummary",
@@ -3490,7 +3569,6 @@
                                               "doctorFlowSummarySentence",
                                               "renderDoctorFlowCardBody",
                                               "renderDoctorFlowCard",
-                                              "doctorAllocationSummary",
                                               "renderSelectedDoctorPanel",
                                               "renderDoctorReportTabButton",
                                               "renderSelectedDoctorTabContent",
@@ -3505,6 +3583,7 @@
                                               "formatObservedDayDate",
                                               "describePeakConcurrentRooms",
                                               "renderSelectedDoctorScheduleFit",
+                                              "doctorScheduleFitSegments",
                                               "renderProcedureMix",
                                               "renderProcedureMixMarkup",
                                               "renderSelectedDoctorProcedures",
@@ -3522,14 +3601,14 @@
                                               "handleProcedureIntelligenceClick",
                                               "formatProcedureShare",
                                               "renderSelectedDoctorAudit",
-                                              "formatAbsoluteMinutes",
-                                              "formatSignedMinutes",
-                                              "renderDoctorAllocationRow",
                                               "renderProcedureAllocation",
-                                              "renderProcedureAllocationRow",
-                                              "describeAllocation",
-                                              "formatAverageVariancePerCase",
-                                              "varianceClass"
+                                              "renderScheduleFitSegment",
+                                              "renderCalibrationEvaluation",
+                                              "renderCalibrationEvidence",
+                                              "formatCalibrationTolerance",
+                                              "formatScheduleFitCoverage",
+                                              "formatScheduleFitAmount",
+                                              "formatSignedScheduleFitSeconds"
                                           ],
                       "headings":  [
 
@@ -3756,7 +3835,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/styles.css",
                       "kind":  "Css",
-                      "sizeBytes":  109830,
+                      "sizeBytes":  112014,
                       "typeSymbols":  [
 
                                       ],
@@ -4476,6 +4555,52 @@
                                             "Admin_access_options_require_token_when_enabled",
                                             "Admin_access_options_reject_sample_token_in_production",
                                             "Backup_restore_scripts_and_documentation_are_present"
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
+                      "path":  "tests/ChairSide.Board.Tests/CalibrationInsightReportTests.cs",
+                      "kind":  "CSharp",
+                      "sizeBytes":  12765,
+                      "typeSymbols":  [
+                                          "CalibrationInsightReportTests"
+                                      ],
+                      "methodSymbols":  [
+                                            "Historical_summary_uses_exact_seconds_without_per_case_rounding",
+                                            "Historical_summary_excludes_reversed_interval_and_keeps_truthful_zero",
+                                            "Historical_summary_keeps_slack_and_debt_when_net_is_zero",
+                                            "Historical_summary_excludes_missing_nonpositive_expected_and_missing_observed_values",
+                                            "Tolerance_boundaries_are_inclusive",
+                                            "Raw_direction_is_independent_from_tolerance",
+                                            "Paired_median_preserves_sign_when_difference_of_medians_reverses_it",
+                                            "Paired_median_avoids_difference_of_medians_magnitude_distortion",
+                                            "Nine_pairs_are_below_minimum_even_when_other_gates_would_pass",
+                                            "Seven_of_ten_raw_direction_is_suppressed_and_eight_of_ten_qualifies",
+                                            "Directional_share_uses_all_pairs_for_non_ten_denominators",
+                                            "Exact_material_boundary_does_not_qualify",
+                                            "Strictly_beyond_material_boundary_qualifies",
+                                            "Many_small_same_sign_differences_and_one_outlier_fail_material_median",
+                                            "Half_small_and_half_large_differences_land_exactly_on_material_boundary",
+                                            "Mixed_and_neutral_combined_populations_follow_raw_direction_then_material_median",
+                                            "Current_default_is_separate_from_historical_assigned_and_captured_defaults",
+                                            "Missing_current_default_never_uses_historical_values_as_a_baseline",
+                                            "Qualified_evidence_reconciles_to_counts_and_median_population",
+                                            "Evaluate",
+                                            "Cycle"
                                         ],
                       "routes":  [
 
@@ -5240,7 +5365,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/ProcedureIntelligenceReportTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  3579,
+                      "sizeBytes":  3673,
                       "typeSymbols":  [
                                           "ProcedureIntelligenceReportTests"
                                       ],
@@ -5401,7 +5526,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/ReportsSnapshotBuilderTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  70658,
+                      "sizeBytes":  76634,
                       "typeSymbols":  [
                                           "ReportsSnapshotBuilderTests"
                                       ],
@@ -5434,6 +5559,8 @@
                                             "Procedure_intelligence_reuses_scoped_groups_and_recomputes_family_range_from_cases",
                                             "Procedure_intelligence_uses_metric_specific_truthful_contributors_and_completed_membership",
                                             "Procedure_intelligence_keeps_current_and_historical_allocation_context_separate",
+                                            "Schedule_fit_uses_exact_seconds_and_preserves_population_coverage_and_reconciliation",
+                                            "Calibration_uses_current_roster_default_and_paired_median_not_historical_or_captured_defaults",
                                             "Procedure_intelligence_doctor_breakdown_uses_roster_then_historical_order_and_doctor_scope_is_flat",
                                             "Procedure_intelligence_json_contract_is_appended_without_variance_interpretation",
                                             "CreateBuilder",
@@ -5583,7 +5710,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/ScheduleFitReportTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  9274,
+                      "sizeBytes":  10847,
                       "typeSymbols":  [
                                           "ScheduleFitReportTests"
                                       ],
@@ -5594,6 +5721,7 @@
                                             "Included_count_exceeds_fit_count_when_some_cycles_are_not_allocation_calculable",
                                             "Null_defensive_entries_do_not_count_as_included_cycles",
                                             "Custom_block_size_flows_through_to_overall_block_totals",
+                                            "Additive_reports_fields_do_not_change_legacy_overall_values_or_serialization_names",
                                             "Invalid_block_size_propagates_argument_out_of_range",
                                             "Schedule_fit_totals_agree_with_allocation_variance_summary_for_standard_population",
                                             "Utc",
@@ -5943,7 +6071,7 @@
                   {
                       "path":  "tests/javascript/common-interactions.test.mjs",
                       "kind":  "JavaScript",
-                      "sizeBytes":  10801,
+                      "sizeBytes":  10804,
                       "typeSymbols":  [
 
                                       ],
@@ -6138,7 +6266,7 @@
                   {
                       "path":  "tests/javascript/reports.test.mjs",
                       "kind":  "JavaScript",
-                      "sizeBytes":  115223,
+                      "sizeBytes":  125150,
                       "typeSymbols":  [
 
                                       ],
@@ -6163,6 +6291,9 @@
                                               "recordDomMutation",
                                               "targetFor",
                                               "allocation",
+                                              "scheduleFitSummary",
+                                              "calibrationEvaluation",
+                                              "scheduleFitProjection",
                                               "sample",
                                               "procedureIntelligenceRow",
                                               "doctorFlowSummary",

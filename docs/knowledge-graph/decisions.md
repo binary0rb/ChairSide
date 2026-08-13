@@ -138,19 +138,23 @@ This file records decisions that should survive across tasks, PRs, and debugging
 
 **Decision:** The reusable report query separates Window, analytical Scope, and Procedure Grouping. Scope is Practice or Doctor plus All, Sedation, or Non-sedation; Procedure Family versus Detailed Variant changes aggregation without changing population membership. Historical doctor IDs remain valid reporting scopes independently of the current active assignment roster.
 
-**Decision:** The general descriptive sample guardrail is Empty at `N = 0`, Limited at `N = 1-4`, and Sufficient at `N >= 5`. A metric with a nonempty population and zero contributors is Unavailable. Comparisons require every compared population to be Sufficient. These rules are not statistical significance and do not replace #219 Calibration Insight evidence rules.
+**Decision:** The general descriptive sample guardrail is Empty at `N = 0`, Limited at `N = 1-4`, and Sufficient at `N >= 5`. A metric with a nonempty population and zero contributors is Unavailable. Comparisons require every compared population to be Sufficient. These rules are not statistical significance and do not replace the separate version-one Calibration Insight evidence rules.
 
 **Decision:** Typical Doctor Time Range is the Type 7 Q25-to-Q75 interval over truthful Doctor Arrived -> Doctor Complete observations in one scoped standard included completed procedure population. It is calculated from underlying cases after scope, Sedation, and Procedure Grouping. Numeric endpoints publish only when the shared Doctor Time sample is Sufficient; Limited samples retain their median and Limited context without range endpoints. The range is descriptive, is not min/max, and is not expected allocation, a target, or Schedule Fit.
 
 **Decision:** The action-required Review Queue remains global within the selected reporting date window, while analytical Case Audit inherits Doctor and Sedation scope. Reversed valid date ranges normalize and return normalized metadata; malformed date input retains graceful legacy behavior without a new HTTP 400 response.
 
-**Decision:** Schedule Fit evaluates the scheduling model. The first-version observed basis remains Seated to Doctor Complete measured case flow, which is not interchangeable with Doctor Time. Slack and debt stay separate, signed net variance remains visible, and population coverage must be exposed. Calibration Insights may surface sufficiently supported directional patterns for human review but never mutate expected allocation automatically.
+**Decision:** Historical assigned Schedule Fit evaluates the scheduling model with positive finalized `ExpectedAllocationMinutes` and truthful exact Seated -> Doctor Complete seconds from the scoped standard included completed population. Reversed intervals do not contribute. Exact case-level slack and debt remain separate, signed net is observed minus expected and debt minus slack, and population coverage is visible. Practice totals ignore Procedure Grouping. The legacy integer-minute `ScheduleFitReport.Overall` remains a Workshop compatibility contract.
+
+**Decision:** Current-default Calibration is a separate server-owned procedure or doctor x procedure evaluation against the current active base-procedure roster `DefaultExpectedUnits * 10` minutes, never historical assigned or captured defaults. Version one requires N >= 10 current-default pairs; uses all pairs as the raw-sign denominator; requires at least 80 percent AboveBaseline or BelowBaseline; classifies -600 through +600 seconds inclusive as AtExpected; and requires the all-pair median variance to be strictly greater than +600 seconds for More or less than -600 seconds for Less. It evaluates only the selected report population, makes no statistical-significance claim, saves no insight history, and never mutates allocation.
+
+**Decision:** Only a server `Qualified` decision creates a Calibration Insight. Qualified non-PHI evidence includes completed-cycle and optional accepted-handoff identity, the current roster baseline snapshot, exact observed and paired-variance seconds, raw direction, and tolerance class, and reconciles to the decision counts and median population. JavaScript owns neutral formatting and does not reconstruct the rules.
 
 **Decision:** Healthy Data Quality remains quiet; exclusions, limited samples, and pending review use progressive disclosure while audit remains the evidence layer behind calculations and insights. Provider ranking, efficiency scoring, attendance inference, idle-time reporting, grades, quotas, and punitive staff metrics are prohibited.
 
 **Rationale:** The reporting redesign must explain observed operational flow and scheduling-model fit without converting incomplete observation into judgments about doctors or staff. Precise shared semantics prevent later report slices from inventing incompatible denominators, time intervals, or interpretation language.
 
-**Deferred parameters:** Calibration Insight sample, deviation, directional-consistency, tolerance, and multi-period persistence rules belong to #219.
+**Review point:** Reconsider the version-one N=10 and 80 percent operational review thresholds after enough production history exists to evaluate actual procedure and doctor x procedure segment volumes.
 
 ## Reporting UI philosophy
 

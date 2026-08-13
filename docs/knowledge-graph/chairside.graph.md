@@ -86,7 +86,13 @@ flowchart LR
     ProcedureIntelligence --> ProcedureDoctorBreakdown["UiSurface: Doctor x procedure disclosure"]
     ProcedureIntelligence --> ProcedureAllocationContext["ReportMetric: Neutral expected allocation context"]
     StandardPopulation --> ScheduleFit["ReportMetric: Schedule Fit"]
+    ScheduleFit --> HistoricalAssignedFit["ReportMetric: Exact historical assigned fit"]
+    ProcedureRoster --> CurrentDefaultCalibration["ReportMetric: Current roster default calibration"]
+    StandardPopulation --> CurrentDefaultCalibration
+    CurrentDefaultCalibration --> CalibrationRules["DesignDecision: N10, raw-sign 80 percent, strict 600-second median"]
+    CurrentDefaultCalibration --> CalibrationEvidence["Contract: Qualified non-PHI case evidence"]
     ScheduleFit --> CalibrationInsights["UiSurface: Calibration Insights"]
+    CurrentDefaultCalibration --> CalibrationInsights
     Reports --> DataQualityAudit["UiSurface: Data Quality and case audit"]
 
     DoctorRoster["ConfigOption: Doctor roster"] --> CanonicalAssignment
@@ -174,8 +180,9 @@ flowchart LR
 - Report queries separate whole-day UTC Window, Practice or historical/current Doctor plus Sedation Scope, and Procedure Family or Detailed Variant grouping. Grouping changes aggregation, not population membership.
 - General descriptive samples are Empty at `N = 0`, Limited at `N = 1-4`, and Sufficient at `N >= 5`; zero contributors within a nonempty population are Unavailable, and comparisons require all populations to be Sufficient.
 - The action-required Review Queue remains global within its selected date window, while analytical Case Audit inherits Doctor and Sedation scope. Valid reversed ranges normalize; malformed dates remain graceful.
-- Schedule Fit preserves compatible expected-vs-observed case-flow semantics, keeps slack and debt separate, and evaluates the scheduling model rather than the doctor.
-- Calibration Insights are neutral, sample-supported review callouts and never mutate expected allocation automatically.
+- Historical assigned Schedule Fit uses finalized expected allocation and truthful exact Seated -> Doctor Complete seconds over the scoped standard included completed population. It keeps exact case-level slack and debt separate, exposes coverage and signed net, and evaluates the scheduling model rather than the doctor. Practice totals ignore Procedure Grouping, while the legacy integer-minute Overall remains a Workshop compatibility contract.
+- Current-default Calibration separately uses the current active base-procedure roster default. It never substitutes historical assigned or captured defaults. Version one requires N >= 10 pairs, at least 80 percent raw-sign direction over all pairs, and an agreeing all-pair median strictly beyond +/-600 seconds; -600 through +600 seconds inclusive remains AtExpected. Evaluation is selected-population-only and is not statistical significance.
+- Only a server Qualified decision creates a neutral Calibration Insight. Qualified non-PHI evidence reconciles to the decision counts and median population. Insights never save history or mutate expected allocation automatically, and browser code does not reconstruct policy thresholds.
 - Healthy Data Quality stays quiet; exclusions and review exceptions remain visible through progressive disclosure and audit evidence.
 - Provider ranking, efficiency scoring, attendance inference, idle-time reporting, and punitive metrics are prohibited.
 - Ready urgency threshold flags are captured without newly persisting Aging/Stale primary states.

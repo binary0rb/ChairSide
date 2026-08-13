@@ -657,9 +657,9 @@ export function createReports({
 }
 
 // ---------------------------------------------------------------------------
-// Allocation balance presentation (Phase 3B). Surfaces the Phase 3A math in
-// plain, neutral language: expected allocation vs measured case flow. No
-// ranking, no scoring, no "sedation time".
+// Schedule Fit presentation. The server owns exact-second historical assigned fit,
+// current-default Calibration decisions, and all thresholds. This renderer only formats
+// the returned projection and never reconstructs eligibility or insight rules.
 // ---------------------------------------------------------------------------
   function renderAllocationReports(r) {
   renderAllocationBalanceCard(r);
@@ -674,31 +674,31 @@ export function createReports({
     return;
   }
 
-  const pill = `<span class="layer-pill layer-pill--allocation">Allocation Logic</span>`;
-  const a = r.allocationVariance;
-  if (!a) {
+  const pill = `<span class="layer-pill layer-pill--allocation">Schedule Fit</span>`;
+  const summary = r.scheduleFit?.practice;
+  if (!summary) {
     card.innerHTML = `
       ${pill}
-      <h3>Overall Allocation Balance${renderHelpIcon("Planned time budget based on the selected procedure mix and allocation settings.")}</h3>
-      <p class="allocation-empty">No allocation variance data available for this report view.</p>`;
+      <h3>Practice Schedule Fit${renderHelpIcon("Compares historical assigned scheduling allocation with exact observed Seated-to-Doctor Complete case flow.")}</h3>
+      <p class="allocation-empty">Schedule Fit is unavailable for this report response.</p>`;
     return;
   }
 
-  const count = a.allocationVarianceCycleCount;
-  const sample = r.samples?.scheduleFit;
-  const samplePresentation = sampledPresentation(sample, String(count));
-  const comparisonAvailable = sampleSupportsComparison(sample);
+  const coverage = formatScheduleFitCoverage(summary);
+  const samplePresentation = sampledPresentation(summary.sample, coverage);
   card.innerHTML = `
     ${pill}
-    <h3>Overall Allocation Balance</h3>
-    <p class="allocation-lead">${escapeHtml(samplePresentation.value)}${samplePresentation.state === "Limited" || samplePresentation.state === "Sufficient" ? ` ${count === 1 ? "case" : "cases"} measured against expected allocation across included cases in this report view.` : ""}</p>
+    <h3>Practice Schedule Fit</h3>
+    <p class="allocation-lead">${escapeHtml(coverage)} have a valid historical assigned fit pair.</p>
     ${renderSampleContext(samplePresentation)}
-    ${comparisonAvailable ? `
-      <p class="allocation-net">Net ${renderVarianceBadge(a.netAllocationVarianceMinutes)} across included cases.</p>
-      <p>Average ${renderAverageVarianceBadge(a.averageAllocationVarianceMinutes)}.</p>
-      <p class="allocation-breakdown-line">${a.casesOverExpectedAllocation} over expected · ${a.casesUnderExpectedAllocation} under expected · ${a.casesAtExpectedAllocation} at expected</p>` : renderAllocationComparisonNotice(sample)}
-    ${sample?.state === "Limited" || sample?.state === "Sufficient" ? `<p class="allocation-context">${a.adjustedAllocationCycleCount} adjusted allocation ${a.adjustedAllocationCycleCount === 1 ? "case" : "cases"} · ${a.totalExpectedAllocationMinutes} min expected · ${a.totalMeasuredCaseFlowMinutes} min measured</p>` : ""}
-    <p class="allocation-footnote">Current analytical scope. Only includes completed cases that have an expected allocation snapshot and a Doctor Complete timestamp, so this can be fewer than total completed cases.</p>`;
+    <dl class="schedule-fit-kpis">
+      <div><dt>Expected scheduling allocation</dt><dd>${escapeHtml(formatScheduleFitAmount(summary.totalExpectedSeconds))}</dd></div>
+      <div><dt>Observed case flow</dt><dd>${escapeHtml(formatScheduleFitAmount(summary.totalObservedSeconds))}</dd></div>
+      <div><dt>Total scheduling slack</dt><dd>${escapeHtml(formatScheduleFitAmount(summary.totalSlackSeconds))}</dd></div>
+      <div><dt>Total scheduling debt</dt><dd>${escapeHtml(formatScheduleFitAmount(summary.totalDebtSeconds))}</dd></div>
+      <div><dt>Signed net difference</dt><dd>${escapeHtml(formatSignedScheduleFitSeconds(summary.netVarianceSeconds))}</dd></div>
+    </dl>
+    <p class="allocation-footnote">Historical assigned Schedule Fit uses finalized Expected Allocation and exact Seated-to-Doctor Complete timing. Slack and debt are calculated per case before totals are combined.</p>`;
 }
 
   function renderDataQualityCard(r) {
@@ -741,67 +741,28 @@ export function createReports({
     return;
   }
 
-  const aggregated = aggregateAllocationByDoctor(r.doctorSummaries || [], r);
+  const summaries = Array.isArray(r.scheduleFit?.doctorSummaries)
+    ? r.scheduleFit.doctorSummaries
+    : [];
   list.classList.remove("doctor-report-card-grid");
-  list.innerHTML = aggregated.length
-    ? aggregated.map(agg => renderDoctorAllocationRow(agg)).join("")
-    : `<p class="allocation-empty">No doctor allocation data for this range.</p>`;
+  list.innerHTML = summaries.length
+    ? summaries.map(renderDoctorScheduleFitRow).join("")
+    : `<p class="allocation-empty">No doctor Schedule Fit data for this range.</p>`;
 }
 
-// Sums each doctor's allocation across the returned (per-month) summaries so a doctor appears
-// once. Ordered by the doctor roster - never by variance, to avoid implying a ranking.
-  function aggregateAllocationByDoctor(summaries, report) {
-  const byDoctor = new Map();
-  const samplesByDoctor = new Map((report?.doctorAllocationSamples || [])
-    .map(item => [item.doctorId, item.sample]));
-  for (const summary of summaries) {
-    const a = summary.allocation;
-    if (!a) {
-      continue;
-    }
-    const key = summary.assignedDoctor;
-    const agg = byDoctor.get(key) || { doctorId: key, count: 0, net: 0, over: 0, under: 0, at: 0, adjusted: 0 };
-    agg.count += a.allocationVarianceCycleCount || 0;
-    agg.net += a.netAllocationVarianceMinutes || 0;
-    agg.over += a.casesOverExpectedAllocation || 0;
-    agg.under += a.casesUnderExpectedAllocation || 0;
-    agg.at += a.casesAtExpectedAllocation || 0;
-    agg.adjusted += a.adjustedAllocationCycleCount || 0;
-    byDoctor.set(key, agg);
+  function renderDoctorScheduleFitRow(item) {
+  const summary = item.historicalAssignedFit;
+  if (!summary) {
+    return "";
   }
-
-  const order = (getSnapshot()?.doctors || []).map(doctor => doctor.id);
-  const rank = id => {
-    const index = order.indexOf(id);
-    return index === -1 ? Number.MAX_SAFE_INTEGER : index;
-  };
-
-  const doctorScope = report?.query?.scope === "Doctor";
-  const scopedDoctorId = doctorScope ? report.query.doctorId : null;
-  const roster = doctorScope
-    ? (scopedDoctorId ? [{ id: scopedDoctorId }] : [])
-    : (getSnapshot()?.doctors || []);
-  const rosterCards = roster.map(doctor => ({
-    doctorId: doctor.id,
-    count: 0,
-    net: 0,
-    over: 0,
-    under: 0,
-    at: 0,
-    adjusted: 0,
-    sample: samplesByDoctor.get(doctor.id),
-    ...byDoctor.get(doctor.id)
-  }));
-  if (doctorScope) {
-    return rosterCards;
-  }
-  const rosterIds = new Set(rosterCards.map(item => item.doctorId));
-  const historicalCards = [...byDoctor.values()]
-    .filter(item => !rosterIds.has(item.doctorId))
-    .map(item => ({ ...item, sample: samplesByDoctor.get(item.doctorId) }))
-    .sort((x, y) => rank(x.doctorId) - rank(y.doctorId));
-
-  return [...rosterCards, ...historicalCards];
+  return `
+    <div class="allocation-row schedule-fit-row">
+      <span class="allocation-row-name">${escapeHtml(item.doctorName || getDoctorName(item.doctorId))}</span>
+      <span class="allocation-row-detail">
+        <strong>${escapeHtml(formatScheduleFitCoverage(summary))}</strong>
+        <small>Historical assigned net ${escapeHtml(formatSignedScheduleFitSeconds(summary.netVarianceSeconds))} · slack ${escapeHtml(formatObservedDuration(summary.totalSlackSeconds))} · debt ${escapeHtml(formatObservedDuration(summary.totalDebtSeconds))}</small>
+      </span>
+    </div>`;
 }
 
 // Issue #216 canonical Doctor Overview authority. The server owns medians, day qualification, and
@@ -909,28 +870,6 @@ export function createReports({
         ${selected ? "Viewing details" : "View details"}
       </span>
     </article>`;
-}
-
-  function doctorAllocationSummary(agg, sample = agg.sample) {
-  const count = agg.count || 0;
-  if (!sample) {
-    return "Allocation sample context is unavailable for this report response.";
-  }
-  if (sample?.state === "Empty") {
-    return "No allocation variance cases in this report range.";
-  }
-  if (sample?.state === "Unavailable") {
-    return "Allocation values are unavailable for this nonempty report population.";
-  }
-  if (!sampleSupportsComparison(sample)) {
-    return `${count} allocation ${count === 1 ? "contributor" : "contributors"}. Comparison is not shown for a Limited sample.`;
-  }
-  if (agg.net === 0) {
-    return `Measured case flow stayed at expected allocation across ${count} ${count === 1 ? "case" : "cases"}.`;
-  }
-
-  const direction = agg.net > 0 ? "over expected" : "under expected";
-  return `Measured case flow ran ${formatAbsoluteMinutes(agg.net)} ${direction} across ${count} ${count === 1 ? "case" : "cases"}.`;
 }
 
   function renderSelectedDoctorPanel(r, doctors) {
@@ -1255,37 +1194,59 @@ export function createReports({
 }
 
   function renderSelectedDoctorScheduleFit(r, summary) {
-  const allocation = aggregateAllocationByDoctor(r.doctorSummaries || [], r)
+  const doctorSummary = (r.scheduleFit?.doctorSummaries || [])
     .find(item => item.doctorId === summary.doctorId);
-  if (!allocation) {
+  if (!doctorSummary?.historicalAssignedFit) {
     return renderSelectedDoctorEmptyState(
       "Schedule Fit",
-      "No allocation context is available for this doctor in the current report response."
+      "No server-owned Schedule Fit projection is available for this doctor in the current report response."
     );
   }
 
-  const sample = allocation.sample;
-  const countPresentation = sample
-    ? sampledPresentation(sample, String(allocation.count || 0))
-    : doctorFlowPresentation(null, String(allocation.count || 0));
-  const comparisonAvailable = sampleSupportsComparison(sample);
+  const historical = doctorSummary.historicalAssignedFit;
+  const segments = doctorScheduleFitSegments(r, summary.doctorId);
   return `
     <section class="selected-doctor-overview">
       <div class="selected-doctor-summary">
         <h3>Schedule Fit</h3>
-        <p>${escapeHtml(doctorAllocationSummary(allocation, sample))}</p>
-        <p class="allocation-footnote">Compares confirmed scheduling allocation with compatible observed case-flow timing. This evaluates the scheduling model, not the doctor.</p>
+        <p>${escapeHtml(formatScheduleFitCoverage(historical))} have a valid historical assigned fit pair.</p>
+        <p class="allocation-footnote">Compares finalized historical scheduling allocation with exact observed Seated-to-Doctor Complete case flow. This evaluates the scheduling model, not the doctor.</p>
       </div>
-      <dl class="selected-doctor-kpis">
-        <div><dt>Allocation Cases</dt><dd>${escapeHtml(countPresentation.value)}${renderSampleContext(countPresentation)}</dd></div>
-        ${comparisonAvailable ? `
-          <div><dt>Net Variance</dt><dd class="${escapeAttribute(varianceClass(allocation.net))}">${escapeHtml(formatSignedMinutes(allocation.net))}</dd></div>
-          <div><dt>Over Expected</dt><dd>${escapeHtml(String(allocation.over || 0))}</dd></div>
-          <div><dt>Under Expected</dt><dd>${escapeHtml(String(allocation.under || 0))}</dd></div>
-          <div><dt>At Expected</dt><dd>${escapeHtml(String(allocation.at || 0))}</dd></div>` : `
-          <div><dt>Comparison</dt><dd class="is-unavailable">${escapeHtml(allocationComparisonValue(sample))}</dd></div>`}
+      <dl class="selected-doctor-kpis schedule-fit-kpis">
+        <div><dt>Expected scheduling allocation</dt><dd>${escapeHtml(formatScheduleFitAmount(historical.totalExpectedSeconds))}</dd></div>
+        <div><dt>Observed case flow</dt><dd>${escapeHtml(formatScheduleFitAmount(historical.totalObservedSeconds))}</dd></div>
+        <div><dt>Total scheduling slack</dt><dd>${escapeHtml(formatObservedDuration(historical.totalSlackSeconds))}</dd></div>
+        <div><dt>Total scheduling debt</dt><dd>${escapeHtml(formatObservedDuration(historical.totalDebtSeconds))}</dd></div>
+        <div><dt>Signed net difference</dt><dd>${escapeHtml(formatSignedScheduleFitSeconds(historical.netVarianceSeconds))}</dd></div>
       </dl>
+      <div class="selected-doctor-schedule-segments">
+        <h4>Procedure Schedule Fit and current-default calibration</h4>
+        ${segments.length
+          ? segments.map(segment => renderScheduleFitSegment(segment)).join("")
+          : `<p class="report-empty-note">No procedure Schedule Fit segments are available for this doctor.</p>`}
+      </div>
     </section>`;
+}
+
+  function doctorScheduleFitSegments(report, doctorId) {
+  const segments = Array.isArray(report.scheduleFit?.procedureSegments)
+    ? report.scheduleFit.procedureSegments
+    : [];
+  if (report.query?.scope === "Doctor") {
+    return segments;
+  }
+
+  return segments.flatMap(segment => {
+    const doctor = (segment.doctorBreakdown || []).find(item => item.doctorId === doctorId);
+    return doctor
+      ? [{
+          ...segment,
+          historicalAssignedFit: doctor.historicalAssignedFit,
+          currentDefaultCalibration: doctor.currentDefaultCalibration,
+          doctorBreakdown: []
+        }]
+      : [];
+  });
 }
 
   function renderProcedureMix(r) {
@@ -1707,116 +1668,141 @@ export function createReports({
     </div>`;
 }
 
-  function formatAbsoluteMinutes(minutes) {
-  if (!Number.isFinite(minutes)) {
-    return "--";
-  }
-  const rounded = Math.round(Math.abs(minutes) * 10) / 10;
-  return `${rounded} min`;
-}
-
-  function formatSignedMinutes(minutes) {
-  if (!Number.isFinite(minutes)) {
-    return "--";
-  }
-  const rounded = Math.round(minutes * 10) / 10;
-  if (rounded > 0) {
-    return `+${rounded} min`;
-  }
-  return `${rounded} min`;
-}
-
-  function renderDoctorAllocationRow(agg) {
-  const name = getDoctorName(agg.doctorId);
-  const sample = agg.sample || fallbackSampleForObservedCount(agg.count || 0);
-  const presentation = sampledPresentation(sample, String(agg.count || 0));
-  if (!sampleSupportsComparison(sample)) {
-    return `
-      <div class="allocation-row">
-        <span class="allocation-row-name">${escapeHtml(name)}</span>
-        <span class="allocation-row-detail allocation-empty">
-          ${escapeHtml(presentation.value)}${renderSampleContext(presentation)}
-          <small>${escapeHtml(allocationComparisonNoticeText(sample))}</small>
-        </span>
-      </div>`;
-  }
-
-  return `
-    <div class="allocation-row">
-      <span class="allocation-row-name">${escapeHtml(name)}</span>
-      <span class="allocation-row-detail">
-        ${describeAllocation(agg.count, agg.net)}
-        <small>${agg.over} over · ${agg.under} under · ${agg.at} at · ${agg.adjusted} adjusted</small>
-      </span>
-    </div>`;
-}
-
   function renderProcedureAllocation(r) {
   const list = document.getElementById("procedureAllocationList");
   if (!list) {
     return;
   }
 
-  // Procedure family (base) summaries only - sedation variants roll up under their family.
-  const families = (r.baseProcedureSummaries || [])
-    .filter(summary => summary.allocation);
+  const segments = Array.isArray(r.scheduleFit?.procedureSegments)
+    ? r.scheduleFit.procedureSegments
+    : [];
 
-  list.innerHTML = families.length
-    ? families.map(renderProcedureAllocationRow).join("")
-    : `<p class="allocation-empty">No procedure family allocation data for this range.</p>`;
+  list.innerHTML = segments.length
+    ? segments.map(segment => renderScheduleFitSegment(segment, { includeDoctorBreakdown: true })).join("")
+    : `<p class="allocation-empty">No procedure Schedule Fit data for this range.</p>`;
 }
 
-  function renderProcedureAllocationRow(summary) {
-  const a = summary.allocation;
-  const label = summary.procedureLabel || summary.procedureCode || "Unknown";
-  const sample = summary.samples?.allocation || fallbackSampleForObservedCount(a.allocationVarianceCycleCount || 0);
-  const presentation = sampledPresentation(sample, String(a.allocationVarianceCycleCount || 0));
-  if (!sampleSupportsComparison(sample)) {
-    return `
-      <div class="allocation-row">
-        <span class="allocation-row-name">${escapeHtml(label)}</span>
-        <span class="allocation-row-detail allocation-empty">
-          ${escapeHtml(presentation.value)}${renderSampleContext(presentation)}
-          <small>${escapeHtml(allocationComparisonNoticeText(sample))}</small>
-        </span>
-      </div>`;
+  function renderScheduleFitSegment(segment, { includeDoctorBreakdown = false } = {}) {
+  const historical = segment?.historicalAssignedFit;
+  if (!historical) {
+    return "";
+  }
+  const context = segment.procedureGrouping === "DetailedVariant"
+    ? (segment.isSedationCase ? "Detailed variant · Sedation" : "Detailed variant")
+    : "Procedure family";
+  const doctorBreakdown = includeDoctorBreakdown && Array.isArray(segment.doctorBreakdown)
+    && segment.doctorBreakdown.length
+    ? `
+      <details class="schedule-fit-doctor-breakdown">
+        <summary>Doctor × procedure detail</summary>
+        <div class="schedule-fit-doctor-segments">
+          ${segment.doctorBreakdown.map(doctor => `
+            <article class="schedule-fit-doctor-segment">
+              <h5>${escapeHtml(doctor.doctorName || getDoctorName(doctor.doctorId))}</h5>
+              <p>${escapeHtml(formatScheduleFitCoverage(doctor.historicalAssignedFit))}; historical assigned net ${escapeHtml(formatSignedScheduleFitSeconds(doctor.historicalAssignedFit.netVarianceSeconds))}.</p>
+              ${renderCalibrationEvaluation(doctor.currentDefaultCalibration)}
+            </article>`).join("")}
+        </div>
+      </details>`
+    : "";
+  return `
+    <article class="allocation-row schedule-fit-segment">
+      <div class="schedule-fit-segment-head">
+        <span class="allocation-row-name">${escapeHtml(segment.procedureLabel || segment.procedureCode || "Unknown")}</span>
+        <small>${escapeHtml(context)}</small>
+      </div>
+      <div class="allocation-row-detail">
+        <strong>${escapeHtml(formatScheduleFitCoverage(historical))}</strong>
+        <span>Historical assigned: expected ${escapeHtml(formatScheduleFitAmount(historical.totalExpectedSeconds))} · observed ${escapeHtml(formatScheduleFitAmount(historical.totalObservedSeconds))}</span>
+        <small>Net ${escapeHtml(formatSignedScheduleFitSeconds(historical.netVarianceSeconds))} · slack ${escapeHtml(formatObservedDuration(historical.totalSlackSeconds))} · debt ${escapeHtml(formatObservedDuration(historical.totalDebtSeconds))}</small>
+        ${renderCalibrationEvaluation(segment.currentDefaultCalibration)}
+        ${doctorBreakdown}
+      </div>
+    </article>`;
+}
+
+  function renderCalibrationEvaluation(evaluation) {
+  if (!evaluation) {
+    return "";
+  }
+  if (evaluation.decision === "CurrentDefaultUnavailable") {
+    return `<p class="calibration-context">Current roster default unavailable. Historical assigned Schedule Fit remains available.</p>`;
+  }
+
+  const baseline = Number.isFinite(evaluation.currentDefaultAllocationMinutes)
+    ? `${evaluation.currentDefaultAllocationMinutes} min`
+    : "Unavailable";
+  const insight = evaluation.insight;
+  if (!insight) {
+    return `<p class="calibration-context">Current roster default: ${escapeHtml(baseline)}.</p>`;
+  }
+
+  const isMore = insight.direction === "MoreTimeThanCurrentDefault";
+  const relation = isMore ? "above" : "below";
+  const rawRelation = isMore ? "above" : "below";
+  return `
+    <aside class="calibration-insight" aria-label="Calibration insight">
+      <strong>Calibration insight</strong>
+      <p>Observed case flow was typically about ${escapeHtml(formatObservedDuration(Math.abs(insight.medianDifferenceSeconds)))} ${relation} the current ${escapeHtml(baseline)} roster default in this selected population.</p>
+      <p>${escapeHtml(String(insight.directionalCaseCount))} of ${escapeHtml(String(insight.totalPairedCaseCount))} cases were ${rawRelation} the current roster default. Review the scheduling assumption.</p>
+      ${renderCalibrationEvidence(insight)}
+    </aside>`;
+}
+
+  function renderCalibrationEvidence(insight) {
+  const evidence = Array.isArray(insight?.evidence) ? insight.evidence : [];
+  if (!evidence.length) {
+    return "";
   }
   return `
-    <div class="allocation-row">
-      <span class="allocation-row-name">${escapeHtml(label)}</span>
-      <span class="allocation-row-detail">
-        ${describeAllocation(a.allocationVarianceCycleCount, a.netAllocationVarianceMinutes)}
-        <small>${a.casesOverExpectedAllocation} over · ${a.casesUnderExpectedAllocation} under · ${a.casesAtExpectedAllocation} at · ${a.adjustedAllocationCycleCount} adjusted</small>
-      </span>
-    </div>`;
+    <details class="calibration-evidence">
+      <summary>View ${evidence.length} contributing case records</summary>
+      <ul>
+        ${evidence.map(item => `
+          <li>
+            Case record ${escapeHtml(String(item.completedCycleId))}: observed ${escapeHtml(formatObservedDuration(item.observedCaseFlowSeconds))}; difference ${escapeHtml(formatSignedScheduleFitSeconds(item.pairedVarianceSeconds))}; ${escapeHtml(formatCalibrationTolerance(item.toleranceClassification))}.
+          </li>`).join("")}
+      </ul>
+    </details>`;
 }
 
-// Compact neutral one-liner for a doctor/procedure row. Average is derived from the row's own
-// net and case count so it stays correct after per-doctor aggregation.
-  function describeAllocation(count, net) {
-  const cases = `${count} ${count === 1 ? "case" : "cases"}`;
-  if (net === 0) {
-    return `<strong>At expected allocation across ${cases}.</strong>`;
+  function formatCalibrationTolerance(value) {
+  if (value === "MoreTimeThanAllocation") {
+    return "more than the tolerance";
   }
-  const avg = count > 0 ? net / count : 0;
-  return `<strong>Net ${renderVarianceBadge(net)} across ${cases}.</strong>
-          <span>Average ${renderAverageVarianceBadge(avg)}.</span>`;
+  if (value === "LessTimeThanAllocation") {
+    return "less than the tolerance";
+  }
+  return "within the At expected tolerance";
 }
 
-// Neutral average-per-case label, rounded to one decimal.
-  function formatAverageVariancePerCase(averageMinutes) {
-  if (!Number.isFinite(averageMinutes)) {
+  function formatScheduleFitCoverage(summary) {
+  if (!summary) {
+    return "Schedule Fit unavailable";
+  }
+  const population = Number(summary.populationCount) || 0;
+  const paired = Number(summary.pairedCaseCount) || 0;
+  const coverage = Number.isFinite(summary.populationCoverage)
+    ? summary.populationCoverage
+    : population === 0 ? 0 : paired / population;
+  return `${paired} of ${population} included completed ${population === 1 ? "case" : "cases"} (${Math.round(coverage * 100)}% coverage)`;
+}
+
+  function formatScheduleFitAmount(seconds) {
+  if (!Number.isFinite(seconds)) {
     return "--";
   }
-  const rounded = Math.round(averageMinutes * 10) / 10;
-  const magnitude = Math.abs(rounded);
-  if (rounded > 0) {
-    return `+${magnitude} min over expected per case`;
+  const blocks = Math.round((seconds / 600) * 10) / 10;
+  return `${formatObservedDuration(seconds)} (${blocks} ${blocks === 1 ? "block" : "blocks"})`;
+}
+
+  function formatSignedScheduleFitSeconds(seconds) {
+  if (!Number.isFinite(seconds)) {
+    return "--";
   }
-  if (rounded < 0) {
-    return `-${magnitude} min under expected per case`;
-  }
-  return "0 min at expected per case";
+  const sign = seconds > 0 ? "+" : seconds < 0 ? "-" : "";
+  return `${sign}${formatObservedDuration(Math.abs(seconds))}`;
 }
 
 // Semantic color class for an allocation variance value, by operational meaning (not ranking):
@@ -1839,11 +1825,6 @@ export function createReports({
   return `<span class="variance ${varianceClass(minutes)}">${escapeHtml(formatAllocationVariance(minutes))}</span>`;
 }
 
-  function renderAverageVarianceBadge(averageMinutes) {
-  const rounded = Number.isFinite(averageMinutes) ? Math.round(averageMinutes * 10) / 10 : averageMinutes;
-  return `<span class="variance ${varianceClass(rounded)}">${escapeHtml(formatAverageVariancePerCase(averageMinutes))}</span>`;
-}
-
   function renderReportFilterBar() {
   const bar = document.getElementById("reportFilterBar");
   if (bar) {
@@ -1851,44 +1832,8 @@ export function createReports({
   }
 }
 
-  function fallbackSampleForObservedCount(count) {
-  const threshold = 5;
-  const state = count === 0 ? "Empty" : count < threshold ? "Limited" : "Sufficient";
-  return {
-    populationCount: count,
-    contributingCount: count,
-    state,
-    limitedSampleThreshold: threshold,
-    supportsComparison: state === "Sufficient"
-  };
-}
-
   function sampleSupportsComparison(sample) {
   return sample?.state === "Sufficient" && sample.supportsComparison !== false;
-}
-
-  function allocationComparisonValue(sample) {
-  if (sample?.state === "Empty") {
-    return "No observation";
-  }
-  if (sample?.state === "Unavailable") {
-    return "Unavailable";
-  }
-  return "Not shown";
-}
-
-  function allocationComparisonNoticeText(sample) {
-  if (sample?.state === "Empty") {
-    return "No allocation observation in this population.";
-  }
-  if (sample?.state === "Unavailable") {
-    return "Allocation comparison is unavailable because this population has no contributing allocation observations.";
-  }
-  return "Comparison is not shown for a Limited sample.";
-}
-
-  function renderAllocationComparisonNotice(sample) {
-  return `<p class="allocation-note">${escapeHtml(allocationComparisonNoticeText(sample))}</p>`;
 }
 
 // Reflects state.reportFilters onto the static filter chips so re-renders never desync the

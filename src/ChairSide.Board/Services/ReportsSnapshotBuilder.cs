@@ -126,10 +126,26 @@ internal sealed class ReportsSnapshotBuilder
         // another cycle's occupied wait.
         AnnotateOccupiedWait(normalCycles, standardCycles);
 
-        var scheduleFit = ScheduleFitReportBuilder.Build(standardCompletedCycles);
+        var compatibilityScheduleFit = ScheduleFitReportBuilder.Build(standardCompletedCycles);
         var scopedProcedurePopulations = BuildScopedProcedurePopulations(
             standardCompletedCycles,
             query.ProcedureGrouping);
+        var calibrationRules = CalibrationRuleSet.VersionOne;
+        var scheduleFit = compatibilityScheduleFit with
+        {
+            Practice = ExactScheduleFitCalculator.BuildHistoricalAssignedSummary(
+                standardCompletedCycles,
+                calibrationRules),
+            ProcedureSegments = BuildScheduleFitProcedureSegments(
+                scopedProcedurePopulations,
+                query,
+                calibrationRules),
+            DoctorSummaries = BuildDoctorScheduleFitSummaries(
+                standardCompletedCycles,
+                query,
+                calibrationRules),
+            Rules = calibrationRules
+        };
         var scopedProcedureGroups = BuildScopedProcedureGroups(
             scopedProcedurePopulations,
             standardCompletedCycles.Count);
@@ -580,10 +596,7 @@ internal sealed class ReportsSnapshotBuilder
             : null;
 
     internal static double? TruthfulSeatedToDoctorCompleteSeconds(CompletedRoomCycle cycle) =>
-        cycle.DoctorCompleteAt is { } completeAt
-        && cycle.SeatedAt <= completeAt
-            ? (completeAt - cycle.SeatedAt).TotalSeconds
-            : null;
+        ExactScheduleFitCalculator.TruthfulObservedCaseFlowSeconds(cycle);
 
     private IReadOnlyList<ObservedDoctorFlowDay> BuildObservedDoctorFlowDays(
         IReadOnlyList<CompletedRoomCycle> scopedStandardCompletedCycles) =>
@@ -952,6 +965,105 @@ internal sealed class ReportsSnapshotBuilder
             })
             .ToList();
 
+    private IReadOnlyList<ScheduleFitSegment> BuildScheduleFitProcedureSegments(
+        IReadOnlyList<ScopedProcedurePopulation> populations,
+        ReportQuery query,
+        CalibrationRuleSet rules) =>
+        populations
+            .Select(population =>
+            {
+                var rosterProcedure = FindActiveProcedure(population.BaseProcedureCode);
+                var currentDefaultMinutes = rosterProcedure?.DefaultExpectedUnits is > 0
+                    ? rosterProcedure.DefaultExpectedUnits * 10
+                    : (int?)null;
+                return new ScheduleFitSegment(
+                    population.ProcedureCode,
+                    population.ProcedureLabel,
+                    population.BaseProcedureCode,
+                    query.ProcedureGrouping,
+                    population.IsSedationCase,
+                    currentDefaultMinutes,
+                    ExactScheduleFitCalculator.BuildHistoricalAssignedSummary(population.Cycles, rules),
+                    ExactScheduleFitCalculator.EvaluateCurrentDefault(
+                        population.Cycles,
+                        currentDefaultMinutes,
+                        rules),
+                    query.Scope == ReportScopeKinds.Doctor
+                        ? []
+                        : BuildDoctorScheduleFitSegments(
+                            population.Cycles,
+                            currentDefaultMinutes,
+                            rules));
+            })
+            .ToList();
+
+    private IReadOnlyList<DoctorScheduleFitSegment> BuildDoctorScheduleFitSegments(
+        IReadOnlyList<CompletedRoomCycle> cycles,
+        int? currentDefaultMinutes,
+        CalibrationRuleSet rules)
+    {
+        var represented = cycles
+            .Where(cycle => !string.IsNullOrWhiteSpace(cycle.AssignedDoctor))
+            .GroupBy(cycle => cycle.AssignedDoctor, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(group => group.Key, group => group.ToList(), StringComparer.OrdinalIgnoreCase);
+
+        return OrderedRepresentedDoctorIds(represented.Keys)
+            .Select(doctorId => new DoctorScheduleFitSegment(
+                doctorId,
+                ResolveDoctorDisplayName(doctorId) ?? doctorId,
+                ExactScheduleFitCalculator.BuildHistoricalAssignedSummary(represented[doctorId], rules),
+                ExactScheduleFitCalculator.EvaluateCurrentDefault(
+                    represented[doctorId],
+                    currentDefaultMinutes,
+                    rules)))
+            .ToList();
+    }
+
+    private IReadOnlyList<DoctorScheduleFitSummary> BuildDoctorScheduleFitSummaries(
+        IReadOnlyList<CompletedRoomCycle> cycles,
+        ReportQuery query,
+        CalibrationRuleSet rules)
+    {
+        var represented = cycles
+            .Where(cycle => !string.IsNullOrWhiteSpace(cycle.AssignedDoctor))
+            .GroupBy(cycle => cycle.AssignedDoctor, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(group => group.Key, group => group.ToList(), StringComparer.OrdinalIgnoreCase);
+        IEnumerable<string> doctorIds = query.Scope == ReportScopeKinds.Doctor
+            ? new[] { query.DoctorId }.Where(id => !string.IsNullOrWhiteSpace(id)).Select(id => id!)
+            : _activeDoctors.Select(doctor => doctor.Id).Concat(
+                OrderedRepresentedDoctorIds(represented.Keys)
+                    .Where(doctorId => !_activeDoctors.Any(active =>
+                        string.Equals(active.Id, doctorId, StringComparison.OrdinalIgnoreCase))));
+
+        return doctorIds
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Select(doctorId =>
+            {
+                var population = represented.GetValueOrDefault(doctorId) ?? [];
+                return new DoctorScheduleFitSummary(
+                    doctorId,
+                    ResolveDoctorDisplayName(doctorId) ?? doctorId,
+                    ExactScheduleFitCalculator.BuildHistoricalAssignedSummary(population, rules));
+            })
+            .ToList();
+    }
+
+    private IEnumerable<string> OrderedRepresentedDoctorIds(IEnumerable<string> representedDoctorIds)
+    {
+        var represented = representedDoctorIds
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var activeIds = _activeDoctors.Select(doctor => doctor.Id).ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        return _activeDoctors
+            .Select(doctor => doctor.Id)
+            .Where(represented.Contains)
+            .Concat(represented
+                .Where(doctorId => !activeIds.Contains(doctorId))
+                .OrderBy(doctorId => ResolveDoctorDisplayName(doctorId) ?? doctorId, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(doctorId => doctorId, StringComparer.OrdinalIgnoreCase));
+    }
+
     private IReadOnlyList<DoctorProcedureIntelligenceSegment> BuildDoctorProcedureIntelligence(
         IReadOnlyList<CompletedRoomCycle> cycles)
     {
@@ -959,17 +1071,7 @@ internal sealed class ReportsSnapshotBuilder
             .Where(cycle => !string.IsNullOrWhiteSpace(cycle.AssignedDoctor))
             .GroupBy(cycle => cycle.AssignedDoctor, StringComparer.OrdinalIgnoreCase)
             .ToDictionary(group => group.Key, group => group.ToList(), StringComparer.OrdinalIgnoreCase);
-        var activeIds = _activeDoctors.Select(doctor => doctor.Id).ToHashSet(StringComparer.OrdinalIgnoreCase);
-
-        var orderedDoctorIds = _activeDoctors
-            .Select(doctor => doctor.Id)
-            .Where(represented.ContainsKey)
-            .Concat(represented.Keys
-                .Where(doctorId => !activeIds.Contains(doctorId))
-                .OrderBy(doctorId => ResolveDoctorDisplayName(doctorId) ?? doctorId, StringComparer.OrdinalIgnoreCase)
-                .ThenBy(doctorId => doctorId, StringComparer.OrdinalIgnoreCase));
-
-        return orderedDoctorIds
+        return OrderedRepresentedDoctorIds(represented.Keys)
             .Select(doctorId => new DoctorProcedureIntelligenceSegment(
                 doctorId,
                 ResolveDoctorDisplayName(doctorId) ?? doctorId,

@@ -93,6 +93,12 @@
                       "path":  "docs/knowledge/reports/reporting-population.md"
                   },
                   {
+                      "id":  "file:docs/knowledge/reports/schedule-fit.md",
+                      "label":  "docs/knowledge/reports/schedule-fit.md",
+                      "type":  "File",
+                      "path":  "docs/knowledge/reports/schedule-fit.md"
+                  },
+                  {
                       "id":  "file:docs/knowledge/reports/sedation-as-modifier.md",
                       "label":  "docs/knowledge/reports/sedation-as-modifier.md",
                       "type":  "File",
@@ -331,6 +337,12 @@
                       "label":  "src/ChairSide.Board/Services/AdminAccessTokenValidator.cs",
                       "type":  "File",
                       "path":  "src/ChairSide.Board/Services/AdminAccessTokenValidator.cs"
+                  },
+                  {
+                      "id":  "file:src/ChairSide.Board/Services/CalibrationInsightReport.cs",
+                      "label":  "src/ChairSide.Board/Services/CalibrationInsightReport.cs",
+                      "type":  "File",
+                      "path":  "src/ChairSide.Board/Services/CalibrationInsightReport.cs"
                   },
                   {
                       "id":  "file:src/ChairSide.Board/Services/ClientErrorRateLimiter.cs",
@@ -745,6 +757,12 @@
                       "label":  "tests/ChairSide.Board.Tests/BoardStoreSecurityAndDiagnosticsTests.cs",
                       "type":  "File",
                       "path":  "tests/ChairSide.Board.Tests/BoardStoreSecurityAndDiagnosticsTests.cs"
+                  },
+                  {
+                      "id":  "file:tests/ChairSide.Board.Tests/CalibrationInsightReportTests.cs",
+                      "label":  "tests/ChairSide.Board.Tests/CalibrationInsightReportTests.cs",
+                      "type":  "File",
+                      "path":  "tests/ChairSide.Board.Tests/CalibrationInsightReportTests.cs"
                   },
                   {
                       "id":  "file:tests/ChairSide.Board.Tests/CanonicalAssignmentDomainValidationTests.cs",
@@ -1341,6 +1359,66 @@
                       "path":  "src/ChairSide.Board/Services/ClientErrorRateLimiter.cs"
                   },
                   {
+                      "id":  "symbol:type:CalibrationBaselineSources",
+                      "label":  "CalibrationBaselineSources",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/CalibrationInsightReport.cs"
+                  },
+                  {
+                      "id":  "symbol:type:CalibrationDecisions",
+                      "label":  "CalibrationDecisions",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/CalibrationInsightReport.cs"
+                  },
+                  {
+                      "id":  "symbol:type:CalibrationEvaluation",
+                      "label":  "CalibrationEvaluation",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/CalibrationInsightReport.cs"
+                  },
+                  {
+                      "id":  "symbol:type:CalibrationEvidenceCase",
+                      "label":  "CalibrationEvidenceCase",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/CalibrationInsightReport.cs"
+                  },
+                  {
+                      "id":  "symbol:type:CalibrationInsight",
+                      "label":  "CalibrationInsight",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/CalibrationInsightReport.cs"
+                  },
+                  {
+                      "id":  "symbol:type:CalibrationInsightDirections",
+                      "label":  "CalibrationInsightDirections",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/CalibrationInsightReport.cs"
+                  },
+                  {
+                      "id":  "symbol:type:CalibrationInsightReportTests",
+                      "label":  "CalibrationInsightReportTests",
+                      "type":  "CodeType",
+                      "path":  "tests/ChairSide.Board.Tests/CalibrationInsightReportTests.cs"
+                  },
+                  {
+                      "id":  "symbol:type:CalibrationPair",
+                      "label":  "CalibrationPair",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/CalibrationInsightReport.cs"
+                  },
+                  {
+                      "id":  "symbol:type:CalibrationRawDirections",
+                      "label":  "CalibrationRawDirections",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/CalibrationInsightReport.cs"
+                  },
+                  {
+                      "id":  "symbol:type:CalibrationRuleSet",
+                      "label":  "CalibrationRuleSet",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/CalibrationInsightReport.cs"
+                  },
+                  {
                       "id":  "symbol:type:CancellationReasons",
                       "label":  "CancellationReasons",
                       "type":  "CodeType",
@@ -1719,6 +1797,18 @@
                       "path":  "src/ChairSide.Board/Options/DoctorRosterOptions.cs"
                   },
                   {
+                      "id":  "symbol:type:DoctorScheduleFitSegment",
+                      "label":  "DoctorScheduleFitSegment",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/CalibrationInsightReport.cs"
+                  },
+                  {
+                      "id":  "symbol:type:DoctorScheduleFitSummary",
+                      "label":  "DoctorScheduleFitSummary",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/CalibrationInsightReport.cs"
+                  },
+                  {
                       "id":  "symbol:type:DoctorStyleProfile",
                       "label":  "DoctorStyleProfile",
                       "type":  "CodeType",
@@ -1753,6 +1843,12 @@
                       "label":  "EnvironmentMaintenancePreflightTests",
                       "type":  "CodeType",
                       "path":  "tests/ChairSide.Board.Tests/EnvironmentMaintenancePreflightTests.cs"
+                  },
+                  {
+                      "id":  "symbol:type:ExactScheduleFitCalculator",
+                      "label":  "ExactScheduleFitCalculator",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/CalibrationInsightReport.cs"
                   },
                   {
                       "id":  "symbol:type:ExceptionReasons",
@@ -1897,6 +1993,12 @@
                       "label":  "Harness",
                       "type":  "CodeType",
                       "path":  "tests/ChairSide.Board.Tests/PrestagingLifecycleEndpointTests.cs"
+                  },
+                  {
+                      "id":  "symbol:type:HistoricalPair",
+                      "label":  "HistoricalPair",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/CalibrationInsightReport.cs"
                   },
                   {
                       "id":  "symbol:type:IReparsePointInspector",
@@ -2643,6 +2745,24 @@
                       "path":  "src/ChairSide.Board/Services/ScheduleFitCalculator.cs"
                   },
                   {
+                      "id":  "symbol:type:ScheduleFitSegment",
+                      "label":  "ScheduleFitSegment",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/CalibrationInsightReport.cs"
+                  },
+                  {
+                      "id":  "symbol:type:ScheduleFitSummary",
+                      "label":  "ScheduleFitSummary",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/CalibrationInsightReport.cs"
+                  },
+                  {
+                      "id":  "symbol:type:ScheduleFitToleranceClassifications",
+                      "label":  "ScheduleFitToleranceClassifications",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/CalibrationInsightReport.cs"
+                  },
+                  {
                       "id":  "symbol:type:ScopedProcedureGroup",
                       "label":  "ScopedProcedureGroup",
                       "type":  "CodeType",
@@ -3070,6 +3190,86 @@
                   {
                       "from":  "file:src/ChairSide.Board/Services/AdminAccessTokenValidator.cs",
                       "to":  "symbol:type:AdminAccessTokenValidator",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/CalibrationInsightReport.cs",
+                      "to":  "symbol:type:CalibrationBaselineSources",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/CalibrationInsightReport.cs",
+                      "to":  "symbol:type:CalibrationDecisions",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/CalibrationInsightReport.cs",
+                      "to":  "symbol:type:CalibrationEvaluation",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/CalibrationInsightReport.cs",
+                      "to":  "symbol:type:CalibrationEvidenceCase",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/CalibrationInsightReport.cs",
+                      "to":  "symbol:type:CalibrationInsight",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/CalibrationInsightReport.cs",
+                      "to":  "symbol:type:CalibrationInsightDirections",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/CalibrationInsightReport.cs",
+                      "to":  "symbol:type:CalibrationPair",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/CalibrationInsightReport.cs",
+                      "to":  "symbol:type:CalibrationRawDirections",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/CalibrationInsightReport.cs",
+                      "to":  "symbol:type:CalibrationRuleSet",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/CalibrationInsightReport.cs",
+                      "to":  "symbol:type:DoctorScheduleFitSegment",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/CalibrationInsightReport.cs",
+                      "to":  "symbol:type:DoctorScheduleFitSummary",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/CalibrationInsightReport.cs",
+                      "to":  "symbol:type:ExactScheduleFitCalculator",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/CalibrationInsightReport.cs",
+                      "to":  "symbol:type:HistoricalPair",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/CalibrationInsightReport.cs",
+                      "to":  "symbol:type:ScheduleFitSegment",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/CalibrationInsightReport.cs",
+                      "to":  "symbol:type:ScheduleFitSummary",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/CalibrationInsightReport.cs",
+                      "to":  "symbol:type:ScheduleFitToleranceClassifications",
                       "label":  "declares"
                   },
                   {
@@ -4038,6 +4238,11 @@
                       "label":  "declares"
                   },
                   {
+                      "from":  "file:tests/ChairSide.Board.Tests/CalibrationInsightReportTests.cs",
+                      "to":  "symbol:type:CalibrationInsightReportTests",
+                      "label":  "declares"
+                  },
+                  {
                       "from":  "file:tests/ChairSide.Board.Tests/CanonicalAssignmentDomainValidationTests.cs",
                       "to":  "symbol:type:CanonicalAssignmentDomainValidationTests",
                       "label":  "declares"
@@ -4379,6 +4584,11 @@
                   },
                   {
                       "from":  "repo:chairside",
+                      "to":  "file:docs/knowledge/reports/schedule-fit.md",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
                       "to":  "file:docs/knowledge/reports/sedation-as-modifier.md",
                       "label":  "contains"
                   },
@@ -4575,6 +4785,11 @@
                   {
                       "from":  "repo:chairside",
                       "to":  "file:src/ChairSide.Board/Services/AdminAccessTokenValidator.cs",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:src/ChairSide.Board/Services/CalibrationInsightReport.cs",
                       "label":  "contains"
                   },
                   {
@@ -4920,6 +5135,11 @@
                   {
                       "from":  "repo:chairside",
                       "to":  "file:tests/ChairSide.Board.Tests/BoardStoreSecurityAndDiagnosticsTests.cs",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:tests/ChairSide.Board.Tests/CalibrationInsightReportTests.cs",
                       "label":  "contains"
                   },
                   {

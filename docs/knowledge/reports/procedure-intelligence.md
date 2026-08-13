@@ -51,7 +51,7 @@ The UI explains the range as `Middle 50% of observed Doctor Time.` It is not min
 
 Current roster default is the base procedure's current DefaultExpectedUnits converted to minutes. It is a rough starting allocation, not an authoritative case expectation. Historical assigned expectation uses finalized ExpectedAllocationMinutes. Historical captured default uses OriginalDefaultExpectedUnits and belongs in deeper disclosure.
 
-Procedure Intelligence does not subtract allocation from Doctor Time, compare aggregate medians, calculate slack or debt, classify over or under, apply an At expected tolerance, or produce Calibration Insights. Those compatible paired-case interpretations belong to #219.
+Procedure Intelligence does not subtract allocation from Doctor Time, compare aggregate medians, calculate slack or debt, classify over or under, apply an At expected tolerance, or produce Calibration Insights. The separate [Schedule Fit and Calibration Insights](schedule-fit.md) authority calculates exact Seated -> Doctor Complete paired-case variance from the same underlying scoped procedure populations. It never subtracts Procedure Intelligence medians.
 
 ## Doctor x procedure disclosure
 
@@ -64,3 +64,4 @@ Practice rows may disclose represented active doctors in roster order followed b
 - `src/ChairSide.Board/wwwroot/reports.js` - median-first presentation and accessible disclosure.
 - `tests/ChairSide.Board.Tests/ProcedureIntelligenceReportTests.cs` - statistical, population, grouping, timing, allocation-context, and contract guards.
 - `tests/javascript/reports.test.mjs` - presentation, sample, disclosure, scope, and accessibility guards.
+- `docs/knowledge/reports/schedule-fit.md` - historical assigned fit and current-default Calibration rules.
