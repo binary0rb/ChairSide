@@ -6,7 +6,7 @@
                   {
                       "path":  ".github/pull_request_template.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  746,
+                      "sizeBytes":  754,
                       "typeSymbols":  [
 
                                       ],
@@ -60,7 +60,7 @@
                   {
                       "path":  "AGENTS.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  20632,
+                      "sizeBytes":  20646,
                       "typeSymbols":  [
 
                                       ],
@@ -404,7 +404,7 @@
                   {
                       "path":  "docs/knowledge/reports/observed-load.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  5205,
+                      "sizeBytes":  5257,
                       "typeSymbols":  [
 
                                       ],
@@ -956,7 +956,7 @@
                   {
                       "path":  "MISTAKES.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  3706,
+                      "sizeBytes":  3771,
                       "typeSymbols":  [
 
                                       ],
@@ -1836,7 +1836,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/DemoBoardStore.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  188792,
+                      "sizeBytes":  188850,
                       "typeSymbols":  [
                                           "ExceptionReasons",
                                           "ReportingExceptionReasons",
@@ -2338,7 +2338,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/ReportQuery.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  7782,
+                      "sizeBytes":  7796,
                       "typeSymbols":  [
                                           "ReportScopeKinds",
                                           "ReportSedationSegments",
@@ -2382,7 +2382,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/ReportsSnapshotBuilder.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  61635,
+                      "sizeBytes":  61934,
                       "typeSymbols":  [
                                           "ReportsSnapshotBuilder"
                                       ],
@@ -2447,7 +2447,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/ReportsSnapshotComposition.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  9528,
+                      "sizeBytes":  9537,
                       "typeSymbols":  [
                                           "ReportsSnapshotComposition",
                                           "ReportPopulationSection",
@@ -3300,7 +3300,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/reports.html",
                       "kind":  "Html",
-                      "sizeBytes":  11578,
+                      "sizeBytes":  11582,
                       "typeSymbols":  [
 
                                       ],
@@ -3326,7 +3326,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/reports.js",
                       "kind":  "JavaScript",
-                      "sizeBytes":  118543,
+                      "sizeBytes":  118804,
                       "typeSymbols":  [
 
                                       ],
@@ -3649,7 +3649,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/styles.css",
                       "kind":  "Css",
-                      "sizeBytes":  100644,
+                      "sizeBytes":  100687,
                       "typeSymbols":  [
 
                                       ],
@@ -4277,7 +4277,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/BoardStoreReportingTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  41847,
+                      "sizeBytes":  41860,
                       "typeSymbols":  [
                                           "BoardStoreTests"
                                       ],
@@ -5220,7 +5220,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/ReportsSnapshotBuilderTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  59250,
+                      "sizeBytes":  59610,
                       "typeSymbols":  [
                                           "ReportsSnapshotBuilderTests"
                                       ],
@@ -5951,7 +5951,7 @@
                   {
                       "path":  "tests/javascript/reports.test.mjs",
                       "kind":  "JavaScript",
-                      "sizeBytes":  100779,
+                      "sizeBytes":  101061,
                       "typeSymbols":  [
 
                                       ],
