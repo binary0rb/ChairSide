@@ -404,7 +404,7 @@
                   {
                       "path":  "docs/knowledge/reports/observed-load.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  7025,
+                      "sizeBytes":  7148,
                       "typeSymbols":  [
 
                                       ],
@@ -692,7 +692,7 @@
                   {
                       "path":  "docs/knowledge-graph/decisions.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  20960,
+                      "sizeBytes":  21102,
                       "typeSymbols":  [
 
                                       ],
@@ -2075,7 +2075,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/DoctorFlowTrendSnapshot.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  10483,
+                      "sizeBytes":  10465,
                       "typeSymbols":  [
                                           "DoctorFlowTrendSeries",
                                           "DoctorFlowTrendBucket",
@@ -4687,7 +4687,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/DoctorFlowTrendSnapshotTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  15135,
+                      "sizeBytes":  18847,
                       "typeSymbols":  [
                                           "DoctorFlowTrendSnapshotTests"
                                       ],
@@ -4695,6 +4695,9 @@
                                             "Finite_range_builds_one_common_monday_skeleton_with_partial_boundaries",
                                             "Finite_range_never_widens_and_keeps_missing_middle_week_as_empty_gap",
                                             "Selected_range_is_capped_at_trailing_twelve_buckets_and_short_ranges_stay_short",
+                                            "End_only_range_uses_explicit_end_and_retains_empty_trailing_weeks",
+                                            "End_only_range_without_observations_emits_empty_gaps_through_explicit_end",
+                                            "Start_only_range_uses_latest_observation_and_invents_no_window_without_one",
                                             "All_time_uses_report_level_latest_dateable_observation_for_every_doctor",
                                             "All_time_without_dateable_observation_keeps_series_but_invents_no_history",
                                             "Weekly_metrics_use_underlying_observations_and_metric_specific_samples",

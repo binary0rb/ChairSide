@@ -83,6 +83,87 @@ public sealed class DoctorFlowTrendSnapshotTests
     }
 
     [Fact]
+    public void End_only_range_uses_explicit_end_and_retains_empty_trailing_weeks()
+    {
+        var series = Assert.Single(Build(
+            [Otte],
+            [Cycle("otte", Utc(2026, 6, 15, 12))],
+            ReportDateRange.FromDates(null, new DateOnly(2026, 8, 1))));
+
+        Assert.Equal("2026-05-11", series.EffectiveStartDate);
+        Assert.Equal("2026-08-02", series.EffectiveEndDate);
+        Assert.Equal(DoctorFlowTrendSnapshotBuilder.MaximumBucketCount, series.Buckets.Count);
+        Assert.Equal("2026-07-27", series.Buckets[^1].StartDate);
+        Assert.True(series.Buckets[^1].IsPartial);
+        Assert.Equal(1, Assert.Single(
+            series.Buckets,
+            bucket => bucket.StartDate == "2026-06-15").CompletedCaseCount);
+        var trailingGaps = series.Buckets
+            .Where(bucket => bucket.StartDate.CompareTo("2026-06-15") > 0)
+            .ToList();
+        Assert.Equal(6, trailingGaps.Count);
+        Assert.All(trailingGaps, bucket =>
+        {
+            Assert.Null(bucket.MedianReadyWaitSeconds);
+            Assert.Null(bucket.MedianDoctorTimeSeconds);
+            Assert.Null(bucket.CompletedCaseCount);
+            Assert.Null(bucket.MedianObservedClinicalSpanMinutes);
+            Assert.Equal(ReportSampleStates.Empty, bucket.Samples.ReadyWait.State);
+            Assert.Equal(ReportSampleStates.Empty, bucket.Samples.DoctorTime.State);
+            Assert.Equal(ReportSampleStates.Empty, bucket.Samples.CompletedCases.State);
+            Assert.Equal(ReportSampleStates.Empty, bucket.Samples.ObservedClinicalSpan.State);
+        });
+    }
+
+    [Fact]
+    public void End_only_range_without_observations_emits_empty_gaps_through_explicit_end()
+    {
+        var series = Assert.Single(Build(
+            [Otte],
+            [],
+            ReportDateRange.FromDates(null, new DateOnly(2026, 8, 1))));
+
+        Assert.Equal("2026-05-11", series.EffectiveStartDate);
+        Assert.Equal("2026-08-02", series.EffectiveEndDate);
+        Assert.Equal(DoctorFlowTrendSnapshotBuilder.MaximumBucketCount, series.Buckets.Count);
+        Assert.All(series.Buckets, bucket =>
+        {
+            Assert.Null(bucket.MedianReadyWaitSeconds);
+            Assert.Null(bucket.MedianDoctorTimeSeconds);
+            Assert.Null(bucket.CompletedCaseCount);
+            Assert.Null(bucket.MedianObservedClinicalSpanMinutes);
+            Assert.Equal(ReportSampleStates.Empty, bucket.Samples.ReadyWait.State);
+            Assert.Equal(ReportSampleStates.Empty, bucket.Samples.DoctorTime.State);
+            Assert.Equal(ReportSampleStates.Empty, bucket.Samples.CompletedCases.State);
+            Assert.Equal(ReportSampleStates.Empty, bucket.Samples.ObservedClinicalSpan.State);
+        });
+    }
+
+    [Fact]
+    public void Start_only_range_uses_latest_observation_and_invents_no_window_without_one()
+    {
+        var range = ReportDateRange.FromDates(new DateOnly(2026, 6, 10), null);
+        var observed = Assert.Single(Build(
+            [Otte],
+            [Cycle("otte", Utc(2026, 7, 22, 12))],
+            range));
+
+        Assert.Equal("2026-06-10", observed.EffectiveStartDate);
+        Assert.Equal("2026-07-23", observed.EffectiveEndDate);
+        Assert.Equal(7, observed.Buckets.Count);
+        Assert.Equal("2026-06-08", observed.Buckets[0].StartDate);
+        Assert.True(observed.Buckets[0].IsPartial);
+        Assert.Equal("2026-07-20", observed.Buckets[^1].StartDate);
+        Assert.True(observed.Buckets[^1].IsPartial);
+
+        var unobserved = Assert.Single(Build([Otte], [], range));
+
+        Assert.Null(unobserved.EffectiveStartDate);
+        Assert.Null(unobserved.EffectiveEndDate);
+        Assert.Empty(unobserved.Buckets);
+    }
+
+    [Fact]
     public void All_time_uses_report_level_latest_dateable_observation_for_every_doctor()
     {
         var series = Build(

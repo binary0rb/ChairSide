@@ -168,7 +168,7 @@ internal static class DoctorFlowTrendSnapshotBuilder
         IReadOnlyList<CompletedRoomCycle> scopedStandardPhaseCycles,
         ReportDateRange selectedRange)
     {
-        var isFinite = selectedRange.StartDate.HasValue && selectedRange.EndDate.HasValue;
+        var hasExplicitEnd = selectedRange.EndDate.HasValue;
         var latestDateableObservation = scopedStandardPhaseCycles
             .Where(cycle => cycle.DoctorCompleteAt.HasValue)
             .Select(cycle => DateOnly.FromDateTime(cycle.DoctorCompleteAt!.Value.UtcDateTime))
@@ -177,7 +177,7 @@ internal static class DoctorFlowTrendSnapshotBuilder
         var hasDateableObservation = scopedStandardPhaseCycles.Any(cycle => cycle.DoctorCompleteAt.HasValue);
 
         DateOnly endInclusive;
-        if (isFinite)
+        if (hasExplicitEnd)
         {
             endInclusive = selectedRange.EndDate!.Value;
         }
@@ -202,7 +202,7 @@ internal static class DoctorFlowTrendSnapshotBuilder
             && selectedRange.StartDate.Value > calendarStart
                 ? selectedRange.StartDate.Value
                 : calendarStart;
-        var effectiveEndExclusive = isFinite
+        var effectiveEndExclusive = hasExplicitEnd
             ? selectedRange.EndDate!.Value.AddDays(1)
             : endInclusive.AddDays(1);
 
