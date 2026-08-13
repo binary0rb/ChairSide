@@ -279,7 +279,7 @@ test("workflow retains room decisions while common mechanics own only private in
     /\b(renderReports|renderDoctorView|selectedDoctorId|selectedProcedureId|sedationOn|expectedUnitsConfirmed|discardAssignmentDraft)\b/);
   assert.match(
     reportsSource,
-    /selector: "\[data-report-doctor-id\], \[data-report-doctor-tab\], \.report-table button"/);
+    /selector: "\[data-report-doctor-id\], \[data-report-doctor-tab\], \.report-table button, \.procedure-intelligence-toggle"/);
   assert.match(
     reportsSource,
     /function wireReportPressGuard\(\) \{[\s\S]*?onCatchUp: \(\) => \{[\s\S]*?renderReports\(\);/);

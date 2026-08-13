@@ -1,7 +1,7 @@
 ﻿{
     "generatedStamp":  "deterministic",
     "root":  ".",
-    "fileCount":  172,
+    "fileCount":  175,
     "files":  [
                   {
                       "path":  ".github/pull_request_template.md",
@@ -60,7 +60,7 @@
                   {
                       "path":  "AGENTS.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  20646,
+                      "sizeBytes":  20756,
                       "typeSymbols":  [
 
                                       ],
@@ -200,7 +200,7 @@
                   {
                       "path":  "docs/design/reporting-design.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  28803,
+                      "sizeBytes":  31184,
                       "typeSymbols":  [
 
                                       ],
@@ -404,7 +404,7 @@
                   {
                       "path":  "docs/knowledge/reports/observed-load.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  7148,
+                      "sizeBytes":  7164,
                       "typeSymbols":  [
 
                                       ],
@@ -434,6 +434,39 @@
                                        "Constraints",
                                        "Source anchors",
                                        "Verification notes"
+                                   ]
+                  },
+                  {
+                      "path":  "docs/knowledge/reports/procedure-intelligence.md",
+                      "kind":  "Markdown",
+                      "sizeBytes":  4646,
+                      "typeSymbols":  [
+
+                                      ],
+                      "methodSymbols":  [
+
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+                                       "Procedure intelligence",
+                                       "Intent",
+                                       "Population authority",
+                                       "Timing metrics",
+                                       "Typical Doctor Time Range",
+                                       "Expected allocation context",
+                                       "Doctor x procedure disclosure",
+                                       "Source anchors"
                                    ]
                   },
                   {
@@ -471,7 +504,7 @@
                   {
                       "path":  "docs/knowledge/reports/reporting-population.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  4691,
+                      "sizeBytes":  4694,
                       "typeSymbols":  [
 
                                       ],
@@ -661,7 +694,7 @@
                   {
                       "path":  "docs/knowledge-graph/chairside.graph.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  17746,
+                      "sizeBytes":  18142,
                       "typeSymbols":  [
 
                                       ],
@@ -692,7 +725,7 @@
                   {
                       "path":  "docs/knowledge-graph/decisions.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  21102,
+                      "sizeBytes":  21603,
                       "typeSymbols":  [
 
                                       ],
@@ -1837,7 +1870,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/DemoBoardStore.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  189179,
+                      "sizeBytes":  189557,
                       "typeSymbols":  [
                                           "ExceptionReasons",
                                           "ReportingExceptionReasons",
@@ -2075,7 +2108,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/DoctorFlowTrendSnapshot.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  10465,
+                      "sizeBytes":  10713,
                       "typeSymbols":  [
                                           "DoctorFlowTrendSeries",
                                           "DoctorFlowTrendBucket",
@@ -2262,6 +2295,39 @@
                                    ]
                   },
                   {
+                      "path":  "src/ChairSide.Board/Services/ProcedureIntelligenceReport.cs",
+                      "kind":  "CSharp",
+                      "sizeBytes":  4649,
+                      "typeSymbols":  [
+                                          "ProcedureIntelligenceRangeMethods",
+                                          "ProcedureAllocationValueCount",
+                                          "ProcedureIntelligenceMetrics",
+                                          "DoctorProcedureIntelligenceSegment",
+                                          "ProcedureIntelligenceRow",
+                                          "ProcedureIntelligenceStatistics"
+                                      ],
+                      "methodSymbols":  [
+                                            "Type7Quantile",
+                                            "Median",
+                                            "Average"
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
                       "path":  "src/ChairSide.Board/Services/ProjectionAssumptionChecklist.cs",
                       "kind":  "CSharp",
                       "sizeBytes":  6150,
@@ -2422,9 +2488,10 @@
                   {
                       "path":  "src/ChairSide.Board/Services/ReportsSnapshotBuilder.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  62775,
+                      "sizeBytes":  69509,
                       "typeSymbols":  [
-                                          "ReportsSnapshotBuilder"
+                                          "ReportsSnapshotBuilder",
+                                          "ScopedProcedurePopulation"
                                       ],
                       "methodSymbols":  [
                                             "Build",
@@ -2442,6 +2509,7 @@
                                             "BuildDoctorFlowSummaries",
                                             "TruthfulReadyWaitSeconds",
                                             "TruthfulDoctorTimeSeconds",
+                                            "TruthfulSeatedToDoctorCompleteSeconds",
                                             "BuildObservedDoctorFlowDays",
                                             "IsQualifyingObservedDoctorFlowCase",
                                             "BuildObservedDoctorWorkingConcurrency",
@@ -2452,7 +2520,12 @@
                                             "ObservedLoadWholeMinutesBetween",
                                             "BuildProcedureSummaries",
                                             "BuildBaseProcedureSummaries",
+                                            "BuildScopedProcedurePopulations",
                                             "BuildScopedProcedureGroups",
+                                            "BuildProcedureIntelligenceRows",
+                                            "BuildDoctorProcedureIntelligence",
+                                            "BuildProcedureIntelligenceMetrics",
+                                            "BuildAllocationValueCounts",
                                             "BuildProcedureSamples",
                                             "BuildDoctorProcedureMix",
                                             "ResolveProcedureLabel",
@@ -2460,13 +2533,7 @@
                                             "HasExtremeDuration",
                                             "CrossesCalendarDay",
                                             "BuildDisplayProcedureLabel",
-                                            "AnnotateAllocationVariance",
-                                            "BuildAllocationVarianceSummary",
-                                            "AnnotateOccupiedWait",
-                                            "ComputeOverlapSeconds",
-                                            "ResolveDoctorDisplayName",
-                                            "FindProcedure",
-                                            "FindActiveProcedure"
+                                            "AnnotateAllocationVariance"
                                         ],
                       "routes":  [
 
@@ -2487,7 +2554,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/ReportsSnapshotComposition.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  9692,
+                      "sizeBytes":  9878,
                       "typeSymbols":  [
                                           "ReportsSnapshotComposition",
                                           "ReportPopulationSection",
@@ -3340,7 +3407,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/reports.html",
                       "kind":  "Html",
-                      "sizeBytes":  11582,
+                      "sizeBytes":  11735,
                       "typeSymbols":  [
 
                                       ],
@@ -3366,7 +3433,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/reports.js",
                       "kind":  "JavaScript",
-                      "sizeBytes":  123214,
+                      "sizeBytes":  135510,
                       "typeSymbols":  [
 
                                       ],
@@ -3441,6 +3508,18 @@
                                               "renderProcedureMix",
                                               "renderProcedureMixMarkup",
                                               "renderSelectedDoctorProcedures",
+                                              "renderProcedureIntelligence",
+                                              "renderProcedureIntelligenceMarkup",
+                                              "renderProcedureIntelligenceRow",
+                                              "renderProcedureIntelligenceMetric",
+                                              "renderTypicalDoctorTimeRange",
+                                              "renderCurrentRosterDefault",
+                                              "renderProcedureIntelligenceDetail",
+                                              "renderHistoricalAssignedAllocation",
+                                              "renderAllocationValueCounts",
+                                              "usefulCapturedDefaults",
+                                              "renderDoctorProcedureIntelligence",
+                                              "handleProcedureIntelligenceClick",
                                               "formatProcedureShare",
                                               "renderSelectedDoctorAudit",
                                               "formatAbsoluteMinutes",
@@ -3450,19 +3529,7 @@
                                               "renderProcedureAllocationRow",
                                               "describeAllocation",
                                               "formatAverageVariancePerCase",
-                                              "varianceClass",
-                                              "renderVarianceBadge",
-                                              "renderAverageVarianceBadge",
-                                              "renderReportFilterBar",
-                                              "fallbackSampleForObservedCount",
-                                              "sampleSupportsComparison",
-                                              "allocationComparisonValue",
-                                              "allocationComparisonNoticeText",
-                                              "renderAllocationComparisonNotice",
-                                              "syncReportFilterButtons",
-                                              "normalizeReportFilterValue",
-                                              "syncDoctorScopeControl",
-                                              "getInsightSummaries"
+                                              "varianceClass"
                                           ],
                       "headings":  [
 
@@ -3689,7 +3756,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/styles.css",
                       "kind":  "Css",
-                      "sizeBytes":  104583,
+                      "sizeBytes":  109830,
                       "typeSymbols":  [
 
                                       ],
@@ -4317,7 +4384,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/BoardStoreReportingTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  42257,
+                      "sizeBytes":  42267,
                       "typeSymbols":  [
                                           "BoardStoreTests"
                                       ],
@@ -4687,7 +4754,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/DoctorFlowTrendSnapshotTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  18847,
+                      "sizeBytes":  19280,
                       "typeSymbols":  [
                                           "DoctorFlowTrendSnapshotTests"
                                       ],
@@ -5171,6 +5238,36 @@
                                    ]
                   },
                   {
+                      "path":  "tests/ChairSide.Board.Tests/ProcedureIntelligenceReportTests.cs",
+                      "kind":  "CSharp",
+                      "sizeBytes":  3579,
+                      "typeSymbols":  [
+                                          "ProcedureIntelligenceReportTests"
+                                      ],
+                      "methodSymbols":  [
+                                            "Type7_iqr_matches_approved_sparse_even_odd_outlier_and_skew_fixtures",
+                                            "Type7_iqr_is_input_order_independent",
+                                            "Limited_doctor_time_keeps_limited_sample_and_suppresses_range_endpoints",
+                                            "Empty_and_unavailable_samples_suppress_range_without_changing_sample_state",
+                                            "Sufficient_truthful_zero_sample_publishes_zero_width_range"
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
                       "path":  "tests/ChairSide.Board.Tests/ProjectionAssumptionChecklistTests.cs",
                       "kind":  "CSharp",
                       "sizeBytes":  9442,
@@ -5304,7 +5401,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/ReportsSnapshotBuilderTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  59868,
+                      "sizeBytes":  70658,
                       "typeSymbols":  [
                                           "ReportsSnapshotBuilderTests"
                                       ],
@@ -5312,7 +5409,7 @@
                                             "Compose_characterizes_all_reporting_populations_without_mutating_source_history",
                                             "Adapter_preserves_every_named_section_value_in_flat_contract",
                                             "Build_applies_completion_window_before_every_population_and_keeps_all_time_total",
-                                            "Reports_snapshot_web_json_property_contract_appends_doctor_allocation_samples",
+                                            "Reports_snapshot_web_json_property_contract_appends_procedure_intelligence",
                                             "Build_applies_historical_doctor_and_sedation_scope_without_treating_grouping_as_a_filter",
                                             "Build_scoped_procedure_groups_reconcile_family_and_detailed_variant_populations",
                                             "Build_scoped_procedure_groups_recompute_sedation_populations_and_shares",
@@ -5334,10 +5431,16 @@
                                             "Build_practice_summary_keeps_active_roster_order_then_historical_and_doctor_scope_is_exact",
                                             "Canonical_and_compatibility_observed_day_json_contracts_remain_distinct",
                                             "Build_keeps_review_queue_global_to_analytical_scope_but_bounded_by_window",
+                                            "Procedure_intelligence_reuses_scoped_groups_and_recomputes_family_range_from_cases",
+                                            "Procedure_intelligence_uses_metric_specific_truthful_contributors_and_completed_membership",
+                                            "Procedure_intelligence_keeps_current_and_historical_allocation_context_separate",
+                                            "Procedure_intelligence_doctor_breakdown_uses_roster_then_historical_order_and_doctor_scope_is_flat",
+                                            "Procedure_intelligence_json_contract_is_appended_without_variance_interpretation",
                                             "CreateBuilder",
                                             "BuildScoped",
                                             "AssertProcedureGroup",
                                             "CompletedCycle",
+                                            "ProcedureCycle",
                                             "Cycle",
                                             "SecondsBetween",
                                             "Utc"
@@ -5840,7 +5943,7 @@
                   {
                       "path":  "tests/javascript/common-interactions.test.mjs",
                       "kind":  "JavaScript",
-                      "sizeBytes":  10771,
+                      "sizeBytes":  10801,
                       "typeSymbols":  [
 
                                       ],
@@ -6035,7 +6138,7 @@
                   {
                       "path":  "tests/javascript/reports.test.mjs",
                       "kind":  "JavaScript",
-                      "sizeBytes":  108083,
+                      "sizeBytes":  115223,
                       "typeSymbols":  [
 
                                       ],
@@ -6061,6 +6164,7 @@
                                               "targetFor",
                                               "allocation",
                                               "sample",
+                                              "procedureIntelligenceRow",
                                               "doctorFlowSummary",
                                               "observedDoctorFlowDay",
                                               "doctorFlowTrendBucket",

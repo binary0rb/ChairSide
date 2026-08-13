@@ -9,6 +9,13 @@ namespace ChairSide.Board.Services;
 /// </summary>
 internal sealed class ReportsSnapshotBuilder
 {
+    private sealed record ScopedProcedurePopulation(
+        string ProcedureCode,
+        string ProcedureLabel,
+        string BaseProcedureCode,
+        bool? IsSedationCase,
+        IReadOnlyList<CompletedRoomCycle> Cycles);
+
     private static readonly TimeSpan ExtremeCaseFlowThreshold = TimeSpan.FromHours(4);
     private static readonly TimeSpan ExtremeRoomCycleThreshold = TimeSpan.FromHours(6);
 
@@ -120,7 +127,15 @@ internal sealed class ReportsSnapshotBuilder
         AnnotateOccupiedWait(normalCycles, standardCycles);
 
         var scheduleFit = ScheduleFitReportBuilder.Build(standardCompletedCycles);
-        var scopedProcedureGroups = BuildScopedProcedureGroups(standardCompletedCycles, query.ProcedureGrouping);
+        var scopedProcedurePopulations = BuildScopedProcedurePopulations(
+            standardCompletedCycles,
+            query.ProcedureGrouping);
+        var scopedProcedureGroups = BuildScopedProcedureGroups(
+            scopedProcedurePopulations,
+            standardCompletedCycles.Count);
+        var procedureIntelligenceRows = BuildProcedureIntelligenceRows(
+            scopedProcedurePopulations,
+            query);
         var observedDoctorFlowDays = BuildObservedDoctorFlowDays(standardCompletedCycles);
         var doctorFlowIdentities = BuildDoctorFlowIdentities(scopedStandardCycles, query);
         var doctorFlowSummaries = BuildDoctorFlowSummaries(
@@ -224,7 +239,8 @@ internal sealed class ReportsSnapshotBuilder
                 NonSedationCaseCount =
                     standardCompletedCycles.Count(cycle => !IsSedationProcedureCode(cycle.ProcedureCode)),
                 BaseProcedureSummaries = BuildBaseProcedureSummaries(standardCompletedCycles),
-                ScopedProcedureGroups = scopedProcedureGroups
+                ScopedProcedureGroups = scopedProcedureGroups,
+                ProcedureIntelligenceRows = procedureIntelligenceRows
             },
             Allocation = new ReportAllocationSection
             {
@@ -563,6 +579,12 @@ internal sealed class ReportsSnapshotBuilder
             ? cycle.DoctorInRoomSeconds
             : null;
 
+    internal static double? TruthfulSeatedToDoctorCompleteSeconds(CompletedRoomCycle cycle) =>
+        cycle.DoctorCompleteAt is { } completeAt
+        && cycle.SeatedAt <= completeAt
+            ? (completeAt - cycle.SeatedAt).TotalSeconds
+            : null;
+
     private IReadOnlyList<ObservedDoctorFlowDay> BuildObservedDoctorFlowDays(
         IReadOnlyList<CompletedRoomCycle> scopedStandardCompletedCycles) =>
         scopedStandardCompletedCycles
@@ -851,12 +873,11 @@ internal sealed class ReportsSnapshotBuilder
             .ThenBy(summary => summary.ProcedureLabel, StringComparer.OrdinalIgnoreCase)
             .ToList();
 
-    private IReadOnlyList<ScopedProcedureGroup> BuildScopedProcedureGroups(
+    private IReadOnlyList<ScopedProcedurePopulation> BuildScopedProcedurePopulations(
         IReadOnlyList<CompletedRoomCycle> cycles,
         string grouping)
     {
-        var scopedPopulationCount = cycles.Count;
-        if (scopedPopulationCount == 0)
+        if (cycles.Count == 0)
         {
             return [];
         }
@@ -868,35 +889,155 @@ internal sealed class ReportsSnapshotBuilder
         {
             return cycles
                 .GroupBy(cycle => cycle.ProcedureCode ?? "", StringComparer.OrdinalIgnoreCase)
-                .Select(group => new ScopedProcedureGroup(
+                .Select(group => new ScopedProcedurePopulation(
                     group.Key,
                     ResolveProcedureLabel(group.Key),
                     ResolveBaseProcedureCode(group.Key),
                     IsSedationProcedureCode(group.Key),
-                    group.Count(),
-                    scopedPopulationCount,
-                    (double)group.Count() / scopedPopulationCount,
-                    ReportSampleContext.ForPopulation(group.Count())))
-                .OrderByDescending(summary => summary.CaseCount)
-                .ThenBy(summary => summary.ProcedureLabel, StringComparer.OrdinalIgnoreCase)
+                    group.ToList()))
+                .OrderByDescending(population => population.Cycles.Count)
+                .ThenBy(population => population.ProcedureLabel, StringComparer.OrdinalIgnoreCase)
                 .ToList();
         }
 
         return cycles
             .GroupBy(cycle => ResolveBaseProcedureCode(cycle.ProcedureCode), StringComparer.OrdinalIgnoreCase)
-            .Select(group => new ScopedProcedureGroup(
+            .Select(group => new ScopedProcedurePopulation(
                 group.Key,
                 ResolveProcedureLabel(group.Key),
                 group.Key,
                 null,
-                group.Count(),
-                scopedPopulationCount,
-                (double)group.Count() / scopedPopulationCount,
-                ReportSampleContext.ForPopulation(group.Count())))
-            .OrderByDescending(summary => summary.CaseCount)
-            .ThenBy(summary => summary.ProcedureLabel, StringComparer.OrdinalIgnoreCase)
+                group.ToList()))
+            .OrderByDescending(population => population.Cycles.Count)
+            .ThenBy(population => population.ProcedureLabel, StringComparer.OrdinalIgnoreCase)
             .ToList();
     }
+
+    private static IReadOnlyList<ScopedProcedureGroup> BuildScopedProcedureGroups(
+        IReadOnlyList<ScopedProcedurePopulation> populations,
+        int scopedPopulationCount) =>
+        populations
+            .Select(population => new ScopedProcedureGroup(
+                population.ProcedureCode,
+                population.ProcedureLabel,
+                population.BaseProcedureCode,
+                population.IsSedationCase,
+                population.Cycles.Count,
+                scopedPopulationCount,
+                scopedPopulationCount == 0
+                    ? 0d
+                    : (double)population.Cycles.Count / scopedPopulationCount,
+                ReportSampleContext.ForPopulation(population.Cycles.Count)))
+            .ToList();
+
+    private IReadOnlyList<ProcedureIntelligenceRow> BuildProcedureIntelligenceRows(
+        IReadOnlyList<ScopedProcedurePopulation> populations,
+        ReportQuery query) =>
+        populations
+            .Select(population =>
+            {
+                var rosterProcedure = FindActiveProcedure(population.BaseProcedureCode);
+                return new ProcedureIntelligenceRow(
+                    population.ProcedureCode,
+                    population.ProcedureLabel,
+                    population.BaseProcedureCode,
+                    query.ProcedureGrouping,
+                    population.IsSedationCase,
+                    rosterProcedure is null ? null : rosterProcedure.DefaultExpectedUnits * 10,
+                    rosterProcedure?.AllocationBehavior,
+                    BuildProcedureIntelligenceMetrics(population.Cycles),
+                    query.Scope == ReportScopeKinds.Doctor
+                        ? []
+                        : BuildDoctorProcedureIntelligence(population.Cycles));
+            })
+            .ToList();
+
+    private IReadOnlyList<DoctorProcedureIntelligenceSegment> BuildDoctorProcedureIntelligence(
+        IReadOnlyList<CompletedRoomCycle> cycles)
+    {
+        var represented = cycles
+            .Where(cycle => !string.IsNullOrWhiteSpace(cycle.AssignedDoctor))
+            .GroupBy(cycle => cycle.AssignedDoctor, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(group => group.Key, group => group.ToList(), StringComparer.OrdinalIgnoreCase);
+        var activeIds = _activeDoctors.Select(doctor => doctor.Id).ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        var orderedDoctorIds = _activeDoctors
+            .Select(doctor => doctor.Id)
+            .Where(represented.ContainsKey)
+            .Concat(represented.Keys
+                .Where(doctorId => !activeIds.Contains(doctorId))
+                .OrderBy(doctorId => ResolveDoctorDisplayName(doctorId) ?? doctorId, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(doctorId => doctorId, StringComparer.OrdinalIgnoreCase));
+
+        return orderedDoctorIds
+            .Select(doctorId => new DoctorProcedureIntelligenceSegment(
+                doctorId,
+                ResolveDoctorDisplayName(doctorId) ?? doctorId,
+                BuildProcedureIntelligenceMetrics(represented[doctorId])))
+            .ToList();
+    }
+
+    private static ProcedureIntelligenceMetrics BuildProcedureIntelligenceMetrics(
+        IReadOnlyList<CompletedRoomCycle> cycles)
+    {
+        var populationCount = cycles.Count;
+        var doctorTimeValues = cycles
+            .Select(TruthfulDoctorTimeSeconds)
+            .Where(value => value.HasValue)
+            .Select(value => (double)value!.Value)
+            .ToList();
+        var readyWaitValues = cycles
+            .Select(TruthfulReadyWaitSeconds)
+            .Where(value => value.HasValue)
+            .Select(value => (double)value!.Value)
+            .ToList();
+        var seatedToDoctorCompleteValues = cycles
+            .Select(TruthfulSeatedToDoctorCompleteSeconds)
+            .Where(value => value.HasValue)
+            .Select(value => value!.Value)
+            .ToList();
+        var historicalAssignedValues = cycles
+            .Where(cycle => cycle.ExpectedAllocationMinutes > 0)
+            .Select(cycle => cycle.ExpectedAllocationMinutes)
+            .ToList();
+        var historicalCapturedDefaultValues = cycles
+            .Where(cycle => cycle.OriginalDefaultExpectedUnits > 0)
+            .Select(cycle => cycle.OriginalDefaultExpectedUnits * 10)
+            .ToList();
+
+        var doctorTimeSample = ReportSampleContext.Create(populationCount, doctorTimeValues.Count);
+        var typicalRange = ProcedureIntelligenceStatistics.TypicalDoctorTimeRange(
+            doctorTimeValues,
+            doctorTimeSample);
+
+        return new ProcedureIntelligenceMetrics(
+            populationCount,
+            ReportSampleContext.ForPopulation(populationCount),
+            ProcedureIntelligenceStatistics.Median(doctorTimeValues),
+            ProcedureIntelligenceStatistics.Average(doctorTimeValues),
+            typicalRange.LowerSeconds,
+            typicalRange.UpperSeconds,
+            ProcedureIntelligenceRangeMethods.Type7Iqr,
+            doctorTimeSample,
+            ProcedureIntelligenceStatistics.Median(readyWaitValues),
+            ProcedureIntelligenceStatistics.Average(readyWaitValues),
+            ReportSampleContext.Create(populationCount, readyWaitValues.Count),
+            ProcedureIntelligenceStatistics.Median(seatedToDoctorCompleteValues),
+            ProcedureIntelligenceStatistics.Average(seatedToDoctorCompleteValues),
+            ReportSampleContext.Create(populationCount, seatedToDoctorCompleteValues.Count),
+            ProcedureIntelligenceStatistics.Median(historicalAssignedValues.Select(value => (double)value).ToList()),
+            ReportSampleContext.Create(populationCount, historicalAssignedValues.Count),
+            BuildAllocationValueCounts(historicalAssignedValues),
+            BuildAllocationValueCounts(historicalCapturedDefaultValues));
+    }
+
+    private static IReadOnlyList<ProcedureAllocationValueCount> BuildAllocationValueCounts(
+        IEnumerable<int> values) =>
+        values
+            .GroupBy(value => value)
+            .OrderBy(group => group.Key)
+            .Select(group => new ProcedureAllocationValueCount(group.Key, group.Count()))
+            .ToList();
 
     private static ReportProcedureMetricSampleContext BuildProcedureSamples(
         IEnumerable<CompletedRoomCycle> cycles)

@@ -3291,7 +3291,11 @@ public sealed record ReportsSnapshot(
     // Doctor-specific weekly trends use a shared report-level Monday-start UTC skeleton. The
     // additive model remains within the selected report range and exposes clipped partial-week
     // boundaries; it does not change the existing practice Trends contract.
-    IReadOnlyList<DoctorFlowTrendSeries>? DoctorFlowTrends = null);
+    IReadOnlyList<DoctorFlowTrendSeries>? DoctorFlowTrends = null,
+    // Procedure Intelligence is additive and shares the exact grouped underlying completed-case
+    // populations used by ScopedProcedureGroups. Legacy procedure and allocation contracts remain
+    // unchanged; new clients use this projection for median-first procedure timing presentation.
+    IReadOnlyList<ProcedureIntelligenceRow>? ProcedureIntelligenceRows = null);
 
 public sealed record DoctorProcedureMixRow(
     string DoctorId,

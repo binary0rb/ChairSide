@@ -77,6 +77,7 @@ internal sealed record ReportProcedureSection
     public required int NonSedationCaseCount { get; init; }
     public required IReadOnlyList<ProcedureCycleSummary> BaseProcedureSummaries { get; init; }
     public required IReadOnlyList<ScopedProcedureGroup> ScopedProcedureGroups { get; init; }
+    public required IReadOnlyList<ProcedureIntelligenceRow> ProcedureIntelligenceRows { get; init; }
 }
 
 /// <summary>
@@ -168,6 +169,7 @@ internal static class ReportsSnapshotAdapter
             DoctorAllocationSamples: composition.DoctorDetail.DoctorAllocationSamples,
             ObservedDoctorFlowDays: composition.DoctorDetail.ObservedDoctorFlowDays,
             DoctorFlowSummaries: composition.DoctorDetail.DoctorFlowSummaries,
-            DoctorFlowTrends: composition.DoctorDetail.DoctorFlowTrends);
+            DoctorFlowTrends: composition.DoctorDetail.DoctorFlowTrends,
+            ProcedureIntelligenceRows: composition.Procedures.ProcedureIntelligenceRows);
     }
 }
