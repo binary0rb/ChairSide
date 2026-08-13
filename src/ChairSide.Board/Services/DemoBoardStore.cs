@@ -3287,7 +3287,11 @@ public sealed record ReportsSnapshot(
     // semantics. Issue #216 canonical Ready-anchored doctor flow is additive and lives in the two
     // projections below; new presentation code must not reinterpret ObservedDoctorDays.
     IReadOnlyList<ObservedDoctorFlowDay>? ObservedDoctorFlowDays = null,
-    IReadOnlyList<DoctorFlowSummary>? DoctorFlowSummaries = null);
+    IReadOnlyList<DoctorFlowSummary>? DoctorFlowSummaries = null,
+    // Doctor-specific weekly trends use a shared report-level Monday-start UTC skeleton. The
+    // additive model remains within the selected report range and exposes clipped partial-week
+    // boundaries; it does not change the existing practice Trends contract.
+    IReadOnlyList<DoctorFlowTrendSeries>? DoctorFlowTrends = null);
 
 public sealed record DoctorProcedureMixRow(
     string DoctorId,

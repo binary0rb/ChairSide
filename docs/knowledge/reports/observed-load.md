@@ -1,7 +1,7 @@
 ---
 title: Observed load
 tags: [reports, doctor-flow, observed-load, reporting-population, domain-rule, active, last-verified]
-last_verified_commit: 7e566bd
+last_verified_commit: a287e0d
 ---
 
 # Observed load
@@ -50,6 +50,19 @@ The nested server-owned `ReportSampleContext` values preserve Empty, Unavailable
 
 New Doctor Flow presentation must use `observedDoctorFlowDays`. Future Doctor Trends work should also build from the canonical projection rather than the compatibility model.
 
+## Weekly Doctor Trends
+
+Issue #217 adds `DoctorFlowTrendSeries` / `doctorFlowTrends` as the doctor-specific weekly trend authority without changing the existing Practice `ReportTrendSnapshot` contract.
+
+- Every response uses one shared calendar skeleton for all returned doctor series, so Practice doctor selection never moves the x-axis.
+- Buckets are Monday-start UTC calendar weeks. Ready Wait, Doctor Time, and Completed Cases remain grouped by `DoctorCompleteAt`; Observed Clinical Span is grouped by canonical `ObservedDoctorFlowDay.ReportDate`, which is also the Doctor Complete UTC date.
+- The display stays within the selected report range and contains at most its trailing 12 intersecting calendar buckets. An explicit selected end date anchors the window even when the selected start is open. Ranges without an explicit end, including All Time and start-only ranges, anchor to the latest dateable in-scope observation across the report population. Without one, doctor navigation remains available but the trend window is honestly empty.
+- Calendar `endDate` and clipped `effectiveEndDate` are exclusive. Effective boundaries identify partial first and last buckets without asking JavaScript to infer report-window semantics.
+- Every bucket is emitted in chronological order. Missing periods remain explicit null-valued Empty gaps instead of measured zero values or omitted intervals.
+- Each metric carries its own server-owned `ReportSampleContext`. A nonempty population with no truthful contributor is Unavailable, while a truthful observed numeric zero remains visible.
+- Weekly medians are calculated from underlying case observations or canonical doctor-day rows, never from daily, weekly, monthly, or range-level medians.
+- Doctor Trends are descriptive only. Issue #217 adds no comparison language, target, forecast, ranking, score, or attendance inference.
+
 ## Constraints
 
 - Present canonical flow as descriptive operational context only.
@@ -67,4 +80,4 @@ New Doctor Flow presentation must use `observedDoctorFlowDays`. Future Doctor Tr
 
 ## Verification notes
 
-Verified while implementing issue #216 from baseline `7e566bd`: the new canonical projections are additive. The older `ObservedDoctorDay` semantics remain intact for compatibility, while Doctor Overview and Room Load / Flow use the Ready-anchored `ObservedDoctorFlowDay` and server-owned `DoctorFlowSummary` contracts.
+Verified while implementing issues #216 and #217 through baseline `a287e0d`: the canonical projections remain additive. The older `ObservedDoctorDay` and Practice `ReportTrendSnapshot` semantics remain intact for compatibility, while Doctor Overview, Room Load / Flow, and Doctor Trends use the Ready-anchored doctor-flow authorities.

@@ -381,6 +381,12 @@
                       "path":  "src/ChairSide.Board/Services/DiagnosticLogger.cs"
                   },
                   {
+                      "id":  "file:src/ChairSide.Board/Services/DoctorFlowTrendSnapshot.cs",
+                      "label":  "src/ChairSide.Board/Services/DoctorFlowTrendSnapshot.cs",
+                      "type":  "File",
+                      "path":  "src/ChairSide.Board/Services/DoctorFlowTrendSnapshot.cs"
+                  },
+                  {
                       "id":  "file:src/ChairSide.Board/Services/ExceptionReviewRecords.cs",
                       "label":  "src/ChairSide.Board/Services/ExceptionReviewRecords.cs",
                       "type":  "File",
@@ -763,6 +769,12 @@
                       "label":  "tests/ChairSide.Board.Tests/DeterministicFixtureBuilderTests.cs",
                       "type":  "File",
                       "path":  "tests/ChairSide.Board.Tests/DeterministicFixtureBuilderTests.cs"
+                  },
+                  {
+                      "id":  "file:tests/ChairSide.Board.Tests/DoctorFlowTrendSnapshotTests.cs",
+                      "label":  "tests/ChairSide.Board.Tests/DoctorFlowTrendSnapshotTests.cs",
+                      "type":  "File",
+                      "path":  "tests/ChairSide.Board.Tests/DoctorFlowTrendSnapshotTests.cs"
                   },
                   {
                       "id":  "file:tests/ChairSide.Board.Tests/DurableFailureInjectionTests.cs",
@@ -1629,6 +1641,36 @@
                       "path":  "src/ChairSide.Board/Services/DemoBoardStore.cs"
                   },
                   {
+                      "id":  "symbol:type:DoctorFlowTrendBucket",
+                      "label":  "DoctorFlowTrendBucket",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/DoctorFlowTrendSnapshot.cs"
+                  },
+                  {
+                      "id":  "symbol:type:DoctorFlowTrendIdentity",
+                      "label":  "DoctorFlowTrendIdentity",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/DoctorFlowTrendSnapshot.cs"
+                  },
+                  {
+                      "id":  "symbol:type:DoctorFlowTrendSeries",
+                      "label":  "DoctorFlowTrendSeries",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/DoctorFlowTrendSnapshot.cs"
+                  },
+                  {
+                      "id":  "symbol:type:DoctorFlowTrendSnapshotBuilder",
+                      "label":  "DoctorFlowTrendSnapshotBuilder",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/DoctorFlowTrendSnapshot.cs"
+                  },
+                  {
+                      "id":  "symbol:type:DoctorFlowTrendSnapshotTests",
+                      "label":  "DoctorFlowTrendSnapshotTests",
+                      "type":  "CodeType",
+                      "path":  "tests/ChairSide.Board.Tests/DoctorFlowTrendSnapshotTests.cs"
+                  },
+                  {
                       "id":  "symbol:type:DoctorProcedureMixRow",
                       "label":  "DoctorProcedureMixRow",
                       "type":  "CodeType",
@@ -1965,6 +2007,12 @@
                       "path":  "src/ChairSide.Board/Services/ProjectionAssumptionChecklist.cs"
                   },
                   {
+                      "id":  "symbol:type:ParsedObservedDoctorFlowDay",
+                      "label":  "ParsedObservedDoctorFlowDay",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/DoctorFlowTrendSnapshot.cs"
+                  },
+                  {
                       "id":  "symbol:type:PersistedReadyHandoff",
                       "label":  "PersistedReadyHandoff",
                       "type":  "CodeType",
@@ -2191,6 +2239,12 @@
                       "label":  "ReportDoctorFlowMetricSampleContext",
                       "type":  "CodeType",
                       "path":  "src/ChairSide.Board/Services/ReportQuery.cs"
+                  },
+                  {
+                      "id":  "symbol:type:ReportDoctorFlowTrendMetricSampleContext",
+                      "label":  "ReportDoctorFlowTrendMetricSampleContext",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/DoctorFlowTrendSnapshot.cs"
                   },
                   {
                       "id":  "symbol:type:ReportingExceptionReasons",
@@ -2653,6 +2707,12 @@
                       "label":  "TodayMarkerFixture",
                       "type":  "CodeType",
                       "path":  "src/ChairSide.Board/Services/DeterministicFixtureBuilder.cs"
+                  },
+                  {
+                      "id":  "symbol:type:TrendWindow",
+                      "label":  "TrendWindow",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/DoctorFlowTrendSnapshot.cs"
                   }
               ],
     "edges":  [
@@ -3282,6 +3342,41 @@
                       "label":  "declares"
                   },
                   {
+                      "from":  "file:src/ChairSide.Board/Services/DoctorFlowTrendSnapshot.cs",
+                      "to":  "symbol:type:DoctorFlowTrendBucket",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/DoctorFlowTrendSnapshot.cs",
+                      "to":  "symbol:type:DoctorFlowTrendIdentity",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/DoctorFlowTrendSnapshot.cs",
+                      "to":  "symbol:type:DoctorFlowTrendSeries",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/DoctorFlowTrendSnapshot.cs",
+                      "to":  "symbol:type:DoctorFlowTrendSnapshotBuilder",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/DoctorFlowTrendSnapshot.cs",
+                      "to":  "symbol:type:ParsedObservedDoctorFlowDay",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/DoctorFlowTrendSnapshot.cs",
+                      "to":  "symbol:type:ReportDoctorFlowTrendMetricSampleContext",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/DoctorFlowTrendSnapshot.cs",
+                      "to":  "symbol:type:TrendWindow",
+                      "label":  "declares"
+                  },
+                  {
                       "from":  "file:src/ChairSide.Board/Services/ExceptionReviewRecords.cs",
                       "to":  "symbol:type:ExceptionReviewRecord",
                       "label":  "declares"
@@ -3882,6 +3977,11 @@
                       "label":  "declares"
                   },
                   {
+                      "from":  "file:tests/ChairSide.Board.Tests/DoctorFlowTrendSnapshotTests.cs",
+                      "to":  "symbol:type:DoctorFlowTrendSnapshotTests",
+                      "label":  "declares"
+                  },
+                  {
                       "from":  "file:tests/ChairSide.Board.Tests/DurableFailureInjectionTests.cs",
                       "to":  "symbol:type:CycleSnapshot",
                       "label":  "declares"
@@ -4413,6 +4513,11 @@
                   },
                   {
                       "from":  "repo:chairside",
+                      "to":  "file:src/ChairSide.Board/Services/DoctorFlowTrendSnapshot.cs",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
                       "to":  "file:src/ChairSide.Board/Services/ExceptionReviewRecords.cs",
                       "label":  "contains"
                   },
@@ -4729,6 +4834,11 @@
                   {
                       "from":  "repo:chairside",
                       "to":  "file:tests/ChairSide.Board.Tests/DeterministicFixtureBuilderTests.cs",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:tests/ChairSide.Board.Tests/DoctorFlowTrendSnapshotTests.cs",
                       "label":  "contains"
                   },
                   {

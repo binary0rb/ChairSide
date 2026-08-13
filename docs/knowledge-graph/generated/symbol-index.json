@@ -1,7 +1,7 @@
 ﻿{
     "generatedStamp":  "deterministic",
     "root":  ".",
-    "fileCount":  170,
+    "fileCount":  172,
     "files":  [
                   {
                       "path":  ".github/pull_request_template.md",
@@ -404,7 +404,7 @@
                   {
                       "path":  "docs/knowledge/reports/observed-load.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  5257,
+                      "sizeBytes":  7148,
                       "typeSymbols":  [
 
                                       ],
@@ -430,6 +430,7 @@
                                        "Time model",
                                        "Metric grains",
                                        "Compatibility projection",
+                                       "Weekly Doctor Trends",
                                        "Constraints",
                                        "Source anchors",
                                        "Verification notes"
@@ -470,7 +471,7 @@
                   {
                       "path":  "docs/knowledge/reports/reporting-population.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  4309,
+                      "sizeBytes":  4691,
                       "typeSymbols":  [
 
                                       ],
@@ -660,7 +661,7 @@
                   {
                       "path":  "docs/knowledge-graph/chairside.graph.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  17261,
+                      "sizeBytes":  17746,
                       "typeSymbols":  [
 
                                       ],
@@ -691,7 +692,7 @@
                   {
                       "path":  "docs/knowledge-graph/decisions.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  20346,
+                      "sizeBytes":  21102,
                       "typeSymbols":  [
 
                                       ],
@@ -1836,7 +1837,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/DemoBoardStore.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  188850,
+                      "sizeBytes":  189179,
                       "typeSymbols":  [
                                           "ExceptionReasons",
                                           "ReportingExceptionReasons",
@@ -2054,6 +2055,45 @@
                                             "TryRotate",
                                             "TryCreateDirectory",
                                             "ResolveLogDirectory"
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
+                      "path":  "src/ChairSide.Board/Services/DoctorFlowTrendSnapshot.cs",
+                      "kind":  "CSharp",
+                      "sizeBytes":  10465,
+                      "typeSymbols":  [
+                                          "DoctorFlowTrendSeries",
+                                          "DoctorFlowTrendBucket",
+                                          "ReportDoctorFlowTrendMetricSampleContext",
+                                          "DoctorFlowTrendIdentity",
+                                          "DoctorFlowTrendSnapshotBuilder",
+                                          "TrendWindow",
+                                          "ParsedObservedDoctorFlowDay"
+                                      ],
+                      "methodSymbols":  [
+                                            "BuildWeekly",
+                                            "BuildSeries",
+                                            "BuildSharedWindow",
+                                            "IsInBucket",
+                                            "IsDoctor",
+                                            "WeekStart",
+                                            "FormatDate",
+                                            "ParseDate"
                                         ],
                       "routes":  [
 
@@ -2382,7 +2422,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/ReportsSnapshotBuilder.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  61934,
+                      "sizeBytes":  62775,
                       "typeSymbols":  [
                                           "ReportsSnapshotBuilder"
                                       ],
@@ -2398,6 +2438,7 @@
                                             "BuildDoctorSummaries",
                                             "BuildDoctorAllocationSamples",
                                             "BuildDoctorDailyAllocationSeries",
+                                            "BuildDoctorFlowIdentities",
                                             "BuildDoctorFlowSummaries",
                                             "TruthfulReadyWaitSeconds",
                                             "TruthfulDoctorTimeSeconds",
@@ -2425,8 +2466,7 @@
                                             "ComputeOverlapSeconds",
                                             "ResolveDoctorDisplayName",
                                             "FindProcedure",
-                                            "FindActiveProcedure",
-                                            "HasSedationModifier"
+                                            "FindActiveProcedure"
                                         ],
                       "routes":  [
 
@@ -2447,7 +2487,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/ReportsSnapshotComposition.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  9537,
+                      "sizeBytes":  9692,
                       "typeSymbols":  [
                                           "ReportsSnapshotComposition",
                                           "ReportPopulationSection",
@@ -3326,7 +3366,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/reports.js",
                       "kind":  "JavaScript",
-                      "sizeBytes":  118804,
+                      "sizeBytes":  123214,
                       "typeSymbols":  [
 
                                       ],
@@ -3375,6 +3415,7 @@
                                               "renderDoctorAllocation",
                                               "aggregateAllocationByDoctor",
                                               "canonicalDoctorFlowSummaries",
+                                              "canonicalDoctorFlowTrends",
                                               "emptyDoctorFlowSummary",
                                               "doctorFlowPresentation",
                                               "renderDoctorFlowMetric",
@@ -3386,6 +3427,10 @@
                                               "renderSelectedDoctorPanel",
                                               "renderDoctorReportTabButton",
                                               "renderSelectedDoctorTabContent",
+                                              "renderSelectedDoctorTrends",
+                                              "renderDoctorTrendMetric",
+                                              "renderDoctorTrendBucket",
+                                              "formatExclusiveDateRange",
                                               "renderSelectedDoctorEmptyState",
                                               "renderSelectedDoctorOverview",
                                               "observedLoadNumber",
@@ -3417,12 +3462,7 @@
                                               "syncReportFilterButtons",
                                               "normalizeReportFilterValue",
                                               "syncDoctorScopeControl",
-                                              "getInsightSummaries",
-                                              "insightsHeadingText",
-                                              "renderGroupedInsights",
-                                              "renderInsightCard",
-                                              "renderFullMetrics",
-                                              "renderCompletedCycles"
+                                              "getInsightSummaries"
                                           ],
                       "headings":  [
 
@@ -3649,7 +3689,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/styles.css",
                       "kind":  "Css",
-                      "sizeBytes":  100687,
+                      "sizeBytes":  104583,
                       "typeSymbols":  [
 
                                       ],
@@ -4277,7 +4317,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/BoardStoreReportingTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  41860,
+                      "sizeBytes":  42257,
                       "typeSymbols":  [
                                           "BoardStoreTests"
                                       ],
@@ -4627,6 +4667,50 @@
                                             "Doctors",
                                             "Procedures",
                                             "Rows"
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
+                      "path":  "tests/ChairSide.Board.Tests/DoctorFlowTrendSnapshotTests.cs",
+                      "kind":  "CSharp",
+                      "sizeBytes":  18847,
+                      "typeSymbols":  [
+                                          "DoctorFlowTrendSnapshotTests"
+                                      ],
+                      "methodSymbols":  [
+                                            "Finite_range_builds_one_common_monday_skeleton_with_partial_boundaries",
+                                            "Finite_range_never_widens_and_keeps_missing_middle_week_as_empty_gap",
+                                            "Selected_range_is_capped_at_trailing_twelve_buckets_and_short_ranges_stay_short",
+                                            "End_only_range_uses_explicit_end_and_retains_empty_trailing_weeks",
+                                            "End_only_range_without_observations_emits_empty_gaps_through_explicit_end",
+                                            "Start_only_range_uses_latest_observation_and_invents_no_window_without_one",
+                                            "All_time_uses_report_level_latest_dateable_observation_for_every_doctor",
+                                            "All_time_without_dateable_observation_keeps_series_but_invents_no_history",
+                                            "Weekly_metrics_use_underlying_observations_and_metric_specific_samples",
+                                            "Weekly_median_is_not_a_median_of_daily_medians",
+                                            "Weekly_odd_medians_use_underlying_ready_wait_and_doctor_time_observations",
+                                            "Empty_unavailable_sufficient_and_truthful_zero_remain_distinct",
+                                            "Canonical_ready_anchored_span_is_the_only_clinical_span_authority",
+                                            "Practice_and_doctor_scopes_preserve_roster_history_and_sedation_isolation",
+                                            "Build",
+                                            "CreateBuilder",
+                                            "Cycle",
+                                            "ObservedDay",
+                                            "Utc"
                                         ],
                       "routes":  [
 
@@ -5220,7 +5304,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/ReportsSnapshotBuilderTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  59610,
+                      "sizeBytes":  59868,
                       "typeSymbols":  [
                                           "ReportsSnapshotBuilderTests"
                                       ],
@@ -5951,7 +6035,7 @@
                   {
                       "path":  "tests/javascript/reports.test.mjs",
                       "kind":  "JavaScript",
-                      "sizeBytes":  101061,
+                      "sizeBytes":  108083,
                       "typeSymbols":  [
 
                                       ],
@@ -5979,6 +6063,8 @@
                                               "sample",
                                               "doctorFlowSummary",
                                               "observedDoctorFlowDay",
+                                              "doctorFlowTrendBucket",
+                                              "doctorFlowTrendSeries",
                                               "reportPayload",
                                               "createFilterChip",
                                               "createHarness",

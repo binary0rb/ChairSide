@@ -52,4 +52,6 @@ Legacy completed cycles continue to use their existing finalized assignment data
 
 Reporting date filters remain whole UTC calendar days, weekly buckets remain Monday-start UTC, and completed-cycle windows remain anchored on `DoctorCompleteAt`.
 
+Doctor Trends apply the selected report window before weekly aggregation and never fetch earlier history to fill an 8-12 week display. One shared server-owned skeleton of at most the trailing 12 intersecting weeks is used for every doctor series. Empty calendar buckets remain null-valued No observation gaps, and clipped effective boundaries disclose partial first and last weeks.
+
 The report UI exposes Today, Last 7 Days, Last 30 Days, Month to Date, Custom, and All Time. Reversed valid ranges normalize and return normalized metadata; malformed date text keeps graceful legacy behavior.

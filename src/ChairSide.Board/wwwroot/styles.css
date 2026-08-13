@@ -2277,6 +2277,147 @@ body[data-view="doctor"] .selected-doctor-tab-panel {
   min-width: 0;
 }
 
+body[data-view="reports"] .doctor-trends,
+body[data-view="doctor"] .doctor-trends {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+
+body[data-view="reports"] .doctor-trends__head,
+body[data-view="doctor"] .doctor-trends__head {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: start;
+  padding: 16px;
+  border: var(--border-thin) solid var(--neutral-200);
+  border-radius: var(--radius-panel);
+  background: var(--neutral-100);
+}
+
+body[data-view="reports"] .doctor-trends__head h3,
+body[data-view="doctor"] .doctor-trends__head h3,
+body[data-view="reports"] .doctor-trend-metric h4,
+body[data-view="doctor"] .doctor-trend-metric h4 {
+  margin: 0;
+  color: var(--neutral-900);
+}
+
+body[data-view="reports"] .doctor-trends__head p,
+body[data-view="doctor"] .doctor-trends__head p {
+  margin: 5px 0 0;
+  color: var(--neutral-700);
+  line-height: 1.45;
+}
+
+body[data-view="reports"] .doctor-trends__window,
+body[data-view="doctor"] .doctor-trends__window {
+  flex: 0 0 auto;
+  padding: 6px 10px;
+  border: 1px solid color-mix(in srgb, var(--doctor-color) 28%, var(--neutral-200));
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--doctor-color) 8%, #ffffff);
+  color: var(--neutral-800);
+  font-size: 12px;
+  font-weight: 850;
+}
+
+body[data-view="reports"] .doctor-trend-metrics,
+body[data-view="doctor"] .doctor-trend-metrics {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+}
+
+body[data-view="reports"] .doctor-trend-metric,
+body[data-view="doctor"] .doctor-trend-metric {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  padding: 14px;
+  border: var(--border-thin) solid var(--neutral-200);
+  border-radius: var(--radius-panel);
+  background: #ffffff;
+}
+
+body[data-view="reports"] .doctor-trend-metric h4,
+body[data-view="doctor"] .doctor-trend-metric h4 {
+  font-size: 15px;
+}
+
+body[data-view="reports"] .doctor-trend-grid,
+body[data-view="doctor"] .doctor-trend-grid {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(132px, 1fr);
+  gap: 8px;
+  min-width: 0;
+  overflow-x: auto;
+  padding: 2px 2px 8px;
+  scroll-snap-type: x proximity;
+}
+
+body[data-view="reports"] .doctor-trend-bucket,
+body[data-view="doctor"] .doctor-trend-bucket {
+  display: grid;
+  align-content: start;
+  gap: 6px;
+  min-height: 116px;
+  padding: 10px;
+  border: 1px solid var(--neutral-200);
+  border-top: 3px solid var(--doctor-color);
+  border-radius: 10px;
+  background: #ffffff;
+  scroll-snap-align: start;
+}
+
+body[data-view="reports"] .doctor-trend-bucket.is-gap,
+body[data-view="doctor"] .doctor-trend-bucket.is-gap {
+  border-style: dashed;
+  border-top-color: var(--neutral-400);
+  background: var(--neutral-100);
+}
+
+body[data-view="reports"] .doctor-trend-bucket--limited,
+body[data-view="doctor"] .doctor-trend-bucket--limited {
+  border-top-color: color-mix(in srgb, var(--doctor-color) 55%, var(--neutral-500));
+  background: color-mix(in srgb, var(--doctor-color) 3%, #ffffff);
+}
+
+body[data-view="reports"] .doctor-trend-bucket.is-partial,
+body[data-view="doctor"] .doctor-trend-bucket.is-partial {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--doctor-color) 16%, transparent);
+}
+
+body[data-view="reports"] .doctor-trend-bucket__date,
+body[data-view="doctor"] .doctor-trend-bucket__date {
+  color: var(--neutral-700);
+  font-size: 11px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+body[data-view="reports"] .doctor-trend-bucket__partial,
+body[data-view="doctor"] .doctor-trend-bucket__partial {
+  color: var(--neutral-600);
+  font-size: 10px;
+  line-height: 1.3;
+}
+
+body[data-view="reports"] .doctor-trend-bucket strong,
+body[data-view="doctor"] .doctor-trend-bucket strong {
+  color: var(--neutral-900);
+  font-size: 18px;
+  font-variant-numeric: tabular-nums;
+}
+
+body[data-view="reports"] .doctor-trend-bucket.is-gap strong,
+body[data-view="doctor"] .doctor-trend-bucket.is-gap strong {
+  color: var(--neutral-600);
+  font-size: 14px;
+}
+
 body[data-view="reports"] .selected-doctor-overview,
 body[data-view="doctor"] .selected-doctor-overview {
   display: grid;
