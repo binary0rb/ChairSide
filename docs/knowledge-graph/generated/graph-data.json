@@ -75,6 +75,12 @@
                       "path":  "docs/knowledge/reports/observed-load.md"
                   },
                   {
+                      "id":  "file:docs/knowledge/reports/procedure-intelligence.md",
+                      "label":  "docs/knowledge/reports/procedure-intelligence.md",
+                      "type":  "File",
+                      "path":  "docs/knowledge/reports/procedure-intelligence.md"
+                  },
+                  {
                       "id":  "file:docs/knowledge/reports/procedure-mix.md",
                       "label":  "docs/knowledge/reports/procedure-mix.md",
                       "type":  "File",
@@ -409,6 +415,12 @@
                       "label":  "src/ChairSide.Board/Services/PrestagingLifecycleApiContracts.cs",
                       "type":  "File",
                       "path":  "src/ChairSide.Board/Services/PrestagingLifecycleApiContracts.cs"
+                  },
+                  {
+                      "id":  "file:src/ChairSide.Board/Services/ProcedureIntelligenceReport.cs",
+                      "label":  "src/ChairSide.Board/Services/ProcedureIntelligenceReport.cs",
+                      "type":  "File",
+                      "path":  "src/ChairSide.Board/Services/ProcedureIntelligenceReport.cs"
                   },
                   {
                       "id":  "file:src/ChairSide.Board/Services/ProjectionAssumptionChecklist.cs",
@@ -829,6 +841,12 @@
                       "label":  "tests/ChairSide.Board.Tests/PrestagingLifecycleTransitionTests.cs",
                       "type":  "File",
                       "path":  "tests/ChairSide.Board.Tests/PrestagingLifecycleTransitionTests.cs"
+                  },
+                  {
+                      "id":  "file:tests/ChairSide.Board.Tests/ProcedureIntelligenceReportTests.cs",
+                      "label":  "tests/ChairSide.Board.Tests/ProcedureIntelligenceReportTests.cs",
+                      "type":  "File",
+                      "path":  "tests/ChairSide.Board.Tests/ProcedureIntelligenceReportTests.cs"
                   },
                   {
                       "id":  "file:tests/ChairSide.Board.Tests/ProjectionAssumptionChecklistTests.cs",
@@ -1671,6 +1689,12 @@
                       "path":  "tests/ChairSide.Board.Tests/DoctorFlowTrendSnapshotTests.cs"
                   },
                   {
+                      "id":  "symbol:type:DoctorProcedureIntelligenceSegment",
+                      "label":  "DoctorProcedureIntelligenceSegment",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/ProcedureIntelligenceReport.cs"
+                  },
+                  {
                       "id":  "symbol:type:DoctorProcedureMixRow",
                       "label":  "DoctorProcedureMixRow",
                       "type":  "CodeType",
@@ -2109,6 +2133,12 @@
                       "path":  "src/ChairSide.Board/Program.cs"
                   },
                   {
+                      "id":  "symbol:type:ProcedureAllocationValueCount",
+                      "label":  "ProcedureAllocationValueCount",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/ProcedureIntelligenceReport.cs"
+                  },
+                  {
                       "id":  "symbol:type:ProcedureCategory",
                       "label":  "ProcedureCategory",
                       "type":  "CodeType",
@@ -2119,6 +2149,36 @@
                       "label":  "ProcedureCycleSummary",
                       "type":  "CodeType",
                       "path":  "src/ChairSide.Board/Services/DemoBoardStore.cs"
+                  },
+                  {
+                      "id":  "symbol:type:ProcedureIntelligenceMetrics",
+                      "label":  "ProcedureIntelligenceMetrics",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/ProcedureIntelligenceReport.cs"
+                  },
+                  {
+                      "id":  "symbol:type:ProcedureIntelligenceRangeMethods",
+                      "label":  "ProcedureIntelligenceRangeMethods",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/ProcedureIntelligenceReport.cs"
+                  },
+                  {
+                      "id":  "symbol:type:ProcedureIntelligenceReportTests",
+                      "label":  "ProcedureIntelligenceReportTests",
+                      "type":  "CodeType",
+                      "path":  "tests/ChairSide.Board.Tests/ProcedureIntelligenceReportTests.cs"
+                  },
+                  {
+                      "id":  "symbol:type:ProcedureIntelligenceRow",
+                      "label":  "ProcedureIntelligenceRow",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/ProcedureIntelligenceReport.cs"
+                  },
+                  {
+                      "id":  "symbol:type:ProcedureIntelligenceStatistics",
+                      "label":  "ProcedureIntelligenceStatistics",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/ProcedureIntelligenceReport.cs"
                   },
                   {
                       "id":  "symbol:type:ProcedureRosterItem",
@@ -2587,6 +2647,12 @@
                       "label":  "ScopedProcedureGroup",
                       "type":  "CodeType",
                       "path":  "src/ChairSide.Board/Services/ReportQuery.cs"
+                  },
+                  {
+                      "id":  "symbol:type:ScopedProcedurePopulation",
+                      "label":  "ScopedProcedurePopulation",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/ReportsSnapshotBuilder.cs"
                   },
                   {
                       "id":  "symbol:type:SeatRoomActionRequest",
@@ -3502,6 +3568,36 @@
                       "label":  "declares"
                   },
                   {
+                      "from":  "file:src/ChairSide.Board/Services/ProcedureIntelligenceReport.cs",
+                      "to":  "symbol:type:DoctorProcedureIntelligenceSegment",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/ProcedureIntelligenceReport.cs",
+                      "to":  "symbol:type:ProcedureAllocationValueCount",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/ProcedureIntelligenceReport.cs",
+                      "to":  "symbol:type:ProcedureIntelligenceMetrics",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/ProcedureIntelligenceReport.cs",
+                      "to":  "symbol:type:ProcedureIntelligenceRangeMethods",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/ProcedureIntelligenceReport.cs",
+                      "to":  "symbol:type:ProcedureIntelligenceRow",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/ProcedureIntelligenceReport.cs",
+                      "to":  "symbol:type:ProcedureIntelligenceStatistics",
+                      "label":  "declares"
+                  },
+                  {
                       "from":  "file:src/ChairSide.Board/Services/ProjectionAssumptionChecklist.cs",
                       "to":  "symbol:type:ObservedScheduleFitInputSummary",
                       "label":  "declares"
@@ -3664,6 +3760,11 @@
                   {
                       "from":  "file:src/ChairSide.Board/Services/ReportsSnapshotBuilder.cs",
                       "to":  "symbol:type:ReportsSnapshotBuilder",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/ReportsSnapshotBuilder.cs",
+                      "to":  "symbol:type:ScopedProcedurePopulation",
                       "label":  "declares"
                   },
                   {
@@ -4082,6 +4183,11 @@
                       "label":  "declares"
                   },
                   {
+                      "from":  "file:tests/ChairSide.Board.Tests/ProcedureIntelligenceReportTests.cs",
+                      "to":  "symbol:type:ProcedureIntelligenceReportTests",
+                      "label":  "declares"
+                  },
+                  {
                       "from":  "file:tests/ChairSide.Board.Tests/ProjectionAssumptionChecklistTests.cs",
                       "to":  "symbol:type:ProjectionAssumptionChecklistTests",
                       "label":  "declares"
@@ -4254,6 +4360,11 @@
                   {
                       "from":  "repo:chairside",
                       "to":  "file:docs/knowledge/reports/observed-load.md",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:docs/knowledge/reports/procedure-intelligence.md",
                       "label":  "contains"
                   },
                   {
@@ -4534,6 +4645,11 @@
                   {
                       "from":  "repo:chairside",
                       "to":  "file:src/ChairSide.Board/Services/PrestagingLifecycleApiContracts.cs",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:src/ChairSide.Board/Services/ProcedureIntelligenceReport.cs",
                       "label":  "contains"
                   },
                   {
@@ -4884,6 +5000,11 @@
                   {
                       "from":  "repo:chairside",
                       "to":  "file:tests/ChairSide.Board.Tests/PrestagingLifecycleTransitionTests.cs",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:tests/ChairSide.Board.Tests/ProcedureIntelligenceReportTests.cs",
                       "label":  "contains"
                   },
                   {

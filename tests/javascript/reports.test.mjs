@@ -384,6 +384,58 @@ function sample(populationCount, contributingCount = populationCount) {
   };
 }
 
+function procedureIntelligenceRow({
+  completedCount = 6,
+  doctorTimeCount = completedCount,
+  lowerSeconds = 720,
+  upperSeconds = 1080,
+  doctorBreakdown = []
+} = {}) {
+  const assignedCount = Math.max(0, completedCount - 1);
+  const firstAssignedCount = Math.min(2, assignedCount);
+  const remainingAssignedCount = assignedCount - firstAssignedCount;
+  const assignedValues = [
+    ...(firstAssignedCount ? [{ minutes: 30, caseCount: firstAssignedCount }] : []),
+    ...(remainingAssignedCount ? [{ minutes: 40, caseCount: remainingAssignedCount }] : [])
+  ];
+  const firstCapturedCount = Math.min(2, completedCount);
+  const remainingCapturedCount = completedCount - firstCapturedCount;
+  const capturedValues = [
+    ...(firstCapturedCount ? [{ minutes: 20, caseCount: firstCapturedCount }] : []),
+    ...(remainingCapturedCount ? [{ minutes: 30, caseCount: remainingCapturedCount }] : [])
+  ];
+  return {
+    procedureCode: "EXT",
+    procedureLabel: "Extraction",
+    baseProcedureCode: "EXT",
+    procedureGrouping: "Family",
+    isSedationCase: null,
+    currentDefaultAllocationMinutes: 30,
+    allocationBehavior: "Variable",
+    metrics: {
+      completedCaseCount: completedCount,
+      completedSample: sample(completedCount),
+      medianDoctorTimeSeconds: doctorTimeCount ? 900 : null,
+      averageDoctorTimeSeconds: doctorTimeCount ? 930 : null,
+      typicalDoctorTimeLowerSeconds: lowerSeconds,
+      typicalDoctorTimeUpperSeconds: upperSeconds,
+      typicalDoctorTimeMethod: "Type7Iqr",
+      doctorTimeSample: sample(completedCount, doctorTimeCount),
+      medianReadyWaitSeconds: 180,
+      averageReadyWaitSeconds: 210,
+      readyWaitSample: sample(completedCount),
+      medianSeatedToDoctorCompleteSeconds: 1500,
+      averageSeatedToDoctorCompleteSeconds: 1560,
+      seatedToDoctorCompleteSample: sample(completedCount),
+      medianHistoricalAssignedAllocationMinutes: 40,
+      historicalAssignedAllocationSample: sample(completedCount, assignedCount),
+      historicalAssignedAllocationValues: assignedValues,
+      historicalCapturedDefaultValues: capturedValues
+    },
+    doctorBreakdown
+  };
+}
+
 function doctorFlowSummary(doctorId, doctorName, caseCount) {
   const completed = sample(caseCount);
   const observed = sample(caseCount > 0 ? 1 : 0);
@@ -570,6 +622,14 @@ function reportPayload({
           sample: sample(completedCount)
         }]
       : [],
+    procedureIntelligenceRows: completedCount > 0
+      ? [procedureIntelligenceRow({
+          completedCount,
+          doctorTimeCount: completedCount,
+          lowerSeconds: completedCount >= 5 ? 720 : null,
+          upperSeconds: completedCount >= 5 ? 1080 : null
+        })]
+      : [],
     rangeLabel: "Jul 1 - Jul 29",
     query: {
       scope: "Practice",
@@ -598,6 +658,7 @@ function createHarness({
     ? [
         "reportFilterBar",
         "reportProcedureMix",
+        "reportProcedureIntelligence",
         "reportTrendPanel",
         "doctorReportDashboard",
         "doctorReportCards",
@@ -980,7 +1041,7 @@ test("wire initializes only the applicable Reports or Doctor interaction surface
   assert.equal(reportsHarness.pressGuards.length, 1);
   assert.equal(
     reportsHarness.pressGuards[0].selector,
-    "[data-report-doctor-id], [data-report-doctor-tab], .report-table button");
+    "[data-report-doctor-id], [data-report-doctor-tab], .report-table button, .procedure-intelligence-toggle");
 
   const doctorHarness = createHarness({
     context: { isReports: false, isDoctor: true }
@@ -1461,15 +1522,17 @@ test("Procedure Mix keeps Limited composition descriptive and empty scope truthf
   assert.doesNotMatch(emptyHtml, /0%/);
 });
 
-test("Procedure Mix static section follows filters and precedes allocation and insights", () => {
+test("Procedure Mix and Procedure Intelligence sections follow filters and precede allocation", () => {
   const filterIndex = reportsHtmlSource.indexOf('id="reportFilterBar"');
   const mixIndex = reportsHtmlSource.indexOf('id="reportProcedureMix"');
+  const intelligenceIndex = reportsHtmlSource.indexOf('id="reportProcedureIntelligence"');
   const allocationIndex = reportsHtmlSource.indexOf('id="reportAllocation"');
   const insightsIndex = reportsHtmlSource.indexOf('id="reportInsights"');
 
   assert.ok(filterIndex >= 0);
   assert.ok(filterIndex < mixIndex);
-  assert.ok(mixIndex < allocationIndex);
+  assert.ok(mixIndex < intelligenceIndex);
+  assert.ok(intelligenceIndex < allocationIndex);
   assert.ok(allocationIndex < insightsIndex);
 });
 
@@ -1491,7 +1554,13 @@ test("matching Doctor scope reuses canonical Procedure Mix markup in the Doctor 
       scopedPopulationCount: 3,
       shareOfScopedCases: 1,
       sample: sample(3)
-    }]
+    }],
+    procedureIntelligenceRows: [procedureIntelligenceRow({
+      completedCount: 3,
+      doctorTimeCount: 3,
+      lowerSeconds: null,
+      upperSeconds: null
+    })]
   };
   const harness = createHarness({ payload });
   harness.reports.wire();
@@ -1504,12 +1573,115 @@ test("matching Doctor scope reuses canonical Procedure Mix markup in the Doctor 
   assert.ok(mainTable);
   assert.equal(doctorTable, mainTable);
   assert.match(harness.elements.get("selectedDoctorPanel").innerHTML, /Limited - N=3/);
-  assert.match(moduleSource, /return renderProcedureMixMarkup\(r, \{ headingTag: "h3", compact: true \}\);/);
+  assert.match(moduleSource, /renderProcedureMixMarkup\(r, \{ headingTag: "h3", compact: true \}\)/);
+  assert.match(harness.elements.get("selectedDoctorPanel").innerHTML, /Procedure Intelligence/);
+  assert.doesNotMatch(harness.elements.get("selectedDoctorPanel").innerHTML, /Doctor breakdown/);
   assert.doesNotMatch(
     moduleSource.slice(
       moduleSource.indexOf("function renderSelectedDoctorProcedures"),
       moduleSource.indexOf("function formatProcedureShare")),
     /doctorProcedureMix|\.sort\(|\.reduce\(/);
+});
+
+test("Procedure Intelligence presents median-first timing, Type 7 range, and neutral allocation context", () => {
+  const row = procedureIntelligenceRow({
+    completedCount: 6,
+    doctorBreakdown: [
+      {
+        doctorId: "otte",
+        doctorName: "Dr. Otte",
+        metrics: procedureIntelligenceRow({ completedCount: 5 }).metrics
+      },
+      {
+        doctorId: "legacy",
+        doctorName: "Dr. Historical",
+        metrics: procedureIntelligenceRow({ completedCount: 1, lowerSeconds: null, upperSeconds: null }).metrics
+      }
+    ]
+  });
+  const harness = createHarness({
+    payload: {
+      ...reportPayload({ otteCases: 3, pledgerCases: 3 }),
+      procedureIntelligenceRows: [row]
+    }
+  });
+
+  harness.reports.render();
+
+  const html = harness.elements.get("reportProcedureIntelligence").innerHTML;
+  assert.match(html, /Procedure Intelligence/);
+  assert.match(html, /Completed N/);
+  assert.match(html, /Median Doctor Time/);
+  assert.match(html, /Typical Doctor Time Range/);
+  assert.match(html, /12:00 - 18:00/);
+  assert.match(html, /Middle 50% of observed Doctor Time/);
+  assert.ok(html.indexOf("Median Doctor Time") < html.indexOf("Typical Doctor Time Range"));
+  assert.match(html, /Current roster default/);
+  assert.match(html, /rough scheduling starting allocation/);
+  assert.match(html, /Variable procedure - confirm the case-specific allocation/);
+  assert.match(html, /Median Seated -&gt; Doctor Complete/);
+  assert.doesNotMatch(html, /Total Room Cycle|efficiency|productive|ranking|score/i);
+  assert.match(html, /type="button"/);
+  assert.match(html, /aria-expanded="false"/);
+  assert.match(html, /aria-controls="practice-procedure-intelligence-detail-0"/);
+
+  const detail = html.match(/<div class="procedure-intelligence-detail"[\s\S]*?<\/article>/)?.[0];
+  assert.ok(detail);
+  assert.match(detail, /Historical assigned allocation/);
+  assert.match(detail, /Historical captured starting allocations/);
+  assert.ok(html.indexOf("Dr. Otte") < html.indexOf("Dr. Historical"));
+});
+
+test("Procedure Intelligence withholds numeric range endpoints for Limited Doctor Time without calling it Unavailable", () => {
+  const harness = createHarness({
+    payload: {
+      ...reportPayload({ otteCases: 2, pledgerCases: 2 }),
+      procedureIntelligenceRows: [procedureIntelligenceRow({
+        completedCount: 4,
+        doctorTimeCount: 4,
+        lowerSeconds: null,
+        upperSeconds: null
+      })]
+    }
+  });
+
+  harness.reports.render();
+
+  const html = harness.elements.get("reportProcedureIntelligence").innerHTML;
+  assert.match(html, /Withheld for Limited sample/);
+  assert.match(html, /Limited - N=4/);
+  assert.doesNotMatch(html, /Typical Doctor Time Range[\s\S]{0,300}Unavailable/);
+  assert.doesNotMatch(html, /12:00 - 18:00/);
+});
+
+test("Procedure Intelligence disclosure toggles native button state and its controlled region", () => {
+  const harness = createHarness();
+  const button = new FakeElement("", "button");
+  const detail = new FakeElement("practice-procedure-intelligence-detail-0");
+  button.dataset.procedureIntelligenceKey = "Practice|Family|EXT";
+  button.setAttribute("aria-controls", detail.id);
+  button.setAttribute("aria-expanded", "false");
+  button.textContent = "View details";
+  detail.hidden = true;
+  harness.elements.set(detail.id, detail);
+  harness.reports.wire();
+
+  const clickHandler = harness.document.listeners.get("click").at(-1);
+  clickHandler({
+    target: targetFor(new Map([[".procedure-intelligence-toggle", button]]))
+  });
+
+  assert.equal(button.getAttribute("aria-expanded"), "true");
+  assert.equal(button.textContent, "Hide details");
+  assert.equal(detail.hidden, false);
+
+  clickHandler({
+    target: targetFor(new Map([[".procedure-intelligence-toggle", button]]))
+  });
+
+  assert.equal(button.getAttribute("aria-expanded"), "false");
+  assert.equal(button.textContent, "View details");
+  assert.equal(detail.hidden, true);
 });
 
 test("Practice scope Doctor Procedures guidance does not mutate scope or reuse Practice mix", async () => {

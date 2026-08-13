@@ -386,14 +386,44 @@ Procedure Intelligence may describe, for a sufficiently supported scoped procedu
 
 - case count;
 - median Doctor Time;
-- typical observed timing range;
+- Typical Doctor Time Range;
 - expected allocation as scheduling context;
 - doctor x procedure drill-down;
 - sedation context.
 
 Longer or shorter observed duration must not be framed as inherently better or worse.
 
-The exact percentile or quantile rule for `Typical Observed Range` is deferred to #218.
+Each Procedure Intelligence row uses exactly one scoped standard included completed procedure population from the reusable report query. Room Available is therefore required for row membership. Procedure Family versus Detailed Variant changes only how those underlying cases are grouped, and Sedation filters the population before grouping. Every statistic is recomputed from the grouped underlying cases rather than from variant summaries or other aggregates.
+
+Doctor Time remains the truthful ordered interval:
+
+`DoctorArrivedAt -> DoctorCompleteAt`
+
+Median Doctor Time, average Doctor Time, and Typical Doctor Time Range use the same nonnegative Doctor Time contributor population. Accepted Ready is not required for Doctor Time. A standard legacy completed case may contribute when its Doctor Arrived and Doctor Complete timestamps remain truthful.
+
+Typical Doctor Time Range is the middle 50 percent of observed Doctor Time, represented by the Type 7 interquartile interval. Sort the unrounded elapsed-second observations as:
+
+`x0 <= ... <= x(n-1)`
+
+For `p = 0.25` and `p = 0.75`, calculate:
+
+`h = (n - 1) * p`
+
+`j = floor(h)`
+
+`g = h - j`
+
+`Q(p) = x[j] + g * (x[j+1] - x[j])`
+
+When `g = 0`, the quantile is the exact indexed observation. The published range is `Q(0.25) -> Q(0.75)`.
+
+The calculation uses elapsed seconds and preserves unrounded interpolated values server-side. Presentation rounds only through the shared duration formatter. Existing reporting-exception rules apply before the calculation; otherwise-included observations are not removed merely because they are long or short. The range is not min/max.
+
+Typical Doctor Time Range uses the existing Doctor Time `ReportSampleContext`. Limited samples at `N = 1-4` may still show Median Doctor Time, but publish null range endpoints. Sufficient samples at `N >= 5` publish both endpoints. A sufficient repeated sample may truthfully publish a zero-width range. Suppressing Limited endpoints does not reclassify the Doctor Time sample as Unavailable.
+
+The UI labels the metric `Typical Doctor Time Range` and explains it as `Middle 50% of observed Doctor Time.` It must not describe the range as normal, expected, a target, predicted, ideal, acceptable, or Schedule Fit.
+
+Procedure Intelligence Ready Wait uses truthful accepted Ready -> Doctor Arrived contributors. Its measured case-flow context uses truthful ordered Seated -> Doctor Complete contributors and must be labeled explicitly rather than reusing `TotalRoomCycleSeconds`, which extends through Room Available and turnover.
 
 ## Schedule Fit
 
@@ -582,7 +612,6 @@ These are implementation gaps, not permission to reinterpret the canonical defin
 The following decisions are deliberately not fixed by #212:
 
 - exact general sample-size guardrails and reusable limited-sample behavior - #213;
-- exact percentile/quantile rule for Typical Observed Range - #218;
 - Calibration Insight minimum sample size - #219;
 - Calibration Insight material-deviation threshold - #219;
 - Calibration Insight directional-consistency rule - #219;

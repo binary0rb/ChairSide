@@ -209,6 +209,7 @@ public sealed class ReportsSnapshotBuilderTests
             ReportSampleContext.ForPopulation(9),
             ReportSampleContext.ForPopulation(10));
         var scopedProcedureGroups = new List<ScopedProcedureGroup>();
+        var procedureIntelligenceRows = new List<ProcedureIntelligenceRow>();
 
         var composition = new ReportsSnapshotComposition
         {
@@ -255,7 +256,8 @@ public sealed class ReportsSnapshotBuilderTests
                 SedationCaseCount = 108,
                 NonSedationCaseCount = 109,
                 BaseProcedureSummaries = baseProcedureSummaries,
-                ScopedProcedureGroups = scopedProcedureGroups
+                ScopedProcedureGroups = scopedProcedureGroups,
+                ProcedureIntelligenceRows = procedureIntelligenceRows
             },
             Allocation = new ReportAllocationSection
             {
@@ -364,6 +366,9 @@ public sealed class ReportsSnapshotBuilderTests
         Assert.Same(composition.Samples, snapshot.Samples);
         Assert.Same(composition.Procedures.ScopedProcedureGroups, snapshot.ScopedProcedureGroups);
         Assert.Same(
+            composition.Procedures.ProcedureIntelligenceRows,
+            snapshot.ProcedureIntelligenceRows);
+        Assert.Same(
             composition.DoctorDetail.DoctorAllocationSamples,
             snapshot.DoctorAllocationSamples);
     }
@@ -428,7 +433,7 @@ public sealed class ReportsSnapshotBuilderTests
     }
 
     [Fact]
-    public void Reports_snapshot_web_json_property_contract_appends_doctor_allocation_samples()
+    public void Reports_snapshot_web_json_property_contract_appends_procedure_intelligence()
     {
         var snapshot = CreateBuilder().Build([], [], ReportDateRange.AllTime);
 
@@ -483,7 +488,8 @@ public sealed class ReportsSnapshotBuilderTests
             "doctorAllocationSamples",
             "observedDoctorFlowDays",
             "doctorFlowSummaries",
-            "doctorFlowTrends"
+            "doctorFlowTrends",
+            "procedureIntelligenceRows"
         ],
             actualNames);
 
@@ -494,6 +500,7 @@ public sealed class ReportsSnapshotBuilderTests
         Assert.Equal(JsonValueKind.Object, json.GetProperty("trends").ValueKind);
         Assert.Equal(JsonValueKind.Array, json.GetProperty("observedDoctorDays").ValueKind);
         Assert.Equal(JsonValueKind.Array, json.GetProperty("doctorProcedureMix").ValueKind);
+        Assert.Equal(JsonValueKind.Array, json.GetProperty("procedureIntelligenceRows").ValueKind);
         Assert.Equal(JsonValueKind.Array, json.GetProperty("exceptionReviewRecords").ValueKind);
         Assert.Equal(JsonValueKind.Object, json.GetProperty("query").ValueKind);
         Assert.Equal(JsonValueKind.Object, json.GetProperty("samples").ValueKind);
@@ -653,6 +660,9 @@ public sealed class ReportsSnapshotBuilderTests
         var group = Assert.Single(snapshot.ScopedProcedureGroups!);
         Assert.Equal("EXT", group.ProcedureCode);
         Assert.Equal(1, group.CaseCount);
+        var intelligence = Assert.Single(snapshot.ProcedureIntelligenceRows!);
+        Assert.Equal("EXT", intelligence.ProcedureCode);
+        Assert.Equal(1, intelligence.Metrics.CompletedCaseCount);
 
         var blankAudit = Assert.Single(snapshot.RecentCompletedCycles, cycle => cycle.CompletedCycleId == blank.CompletedCycleId);
         Assert.True(blankAudit.IsUnmappedProcedure);
@@ -1141,6 +1151,177 @@ public sealed class ReportsSnapshotBuilderTests
         Assert.Empty(snapshot.RecentCompletedCycles);
     }
 
+    [Fact]
+    public void Procedure_intelligence_reuses_scoped_groups_and_recomputes_family_range_from_cases()
+    {
+        var cycles = new List<CompletedRoomCycle>();
+        var extDoctorMinutes = new[] { 10, 10, 10, 10, 50 };
+        var sedationDoctorMinutes = new[] { 20, 20, 20, 20, 20 };
+        var id = 1L;
+        cycles.AddRange(extDoctorMinutes.Select(minutes => ProcedureCycle(id++, "EXT", "otte", minutes)));
+        cycles.AddRange(sedationDoctorMinutes.Select(minutes => ProcedureCycle(id++, "EXT+SED", "otte", minutes)));
+
+        var familyQuery = ReportQuery.FromStrings(
+            null, null, ReportScopeKinds.Practice, null, ReportSedationSegments.All,
+            ReportProcedureGroupings.Family);
+        var detailedQuery = familyQuery with { ProcedureGrouping = ReportProcedureGroupings.DetailedVariant };
+        var family = CreateBuilder().Build(cycles, [], familyQuery);
+        var detailed = CreateBuilder().Build(cycles, [], detailedQuery);
+
+        var familyGroup = Assert.Single(family.ScopedProcedureGroups!);
+        var familyRow = Assert.Single(family.ProcedureIntelligenceRows!);
+        Assert.Equal(familyGroup.ProcedureCode, familyRow.ProcedureCode);
+        Assert.Equal(familyGroup.CaseCount, familyRow.Metrics.CompletedCaseCount);
+        Assert.Equal(10, familyRow.Metrics.TypicalDoctorTimeLowerSeconds / 60d);
+        Assert.Equal(20, familyRow.Metrics.TypicalDoctorTimeUpperSeconds / 60d);
+
+        Assert.Equal(2, detailed.ScopedProcedureGroups!.Count);
+        Assert.Equal(2, detailed.ProcedureIntelligenceRows!.Count);
+        Assert.Equal(
+            detailed.ScopedProcedureGroups.Select(row => row.ProcedureCode),
+            detailed.ProcedureIntelligenceRows.Select(row => row.ProcedureCode));
+        Assert.Equal(10, detailed.ProcedureIntelligenceRows.Single(row => row.ProcedureCode == "EXT")
+            .Metrics.TypicalDoctorTimeLowerSeconds / 60d);
+        Assert.Equal(20, detailed.ProcedureIntelligenceRows.Single(row => row.ProcedureCode == "EXT+SED")
+            .Metrics.TypicalDoctorTimeLowerSeconds / 60d);
+
+        var sedation = CreateBuilder().Build(
+            cycles,
+            [],
+            familyQuery with { Sedation = ReportSedationSegments.Sedation });
+        var sedationGroup = Assert.Single(sedation.ScopedProcedureGroups!);
+        var sedationRow = Assert.Single(sedation.ProcedureIntelligenceRows!);
+        Assert.Equal(5, sedationGroup.CaseCount);
+        Assert.Equal(5, sedationRow.Metrics.CompletedCaseCount);
+        Assert.Equal(20, sedationRow.Metrics.MedianDoctorTimeSeconds / 60d);
+    }
+
+    [Fact]
+    public void Procedure_intelligence_uses_metric_specific_truthful_contributors_and_completed_membership()
+    {
+        var canonical = ProcedureCycle(1, "EXT", "otte", doctorMinutes: 20, readyWaitMinutes: 5);
+        canonical.RoomAvailableAt = canonical.DoctorCompleteAt!.Value.AddHours(1);
+        canonical.TotalRoomCycleSeconds = SecondsBetween(canonical.SeatedAt, canonical.RoomAvailableAt.Value);
+
+        var legacyWithoutReady = ProcedureCycle(2, "EXT", "otte", doctorMinutes: 30);
+        legacyWithoutReady.ReadyForDoctorAt = null;
+        legacyWithoutReady.ReadyToDoctorSeconds = null;
+
+        var invalidDoctorTime = ProcedureCycle(3, "EXT", "otte", doctorMinutes: 10);
+        invalidDoctorTime.DoctorCompleteAt = invalidDoctorTime.DoctorArrivedAt!.Value.AddMinutes(-1);
+        invalidDoctorTime.DoctorInRoomSeconds = 60;
+
+        var incompleteTurnover = ProcedureCycle(4, "EXT", "otte", doctorMinutes: 40);
+        incompleteTurnover.RoomAvailableAt = null;
+        incompleteTurnover.TotalRoomCycleSeconds = null;
+
+        var snapshot = CreateBuilder().Build(
+            [canonical, legacyWithoutReady, invalidDoctorTime, incompleteTurnover],
+            [],
+            ReportQuery.Default);
+        var row = Assert.Single(snapshot.ProcedureIntelligenceRows!);
+
+        Assert.Equal(3, row.Metrics.CompletedCaseCount);
+        Assert.Equal(2, row.Metrics.DoctorTimeSample.ContributingCount);
+        Assert.Equal(ReportSampleStates.Limited, row.Metrics.DoctorTimeSample.State);
+        Assert.Equal(25 * 60, row.Metrics.MedianDoctorTimeSeconds);
+        Assert.Null(row.Metrics.TypicalDoctorTimeLowerSeconds);
+        Assert.Null(row.Metrics.TypicalDoctorTimeUpperSeconds);
+        Assert.Equal(2, row.Metrics.ReadyWaitSample.ContributingCount);
+        Assert.Equal(3, row.Metrics.SeatedToDoctorCompleteSample.ContributingCount);
+        Assert.Equal(30 * 60, row.Metrics.MedianSeatedToDoctorCompleteSeconds);
+        Assert.NotEqual(canonical.TotalRoomCycleSeconds, row.Metrics.MedianSeatedToDoctorCompleteSeconds);
+    }
+
+    [Fact]
+    public void Procedure_intelligence_keeps_current_and_historical_allocation_context_separate()
+    {
+        var first = ProcedureCycle(1, "EXT", "otte", 20, expectedAllocationMinutes: 20);
+        var second = ProcedureCycle(2, "EXT", "otte", 20, expectedAllocationMinutes: 40);
+        var third = ProcedureCycle(3, "EXT", "otte", 20, expectedAllocationMinutes: 40);
+        var known = ProcedureCycle(4, "CON", "otte", 10, expectedAllocationMinutes: 10);
+        first.OriginalDefaultExpectedUnits = 2;
+        second.OriginalDefaultExpectedUnits = 3;
+        third.OriginalDefaultExpectedUnits = 3;
+        known.OriginalDefaultExpectedUnits = 1;
+
+        var rows = CreateBuilder().Build(
+            [first, second, third, known], [], ReportQuery.Default).ProcedureIntelligenceRows!;
+        var row = Assert.Single(rows, item => item.ProcedureCode == "EXT");
+        var knownRow = Assert.Single(rows, item => item.ProcedureCode == "CON");
+
+        Assert.Equal(30, row.CurrentDefaultAllocationMinutes);
+        Assert.Equal("Variable", row.AllocationBehavior);
+        Assert.Equal(10, knownRow.CurrentDefaultAllocationMinutes);
+        Assert.Equal("Known", knownRow.AllocationBehavior);
+        Assert.Equal(40, row.Metrics.MedianHistoricalAssignedAllocationMinutes);
+        Assert.Equal(
+            [(20, 1), (40, 2)],
+            row.Metrics.HistoricalAssignedAllocationValues
+                .Select(value => (value.Minutes, value.CaseCount)));
+        Assert.Equal(
+            [(20, 1), (30, 2)],
+            row.Metrics.HistoricalCapturedDefaultValues
+                .Select(value => (value.Minutes, value.CaseCount)));
+    }
+
+    [Fact]
+    public void Procedure_intelligence_doctor_breakdown_uses_roster_then_historical_order_and_doctor_scope_is_flat()
+    {
+        Doctor[] allDoctors =
+        [
+            new("pledger", "Dr. Pledger", "JWP", "#16a34a"),
+            new("otte", "Dr. Otte", "LDO", "#dc2626"),
+            new("former-z", "Dr. Zed", "ZZZ", "#64748b"),
+            new("former-a", "Dr. Able", "AAA", "#64748b")
+        ];
+        Doctor[] activeDoctors = [allDoctors[0], allDoctors[1]];
+        CompletedRoomCycle[] cycles =
+        [
+            ProcedureCycle(1, "EXT", "otte", 10),
+            ProcedureCycle(2, "EXT", "pledger", 20),
+            ProcedureCycle(3, "EXT", "former-z", 30),
+            ProcedureCycle(4, "EXT", "former-a", 40),
+            ProcedureCycle(5, "EXT", "otte", 50)
+        ];
+        var builder = CreateBuilder(allDoctors, activeDoctors);
+
+        var practiceRow = Assert.Single(builder.Build(cycles, [], ReportQuery.Default)
+            .ProcedureIntelligenceRows!);
+        Assert.Equal(
+            ["pledger", "otte", "former-a", "former-z"],
+            practiceRow.DoctorBreakdown.Select(segment => segment.DoctorId));
+        Assert.All(practiceRow.DoctorBreakdown, segment =>
+            Assert.Equal(ReportSampleStates.Limited, segment.Metrics.DoctorTimeSample.State));
+
+        var doctorQuery = ReportQuery.FromStrings(
+            null, null, ReportScopeKinds.Doctor, "former-a", ReportSedationSegments.All,
+            ReportProcedureGroupings.Family);
+        var doctorRow = Assert.Single(builder.Build(cycles, [], doctorQuery).ProcedureIntelligenceRows!);
+        Assert.Equal(1, doctorRow.Metrics.CompletedCaseCount);
+        Assert.Empty(doctorRow.DoctorBreakdown);
+    }
+
+    [Fact]
+    public void Procedure_intelligence_json_contract_is_appended_without_variance_interpretation()
+    {
+        var snapshot = CreateBuilder().Build(
+            [ProcedureCycle(1, "EXT", "otte", 20)], [], ReportQuery.Default);
+        var json = JsonSerializer.SerializeToElement(snapshot, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        var row = json.GetProperty("procedureIntelligenceRows")[0];
+        var metrics = row.GetProperty("metrics");
+
+        Assert.Equal("Type7Iqr", metrics.GetProperty("typicalDoctorTimeMethod").GetString());
+        Assert.True(metrics.TryGetProperty("medianSeatedToDoctorCompleteSeconds", out _));
+        Assert.True(row.TryGetProperty("currentDefaultAllocationMinutes", out _));
+        Assert.False(metrics.TryGetProperty("variance", out _));
+        Assert.False(metrics.TryGetProperty("slack", out _));
+        Assert.False(metrics.TryGetProperty("debt", out _));
+        Assert.NotNull(snapshot.ProcedureSummaries);
+        Assert.NotNull(snapshot.BaseProcedureSummaries);
+        Assert.NotNull(snapshot.ScopedProcedureGroups);
+    }
+
     private static ReportsSnapshotBuilder CreateBuilder(
         IReadOnlyList<Doctor>? doctors = null,
         IReadOnlyList<Doctor>? activeDoctors = null)
@@ -1151,10 +1332,13 @@ public sealed class ReportsSnapshotBuilderTests
         ];
         ProcedureCategory[] procedures =
         [
-            new("extraction", "EXT", "Extraction", "forceps", SedationEligible: true),
-            new("consult", "CON", "Consult", "message-circle"),
+            new("extraction", "EXT", "Extraction", "forceps", SedationEligible: true,
+                AllocationBehavior: "Variable", DefaultExpectedUnits: 3),
+            new("consult", "CON", "Consult", "message-circle",
+                AllocationBehavior: "Known", DefaultExpectedUnits: 1),
             new("sedation", "SED", "Sedation", "moon", SedationEligible: true),
-            new("biopsy", "BX", "Biopsy", "vial")
+            new("biopsy", "BX", "Biopsy", "vial",
+                AllocationBehavior: "Variable", DefaultExpectedUnits: 2)
         ];
         ProcedureCategory[] activeProcedures = [procedures[0], procedures[1], procedures[3]];
         var allDoctors = doctors ?? defaultDoctors;
@@ -1207,6 +1391,32 @@ public sealed class ReportsSnapshotBuilderTests
             seatedAt.AddMinutes(30),
             seatedAt.AddMinutes(40),
             30);
+        cycle.AssignedDoctor = doctorId;
+        return cycle;
+    }
+
+    private static CompletedRoomCycle ProcedureCycle(
+        long id,
+        string procedureCode,
+        string doctorId,
+        int doctorMinutes,
+        int readyWaitMinutes = 5,
+        int expectedAllocationMinutes = 30)
+    {
+        var seatedAt = Utc(2026, 8, 10, 8, 0).AddMinutes(id * 70);
+        var readyAt = seatedAt.AddMinutes(5);
+        var arrivedAt = readyAt.AddMinutes(readyWaitMinutes);
+        var completeAt = arrivedAt.AddMinutes(doctorMinutes);
+        var cycle = Cycle(
+            id,
+            (int)((id - 1) % 12) + 1,
+            procedureCode,
+            seatedAt,
+            readyAt,
+            arrivedAt,
+            completeAt,
+            completeAt.AddMinutes(10),
+            expectedAllocationMinutes);
         cycle.AssignedDoctor = doctorId;
         return cycle;
     }

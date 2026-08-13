@@ -2072,6 +2072,261 @@ body[data-view="reports"] .report-procedure-mix {
   }
 }
 
+body[data-view="reports"] .report-procedure-intelligence,
+.procedure-intelligence-list,
+.procedure-intelligence-card,
+.procedure-intelligence-detail {
+  min-width: 0;
+}
+
+.report-procedure-intelligence {
+  display: grid;
+  gap: 14px;
+}
+
+.procedure-intelligence-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.procedure-intelligence-head h2,
+.procedure-intelligence-head h3 {
+  margin: 6px 0 4px;
+  letter-spacing: 0;
+}
+
+.procedure-intelligence-head h2 {
+  font-size: 22px;
+}
+
+.procedure-intelligence-head h3 {
+  font-size: 18px;
+}
+
+.procedure-intelligence-head p,
+.procedure-intelligence-empty p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.procedure-intelligence-empty {
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel);
+}
+
+.procedure-intelligence-empty strong {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--ink);
+}
+
+.procedure-intelligence-list {
+  display: grid;
+  gap: 14px;
+}
+
+.procedure-intelligence-card {
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel);
+  box-shadow: var(--shadow-soft);
+}
+
+.procedure-intelligence-list.is-compact .procedure-intelligence-card {
+  box-shadow: none;
+}
+
+.procedure-intelligence-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.procedure-intelligence-card-head h3 {
+  margin: 2px 0 0;
+  font-size: 19px;
+  letter-spacing: 0;
+}
+
+.procedure-intelligence-code {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+}
+
+.procedure-intelligence-primary,
+.procedure-intelligence-secondary,
+.procedure-intelligence-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.procedure-intelligence-primary .procedure-intelligence-metric {
+  border-color: color-mix(in srgb, var(--accent) 30%, var(--line));
+}
+
+.procedure-intelligence-metric {
+  min-width: 0;
+  padding: 11px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--bg);
+}
+
+.procedure-intelligence-metric > span,
+.procedure-intelligence-metric > strong,
+.procedure-intelligence-metric > small {
+  display: block;
+}
+
+.procedure-intelligence-metric > span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.procedure-intelligence-metric > strong {
+  margin-top: 5px;
+  color: var(--ink);
+  font-size: 17px;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+.procedure-intelligence-metric > small {
+  margin-top: 5px;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.procedure-intelligence-metric .metric-sample {
+  margin-top: 6px;
+}
+
+.procedure-intelligence-toggle {
+  justify-self: start;
+  min-height: 42px;
+  padding: 9px 13px;
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  background: var(--panel);
+  color: var(--ink);
+  font: inherit;
+  font-weight: 850;
+  cursor: pointer;
+}
+
+.procedure-intelligence-toggle:hover {
+  border-color: var(--accent);
+}
+
+.procedure-intelligence-toggle:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--accent) 35%, transparent);
+  outline-offset: 2px;
+}
+
+.procedure-intelligence-detail {
+  display: grid;
+  gap: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+
+.procedure-intelligence-detail[hidden] {
+  display: none;
+}
+
+.procedure-intelligence-allocation-context,
+.procedure-intelligence-doctors {
+  min-width: 0;
+  padding: 13px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--bg);
+}
+
+.procedure-intelligence-allocation-context h4,
+.procedure-intelligence-doctors h4,
+.procedure-intelligence-doctor-row h5 {
+  margin: 0;
+  color: var(--ink);
+}
+
+.procedure-intelligence-allocation-context p {
+  margin: 7px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.procedure-intelligence-allocation-context p span {
+  color: var(--ink);
+  font-weight: 800;
+}
+
+.procedure-intelligence-doctor-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.procedure-intelligence-doctor-row {
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--panel);
+}
+
+.procedure-intelligence-doctor-row > div {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 9px;
+}
+
+@media (max-width: 980px) {
+  .procedure-intelligence-primary,
+  .procedure-intelligence-secondary,
+  .procedure-intelligence-detail-grid,
+  .procedure-intelligence-doctor-row > div {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .procedure-intelligence-card-head,
+  .procedure-intelligence-head {
+    flex-direction: column;
+  }
+
+  .procedure-intelligence-primary,
+  .procedure-intelligence-secondary,
+  .procedure-intelligence-detail-grid,
+  .procedure-intelligence-doctor-row > div {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .procedure-intelligence-toggle {
+    width: 100%;
+  }
+}
+
 body[data-view="reports"] .report-insights {
   display: grid;
   gap: 12px;

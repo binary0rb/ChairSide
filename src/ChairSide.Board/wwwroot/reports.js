@@ -27,7 +27,8 @@ export function createReports({
     reportDoctorId: null,
     reportScopeDoctors: new Map(),
     reportDoctorTab: "overview",
-    reportPressActive: false
+    reportPressActive: false,
+    procedureIntelligenceExpanded: new Set()
   };
   const reportActionStates = new Map();
   const reportActionElements = new Map();
@@ -217,6 +218,7 @@ export function createReports({
   syncReportFilterButtons();
   renderReportFilterBar();
   renderProcedureMix(r);
+  renderProcedureIntelligence(r);
   renderAllocationReports(r);
   renderGroupedInsights(r, hasData);
   renderFullMetrics(r, hasData);
@@ -1366,7 +1368,300 @@ export function createReports({
     );
   }
 
-  return renderProcedureMixMarkup(r, { headingTag: "h3", compact: true });
+  return [
+    renderProcedureMixMarkup(r, { headingTag: "h3", compact: true }),
+    renderProcedureIntelligenceMarkup(r, {
+      headingTag: "h3",
+      compact: true,
+      idPrefix: "doctor-procedure-intelligence"
+    })
+  ].join("");
+}
+
+  function renderProcedureIntelligence(r) {
+  const container = document.getElementById("reportProcedureIntelligence");
+  if (!container) {
+    return;
+  }
+
+  container.hidden = false;
+  container.innerHTML = renderProcedureIntelligenceMarkup(r, {
+    headingTag: "h2",
+    headingId: "reportProcedureIntelligenceHeading",
+    idPrefix: "practice-procedure-intelligence"
+  });
+}
+
+  function renderProcedureIntelligenceMarkup(r, {
+  headingTag = "h2",
+  headingId = null,
+  compact = false,
+  idPrefix = "procedure-intelligence"
+} = {}) {
+  const rows = Array.isArray(r?.procedureIntelligenceRows) ? r.procedureIntelligenceRows : [];
+  const safeHeadingTag = /^h[2-4]$/.test(headingTag) ? headingTag : "h2";
+  const headingAttribute = headingId ? ` id="${escapeAttribute(headingId)}"` : "";
+  const scopeKey = r?.query?.scope === "Doctor"
+    ? `Doctor:${r.query.doctorId || "unknown"}`
+    : "Practice";
+  const body = rows.length
+    ? `<div class="procedure-intelligence-list${compact ? " is-compact" : ""}">
+        ${rows.map((row, index) => renderProcedureIntelligenceRow(
+          row,
+          index,
+          { idPrefix, scopeKey, showDoctors: r?.query?.scope !== "Doctor" }
+        )).join("")}
+      </div>`
+    : `<div class="procedure-intelligence-empty">
+        <strong>No observation</strong>
+        <p>Procedure timing will appear when included completed cases match the current scope.</p>
+      </div>`;
+
+  return `
+    <div class="procedure-intelligence-head">
+      <div>
+        <span class="layer-pill layer-pill--timing">Procedure Intelligence</span>
+        <${safeHeadingTag}${headingAttribute}>Procedure Intelligence</${safeHeadingTag}>
+        <p>Observed procedure timing and neutral scheduling context for the current scope.</p>
+      </div>
+    </div>
+    ${body}`;
+}
+
+  function renderProcedureIntelligenceRow(row, index, { idPrefix, scopeKey, showDoctors }) {
+  const metrics = row?.metrics || {};
+  const procedureCode = row?.procedureCode || row?.baseProcedureCode || `row-${index}`;
+  const expansionKey = `${scopeKey}|${row?.procedureGrouping || "Family"}|${procedureCode}`;
+  const detailId = `${idPrefix}-detail-${index}`;
+  const expanded = state.procedureIntelligenceExpanded.has(expansionKey);
+  const label = row?.procedureLabel || procedureCode || "Unknown procedure";
+  const doctorBreakdown = showDoctors && Array.isArray(row?.doctorBreakdown)
+    ? row.doctorBreakdown
+    : [];
+
+  return `
+    <article class="procedure-intelligence-card">
+      <header class="procedure-intelligence-card-head">
+        <div>
+          <span class="procedure-intelligence-code">${escapeHtml(procedureCode)}</span>
+          <h3>${escapeHtml(label)}</h3>
+        </div>
+        ${renderSampleContext(sampledPresentation(
+          metrics.completedSample,
+          String(metrics.completedCaseCount ?? 0)
+        ))}
+      </header>
+      <div class="procedure-intelligence-primary">
+        ${renderProcedureIntelligenceMetric(
+          "Completed N",
+          String(metrics.completedCaseCount ?? 0),
+          metrics.completedSample
+        )}
+        ${renderProcedureIntelligenceMetric(
+          "Median Doctor Time",
+          formatObservedDuration(metrics.medianDoctorTimeSeconds),
+          metrics.doctorTimeSample,
+          "Doctor Arrived to Doctor Complete."
+        )}
+        ${renderTypicalDoctorTimeRange(metrics)}
+      </div>
+      <div class="procedure-intelligence-secondary">
+        ${renderCurrentRosterDefault(row)}
+        ${renderProcedureIntelligenceMetric(
+          "Median Ready Wait",
+          formatObservedDuration(metrics.medianReadyWaitSeconds),
+          metrics.readyWaitSample,
+          "Accepted Ready to Doctor Arrived."
+        )}
+        ${renderProcedureIntelligenceMetric(
+          "Median Seated -> Doctor Complete",
+          formatObservedDuration(metrics.medianSeatedToDoctorCompleteSeconds),
+          metrics.seatedToDoctorCompleteSample,
+          "Observed case flow from Seated to Doctor Complete; turnover is not included."
+        )}
+      </div>
+      <button type="button"
+        class="procedure-intelligence-toggle"
+        data-procedure-intelligence-key="${escapeAttribute(expansionKey)}"
+        aria-expanded="${String(expanded)}"
+        aria-controls="${escapeAttribute(detailId)}">
+        ${expanded ? "Hide details" : "View details"}
+      </button>
+      <div class="procedure-intelligence-detail" id="${escapeAttribute(detailId)}"${expanded ? "" : " hidden"}>
+        ${renderProcedureIntelligenceDetail(row, doctorBreakdown)}
+      </div>
+    </article>`;
+}
+
+  function renderProcedureIntelligenceMetric(label, value, sample, helpText = null) {
+  const presentation = sampledPresentation(sample, value);
+  return `
+    <div class="procedure-intelligence-metric">
+      <span>${escapeHtml(label)}</span>${helpText ? renderHelpIcon(helpText) : ""}
+      <strong>${escapeHtml(presentation.value)}</strong>
+      ${renderSampleContext(presentation)}
+    </div>`;
+}
+
+  function renderTypicalDoctorTimeRange(metrics) {
+  const sample = metrics?.doctorTimeSample;
+  let value = "No observation";
+  let explanation = "Middle 50% of observed Doctor Time.";
+
+  if (sample?.state === "Sufficient"
+      && Number.isFinite(metrics?.typicalDoctorTimeLowerSeconds)
+      && Number.isFinite(metrics?.typicalDoctorTimeUpperSeconds)) {
+    value = `${formatDuration(metrics.typicalDoctorTimeLowerSeconds)} - ${formatDuration(metrics.typicalDoctorTimeUpperSeconds)}`;
+  } else if (sample?.state === "Limited") {
+    value = "Withheld for Limited sample";
+    explanation = "Middle 50% of observed Doctor Time. Numeric endpoints are shown at N=5.";
+  } else if (sample?.state === "Unavailable") {
+    value = "Unavailable";
+  }
+
+  const presentation = sampledPresentation(sample, value);
+  return `
+    <div class="procedure-intelligence-metric is-range">
+      <span>Typical Doctor Time Range</span>${renderHelpIcon(explanation)}
+      <strong>${escapeHtml(presentation.value)}</strong>
+      ${renderSampleContext(presentation)}
+      <small>Middle 50% of observed Doctor Time.</small>
+    </div>`;
+}
+
+  function renderCurrentRosterDefault(row) {
+  const hasDefault = Number.isFinite(row?.currentDefaultAllocationMinutes);
+  const value = hasDefault
+    ? formatDurationMinutes(row.currentDefaultAllocationMinutes)
+    : "Unavailable";
+  const behavior = row?.allocationBehavior === "Variable"
+    ? "Variable procedure - confirm the case-specific allocation."
+    : row?.allocationBehavior === "Known"
+      ? "Known procedure starting allocation."
+      : "Current rough roster starting allocation.";
+
+  return `
+    <div class="procedure-intelligence-metric is-allocation-context">
+      <span>Current roster default</span>${renderHelpIcon("Current rough scheduling starting allocation; it is not expected Doctor Time or Schedule Fit.")}
+      <strong>${escapeHtml(value)}</strong>
+      <small>${escapeHtml(behavior)}</small>
+    </div>`;
+}
+
+  function renderProcedureIntelligenceDetail(row, doctorBreakdown) {
+  const metrics = row?.metrics || {};
+  const capturedDefaults = usefulCapturedDefaults(
+    metrics.historicalCapturedDefaultValues,
+    row?.currentDefaultAllocationMinutes);
+
+  return `
+    <div class="procedure-intelligence-detail-grid">
+      ${renderProcedureIntelligenceMetric(
+        "Average Doctor Time",
+        formatObservedDuration(metrics.averageDoctorTimeSeconds),
+        metrics.doctorTimeSample
+      )}
+      ${renderProcedureIntelligenceMetric(
+        "Average Ready Wait",
+        formatObservedDuration(metrics.averageReadyWaitSeconds),
+        metrics.readyWaitSample
+      )}
+      ${renderProcedureIntelligenceMetric(
+        "Average Seated -> Doctor Complete",
+        formatObservedDuration(metrics.averageSeatedToDoctorCompleteSeconds),
+        metrics.seatedToDoctorCompleteSample
+      )}
+    </div>
+    <section class="procedure-intelligence-allocation-context" aria-label="Historical assigned allocation context">
+      <h4>Historical assigned allocation</h4>
+      <p>${renderHistoricalAssignedAllocation(metrics)}</p>
+      ${capturedDefaults.length
+        ? `<p><span>Historical captured starting allocations:</span> ${renderAllocationValueCounts(capturedDefaults)}</p>`
+        : ""}
+    </section>
+    ${doctorBreakdown.length ? renderDoctorProcedureIntelligence(doctorBreakdown) : ""}`;
+}
+
+  function renderHistoricalAssignedAllocation(metrics) {
+  const sample = metrics?.historicalAssignedAllocationSample;
+  if (!sample || sample.state === "Empty") {
+    return "No observation.";
+  }
+  if (sample.state === "Unavailable") {
+    return `Unavailable - 0 of ${sample.populationCount || 0} included cases have an assigned allocation.`;
+  }
+
+  const median = Number.isFinite(metrics?.medianHistoricalAssignedAllocationMinutes)
+    ? formatDurationMinutes(metrics.medianHistoricalAssignedAllocationMinutes)
+    : "Unavailable";
+  return `Median ${escapeHtml(median)} (${escapeHtml(`N=${sample.contributingCount || 0}`)}). ${renderAllocationValueCounts(metrics.historicalAssignedAllocationValues)}`;
+}
+
+  function renderAllocationValueCounts(values) {
+  if (!Array.isArray(values) || values.length === 0) {
+    return "No captured values.";
+  }
+  return values.map(value => {
+    const count = value?.caseCount || 0;
+    return `${escapeHtml(formatDurationMinutes(value?.minutes))} (${count} ${count === 1 ? "case" : "cases"})`;
+  }).join(", ");
+}
+
+  function usefulCapturedDefaults(values, currentDefaultMinutes) {
+  if (!Array.isArray(values) || values.length === 0) {
+    return [];
+  }
+  return values.length > 1 || values.some(value => value?.minutes !== currentDefaultMinutes)
+    ? values
+    : [];
+}
+
+  function renderDoctorProcedureIntelligence(segments) {
+  return `
+    <section class="procedure-intelligence-doctors" aria-label="Doctor breakdown">
+      <h4>Doctor breakdown</h4>
+      <div class="procedure-intelligence-doctor-list">
+        ${segments.map(segment => {
+          const metrics = segment?.metrics || {};
+          return `
+            <article class="procedure-intelligence-doctor-row">
+              <h5>${escapeHtml(segment?.doctorName || segment?.doctorId || "Unknown doctor")}</h5>
+              <div>
+                ${renderProcedureIntelligenceMetric("Completed N", String(metrics.completedCaseCount ?? 0), metrics.completedSample)}
+                ${renderProcedureIntelligenceMetric("Median Doctor Time", formatObservedDuration(metrics.medianDoctorTimeSeconds), metrics.doctorTimeSample)}
+                ${renderTypicalDoctorTimeRange(metrics)}
+                ${renderProcedureIntelligenceMetric("Median Ready Wait", formatObservedDuration(metrics.medianReadyWaitSeconds), metrics.readyWaitSample)}
+                ${renderProcedureIntelligenceMetric("Median Seated -> Doctor Complete", formatObservedDuration(metrics.medianSeatedToDoctorCompleteSeconds), metrics.seatedToDoctorCompleteSample)}
+              </div>
+            </article>`;
+        }).join("")}
+      </div>
+    </section>`;
+}
+
+  function handleProcedureIntelligenceClick(event) {
+  const button = event.target.closest(".procedure-intelligence-toggle");
+  if (!button) {
+    return false;
+  }
+
+  const key = button.dataset.procedureIntelligenceKey;
+  const detailId = button.getAttribute("aria-controls");
+  const detail = detailId ? document.getElementById(detailId) : null;
+  const expanded = button.getAttribute("aria-expanded") !== "true";
+  button.setAttribute("aria-expanded", String(expanded));
+  button.textContent = expanded ? "Hide details" : "View details";
+  if (detail) {
+    detail.hidden = !expanded;
+  }
+  if (key) {
+    if (expanded) {
+      state.procedureIntelligenceExpanded.add(key);
+    } else {
+      state.procedureIntelligenceExpanded.delete(key);
+    }
+  }
+  return true;
 }
 
   function formatProcedureShare(share) {
@@ -2765,7 +3060,7 @@ export function createReports({
 
   wirePressInterruptionGuard({
     pressTarget: shell,
-    selector: "[data-report-doctor-id], [data-report-doctor-tab], .report-table button",
+    selector: "[data-report-doctor-id], [data-report-doctor-tab], .report-table button, .procedure-intelligence-toggle",
     isPressActive: () => state.reportPressActive,
     setPressActive: value => {
       state.reportPressActive = value;
@@ -2780,6 +3075,9 @@ export function createReports({
 
   function wireDoctorCockpitActions() {
   document.addEventListener("click", event => {
+    if (handleProcedureIntelligenceClick(event)) {
+      return;
+    }
     const tab = event.target.closest("[data-report-doctor-tab]");
     if (!tab) {
       return;
@@ -2812,6 +3110,9 @@ export function createReports({
 }
 
   async function handleReportsActionClick(event) {
+  if (handleProcedureIntelligenceClick(event)) {
+    return;
+  }
   const openReviewQueueButton = event.target.closest("[data-action='open-review-queue']");
   if (openReviewQueueButton) {
     const detail = document.getElementById("reportDetail");
@@ -2999,7 +3300,7 @@ export function createReports({
     focusDestination: document.getElementById("reportAccessToken")
       || document.getElementById("reportAccessHeading")
   });
-  ["reportTrendPanel", "reportFilterBar", "reportProcedureMix", "reportInsights", "reportMetrics", "reportDetail"].forEach(id => {
+  ["reportTrendPanel", "reportFilterBar", "reportProcedureMix", "reportProcedureIntelligence", "reportInsights", "reportMetrics", "reportDetail"].forEach(id => {
     const element = document.getElementById(id);
     if (element) {
       element.hidden = true;
