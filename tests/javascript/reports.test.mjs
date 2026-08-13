@@ -384,6 +384,44 @@ function sample(populationCount, contributingCount = populationCount) {
   };
 }
 
+function doctorFlowSummary(doctorId, doctorName, caseCount) {
+  const completed = sample(caseCount);
+  const observed = sample(caseCount > 0 ? 1 : 0);
+  return {
+    doctorId,
+    doctorName,
+    completedCaseCount: caseCount,
+    medianReadyWaitSeconds: caseCount > 0 ? 120 : null,
+    medianDoctorTimeSeconds: caseCount > 0 ? 900 : null,
+    medianObservedClinicalSpanMinutes: caseCount > 0 ? 45 : null,
+    peakConcurrentRooms: caseCount > 0 ? Math.min(caseCount, 2) : null,
+    observedDoctorDayCount: caseCount > 0 ? 1 : 0,
+    samples: {
+      completedCases: completed,
+      readyWait: completed,
+      doctorTime: completed,
+      observedDays: observed
+    }
+  };
+}
+
+function observedDoctorFlowDay(doctorId, doctorName, reportDate, caseCount) {
+  return {
+    doctorId,
+    doctorName,
+    reportDate,
+    qualifyingCaseCount: caseCount,
+    firstAcceptedReadyAt: `${reportDate}T14:00:00Z`,
+    lastDoctorCompleteAt: `${reportDate}T14:45:00Z`,
+    observedClinicalSpanMinutes: 45,
+    minutesWithOneDoctorWorkingRoom: 30,
+    minutesWithTwoDoctorWorkingRooms: 10,
+    minutesWithThreeOrMoreDoctorWorkingRooms: 0,
+    unstructuredTimeMinutes: 5,
+    peakConcurrentRooms: caseCount > 1 ? 2 : 1
+  };
+}
+
 function reportPayload({
   otteCases = 0,
   pledgerCases = 2,
@@ -422,6 +460,14 @@ function reportPayload({
     doctorAllocationSamples: [
       { doctorId: "otte", sample: sample(otteCases) },
       { doctorId: "pledger", sample: sample(pledgerCases) }
+    ],
+    doctorFlowSummaries: [
+      doctorFlowSummary("otte", "Dr. Otte", otteCases),
+      doctorFlowSummary("pledger", "Dr. Pledger", pledgerCases)
+    ],
+    observedDoctorFlowDays: [
+      ...(otteCases > 0 ? [observedDoctorFlowDay("otte", "Dr. Otte", "2026-07-14", otteCases)] : []),
+      ...(pledgerCases > 0 ? [observedDoctorFlowDay("pledger", "Dr. Pledger", "2026-07-15", pledgerCases)] : [])
     ],
     recentCompletedCycles: [],
     exceptionReviewRecords: [],
@@ -837,8 +883,6 @@ function allocationPayload(populationCount, contributingCount) {
 function allocationSurfaceHtml(harness) {
   return [
     "allocationBalanceCard",
-    "doctorReportCards",
-    "selectedDoctorPanel",
     "doctorAllocationList",
     "procedureAllocationList"
   ].map(id => harness.elements.get(id).innerHTML).join("\n");
@@ -924,7 +968,7 @@ test("filter, doctor, and tab state survive ordinary rerenders and refreshed pay
   assert.match(
     panel.innerHTML,
     /aria-selected="true" data-report-doctor-tab="flow"/);
-  assert.match(panel.innerHTML, /Observed Load/);
+  assert.match(panel.innerHTML, /Room Load \/ Flow/);
 });
 
 test("default doctor selection uses first doctor with cases then first roster doctor", () => {
@@ -941,6 +985,210 @@ test("default doctor selection uses first doctor with cases then first roster do
   assert.equal(
     selectedCard(withoutCases.elements.get("doctorReportCards").innerHTML, "otte"),
     true);
+});
+
+test("Doctor Overview uses the six canonical flow metrics without allocation or pressure shortcuts", () => {
+  const payload = reportPayload({ otteCases: 5, pledgerCases: 0 });
+  payload.doctorFlowSummaries = [{
+    ...doctorFlowSummary("otte", "Dr. Otte", 5),
+    medianReadyWaitSeconds: 123,
+    medianDoctorTimeSeconds: 987,
+    medianObservedClinicalSpanMinutes: 77,
+    peakConcurrentRooms: 3,
+    observedDoctorDayCount: 5,
+    samples: {
+      completedCases: sample(5),
+      readyWait: sample(5),
+      doctorTime: sample(5),
+      observedDays: sample(5)
+    }
+  }];
+  const harness = createHarness({ payload });
+
+  harness.reports.render();
+
+  const cards = harness.elements.get("doctorReportCards").innerHTML;
+  const panel = harness.elements.get("selectedDoctorPanel").innerHTML;
+  for (const label of [
+    "Completed Cases",
+    "Median Ready Wait",
+    "Median Doctor Time",
+    "Median Observed Clinical Span",
+    "Peak Concurrent Rooms",
+    "Observed Doctor Days"
+  ]) {
+    assert.match(cards, new RegExp(label));
+    assert.match(panel, new RegExp(label));
+  }
+  assert.match(cards, /02:03/);
+  assert.match(cards, /16:27/);
+  assert.match(cards, /77 min/);
+  assert.match(cards, /3\+ rooms/);
+  assert.doesNotMatch(cards, /Allocation|Pressure point|sparkline/i);
+  for (const tab of ["Overview", "Trends", "Procedures", "Room Load \/ Flow", "Schedule Fit", "Case Audit"]) {
+    assert.match(panel, new RegExp(tab));
+  }
+});
+
+test("Room Load Flow tab reads only canonical observedDoctorFlowDays and preserves its minute partition", async () => {
+  const payload = {
+    ...reportPayload({ otteCases: 2, pledgerCases: 0 }),
+    observedDoctorDays: [{
+      doctorId: "otte",
+      reportDate: "2026-07-14",
+      encounterCount: 99,
+      observedTeamSpanMinutes: 999
+    }]
+  };
+  const harness = createHarness({ payload });
+  harness.reports.wire();
+  harness.reports.render();
+
+  const flowTab = new FakeElement();
+  flowTab.dataset.reportDoctorTab = "flow";
+  await harness.document.dispatch("click", {
+    target: targetFor(new Map([["[data-report-doctor-tab]", flowTab]]))
+  });
+
+  const panel = harness.elements.get("selectedDoctorPanel").innerHTML;
+  assert.match(panel, /Clinical Span/);
+  assert.match(panel, /Unstructured Time/);
+  assert.match(panel, /1 Doctor Working room/);
+  assert.match(panel, /2 Doctor Working rooms/);
+  assert.match(panel, /3\+ Doctor Working rooms/);
+  assert.match(panel, /45 min/);
+  assert.match(panel, /5 min/);
+  assert.match(panel, /30 min/);
+  assert.match(panel, /10 min/);
+  assert.match(panel, /0 min/);
+  assert.doesNotMatch(panel, /Team Span|999|99 cases|idle|pressure point/i);
+  assert.doesNotMatch(panel, /productivity|downtime|recoverable|unscheduled|attendance|hours worked/i);
+});
+
+test("Practice doctor cards preserve server roster membership, Empty state, and represented history", () => {
+  const payload = reportPayload({ otteCases: 0, pledgerCases: 2 });
+  payload.doctorFlowSummaries = [
+    doctorFlowSummary("otte", "Dr. Otte", 0),
+    doctorFlowSummary("pledger", "Dr. Pledger", 2),
+    doctorFlowSummary("former", "Dr. Former", 1)
+  ];
+  const harness = createHarness({ payload });
+
+  harness.reports.render();
+
+  const cards = harness.elements.get("doctorReportCards").innerHTML;
+  assert.ok(cards.indexOf('data-report-doctor-id="otte"') < cards.indexOf('data-report-doctor-id="pledger"'));
+  assert.ok(cards.indexOf('data-report-doctor-id="pledger"') < cards.indexOf('data-report-doctor-id="former"'));
+  assert.match(cards, /Dr\. Former/);
+  const emptyCard = cards.match(/<article[^>]+data-report-doctor-id="otte"[\s\S]*?<\/article>/)?.[0];
+  assert.ok(emptyCard);
+  assert.match(emptyCard, /No observation/);
+  assert.doesNotMatch(emptyCard, /<dd>0(?:<|\s)/);
+});
+
+test("phase-only doctor timing stays visible without classifying the card as empty", () => {
+  const payload = reportPayload({ otteCases: 0, pledgerCases: 0 });
+  payload.doctorFlowSummaries = [{
+    doctorId: "otte",
+    doctorName: "Dr. Otte",
+    completedCaseCount: 0,
+    medianReadyWaitSeconds: 360,
+    medianDoctorTimeSeconds: 1200,
+    medianObservedClinicalSpanMinutes: null,
+    peakConcurrentRooms: null,
+    observedDoctorDayCount: 0,
+    samples: {
+      completedCases: sample(0, 0),
+      readyWait: sample(2, 2),
+      doctorTime: sample(2, 1),
+      observedDays: sample(0, 0)
+    }
+  }];
+  const harness = createHarness({ payload });
+
+  harness.reports.render();
+
+  const cards = harness.elements.get("doctorReportCards").innerHTML;
+  const card = cards.match(/<article[^>]+data-report-doctor-id="otte"[\s\S]*?<\/article>/)?.[0];
+  assert.ok(card);
+  assert.doesNotMatch(card, /No completed or phase observations/);
+  assert.match(card, /No completed cases yet; phase timing observations are available in the current scope and range\./);
+  assert.match(card, /Median Ready Wait[\s\S]*?06:00/);
+  assert.match(card, /Median Doctor Time[\s\S]*?20:00/);
+  assert.match(card, /Limited - N=2/);
+  assert.match(card, /Limited - N=1/);
+  assert.match(card, /Observed Doctor Days[\s\S]*?No observation/);
+  assert.doesNotMatch(card, /class="doctor-report-card[^"]*\bis-empty\b/);
+
+  const selectedPanel = harness.elements.get("selectedDoctorPanel").innerHTML;
+  assert.match(selectedPanel, /No completed cases yet; phase timing observations are available in the current scope and range\./);
+
+  const predicateSource = moduleSource.slice(
+    moduleSource.indexOf("function hasDoctorPhaseTimingObservation"),
+    moduleSource.indexOf("function doctorFlowSummarySentence"));
+  assert.doesNotMatch(predicateSource, /limitedSampleThreshold|contributingCount\s*<\s*5|state\s*===\s*["']Limited["']/);
+});
+
+test("missing doctor-flow contributors stay Unavailable and Limited context stays neutral", () => {
+  const unavailable = doctorFlowSummary("otte", "Dr. Otte", 6);
+  unavailable.medianReadyWaitSeconds = null;
+  unavailable.medianDoctorTimeSeconds = null;
+  unavailable.medianObservedClinicalSpanMinutes = null;
+  unavailable.peakConcurrentRooms = null;
+  unavailable.observedDoctorDayCount = 0;
+  unavailable.samples = {
+    completedCases: sample(6),
+    readyWait: sample(6, 0),
+    doctorTime: sample(6, 0),
+    observedDays: sample(2, 0)
+  };
+  const payload = reportPayload({ otteCases: 6, pledgerCases: 0 });
+  payload.doctorFlowSummaries = [unavailable];
+  const harness = createHarness({ payload });
+
+  harness.reports.render();
+
+  const cards = harness.elements.get("doctorReportCards").innerHTML;
+  assert.match(cards, /Completed Cases[\s\S]*?>6</);
+  assert.match(cards, /Median Ready Wait[\s\S]*?Unavailable/);
+  assert.match(cards, /Median Doctor Time[\s\S]*?Unavailable/);
+  assert.match(cards, /Median Observed Clinical Span[\s\S]*?Unavailable/);
+  assert.match(cards, /Observed Doctor Days[\s\S]*?Unavailable/);
+  assert.doesNotMatch(cards, /Pressure point|over expected|under expected|best|worst/i);
+
+  const limitedPayload = reportPayload({ otteCases: 3, pledgerCases: 0 });
+  limitedPayload.doctorFlowSummaries = [doctorFlowSummary("otte", "Dr. Otte", 3)];
+  const limitedHarness = createHarness({ payload: limitedPayload });
+  limitedHarness.reports.render();
+  const limitedCards = limitedHarness.elements.get("doctorReportCards").innerHTML;
+  assert.match(limitedCards, /Limited - N=3/);
+  assert.doesNotMatch(limitedCards, /Pressure point|over expected|under expected|best|worst/i);
+});
+
+test("Trends remains a placeholder and Schedule Fit stays isolated from Doctor Overview", async () => {
+  const harness = createHarness({ payload: reportPayload({ otteCases: 5, pledgerCases: 0 }) });
+  harness.reports.wire();
+  harness.reports.render();
+
+  const overview = harness.elements.get("selectedDoctorPanel").innerHTML;
+  assert.doesNotMatch(overview, /Net Variance|Over Expected|Under Expected|At Expected/);
+
+  const trendsTab = new FakeElement();
+  trendsTab.dataset.reportDoctorTab = "trends";
+  await harness.document.dispatch("click", {
+    target: targetFor(new Map([["[data-report-doctor-tab]", trendsTab]]))
+  });
+  assert.match(harness.elements.get("selectedDoctorPanel").innerHTML, /Trend charts are planned/);
+
+  const scheduleTab = new FakeElement();
+  scheduleTab.dataset.reportDoctorTab = "schedule";
+  await harness.document.dispatch("click", {
+    target: targetFor(new Map([["[data-report-doctor-tab]", scheduleTab]]))
+  });
+  const schedule = harness.elements.get("selectedDoctorPanel").innerHTML;
+  assert.match(schedule, /Schedule Fit/);
+  assert.match(schedule, /Net Variance/);
+  assert.doesNotMatch(schedule, /Calibration Insights|automatic|recommendation/i);
 });
 
 test("first-class Procedure Mix renders the server total, shares, labels, and row order", () => {
@@ -1090,7 +1338,7 @@ test("nonempty allocation populations with zero contributors render Unavailable,
   assert.match(html, /Unavailable/);
   assert.match(html, /0 of 6 contributors/);
   assert.doesNotMatch(harness.elements.get("allocationBalanceCard").innerHTML, /0 min expected|0 min measured/);
-  for (const id of ["allocationBalanceCard", "selectedDoctorPanel", "procedureAllocationList"]) {
+  for (const id of ["allocationBalanceCard", "procedureAllocationList"]) {
     assert.doesNotMatch(harness.elements.get(id).innerHTML, /No observation/);
   }
 });
@@ -1102,7 +1350,6 @@ test("Limited allocation samples retain N while suppressing comparison language"
   const html = allocationSurfaceHtml(harness);
 
   assert.match(html, /Limited - N=3/);
-  assert.match(html, /3 allocation contributors/);
   assert.doesNotMatch(html, /\bNet\b|\bAvg\b|O \/ U \/ A|over expected|under expected/i);
 });
 
@@ -1115,7 +1362,7 @@ test("Sufficient allocation samples retain supported descriptive comparison lang
   assert.match(html, /Sufficient - N=5/);
   assert.match(html, /\bNet\b/);
   assert.match(html, /over expected/);
-  assert.match(html, /O \/ U \/ A/);
+  assert.match(html, /5 over .* 0 under .* 0 at/);
 });
 
 test("Doctor scope exposes only its requested doctor until the scope control reloads another doctor", async () => {
@@ -1128,7 +1375,9 @@ test("Doctor scope exposes only its requested doctor until the scope control rel
       procedureGrouping: "Family"
     },
     doctorSummaries: [{ assignedDoctor: "otte", allocation: allocation(5, 5) }],
-    doctorAllocationSamples: [{ doctorId: "otte", sample: sample(5) }]
+    doctorAllocationSamples: [{ doctorId: "otte", sample: sample(5) }],
+    doctorFlowSummaries: [doctorFlowSummary("otte", "Dr. Otte", 5)],
+    observedDoctorFlowDays: [observedDoctorFlowDay("otte", "Dr. Otte", "2026-07-14", 5)]
   };
   const nextPayload = {
     ...reportPayload({ otteCases: 0, pledgerCases: 5 }),
@@ -1139,7 +1388,9 @@ test("Doctor scope exposes only its requested doctor until the scope control rel
       procedureGrouping: "Family"
     },
     doctorSummaries: [{ assignedDoctor: "pledger", allocation: allocation(5, -5) }],
-    doctorAllocationSamples: [{ doctorId: "pledger", sample: sample(5) }]
+    doctorAllocationSamples: [{ doctorId: "pledger", sample: sample(5) }],
+    doctorFlowSummaries: [doctorFlowSummary("pledger", "Dr. Pledger", 5)],
+    observedDoctorFlowDays: [observedDoctorFlowDay("pledger", "Dr. Pledger", "2026-07-15", 5)]
   };
   const responseGate = deferred();
   let harness;

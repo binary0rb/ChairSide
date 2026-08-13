@@ -1623,6 +1623,12 @@
                       "path":  "src/ChairSide.Board/Services/DemoBoardStore.cs"
                   },
                   {
+                      "id":  "symbol:type:DoctorFlowSummary",
+                      "label":  "DoctorFlowSummary",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/DemoBoardStore.cs"
+                  },
+                  {
                       "id":  "symbol:type:DoctorProcedureMixRow",
                       "label":  "DoctorProcedureMixRow",
                       "type":  "CodeType",
@@ -1947,6 +1953,12 @@
                       "path":  "src/ChairSide.Board/Services/DemoBoardStore.cs"
                   },
                   {
+                      "id":  "symbol:type:ObservedDoctorFlowDay",
+                      "label":  "ObservedDoctorFlowDay",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/DemoBoardStore.cs"
+                  },
+                  {
                       "id":  "symbol:type:ObservedScheduleFitInputSummary",
                       "label":  "ObservedScheduleFitInputSummary",
                       "type":  "CodeType",
@@ -2173,6 +2185,12 @@
                       "label":  "ReportDoctorDetailSection",
                       "type":  "CodeType",
                       "path":  "src/ChairSide.Board/Services/ReportsSnapshotComposition.cs"
+                  },
+                  {
+                      "id":  "symbol:type:ReportDoctorFlowMetricSampleContext",
+                      "label":  "ReportDoctorFlowMetricSampleContext",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/ReportQuery.cs"
                   },
                   {
                       "id":  "symbol:type:ReportingExceptionReasons",
@@ -3045,6 +3063,11 @@
                   },
                   {
                       "from":  "file:src/ChairSide.Board/Services/DemoBoardStore.cs",
+                      "to":  "symbol:type:DoctorFlowSummary",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/DemoBoardStore.cs",
                       "to":  "symbol:type:DoctorProcedureMixRow",
                       "label":  "declares"
                   },
@@ -3066,6 +3089,11 @@
                   {
                       "from":  "file:src/ChairSide.Board/Services/DemoBoardStore.cs",
                       "to":  "symbol:type:ObservedDoctorDay",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/DemoBoardStore.cs",
+                      "to":  "symbol:type:ObservedDoctorFlowDay",
                       "label":  "declares"
                   },
                   {
@@ -3481,6 +3509,11 @@
                   {
                       "from":  "file:src/ChairSide.Board/Services/ReportQuery.cs",
                       "to":  "symbol:type:ReportDoctorAllocationSampleContext",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/ReportQuery.cs",
+                      "to":  "symbol:type:ReportDoctorFlowMetricSampleContext",
                       "label":  "declares"
                   },
                   {

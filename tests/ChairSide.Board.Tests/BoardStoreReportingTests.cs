@@ -594,6 +594,15 @@ public sealed partial class BoardStoreTests
         Assert.Equal(180, bucket.MedianReadyWaitSeconds);
         Assert.Equal(1, bucket.ReadyWaitSample!.ContributingCount);
         Assert.Equal(ReportSampleStates.Limited, bucket.ReadyWaitSample.State);
+        var flowDay = Assert.Single(reports.ObservedDoctorFlowDays!);
+        Assert.Equal(start.AddMinutes(20), flowDay.FirstAcceptedReadyAt);
+        Assert.Equal(start.AddMinutes(40), flowDay.LastDoctorCompleteAt);
+        Assert.Equal(20, flowDay.ObservedClinicalSpanMinutes);
+        Assert.Equal(3, flowDay.UnstructuredTimeMinutes);
+        Assert.Equal(17, flowDay.MinutesWithOneDoctorWorkingRoom);
+        var flowSummary = Assert.Single(reports.DoctorFlowSummaries!, summary => summary.DoctorId == "otte");
+        Assert.Equal(180, flowSummary.MedianReadyWaitSeconds);
+        Assert.Equal(1, flowSummary.ObservedDoctorDayCount);
     }
 
     // -------------------------------------------------------------------------

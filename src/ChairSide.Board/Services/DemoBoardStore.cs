@@ -95,7 +95,11 @@ public sealed class DemoBoardStore
         _activeDoctors = BuildDoctors(doctorRosterOptions.Value, activeOnly: true).ToList();
         _procedures = BuildProcedures(procedureRosterOptions.Value).ToList();
         _activeProcedures = BuildProcedures(procedureRosterOptions.Value, activeOnly: true).ToList();
-        _reportsSnapshotBuilder = new ReportsSnapshotBuilder(_doctors, _procedures, _activeProcedures);
+        _reportsSnapshotBuilder = new ReportsSnapshotBuilder(
+            _doctors,
+            _activeDoctors,
+            _procedures,
+            _activeProcedures);
         _fixtureBuilder = new DeterministicFixtureBuilder(_activeDoctors, _activeProcedures);
         var now = Now;
 
@@ -3278,7 +3282,12 @@ public sealed record ReportsSnapshot(
     IReadOnlyList<ScopedProcedureGroup>? ScopedProcedureGroups = null,
     // Per-doctor allocation sample contexts over each represented doctor's exact population.
     // Doctor scope returns only the requested doctor, including an explicit Empty context.
-    IReadOnlyList<ReportDoctorAllocationSampleContext>? DoctorAllocationSamples = null);
+    IReadOnlyList<ReportDoctorAllocationSampleContext>? DoctorAllocationSamples = null,
+    // Legacy/compatibility observed-load data remains available with its established Seated-based
+    // semantics. Issue #216 canonical Ready-anchored doctor flow is additive and lives in the two
+    // projections below; new presentation code must not reinterpret ObservedDoctorDays.
+    IReadOnlyList<ObservedDoctorFlowDay>? ObservedDoctorFlowDays = null,
+    IReadOnlyList<DoctorFlowSummary>? DoctorFlowSummaries = null);
 
 public sealed record DoctorProcedureMixRow(
     string DoctorId,
@@ -3311,11 +3320,53 @@ public sealed record ObservedDoctorDay(
     int MinutesWithThreeOrMoreActiveRooms,
     int MaxActiveRoomCount);
 
+/// <summary>
+/// Canonical Ready-anchored observed clinical flow for one doctor and UTC DoctorComplete date.
+/// Doctor Working intervals are half-open DoctorArrivedAt -> DoctorCompleteAt intervals. The four
+/// whole-minute buckets are mutually exclusive and reconcile exactly to ObservedClinicalSpanMinutes.
+/// </summary>
+public sealed record ObservedDoctorFlowDay(
+    string DoctorId,
+    string DoctorName,
+    string ReportDate,
+    int QualifyingCaseCount,
+    DateTimeOffset FirstAcceptedReadyAt,
+    DateTimeOffset LastDoctorCompleteAt,
+    int ObservedClinicalSpanMinutes,
+    int MinutesWithOneDoctorWorkingRoom,
+    int MinutesWithTwoDoctorWorkingRooms,
+    int MinutesWithThreeOrMoreDoctorWorkingRooms,
+    int UnstructuredTimeMinutes,
+    int PeakConcurrentRooms);
+
+/// <summary>
+/// Server-owned range-level authority for Doctor Overview. Medians are calculated from underlying
+/// phase observations or canonical day rows, never from monthly DoctorSummaries.
+/// </summary>
+public sealed record DoctorFlowSummary(
+    string DoctorId,
+    string DoctorName,
+    int CompletedCaseCount,
+    double? MedianReadyWaitSeconds,
+    double? MedianDoctorTimeSeconds,
+    double? MedianObservedClinicalSpanMinutes,
+    int? PeakConcurrentRooms,
+    int ObservedDoctorDayCount,
+    ReportDoctorFlowMetricSampleContext Samples);
+
 internal readonly record struct ObservedRoomConcurrency(
     int MinutesWithOneActiveRoom,
     int MinutesWithTwoActiveRooms,
     int MinutesWithThreeOrMoreActiveRooms,
     int MaxActiveRoomCount);
+
+internal readonly record struct ObservedDoctorWorkingConcurrency(
+    int ObservedClinicalSpanMinutes,
+    int MinutesWithOneDoctorWorkingRoom,
+    int MinutesWithTwoDoctorWorkingRooms,
+    int MinutesWithThreeOrMoreDoctorWorkingRooms,
+    int UnstructuredTimeMinutes,
+    int PeakConcurrentRooms);
 
 /// <summary>
 /// A completed-cycle reporting window. Dates are interpreted as whole UTC calendar days (start

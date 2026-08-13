@@ -6,7 +6,7 @@
                   {
                       "path":  ".github/pull_request_template.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  746,
+                      "sizeBytes":  754,
                       "typeSymbols":  [
 
                                       ],
@@ -60,7 +60,7 @@
                   {
                       "path":  "AGENTS.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  20632,
+                      "sizeBytes":  20646,
                       "typeSymbols":  [
 
                                       ],
@@ -404,7 +404,7 @@
                   {
                       "path":  "docs/knowledge/reports/observed-load.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  3580,
+                      "sizeBytes":  5257,
                       "typeSymbols":  [
 
                                       ],
@@ -426,8 +426,10 @@
                       "headings":  [
                                        "Observed load",
                                        "Intent",
-                                       "Approved redesign boundary",
-                                       "What it reports",
+                                       "Canonical implementation",
+                                       "Time model",
+                                       "Metric grains",
+                                       "Compatibility projection",
                                        "Constraints",
                                        "Source anchors",
                                        "Verification notes"
@@ -954,7 +956,7 @@
                   {
                       "path":  "MISTAKES.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  3706,
+                      "sizeBytes":  3771,
                       "typeSymbols":  [
 
                                       ],
@@ -1834,7 +1836,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/DemoBoardStore.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  186671,
+                      "sizeBytes":  188850,
                       "typeSymbols":  [
                                           "ExceptionReasons",
                                           "ReportingExceptionReasons",
@@ -1847,6 +1849,8 @@
                                           "ReportsSnapshot",
                                           "DoctorProcedureMixRow",
                                           "ObservedDoctorDay",
+                                          "ObservedDoctorFlowDay",
+                                          "DoctorFlowSummary",
                                           "struct",
                                           "CompletedRoomCycle",
                                           "DoctorCycleSummary",
@@ -2334,7 +2338,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/ReportQuery.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  7251,
+                      "sizeBytes":  7796,
                       "typeSymbols":  [
                                           "ReportScopeKinds",
                                           "ReportSedationSegments",
@@ -2346,6 +2350,7 @@
                                           "ReportMetricSampleContext",
                                           "ReportProcedureMetricSampleContext",
                                           "ReportDoctorAllocationSampleContext",
+                                          "ReportDoctorFlowMetricSampleContext",
                                           "ScopedProcedureGroup"
                                       ],
                       "methodSymbols":  [
@@ -2377,7 +2382,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/ReportsSnapshotBuilder.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  50095,
+                      "sizeBytes":  61934,
                       "typeSymbols":  [
                                           "ReportsSnapshotBuilder"
                                       ],
@@ -2388,9 +2393,19 @@
                                             "BuildExceptionReviewRecords",
                                             "AverageSeconds",
                                             "MedianSeconds",
+                                            "MedianSecondsOrNull",
+                                            "MedianWholeMinutesOrNull",
                                             "BuildDoctorSummaries",
                                             "BuildDoctorAllocationSamples",
                                             "BuildDoctorDailyAllocationSeries",
+                                            "BuildDoctorFlowSummaries",
+                                            "TruthfulReadyWaitSeconds",
+                                            "TruthfulDoctorTimeSeconds",
+                                            "BuildObservedDoctorFlowDays",
+                                            "IsQualifyingObservedDoctorFlowCase",
+                                            "BuildObservedDoctorWorkingConcurrency",
+                                            "DoctorWorkingBucketIndex",
+                                            "ApportionObservedFlowWholeMinutes",
                                             "BuildObservedDoctorDays",
                                             "BuildObservedRoomConcurrency",
                                             "ObservedLoadWholeMinutesBetween",
@@ -2411,14 +2426,7 @@
                                             "ResolveDoctorDisplayName",
                                             "FindProcedure",
                                             "FindActiveProcedure",
-                                            "HasSedationModifier",
-                                            "StripSedationModifier",
-                                            "ComposeProcedureCode",
-                                            "IsSedationProcedureCode",
-                                            "ResolveBaseProcedureCode",
-                                            "ResolveProcedure",
-                                            "CopyCompletedCycle",
-                                            "CopyAbortedAssignment"
+                                            "HasSedationModifier"
                                         ],
                       "routes":  [
 
@@ -2439,7 +2447,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/ReportsSnapshotComposition.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  9185,
+                      "sizeBytes":  9537,
                       "typeSymbols":  [
                                           "ReportsSnapshotComposition",
                                           "ReportPopulationSection",
@@ -3292,7 +3300,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/reports.html",
                       "kind":  "Html",
-                      "sizeBytes":  11573,
+                      "sizeBytes":  11582,
                       "typeSymbols":  [
 
                                       ],
@@ -3318,7 +3326,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/reports.js",
                       "kind":  "JavaScript",
-                      "sizeBytes":  118562,
+                      "sizeBytes":  118804,
                       "typeSymbols":  [
 
                                       ],
@@ -3366,11 +3374,15 @@
                                               "renderDataQualityCard",
                                               "renderDoctorAllocation",
                                               "aggregateAllocationByDoctor",
-                                              "renderDoctorCardBody",
-                                              "renderDoctorAllocationCard",
-                                              "renderDoctorSparkline",
+                                              "canonicalDoctorFlowSummaries",
+                                              "emptyDoctorFlowSummary",
+                                              "doctorFlowPresentation",
+                                              "renderDoctorFlowMetric",
+                                              "hasDoctorPhaseTimingObservation",
+                                              "doctorFlowSummarySentence",
+                                              "renderDoctorFlowCardBody",
+                                              "renderDoctorFlowCard",
                                               "doctorAllocationSummary",
-                                              "mainPressurePoint",
                                               "renderSelectedDoctorPanel",
                                               "renderDoctorReportTabButton",
                                               "renderSelectedDoctorTabContent",
@@ -3379,7 +3391,8 @@
                                               "observedLoadNumber",
                                               "renderSelectedDoctorFlow",
                                               "formatObservedDayDate",
-                                              "describePeakActiveLoad",
+                                              "describePeakConcurrentRooms",
+                                              "renderSelectedDoctorScheduleFit",
                                               "renderProcedureMix",
                                               "renderProcedureMixMarkup",
                                               "renderSelectedDoctorProcedures",
@@ -3409,12 +3422,7 @@
                                               "renderGroupedInsights",
                                               "renderInsightCard",
                                               "renderFullMetrics",
-                                              "renderCompletedCycles",
-                                              "formatAllocationMinutes",
-                                              "formatDurationMinutes",
-                                              "formatApproxDurationMinutes",
-                                              "formatAllocationVariance",
-                                              "revealReportDisclosures"
+                                              "renderCompletedCycles"
                                           ],
                       "headings":  [
 
@@ -3641,7 +3649,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/styles.css",
                       "kind":  "Css",
-                      "sizeBytes":  100096,
+                      "sizeBytes":  100687,
                       "typeSymbols":  [
 
                                       ],
@@ -4269,7 +4277,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/BoardStoreReportingTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  41193,
+                      "sizeBytes":  41860,
                       "typeSymbols":  [
                                           "BoardStoreTests"
                                       ],
@@ -5212,7 +5220,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/ReportsSnapshotBuilderTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  42639,
+                      "sizeBytes":  59610,
                       "typeSymbols":  [
                                           "ReportsSnapshotBuilderTests"
                                       ],
@@ -5230,6 +5238,17 @@
                                             "Build_keeps_broader_completed_count_while_timing_uses_truthful_ready_contributors",
                                             "Build_marks_weekly_ready_wait_unavailable_when_completed_population_has_no_ready_observation",
                                             "Build_preserves_unavailable_doctor_allocation_when_population_has_no_contributors",
+                                            "Build_mixed_canonical_and_legacy_day_keeps_completed_and_phase_metrics_separate",
+                                            "Build_doctor_phase_timing_does_not_require_completed_throughput",
+                                            "Build_canonical_room_load_partitions_single_two_and_three_plus_working_rooms",
+                                            "Build_sequential_working_intervals_count_prearrival_and_between_case_gaps_as_unstructured",
+                                            "Build_fractional_bucket_minutes_use_stable_largest_remainder_tie_break",
+                                            "Build_emits_no_canonical_day_for_missing_ready_missing_arrival_or_cross_day_flow",
+                                            "Build_groups_canonical_days_by_doctor_complete_utc_date",
+                                            "Build_doctor_flow_summary_uses_underlying_medians_across_months",
+                                            "Build_doctor_flow_summary_uses_median_canonical_span_and_server_sample_states",
+                                            "Build_practice_summary_keeps_active_roster_order_then_historical_and_doctor_scope_is_exact",
+                                            "Canonical_and_compatibility_observed_day_json_contracts_remain_distinct",
                                             "Build_keeps_review_queue_global_to_analytical_scope_but_bounded_by_window",
                                             "CreateBuilder",
                                             "BuildScoped",
@@ -5932,7 +5951,7 @@
                   {
                       "path":  "tests/javascript/reports.test.mjs",
                       "kind":  "JavaScript",
-                      "sizeBytes":  90218,
+                      "sizeBytes":  101061,
                       "typeSymbols":  [
 
                                       ],
@@ -5958,6 +5977,8 @@
                                               "targetFor",
                                               "allocation",
                                               "sample",
+                                              "doctorFlowSummary",
+                                              "observedDoctorFlowDay",
                                               "reportPayload",
                                               "createFilterChip",
                                               "createHarness",
