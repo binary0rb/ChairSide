@@ -710,7 +710,7 @@ internal sealed class ReportsSnapshotBuilder
     {
         if (string.IsNullOrWhiteSpace(procedureCode))
         {
-            return (false, false);
+            return (false, true);
         }
 
         var baseCode = ResolveBaseProcedureCode(procedureCode);

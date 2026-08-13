@@ -557,9 +557,10 @@ public sealed partial class BoardStoreTests
             timeProvider: clock);
         var assignment = RoomAssignmentContract.Create(
             "otte",
-            "CON",
-            SedationContract.UnavailableProcedureIneligible(),
-            ExpectedAllocationContract.ConfirmedSuggestedValue(3));
+            "EXT+SED",
+            SedationContract.EligibleYes(),
+            ExpectedAllocationContract.ConfirmedSuggestedValue(3),
+            isAddOn: true);
 
         Assert.NotNull(context.Store.BeginPrestage(1));
         Assert.NotNull(context.Store.SaveAssignmentDetails(1, assignment));
@@ -580,6 +581,15 @@ public sealed partial class BoardStoreTests
 
         var reports = context.Store.GetReports();
         Assert.Equal(180, reports.MedianReadyToDoctorSeconds);
+        Assert.Equal(1, reports.IncludedCompletedCycleCount);
+        var procedure = Assert.Single(reports.ScopedProcedureGroups!);
+        Assert.Equal("EXT", procedure.ProcedureCode);
+        Assert.Equal(1, procedure.CaseCount);
+        Assert.Equal(1, procedure.ScopedPopulationCount);
+        Assert.Equal(1d, procedure.ShareOfScopedCases);
+        var completedCycle = Assert.Single(reports.RecentCompletedCycles);
+        Assert.Equal("EXT+SED", completedCycle.ProcedureCode);
+        Assert.True(completedCycle.IsAddOn);
         var bucket = Assert.Single(reports.Trends!.Buckets);
         Assert.Equal(180, bucket.MedianReadyWaitSeconds);
         Assert.Equal(1, bucket.ReadyWaitSample!.ContributingCount);
