@@ -20,12 +20,16 @@ const domUtilsUrl = new URL(
 const formatUtilsUrl = new URL(
   "../../src/ChairSide.Board/wwwroot/format-utils.js",
   import.meta.url);
+const stylesUrl = new URL(
+  "../../src/ChairSide.Board/wwwroot/styles.css",
+  import.meta.url);
 const moduleSource = await readFile(moduleUrl, "utf8");
 const reportsHtmlSource = await readFile(reportsHtmlUrl, "utf8");
 const boardSource = await readFile(boardUrl, "utf8");
 const applicationStateSource = await readFile(applicationStateUrl, "utf8");
 const domUtilsSource = await readFile(domUtilsUrl, "utf8");
 const formatUtilsSource = await readFile(formatUtilsUrl, "utf8");
+const stylesSource = await readFile(stylesUrl, "utf8");
 
 const commonInteractionsDataUrl = `data:text/javascript;base64,${Buffer.from(`
 export function wirePressInterruptionGuard(options) {
@@ -367,6 +371,144 @@ function allocation(count, net = 0) {
   };
 }
 
+function scheduleFitSummary(populationCount, pairedCaseCount = populationCount, {
+  expectedSeconds = pairedCaseCount * 1800,
+  observedSeconds = pairedCaseCount * 1800,
+  slackSeconds = 0,
+  debtSeconds = 0,
+  netVarianceSeconds = observedSeconds - expectedSeconds
+} = {}) {
+  return {
+    populationCount,
+    pairedCaseCount,
+    populationCoverage: populationCount ? pairedCaseCount / populationCount : 0,
+    totalExpectedSeconds: expectedSeconds,
+    totalObservedSeconds: observedSeconds,
+    totalSlackSeconds: slackSeconds,
+    totalDebtSeconds: debtSeconds,
+    netVarianceSeconds,
+    medianExpectedSeconds: pairedCaseCount ? 1800 : null,
+    medianObservedSeconds: pairedCaseCount ? 1800 : null,
+    medianPairedVarianceSeconds: pairedCaseCount ? 0 : null,
+    lessTimeCaseCount: 0,
+    atExpectedCaseCount: pairedCaseCount,
+    moreTimeCaseCount: 0,
+    sample: sample(populationCount, pairedCaseCount)
+  };
+}
+
+function calibrationEvaluation({
+  decision = "InsufficientDirectionalConsistency",
+  currentDefaultAllocationMinutes = 30,
+  totalPairedCaseCount = 10,
+  aboveBaselineCaseCount = 0,
+  belowBaselineCaseCount = 0,
+  equalBaselineCaseCount = 10,
+  moreThanToleranceCaseCount = 0,
+  lessThanToleranceCaseCount = 0,
+  atExpectedCaseCount = 10,
+  directionalShare = 0,
+  medianPairedVarianceSeconds = 0,
+  candidateDirection = null,
+  insight = null
+} = {}) {
+  return {
+    decision,
+    currentDefaultAllocationMinutes,
+    totalPairedCaseCount,
+    aboveBaselineCaseCount,
+    belowBaselineCaseCount,
+    equalBaselineCaseCount,
+    moreThanToleranceCaseCount,
+    lessThanToleranceCaseCount,
+    atExpectedCaseCount,
+    directionalShare,
+    medianPairedVarianceSeconds,
+    candidateDirection,
+    insight
+  };
+}
+
+function scheduleFitProjection(otteCases, pledgerCases) {
+  const population = otteCases + pledgerCases;
+  const procedureSummary = scheduleFitSummary(population);
+  return {
+    overall: {
+      cycleCount: population,
+      blockMinutes: 10,
+      totalExpectedMinutes: population * 30,
+      totalMeasuredMinutes: population * 30,
+      totalVarianceMinutes: 0,
+      totalSlackMinutes: 0,
+      totalDebtMinutes: 0,
+      totalExpectedBlocks: population * 3,
+      totalActualBlocks: population * 3,
+      totalVarianceBlocks: 0,
+      utilizationRatio: population ? 1 : null
+    },
+    includedCycleCount: population,
+    scheduleFitCycleCount: population,
+    practice: procedureSummary,
+    doctorSummaries: [
+      { doctorId: "otte", doctorName: "Dr. Otte", historicalAssignedFit: scheduleFitSummary(otteCases) },
+      { doctorId: "pledger", doctorName: "Dr. Pledger", historicalAssignedFit: scheduleFitSummary(pledgerCases) }
+    ],
+    procedureSegments: population
+      ? [{
+          procedureCode: "EXT",
+          procedureLabel: "Extraction",
+          baseProcedureCode: "EXT",
+          procedureGrouping: "Family",
+          isSedationCase: null,
+          currentDefaultAllocationMinutes: 30,
+          historicalAssignedFit: procedureSummary,
+          currentDefaultCalibration: calibrationEvaluation({
+            totalPairedCaseCount: population,
+            equalBaselineCaseCount: population,
+            atExpectedCaseCount: population
+          }),
+          doctorBreakdown: [
+            ...(otteCases ? [{
+              doctorId: "otte",
+              doctorName: "Dr. Otte",
+              historicalAssignedFit: scheduleFitSummary(otteCases),
+              currentDefaultCalibration: calibrationEvaluation({
+                totalPairedCaseCount: otteCases,
+                equalBaselineCaseCount: otteCases,
+                atExpectedCaseCount: otteCases,
+                decision: otteCases < 10 ? "BelowMinimumSample" : "InsufficientDirectionalConsistency"
+              })
+            }] : []),
+            ...(pledgerCases ? [{
+              doctorId: "pledger",
+              doctorName: "Dr. Pledger",
+              historicalAssignedFit: scheduleFitSummary(pledgerCases),
+              currentDefaultCalibration: calibrationEvaluation({
+                totalPairedCaseCount: pledgerCases,
+                equalBaselineCaseCount: pledgerCases,
+                atExpectedCaseCount: pledgerCases,
+                decision: pledgerCases < 10 ? "BelowMinimumSample" : "InsufficientDirectionalConsistency"
+              })
+            }] : [])
+          ]
+        }]
+      : [],
+    rules: {
+      version: "1",
+      minimumPairedCases: 10,
+      atExpectedToleranceSeconds: 600,
+      minimumDirectionalShare: 0.8,
+      directionalMethod: "RawPairedVarianceSign",
+      directionalDenominator: "AllPairedCases",
+      materialDeviationSeconds: 600,
+      materialComparison: "StrictlyGreaterThan",
+      centralMethod: "MedianPairedVariance",
+      persistenceRequirement: "SelectedPopulationOnly",
+      baseline: "CurrentRosterDefault"
+    }
+  };
+}
+
 function sample(populationCount, contributingCount = populationCount) {
   const state = populationCount === 0
     ? "Empty"
@@ -594,6 +736,7 @@ function reportPayload({
       { doctorId: "otte", sample: sample(otteCases) },
       { doctorId: "pledger", sample: sample(pledgerCases) }
     ],
+    scheduleFit: scheduleFitProjection(otteCases, pledgerCases),
     doctorFlowSummaries: [
       doctorFlowSummary("otte", "Dr. Otte", otteCases),
       doctorFlowSummary("pledger", "Dr. Pledger", pledgerCases)
@@ -999,10 +1142,20 @@ async function openDoctorProceduresTab(harness) {
   });
 }
 
+async function openDoctorScheduleFitTab(harness) {
+  const scheduleTab = new FakeElement();
+  scheduleTab.dataset.reportDoctorTab = "schedule";
+  await harness.document.dispatch("click", {
+    target: targetFor(new Map([
+      ["[data-report-doctor-tab]", scheduleTab]
+    ]))
+  });
+}
+
 function allocationPayload(populationCount, contributingCount) {
   const net = contributingCount >= 5 ? 10 : contributingCount > 0 ? 4 : 0;
   const context = sample(populationCount, contributingCount);
-  return {
+  const payload = {
     ...reportPayload({ otteCases: contributingCount, pledgerCases: 0 }),
     completedRoomCyclesCount: populationCount,
     includedCompletedCycleCount: populationCount,
@@ -1024,6 +1177,19 @@ function allocationPayload(populationCount, contributingCount) {
       samples: { allocation: context }
     }]
   };
+  const exact = scheduleFitSummary(populationCount, contributingCount, {
+    expectedSeconds: contributingCount * 1800,
+    observedSeconds: contributingCount * 1800 + net * 60,
+    slackSeconds: net < 0 ? Math.abs(net) * 60 : 0,
+    debtSeconds: net > 0 ? net * 60 : 0,
+    netVarianceSeconds: net * 60
+  });
+  payload.scheduleFit.practice = exact;
+  payload.scheduleFit.doctorSummaries[0].historicalAssignedFit = exact;
+  if (payload.scheduleFit.procedureSegments.length) {
+    payload.scheduleFit.procedureSegments[0].historicalAssignedFit = exact;
+  }
+  return payload;
 }
 
 function allocationSurfaceHtml(harness) {
@@ -1342,8 +1508,9 @@ test("Doctor Trends renders four descriptive weekly metrics while Schedule Fit s
   });
   const schedule = harness.elements.get("selectedDoctorPanel").innerHTML;
   assert.match(schedule, /Schedule Fit/);
-  assert.match(schedule, /Net Variance/);
-  assert.doesNotMatch(schedule, /Calibration Insights|automatic|recommendation/i);
+  assert.match(schedule, /Signed net difference/);
+  assert.match(schedule, /finalized historical scheduling allocation/);
+  assert.doesNotMatch(schedule, /Calibration insight|automatic|recommendation/i);
 });
 
 test("Doctor Trends keeps gaps, server sample states, truthful zero, and local doctor selection", async () => {
@@ -1697,40 +1864,230 @@ test("Practice scope Doctor Procedures guidance does not mutate scope or reuse P
   assert.equal(harness.reloadCount, 0);
 });
 
-test("nonempty allocation populations with zero contributors render Unavailable, not Empty", () => {
+test("Practice Empty Schedule Fit shows No observation without measured zero aggregates", () => {
+  const harness = createHarness({ payload: reportPayload({ otteCases: 0, pledgerCases: 0 }) });
+
+  harness.reports.render();
+
+  const html = harness.elements.get("allocationBalanceCard").innerHTML;
+  assert.match(html, /No observation/);
+  assert.match(html, /Empty - N=0/);
+  assert.doesNotMatch(html, /schedule-fit-kpis|Expected scheduling allocation|Observed case flow|Signed net difference|00:00/);
+});
+
+test("Practice Unavailable Schedule Fit keeps coverage without measured zero aggregates", () => {
   const harness = createHarness({ payload: allocationPayload(6, 0) });
 
   harness.reports.render();
-  const html = allocationSurfaceHtml(harness);
+  const html = harness.elements.get("allocationBalanceCard").innerHTML;
 
   assert.match(html, /Unavailable/);
+  assert.match(html, /0 of 6 included completed cases \(0% coverage\)/);
   assert.match(html, /0 of 6 contributors/);
-  assert.doesNotMatch(harness.elements.get("allocationBalanceCard").innerHTML, /0 min expected|0 min measured/);
-  for (const id of ["allocationBalanceCard", "procedureAllocationList"]) {
-    assert.doesNotMatch(harness.elements.get(id).innerHTML, /No observation/);
-  }
+  assert.doesNotMatch(html, /schedule-fit-kpis|Expected scheduling allocation|Observed case flow|Signed net difference|00:00|0 blocks/);
+  assert.doesNotMatch(html, /No observation/);
 });
 
-test("Limited allocation samples retain N while suppressing comparison language", () => {
+test("Doctor Empty Schedule Fit row and selected tab never show measured zero", async () => {
+  const harness = createHarness({ payload: reportPayload({ otteCases: 0, pledgerCases: 0 }) });
+  harness.reports.wire();
+  harness.reports.render();
+
+  const rows = harness.elements.get("doctorAllocationList").innerHTML;
+  assert.match(rows, /Dr\. Otte[\s\S]*?No observation/);
+  assert.doesNotMatch(rows, /Historical assigned net|00:00/);
+
+  await openDoctorScheduleFitTab(harness);
+  const panel = harness.elements.get("selectedDoctorPanel").innerHTML;
+  assert.match(panel, /Schedule Fit/);
+  assert.match(panel, /No observation/);
+  assert.doesNotMatch(panel, /Expected scheduling allocation|Signed net difference|00:00/);
+});
+
+test("Doctor Unavailable Schedule Fit row and selected tab preserve coverage without measured zero", async () => {
+  const harness = createHarness({ payload: allocationPayload(6, 0) });
+  harness.reports.wire();
+  harness.reports.render();
+
+  const rows = harness.elements.get("doctorAllocationList").innerHTML;
+  assert.match(rows, /Dr\. Otte[\s\S]*?0 of 6 included completed cases \(0% coverage\)/);
+  assert.match(rows, /Historical assigned measurements: Unavailable/);
+  assert.doesNotMatch(rows, /Historical assigned net|00:00/);
+
+  await openDoctorScheduleFitTab(harness);
+  const panel = harness.elements.get("selectedDoctorPanel").innerHTML;
+  assert.match(panel, /0 of 6 included completed cases \(0% coverage\)/);
+  assert.match(panel, /Historical assigned Schedule Fit measurements: Unavailable/);
+  assert.doesNotMatch(panel, /Expected scheduling allocation|Signed net difference|00:00|0 blocks/);
+});
+
+test("Procedure and doctor x procedure Unavailable fit preserve coverage without measured zero", () => {
+  const payload = allocationPayload(6, 0);
+  const unavailable = scheduleFitSummary(6, 0);
+  payload.scheduleFit.procedureSegments = [{
+    procedureCode: "EXT",
+    procedureLabel: "Extraction",
+    baseProcedureCode: "EXT",
+    procedureGrouping: "Family",
+    isSedationCase: null,
+    currentDefaultAllocationMinutes: 30,
+    historicalAssignedFit: unavailable,
+    currentDefaultCalibration: calibrationEvaluation({
+      decision: "BelowMinimumSample",
+      totalPairedCaseCount: 6
+    }),
+    doctorBreakdown: [{
+      doctorId: "otte",
+      doctorName: "Dr. Otte",
+      historicalAssignedFit: unavailable,
+      currentDefaultCalibration: calibrationEvaluation({
+        decision: "BelowMinimumSample",
+        totalPairedCaseCount: 6
+      })
+    }]
+  }];
+  const harness = createHarness({ payload });
+
+  harness.reports.render();
+
+  const html = harness.elements.get("procedureAllocationList").innerHTML;
+  assert.match(html, /Extraction/);
+  assert.match(html, /0 of 6 included completed cases \(0% coverage\)/);
+  assert.match(html, /Historical assigned measurements: Unavailable/);
+  assert.match(html, /Doctor × procedure detail/);
+  assert.match(html, /Dr\. Otte[\s\S]*?historical assigned measurements: Unavailable/);
+  assert.doesNotMatch(html, /Historical assigned: expected|historical assigned net|00:00|0 blocks/);
+});
+
+test("Truthful zero Schedule Fit remains numeric when valid pairs exist", () => {
+  const payload = allocationPayload(1, 1);
+  payload.scheduleFit.practice = scheduleFitSummary(1, 1);
+  const harness = createHarness({ payload });
+
+  harness.reports.render();
+
+  const html = harness.elements.get("allocationBalanceCard").innerHTML;
+  assert.match(html, /1 of 1 included completed case \(100% coverage\)/);
+  assert.match(html, /Expected scheduling allocation[\s\S]*?30:00/);
+  assert.match(html, /Observed case flow[\s\S]*?30:00/);
+  assert.match(html, /Total scheduling slack[\s\S]*?00:00/);
+  assert.match(html, /Total scheduling debt[\s\S]*?00:00/);
+  assert.match(html, /Signed net difference[\s\S]*?00:00/);
+  assert.doesNotMatch(html, /No observation|Unavailable/);
+});
+
+test("Limited historical Schedule Fit remains descriptive and suppresses Calibration insight", () => {
   const harness = createHarness({ payload: allocationPayload(3, 3) });
 
   harness.reports.render();
   const html = allocationSurfaceHtml(harness);
 
   assert.match(html, /Limited - N=3/);
-  assert.doesNotMatch(html, /\bNet\b|\bAvg\b|O \/ U \/ A|over expected|under expected/i);
+  assert.match(html, /3 of 3 included completed cases \(100% coverage\)/);
+  assert.match(html, /Signed net difference/);
+  assert.doesNotMatch(html, /Calibration insight|over expected|under expected/i);
 });
 
-test("Sufficient allocation samples retain supported descriptive comparison language", () => {
+test("Sufficient historical Schedule Fit shows server totals without provider judgment", () => {
   const harness = createHarness({ payload: allocationPayload(5, 5) });
 
   harness.reports.render();
   const html = allocationSurfaceHtml(harness);
 
   assert.match(html, /Sufficient - N=5/);
-  assert.match(html, /\bNet\b/);
-  assert.match(html, /over expected/);
-  assert.match(html, /5 over .* 0 under .* 0 at/);
+  assert.match(html, /Expected scheduling allocation/);
+  assert.match(html, /Observed case flow/);
+  assert.match(html, /Total scheduling debt/);
+  assert.doesNotMatch(html, /efficient|inefficient|performance|grade|score|over expected/i);
+});
+
+test("Practice Schedule Fit preserves simultaneous slack and debt while reconciling signed net", () => {
+  const payload = allocationPayload(2, 2);
+  payload.scheduleFit.practice = scheduleFitSummary(2, 2, {
+    expectedSeconds: 3600,
+    observedSeconds: 3600,
+    slackSeconds: 660,
+    debtSeconds: 660,
+    netVarianceSeconds: 0
+  });
+  const harness = createHarness({ payload });
+
+  harness.reports.render();
+
+  const html = harness.elements.get("allocationBalanceCard").innerHTML;
+  assert.match(html, /Total scheduling slack/);
+  assert.match(html, /Total scheduling debt/);
+  assert.match(html, /11:00/);
+  assert.match(html, /Signed net difference/);
+  assert.match(html, />00:00</);
+  assert.doesNotMatch(html, /utilization|efficiency|performance|grade|score/i);
+});
+
+test("Calibration callout and evidence render only from a server-owned Qualified insight", () => {
+  const payload = reportPayload({ otteCases: 10, pledgerCases: 0 });
+  const evidence = Array.from({ length: 10 }, (_, index) => ({
+    completedCycleId: index + 1,
+    acceptedReadyHandoffId: 100 + index,
+    baselineSource: "CurrentRosterDefault",
+    baselineAllocationMinutes: 30,
+    observedCaseFlowSeconds: 2460,
+    pairedVarianceSeconds: 660,
+    rawDirection: "AboveBaseline",
+    toleranceClassification: "MoreTimeThanAllocation"
+  }));
+  payload.scheduleFit.procedureSegments[0].currentDefaultCalibration = calibrationEvaluation({
+    decision: "Qualified",
+    totalPairedCaseCount: 10,
+    aboveBaselineCaseCount: 8,
+    equalBaselineCaseCount: 2,
+    moreThanToleranceCaseCount: 8,
+    atExpectedCaseCount: 2,
+    directionalShare: 0.8,
+    medianPairedVarianceSeconds: 660,
+    candidateDirection: "MoreTimeThanCurrentDefault",
+    insight: {
+      direction: "MoreTimeThanCurrentDefault",
+      medianDifferenceSeconds: 660,
+      directionalCaseCount: 8,
+      totalPairedCaseCount: 10,
+      directionalShare: 0.8,
+      evidence
+    }
+  });
+  const harness = createHarness({ payload });
+
+  harness.reports.render();
+
+  const html = harness.elements.get("procedureAllocationList").innerHTML;
+  assert.match(html, /Calibration insight/);
+  assert.match(html, /11:00 above the current 30 min roster default/);
+  assert.match(html, /8 of 10 cases were above/);
+  assert.match(html, /View 10 contributing case records/);
+  assert.match(html, /<details class="calibration-evidence">/);
+  assert.match(html, /<summary>View 10 contributing case records<\/summary>/);
+  assert.match(html, /Case record 1: observed 41:00; difference \+11:00; more than the tolerance/);
+});
+
+test("Suggestive calibration counts cannot create a client-side insight when the server omits it", () => {
+  const payload = reportPayload({ otteCases: 10, pledgerCases: 0 });
+  payload.scheduleFit.procedureSegments[0].currentDefaultCalibration = calibrationEvaluation({
+    decision: "BelowMaterialDeviation",
+    totalPairedCaseCount: 10,
+    aboveBaselineCaseCount: 10,
+    moreThanToleranceCaseCount: 10,
+    atExpectedCaseCount: 0,
+    directionalShare: 1,
+    medianPairedVarianceSeconds: 3600,
+    candidateDirection: "MoreTimeThanCurrentDefault",
+    insight: null
+  });
+  const harness = createHarness({ payload });
+
+  harness.reports.render();
+
+  const html = harness.elements.get("procedureAllocationList").innerHTML;
+  assert.match(html, /Current roster default: 30 min/);
+  assert.doesNotMatch(html, /Calibration insight|Review the scheduling assumption/);
 });
 
 test("Doctor scope exposes only its requested doctor until the scope control reloads another doctor", async () => {
@@ -3260,4 +3617,11 @@ test("module and board preserve shared authority and one-way ownership boundarie
     boardSource,
     /function (renderReports|renderDoctorCockpit|handleReportsActionClick|handleConfirmExclusionClick|renderReportsAccessPrompt|loadReports)\b/);
   assert.doesNotMatch(boardSource, /\/api\/reports/);
+  assert.doesNotMatch(moduleSource, /aggregateAllocationByDoctor|doctorAllocationSummary/);
+  assert.doesNotMatch(
+    moduleSource,
+    /minimumPairedCases|atExpectedToleranceSeconds|minimumDirectionalShare|materialDeviationSeconds/);
+  assert.match(
+    stylesSource,
+    /@media \(max-width: 700px\)[\s\S]*?\.schedule-fit-kpis\s*\{[\s\S]*?grid-template-columns: 1fr;/);
 });

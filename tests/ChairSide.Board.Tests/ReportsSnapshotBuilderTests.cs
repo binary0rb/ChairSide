@@ -1168,6 +1168,8 @@ public sealed class ReportsSnapshotBuilderTests
         var family = CreateBuilder().Build(cycles, [], familyQuery);
         var detailed = CreateBuilder().Build(cycles, [], detailedQuery);
 
+        Assert.Equal(family.ScheduleFit!.Practice, detailed.ScheduleFit!.Practice);
+
         var familyGroup = Assert.Single(family.ScopedProcedureGroups!);
         var familyRow = Assert.Single(family.ProcedureIntelligenceRows!);
         Assert.Equal(familyGroup.ProcedureCode, familyRow.ProcedureCode);
@@ -1177,9 +1179,13 @@ public sealed class ReportsSnapshotBuilderTests
 
         Assert.Equal(2, detailed.ScopedProcedureGroups!.Count);
         Assert.Equal(2, detailed.ProcedureIntelligenceRows!.Count);
+        Assert.Equal(2, detailed.ScheduleFit!.ProcedureSegments!.Count);
         Assert.Equal(
             detailed.ScopedProcedureGroups.Select(row => row.ProcedureCode),
             detailed.ProcedureIntelligenceRows.Select(row => row.ProcedureCode));
+        Assert.Equal(
+            detailed.ScopedProcedureGroups.Select(row => row.ProcedureCode),
+            detailed.ScheduleFit.ProcedureSegments.Select(row => row.ProcedureCode));
         Assert.Equal(10, detailed.ProcedureIntelligenceRows.Single(row => row.ProcedureCode == "EXT")
             .Metrics.TypicalDoctorTimeLowerSeconds / 60d);
         Assert.Equal(20, detailed.ProcedureIntelligenceRows.Single(row => row.ProcedureCode == "EXT+SED")
@@ -1194,6 +1200,8 @@ public sealed class ReportsSnapshotBuilderTests
         Assert.Equal(5, sedationGroup.CaseCount);
         Assert.Equal(5, sedationRow.Metrics.CompletedCaseCount);
         Assert.Equal(20, sedationRow.Metrics.MedianDoctorTimeSeconds / 60d);
+        Assert.Equal(5, Assert.Single(sedation.ScheduleFit!.ProcedureSegments!)
+            .HistoricalAssignedFit.PopulationCount);
     }
 
     [Fact]
@@ -1266,6 +1274,74 @@ public sealed class ReportsSnapshotBuilderTests
     }
 
     [Fact]
+    public void Schedule_fit_uses_exact_seconds_and_preserves_population_coverage_and_reconciliation()
+    {
+        var debt = ProcedureCycle(1, "EXT", "otte", 20, expectedAllocationMinutes: 30);
+        var slack = ProcedureCycle(2, "EXT", "otte", 20, expectedAllocationMinutes: 30);
+        var unpaired = ProcedureCycle(3, "EXT", "otte", 20, expectedAllocationMinutes: 0);
+        var notAvailable = ProcedureCycle(4, "EXT", "otte", 20, expectedAllocationMinutes: 30);
+        debt.DoctorCompleteAt = debt.SeatedAt.AddMinutes(30).AddSeconds(29);
+        slack.DoctorCompleteAt = slack.SeatedAt.AddMinutes(29).AddSeconds(31);
+        notAvailable.RoomAvailableAt = null;
+        notAvailable.TotalRoomCycleSeconds = null;
+
+        var snapshot = CreateBuilder().Build([debt, slack, unpaired, notAvailable], [], ReportQuery.Default);
+        var practice = snapshot.ScheduleFit!.Practice!;
+
+        Assert.Equal(3, practice.PopulationCount);
+        Assert.Equal(2, practice.PairedCaseCount);
+        Assert.Equal(2d / 3d, practice.PopulationCoverage, precision: 10);
+        Assert.Equal(3600d, practice.TotalExpectedSeconds);
+        Assert.Equal(3600d, practice.TotalObservedSeconds);
+        Assert.Equal(29d, practice.TotalSlackSeconds);
+        Assert.Equal(29d, practice.TotalDebtSeconds);
+        Assert.Equal(0d, practice.NetVarianceSeconds);
+        Assert.Equal(
+            practice.TotalObservedSeconds - practice.TotalExpectedSeconds,
+            practice.TotalDebtSeconds - practice.TotalSlackSeconds);
+    }
+
+    [Fact]
+    public void Calibration_uses_current_roster_default_and_paired_median_not_historical_or_captured_defaults()
+    {
+        var cycles = Enumerable.Range(1, 10)
+            .Select(id => ProcedureCycle(id, "EXT", "otte", doctorMinutes: 31,
+                expectedAllocationMinutes: 40))
+            .ToArray();
+        foreach (var cycle in cycles)
+        {
+            cycle.OriginalDefaultExpectedUnits = 1;
+            cycle.AcceptedReadyHandoffId = $"handoff-{cycle.CompletedCycleId}";
+        }
+
+        var segment = Assert.Single(CreateBuilder().Build(cycles, [], ReportQuery.Default)
+            .ScheduleFit!.ProcedureSegments!);
+        var historical = segment.HistoricalAssignedFit;
+        var calibration = segment.CurrentDefaultCalibration;
+
+        Assert.Equal(30, segment.CurrentDefaultAllocationMinutes);
+        Assert.Equal(60d, historical.MedianPairedVarianceSeconds);
+        Assert.Equal(CalibrationDecisions.Qualified, calibration.Decision);
+        Assert.Equal(660d, calibration.MedianPairedVarianceSeconds);
+        Assert.Equal(CalibrationInsightDirections.MoreTimeThanCurrentDefault,
+            calibration.CandidateDirection);
+        Assert.Equal(10, calibration.AboveBaselineCaseCount);
+        Assert.Equal(10, calibration.MoreThanToleranceCaseCount);
+        var insight = Assert.IsType<CalibrationInsight>(calibration.Insight);
+        Assert.Equal(660d, insight.MedianDifferenceSeconds);
+        Assert.Equal(10, insight.Evidence.Count);
+        Assert.All(insight.Evidence, evidence =>
+        {
+            Assert.Equal(CalibrationBaselineSources.CurrentRosterDefault, evidence.BaselineSource);
+            Assert.Equal(30, evidence.BaselineMinutesUsed);
+            Assert.Equal(660d, evidence.PairedVarianceSeconds);
+            Assert.Equal(CalibrationRawDirections.AboveBaseline, evidence.RawDirection);
+            Assert.Equal(ScheduleFitToleranceClassifications.MoreTimeThanAllocation,
+                evidence.ToleranceClassification);
+        });
+    }
+
+    [Fact]
     public void Procedure_intelligence_doctor_breakdown_uses_roster_then_historical_order_and_doctor_scope_is_flat()
     {
         Doctor[] allDoctors =
@@ -1293,6 +1369,11 @@ public sealed class ReportsSnapshotBuilderTests
             practiceRow.DoctorBreakdown.Select(segment => segment.DoctorId));
         Assert.All(practiceRow.DoctorBreakdown, segment =>
             Assert.Equal(ReportSampleStates.Limited, segment.Metrics.DoctorTimeSample.State));
+        var practiceScheduleFit = Assert.Single(builder.Build(cycles, [], ReportQuery.Default)
+            .ScheduleFit!.ProcedureSegments!);
+        Assert.Equal(
+            ["pledger", "otte", "former-a", "former-z"],
+            practiceScheduleFit.DoctorBreakdown.Select(segment => segment.DoctorId));
 
         var doctorQuery = ReportQuery.FromStrings(
             null, null, ReportScopeKinds.Doctor, "former-a", ReportSedationSegments.All,
@@ -1300,6 +1381,9 @@ public sealed class ReportsSnapshotBuilderTests
         var doctorRow = Assert.Single(builder.Build(cycles, [], doctorQuery).ProcedureIntelligenceRows!);
         Assert.Equal(1, doctorRow.Metrics.CompletedCaseCount);
         Assert.Empty(doctorRow.DoctorBreakdown);
+        var doctorScheduleFit = builder.Build(cycles, [], doctorQuery).ScheduleFit!;
+        Assert.Empty(Assert.Single(doctorScheduleFit.ProcedureSegments!).DoctorBreakdown);
+        Assert.Equal("former-a", Assert.Single(doctorScheduleFit.DoctorSummaries!).DoctorId);
     }
 
     [Fact]
@@ -1320,6 +1404,21 @@ public sealed class ReportsSnapshotBuilderTests
         Assert.NotNull(snapshot.ProcedureSummaries);
         Assert.NotNull(snapshot.BaseProcedureSummaries);
         Assert.NotNull(snapshot.ScopedProcedureGroups);
+
+        var scheduleFit = json.GetProperty("scheduleFit");
+        Assert.True(scheduleFit.TryGetProperty("overall", out _));
+        Assert.True(scheduleFit.TryGetProperty("practice", out _));
+        Assert.True(scheduleFit.TryGetProperty("procedureSegments", out _));
+        Assert.True(scheduleFit.TryGetProperty("doctorSummaries", out _));
+        var rules = scheduleFit.GetProperty("rules");
+        Assert.Equal(10, rules.GetProperty("minimumPairedCases").GetInt32());
+        Assert.Equal(600, rules.GetProperty("atExpectedToleranceSeconds").GetInt32());
+        Assert.Equal(0.8d, rules.GetProperty("minimumDirectionalShare").GetDouble(), precision: 10);
+        Assert.Equal("RawPairedVarianceSign", rules.GetProperty("directionalMethod").GetString());
+        Assert.Equal("AllPairedCases", rules.GetProperty("directionalDenominator").GetString());
+        Assert.Equal("StrictlyGreaterThan", rules.GetProperty("materialComparison").GetString());
+        Assert.Equal("SelectedPopulationOnly", rules.GetProperty("persistenceRequirement").GetString());
+        Assert.Equal("CurrentRosterDefault", rules.GetProperty("baseline").GetString());
     }
 
     private static ReportsSnapshotBuilder CreateBuilder(

@@ -26,7 +26,7 @@ last_verified_commit: ca75b09
 
 Doctor scopes accept historical doctor IDs independently of the active assignment roster. The analytical Case Audit follows Doctor and Sedation scope. The action-required Review Queue ignores analytical scope and remains global within the selected date window.
 
-`ReportSampleContext` carries population count, contributing count, state, threshold, and comparison eligibility. Empty is `N = 0`, Limited is `N = 1-4`, and Sufficient is `N >= 5`. A metric with a nonempty population and zero contributors is Unavailable. Comparison language requires every compared population to be Sufficient. Calibration Insights retain separate, stricter evidence rules under #219.
+`ReportSampleContext` carries population count, contributing count, state, threshold, and comparison eligibility. Empty is `N = 0`, Limited is `N = 1-4`, and Sufficient is `N >= 5`. A metric with a nonempty population and zero contributors is Unavailable. Comparison language requires every compared population to be Sufficient. Calibration Insights retain separate, stricter N >= 10 evidence eligibility without reclassifying the general descriptive sample state; the full server-owned rule is documented in `schedule-fit.md`.
 
 ## Assignment and handoff attribution
 

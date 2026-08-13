@@ -82,7 +82,7 @@ Procedure Intelligence may show:
 
 ### Schedule Fit and Calibration Insights
 
-Schedule Fit reports compatible expected-vs-observed case-flow timing, slack, debt, signed net variance, and population coverage. Calibration Insights may surface sufficiently supported patterns without changing scheduling assumptions automatically.
+Historical assigned Schedule Fit compares finalized assigned allocation with exact Seated -> Doctor Complete timing. Current-default Calibration separately evaluates the selected procedure population against the active base-procedure roster default using server-owned version-one evidence rules. Neither changes scheduling assumptions automatically.
 
 ### Data Quality and audit
 
@@ -435,19 +435,25 @@ It evaluates the scheduling model, not provider performance.
 
 ### Expected allocation basis
 
-For canonical cases, expected allocation comes from confirmed expected allocation captured by the accepted Ready handoff.
+Historical assigned Schedule Fit and current-default Calibration answer different questions and must remain visibly and structurally separate.
+
+For historical assigned Schedule Fit, expected allocation is the finalized `CompletedRoomCycle.ExpectedAllocationMinutes`. For canonical cases, that value comes from the confirmed allocation captured by the accepted Ready handoff.
 
 For legacy completed cases without a canonical accepted Ready snapshot, preserve existing finalized historical allocation attribution when otherwise valid. Do not invent a Ready timestamp to support it.
 
+For current-default Calibration, the baseline is the current active base-procedure roster `DefaultExpectedUnits * 10` minutes. Do not use historical `ExpectedAllocationMinutes` or `OriginalDefaultExpectedUnits` as this baseline. `OriginalDefaultExpectedUnits` remains historical audit and disclosure context only. If no positive current active roster default resolves, historical assigned Schedule Fit may remain visible but Calibration is `CurrentDefaultUnavailable` and produces no insight.
+
 ### Observed measurement basis
 
-The approved first-version Schedule Fit comparison preserves the existing measured case-flow interval:
+The approved first-version Schedule Fit and Calibration comparison uses the truthful exact elapsed interval:
 
 `SeatedAt -> DoctorCompleteAt`
 
 This is intentionally different from Doctor Time.
 
-Do not substitute `DoctorArrivedAt -> DoctorCompleteAt` and continue calling the result allocation variance or Schedule Fit. A future change to the measured allocation basis requires an explicit design decision and characterization coverage.
+Require `SeatedAt <= DoctorCompleteAt`. A reversed interval is a noncontributor and must not be clamped to zero. Calculate new Reports pairing, variance, slack, debt, medians, and threshold decisions in exact seconds; expected minutes convert to seconds before calculation, and rounding occurs only for presentation.
+
+Do not substitute `DoctorArrivedAt -> DoctorCompleteAt` and continue calling the result allocation variance or Schedule Fit. Do not use individually rounded `MeasuredCaseFlowMinutes` as the new Reports authority. The existing `ScheduleFitReport.Overall`, `ScheduleFitResult`, and Workshop compatibility path retain their integer-minute behavior.
 
 ### Contributing population
 
@@ -463,7 +469,7 @@ Cases in the wider included population that cannot satisfy those requirements re
 
 For one contributing case:
 
-`variance = observed measured case-flow - expected allocation`
+`varianceSeconds = observed exact measured case-flow seconds - (expected allocation minutes * 60)`
 
 `slack = max(expected allocation - observed measured case-flow, 0)`
 
@@ -482,7 +488,7 @@ Slack and debt remain separate even when signed net variance balances. Opposing 
 
 ### Blocks and coverage
 
-Scheduling blocks are a reporting lens over minute totals, not a separate lifecycle fact. The current default reporting block is 10 minutes.
+Scheduling blocks are a presentation lens over exact-second totals, not a separate lifecycle fact. The current default reporting block is 10 minutes. Do not sum independently rounded minutes or blocks.
 
 Schedule Fit exposes both:
 
@@ -493,7 +499,7 @@ Coverage is contextual evidence, not a score. Neutral presentation may state `N 
 
 ### Calibration Insights
 
-A `Calibration Insight` is a neutral evidence-backed callout that a scheduling assumption appears persistently over- or under-allocated in a sufficiently supported population.
+A `Calibration Insight` is a neutral evidence-backed callout that a scheduling assumption appears materially over- or under-allocated in a sufficiently supported selected population.
 
 Calibration Insights:
 
@@ -506,15 +512,25 @@ Calibration Insights:
 - never automatically change expected allocation;
 - remain silent when evidence is insufficient or no notable pattern exists.
 
-Issue #219 owns the exact first-version rules for:
+Version-one Calibration evaluates each current scoped procedure or doctor x procedure population against the current base-procedure roster default. It does not compare unrelated aggregates or subtract Procedure Intelligence medians. Its central deviation is the median of all underlying paired per-case variance seconds.
 
-- minimum qualifying sample size;
-- material-deviation threshold;
-- directional-consistency requirement;
-- `At expected` tolerance;
-- whether persistence across multiple historical periods is initially required.
+The immutable version-one rules are:
 
-The exploratory values in #219 are hypotheses, not canonical thresholds.
+- at least 10 current-default pairs are required;
+- each pair has a raw direction: positive is `AboveBaseline`, negative is `BelowBaseline`, and zero is `EqualBaseline`;
+- directional consistency uses all paired cases as its denominator; `aboveCount / N >= 0.80` selects `MoreTimeThanCurrentDefault`, while `belowCount / N >= 0.80` selects `LessTimeThanCurrentDefault`;
+- equal cases remain in the denominator and in neither numerator;
+- tolerance classification is separate from raw direction: less than -600 seconds is `LessTimeThanAllocation`, -600 through +600 seconds inclusive is `AtExpected`, and greater than +600 seconds is `MoreTimeThanAllocation`;
+- material deviation uses the median of all paired variance seconds and must agree with the candidate direction: greater than +600 seconds for More or less than -600 seconds for Less;
+- exactly +/-600 seconds is not material;
+- no multi-period persistence is required; evaluation uses only the selected report population;
+- only a server decision of `Qualified` creates a visible insight.
+
+The N=10 and 80 percent gates are operational review thresholds, not claims of statistical significance. They should be reconsidered after enough production history exists to evaluate real procedure and doctor x procedure volumes.
+
+The response exposes the current default, rule metadata, deterministic decision counts, paired median, and qualified non-PHI evidence. Qualified evidence includes completed-cycle identity, accepted Ready handoff identity when available, the current-default baseline snapshot, exact observed and variance seconds, raw direction, and tolerance classification. Evidence must reconcile to the total pair count, direction counts, AtExpected count, and median population. Non-qualified evaluations remain deterministic but do not carry a large evidence array.
+
+Calibration never saves insight history, mutates the procedure roster, or automatically changes a scheduling assumption. Users may deliberately select a broader historical range when they want a broader population.
 
 ## Sample size and no-observation behavior
 
@@ -538,7 +554,7 @@ The general descriptive sample guardrail is:
 
 A metric with a nonempty wider scoped population but zero contributing observations is Unavailable, not a measured zero. Every population in a comparison must be Sufficient before comparison language is shown. This rule is a descriptive presentation guardrail, not a statistical-significance claim.
 
-Calibration Insight sample rules remain separately owned by #219 because their evidentiary threshold may be stricter than ordinary descriptive reporting.
+Calibration Insight eligibility is independently N >= 10. A population may therefore be descriptively Sufficient at N >= 5 while still being below the Calibration minimum; this does not reclassify its general `ReportSampleContext`.
 
 ## Data Quality and audit
 
@@ -602,21 +618,14 @@ At publication of #212:
 - current observed-load concurrency uses Seated-to-Doctor-Complete room intervals rather than Doctor Working intervals;
 - current observed-load reporting does not yet expose Unstructured Time under this definition;
 - current Procedure Mix is doctor-scoped; Practice Procedure Mix is future work under #215;
-- current Schedule Fit already preserves the Seated-to-Doctor-Complete measured case-flow basis and separate slack/debt math, while framing and Calibration Insights remain future work under #219;
+- #219 adds the exact-second Reports Schedule Fit authority and server-owned current-default Calibration while preserving the legacy integer-minute Workshop compatibility contract;
 - current Data Quality and exception detail exist, while progressive disclosure is future work under #220.
 
 These are implementation gaps, not permission to reinterpret the canonical definitions in this document.
 
 ## Deferred design and future reporting
 
-The following decisions are deliberately not fixed by #212:
-
-- exact general sample-size guardrails and reusable limited-sample behavior - #213;
-- Calibration Insight minimum sample size - #219;
-- Calibration Insight material-deviation threshold - #219;
-- Calibration Insight directional-consistency rule - #219;
-- Calibration Insight `At expected` tolerance - #219;
-- whether first-version Calibration Insights require persistence across multiple historical periods - #219.
+The general sample-size guardrails and reusable limited-sample behavior were fixed by #213. The five Calibration Insight choices originally deferred by #212 are fixed by #219 in the Schedule Fit section above.
 
 Deferred analytical areas until enough production history exists and the core redesign is stable:
 
@@ -626,7 +635,7 @@ Deferred analytical areas until enough production history exists and the core re
 - richer lifecycle flow-decomposition visualization;
 - broader Operational Insights beyond Calibration Insights.
 
-No later issue should silently hard-code one of these deferred choices as if #212 approved it.
+Later changes to these rules require an explicit design decision and matching rule metadata and test updates.
 
 ## Implementation and test derivation rules
 

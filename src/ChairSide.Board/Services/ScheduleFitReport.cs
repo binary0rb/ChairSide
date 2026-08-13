@@ -1,12 +1,9 @@
 namespace ChairSide.Board.Services;
 
 /// <summary>
-/// Read model that bridges a completed-cycle population to a schedule-fit summary for future Reports
-/// and Workshop use. It is intentionally thin: it does not own any schedule-fit math (that lives in
-/// <see cref="ScheduleFitCalculator"/>) and it does not decide which cycles belong to the report -
-/// the caller passes the intended population (eventually the standard completed-cycle set the rest of
-/// the report already uses). This keeps the read model honest about its inputs and free of duplicated
-/// population or variance logic.
+/// Read model that preserves the legacy integer-minute <see cref="Overall"/> contract for Workshop
+/// while allowing Reports to append exact-second Schedule Fit and Calibration projections. Population
+/// selection remains the caller's responsibility.
 ///
 /// <see cref="IncludedCycleCount"/> is the size of the supplied population (non-null entries), while
 /// <see cref="ScheduleFitCycleCount"/> is the allocation-calculable subset that actually contributed
@@ -16,11 +13,15 @@ namespace ChairSide.Board.Services;
 public sealed record ScheduleFitReport(
     ScheduleFitResult Overall,
     int IncludedCycleCount,
-    int ScheduleFitCycleCount);
+    int ScheduleFitCycleCount,
+    ScheduleFitSummary? Practice = null,
+    IReadOnlyList<ScheduleFitSegment>? ProcedureSegments = null,
+    IReadOnlyList<DoctorScheduleFitSummary>? DoctorSummaries = null,
+    CalibrationRuleSet? Rules = null);
 
 /// <summary>
-/// Builds a <see cref="ScheduleFitReport"/> over a caller-supplied completed-cycle population, reusing
-/// <see cref="ScheduleFitCalculator"/> for every metric. No I/O, no DI, no population inference.
+/// Builds the compatibility portion of a <see cref="ScheduleFitReport"/> over a caller-supplied
+/// completed-cycle population. ReportsSnapshotBuilder appends the exact-second Reports projection.
 /// </summary>
 public static class ScheduleFitReportBuilder
 {
