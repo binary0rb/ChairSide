@@ -6,9 +6,9 @@ This file is mechanical output from `tools/knowledge-graph/New-ChairSideKnowledg
 
 | Path | Kind | Discovered symbols | Routes / hubs |
 | --- | --- | --- | --- |
-| `.github/pull_request_template.md` | Markdown | headings: Knowledge impact, Validation | - |
+| `.github/pull_request_template.md` | Markdown | headings: Knowledge impact, Mistakes learning, Validation | - |
 | `.github/workflows/javascript-lint.yml` | Yaml | - | - |
-| `AGENTS.md` | Markdown | headings: AGENTS, ChairSide Project Brief, Project name, Purpose, Scope, Repository orientation and token discipline, Private development knowledge graph, PR knowledge-impact check | - |
+| `AGENTS.md` | Markdown | headings: AGENTS, ChairSide Project Brief, Project name, Purpose, Scope, Repository orientation and token discipline, Verified mistakes and learning, Private development knowledge graph | - |
 | `ChairSide.Board.sln` | Solution | - | - |
 | `CLAUDE.md` | Markdown | headings: Claude Code note | - |
 | `docs/design/prestage-assignment-lifecycle.md` | Markdown | headings: Prestaging Assignment Lifecycle, Status and traceability, Primary lifecycle, Assignment completeness, Ready boundary, Canonical HTTP contract, Capability and integrity authority, Ready urgency, withdrawal, and acceptance | - |
@@ -34,6 +34,7 @@ This file is mechanical output from `tools/knowledge-graph/New-ChairSideKnowledg
 | `docs/visual-language.md` | Markdown | headings: Visual Language | - |
 | `docs/workflow.md` | Markdown | headings: Workflow | - |
 | `eslint.config.mjs` | JavaScript | - | - |
+| `MISTAKES.md` | Markdown | headings: Verified Mistakes Learning Ledger, Purpose, Authority boundary, When to consult, When to add an entry, What not to record, Promotion, Entry format | - |
 | `package.json` | Json | - | - |
 | `package-lock.json` | Json | - | - |
 | `README.md` | Markdown | headings: ChairSide Board, Scaffold, Seed Data, Run Locally, IIS Deployment, Reset Demo Data, Deterministic Stress Fixtures (Maintenance), Reports | - |

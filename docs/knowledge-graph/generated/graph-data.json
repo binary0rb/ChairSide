@@ -171,6 +171,12 @@
                       "path":  "eslint.config.mjs"
                   },
                   {
+                      "id":  "file:MISTAKES.md",
+                      "label":  "MISTAKES.md",
+                      "type":  "File",
+                      "path":  "MISTAKES.md"
+                  },
+                  {
                       "id":  "file:package.json",
                       "label":  "package.json",
                       "type":  "File",
@@ -4195,6 +4201,11 @@
                   {
                       "from":  "repo:chairside",
                       "to":  "file:eslint.config.mjs",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:MISTAKES.md",
                       "label":  "contains"
                   },
                   {
