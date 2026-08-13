@@ -3290,7 +3290,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/reports.js",
                       "kind":  "JavaScript",
-                      "sizeBytes":  118153,
+                      "sizeBytes":  118543,
                       "typeSymbols":  [
 
                                       ],
@@ -3342,6 +3342,7 @@
                                               "emptyDoctorFlowSummary",
                                               "doctorFlowPresentation",
                                               "renderDoctorFlowMetric",
+                                              "hasDoctorPhaseTimingObservation",
                                               "doctorFlowSummarySentence",
                                               "renderDoctorFlowCardBody",
                                               "renderDoctorFlowCard",
@@ -3385,8 +3386,7 @@
                                               "renderGroupedInsights",
                                               "renderInsightCard",
                                               "renderFullMetrics",
-                                              "renderCompletedCycles",
-                                              "formatAllocationMinutes"
+                                              "renderCompletedCycles"
                                           ],
                       "headings":  [
 
@@ -5915,7 +5915,7 @@
                   {
                       "path":  "tests/javascript/reports.test.mjs",
                       "kind":  "JavaScript",
-                      "sizeBytes":  98868,
+                      "sizeBytes":  100779,
                       "typeSymbols":  [
 
                                       ],

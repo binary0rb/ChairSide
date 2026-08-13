@@ -1086,6 +1086,49 @@ test("Practice doctor cards preserve server roster membership, Empty state, and 
   assert.doesNotMatch(emptyCard, /<dd>0(?:<|\s)/);
 });
 
+test("phase-only doctor timing stays visible without classifying the card as empty", () => {
+  const payload = reportPayload({ otteCases: 0, pledgerCases: 0 });
+  payload.doctorFlowSummaries = [{
+    doctorId: "otte",
+    doctorName: "Dr. Otte",
+    completedCaseCount: 0,
+    medianReadyWaitSeconds: 360,
+    medianDoctorTimeSeconds: 1200,
+    medianObservedClinicalSpanMinutes: null,
+    peakConcurrentRooms: null,
+    observedDoctorDayCount: 0,
+    samples: {
+      completedCases: sample(0, 0),
+      readyWait: sample(2, 2),
+      doctorTime: sample(2, 1),
+      observedDays: sample(0, 0)
+    }
+  }];
+  const harness = createHarness({ payload });
+
+  harness.reports.render();
+
+  const cards = harness.elements.get("doctorReportCards").innerHTML;
+  const card = cards.match(/<article[^>]+data-report-doctor-id="otte"[\s\S]*?<\/article>/)?.[0];
+  assert.ok(card);
+  assert.doesNotMatch(card, /No completed or phase observations/);
+  assert.match(card, /No completed cases yet; phase timing observations are available in the current scope and range\./);
+  assert.match(card, /Median Ready Wait[\s\S]*?06:00/);
+  assert.match(card, /Median Doctor Time[\s\S]*?20:00/);
+  assert.match(card, /Limited - N=2/);
+  assert.match(card, /Limited - N=1/);
+  assert.match(card, /Observed Doctor Days[\s\S]*?No observation/);
+  assert.doesNotMatch(card, /class="doctor-report-card[^"]*\bis-empty\b/);
+
+  const selectedPanel = harness.elements.get("selectedDoctorPanel").innerHTML;
+  assert.match(selectedPanel, /No completed cases yet; phase timing observations are available in the current scope and range\./);
+
+  const predicateSource = moduleSource.slice(
+    moduleSource.indexOf("function hasDoctorPhaseTimingObservation"),
+    moduleSource.indexOf("function doctorFlowSummarySentence"));
+  assert.doesNotMatch(predicateSource, /limitedSampleThreshold|contributingCount\s*<\s*5|state\s*===\s*["']Limited["']/);
+});
+
 test("missing doctor-flow contributors stay Unavailable and Limited context stays neutral", () => {
   const unavailable = doctorFlowSummary("otte", "Dr. Otte", 6);
   unavailable.medianReadyWaitSeconds = null;

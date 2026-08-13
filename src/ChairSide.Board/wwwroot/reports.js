@@ -842,6 +842,11 @@ export function createReports({
     </div>`;
 }
 
+  function hasDoctorPhaseTimingObservation(summary) {
+  return summary?.samples?.readyWait?.contributingCount > 0
+    || summary?.samples?.doctorTime?.contributingCount > 0;
+}
+
   function doctorFlowSummarySentence(summary) {
   const completedState = summary?.samples?.completedCases?.state;
   const observedState = summary?.samples?.observedDays?.state;
@@ -849,7 +854,9 @@ export function createReports({
     return "Doctor flow sample context is unavailable for this report response.";
   }
   if (completedState === "Empty") {
-    return "No completed or phase observations match the current scope and range.";
+    return hasDoctorPhaseTimingObservation(summary)
+      ? "No completed cases yet; phase timing observations are available in the current scope and range."
+      : "No completed or phase timing observations match the current scope and range.";
   }
   if (observedState === "Unavailable") {
     return "Completed history is present, but no Ready-anchored observed doctor-day qualifies.";
@@ -884,10 +891,11 @@ export function createReports({
   const doctor = (getSnapshot()?.doctors || []).find(item => item.id === summary.doctorId);
   const name = doctor ? doctor.name : summary.doctorName || getDoctorName(summary.doctorId);
   const identity = getDoctorIdentity(summary.doctorId, name);
-  const completedState = summary.samples?.completedCases?.state;
+  const isVisuallyEmpty = summary.samples?.completedCases?.state === "Empty"
+    && !hasDoctorPhaseTimingObservation(summary);
   const selected = summary.doctorId === state.reportDoctorId;
   return `
-    <article class="doctor-report-card ${completedState === "Empty" ? "is-empty" : ""} ${selected ? "is-selected" : ""}" style="--doctor-color: ${escapeAttribute(identity.color)}" data-report-doctor-id="${escapeAttribute(summary.doctorId)}" role="button" tabindex="0" aria-pressed="${selected ? "true" : "false"}" aria-label="${escapeAttribute(`Show report details for ${name}`)}">
+    <article class="doctor-report-card ${isVisuallyEmpty ? "is-empty" : ""} ${selected ? "is-selected" : ""}" style="--doctor-color: ${escapeAttribute(identity.color)}" data-report-doctor-id="${escapeAttribute(summary.doctorId)}" role="button" tabindex="0" aria-pressed="${selected ? "true" : "false"}" aria-label="${escapeAttribute(`Show report details for ${name}`)}">
       ${renderDoctorFlowCardBody(summary, name, identity)}
       <span class="doctor-report-detail-link" aria-hidden="true">
         ${selected ? "Viewing details" : "View details"}
