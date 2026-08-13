@@ -161,9 +161,9 @@ export function createReports({
     return;
   }
 
-  const allDoctors = aggregateAllocationByDoctor(r.doctorSummaries || [], r);
-  const agg = allDoctors.find(item => item.doctorId === doctor.id)
-    || { doctorId: doctor.id, count: 0, net: 0, over: 0, under: 0, at: 0, adjusted: 0 };
+  const allDoctors = canonicalDoctorFlowSummaries(r);
+  const summary = allDoctors.find(item => item.doctorId === doctor.id)
+    || emptyDoctorFlowSummary(doctor.id, doctor.name);
   const identity = getDoctorIdentity(doctor.id, doctor.name);
 
   cockpit.hidden = false;
@@ -180,8 +180,8 @@ export function createReports({
         <p class="doctor-cockpit-range-label">Reporting range: Month to date${escapeHtml(rangeSuffix)}</p>
         <article class="doctor-report-card is-selected is-panel-summary"
           style="--doctor-color: ${escapeAttribute(identity.color)}"
-          aria-label="${escapeAttribute(`${doctor.name} — allocation summary`)}">
-          ${renderDoctorCardBody(agg, r, doctor.name, identity)}
+          aria-label="${escapeAttribute(`${doctor.name} - observed clinical flow summary`)}">
+          ${renderDoctorFlowCardBody(summary, doctor.name, identity)}
         </article>`;
     }
   }
@@ -189,7 +189,7 @@ export function createReports({
   // Full selected-doctor detail panel (head + tabs + tab content) reused directly.
   // state.reportDoctorId was pinned to doctor.id in renderDoctorView, so the panel's
   // internal doctors.find(item => item.doctorId === state.reportDoctorId) always resolves.
-  renderSelectedDoctorPanel(r, [agg]);
+  renderSelectedDoctorPanel(r, [summary]);
 }
 
   function renderReports() {
@@ -609,7 +609,7 @@ export function createReports({
     return;
   }
 
-  const doctors = aggregateAllocationByDoctor(r.doctorSummaries || [], r);
+  const doctors = canonicalDoctorFlowSummaries(r);
   section.hidden = !hasData && doctors.length === 0;
   if (section.hidden) {
     grid.innerHTML = "";
@@ -632,7 +632,7 @@ export function createReports({
     if (!state.reportPressActive) {
       grid.dataset.renderKey = gridToken;
       grid.innerHTML = doctors.length
-        ? doctors.map(agg => renderDoctorAllocationCard(agg, r)).join("")
+        ? doctors.map(summary => renderDoctorFlowCard(summary)).join("")
         : `<p class="report-empty-note">No doctor report data for this range.</p>`;
     }
   }
@@ -651,7 +651,7 @@ export function createReports({
     return;
   }
 
-  state.reportDoctorId = doctors.find(item => (item.count || 0) > 0)?.doctorId || doctors[0].doctorId;
+  state.reportDoctorId = doctors.find(item => (item.completedCaseCount || 0) > 0)?.doctorId || doctors[0].doctorId;
 }
 
 // ---------------------------------------------------------------------------
@@ -802,113 +802,104 @@ export function createReports({
   return [...rosterCards, ...historicalCards];
 }
 
-// Renders the inner body of a doctor report card: header (initials + name + summary), metrics dl,
-// and sparkline. Used by both the interactive grid card and the non-interactive cockpit summary.
-  function renderDoctorCardBody(agg, report, name, identity) {
-  const count = agg.count || 0;
-  const average = count > 0 ? agg.net / count : Number.NaN;
-  const doctorSample = agg.sample || fallbackSampleForObservedCount(count);
-  const comparisonAvailable = sampleSupportsComparison(doctorSample);
-  const countPresentation = sampledPresentation(doctorSample, String(count));
-  const sparkPoints = (report?.doctorDailyAllocationSeries || []).find(item => item.doctorId === agg.doctorId)?.points;
+// Issue #216 canonical Doctor Overview authority. The server owns medians, day qualification, and
+// sample states; this presentation never reconstructs metrics from monthly DoctorSummaries.
+  function canonicalDoctorFlowSummaries(report) {
+  return Array.isArray(report?.doctorFlowSummaries) ? report.doctorFlowSummaries : [];
+}
+
+  function emptyDoctorFlowSummary(doctorId, doctorName) {
+  return {
+    doctorId,
+    doctorName,
+    completedCaseCount: 0,
+    medianReadyWaitSeconds: null,
+    medianDoctorTimeSeconds: null,
+    medianObservedClinicalSpanMinutes: null,
+    peakConcurrentRooms: null,
+    observedDoctorDayCount: 0,
+    samples: null
+  };
+}
+
+  function doctorFlowPresentation(sample, measuredValue) {
+  if (!sample) {
+    return {
+      value: "Unavailable",
+      state: "Unavailable",
+      detail: "server sample context unavailable"
+    };
+  }
+  return sampledPresentation(sample, measuredValue);
+}
+
+  function renderDoctorFlowMetric(label, measuredValue, sample, helpText = null) {
+  const presentation = doctorFlowPresentation(sample, measuredValue);
+  return `
+    <div>
+      <dt>${escapeHtml(label)}${helpText ? renderHelpIcon(helpText) : ""}</dt>
+      <dd>${escapeHtml(presentation.value)}${renderSampleContext(presentation)}</dd>
+    </div>`;
+}
+
+  function doctorFlowSummarySentence(summary) {
+  const completedState = summary?.samples?.completedCases?.state;
+  const observedState = summary?.samples?.observedDays?.state;
+  if (!summary?.samples) {
+    return "Doctor flow sample context is unavailable for this report response.";
+  }
+  if (completedState === "Empty") {
+    return "No completed or phase observations match the current scope and range.";
+  }
+  if (observedState === "Unavailable") {
+    return "Completed history is present, but no Ready-anchored observed doctor-day qualifies.";
+  }
+  return `${summary.observedDoctorDayCount} observed doctor day${summary.observedDoctorDayCount === 1 ? "" : "s"} in the current scope and range.`;
+}
+
+  function renderDoctorFlowCardBody(summary, name, identity) {
+  const samples = summary.samples || {};
   return `
     <header class="doctor-report-card-head">
       <span class="doctor-report-initials" aria-hidden="true">${escapeHtml(identity.initials)}</span>
       <div class="doctor-report-identity">
         <h4>${escapeHtml(name)}</h4>
-        <p>${escapeHtml(doctorAllocationSummary(agg, doctorSample))}</p>
+        <p>${escapeHtml(doctorFlowSummarySentence(summary))}</p>
       </div>
     </header>
-    <dl class="doctor-report-metrics">
-      <div>
-        <dt>Cases</dt>
-        <dd>${escapeHtml(countPresentation.value)}${renderSampleContext(countPresentation)}</dd>
-      </div>
-      ${comparisonAvailable ? `
-        <div>
-          <dt>Balance</dt>
-          <dd class="${escapeAttribute(varianceClass(agg.net))}">${escapeHtml(formatSignedMinutes(agg.net))}</dd>
-        </div>
-        <div>
-          <dt>Avg</dt>
-          <dd class="${escapeAttribute(varianceClass(average))}">${escapeHtml(formatSignedMinutes(average))}</dd>
-        </div>
-        <div class="doctor-card-metric--help-corner">
-          <dt>O / U / A</dt>
-          <dd>${escapeHtml(`${agg.over} / ${agg.under} / ${agg.at}`)}</dd>
-          ${renderHelpIcon("O/U/A means Over, Under, or At target compared with expected procedure allocation.", "corner")}
-        </div>` : `
-        <div>
-          <dt>Comparison</dt>
-          <dd class="is-unavailable">${escapeHtml(allocationComparisonValue(doctorSample))}</dd>
-        </div>`}
-    </dl>
-    ${comparisonAvailable ? renderDoctorSparkline(sparkPoints) : ""}`;
+    <dl class="doctor-report-metrics doctor-flow-metrics">
+      ${renderDoctorFlowMetric("Completed Cases", String(summary.completedCaseCount ?? 0), samples.completedCases)}
+      ${renderDoctorFlowMetric("Median Ready Wait", formatObservedDuration(summary.medianReadyWaitSeconds), samples.readyWait)}
+      ${renderDoctorFlowMetric("Median Doctor Time", formatObservedDuration(summary.medianDoctorTimeSeconds), samples.doctorTime)}
+      ${renderDoctorFlowMetric("Median Observed Clinical Span", formatDurationMinutes(summary.medianObservedClinicalSpanMinutes), samples.observedDays, "Median Ready-anchored Observed Clinical Span across qualifying observed doctor-days.")}
+      ${renderDoctorFlowMetric("Peak Concurrent Rooms", describePeakConcurrentRooms(summary.peakConcurrentRooms), samples.observedDays)}
+      ${renderDoctorFlowMetric("Observed Doctor Days", String(summary.observedDoctorDayCount ?? 0), samples.observedDays, "Counts only UTC dates with qualifying Ready-anchored observed clinical flow.")}
+    </dl>`;
 }
 
 // The whole card is the selection control (role="button", focusable). The "View details" affordance
 // is a non-interactive visual cue (aria-hidden span) so we never nest interactive controls; clicks
 // anywhere in the card and Enter/Space on the focused card both resolve to data-report-doctor-id.
-  function renderDoctorAllocationCard(agg, report) {
-  const doctor = (getSnapshot()?.doctors || []).find(item => item.id === agg.doctorId);
-  const name = doctor ? doctor.name : getDoctorName(agg.doctorId);
-  const identity = getDoctorIdentity(agg.doctorId, name);
-  const count = agg.count || 0;
-  const selected = agg.doctorId === state.reportDoctorId;
+  function renderDoctorFlowCard(summary) {
+  const doctor = (getSnapshot()?.doctors || []).find(item => item.id === summary.doctorId);
+  const name = doctor ? doctor.name : summary.doctorName || getDoctorName(summary.doctorId);
+  const identity = getDoctorIdentity(summary.doctorId, name);
+  const completedState = summary.samples?.completedCases?.state;
+  const selected = summary.doctorId === state.reportDoctorId;
   return `
-    <article class="doctor-report-card ${count === 0 ? "is-empty" : ""} ${selected ? "is-selected" : ""}" style="--doctor-color: ${escapeAttribute(identity.color)}" data-report-doctor-id="${escapeAttribute(agg.doctorId)}" role="button" tabindex="0" aria-pressed="${selected ? "true" : "false"}" aria-label="${escapeAttribute(`Show report details for ${name}`)}">
-      ${renderDoctorCardBody(agg, report, name, identity)}
+    <article class="doctor-report-card ${completedState === "Empty" ? "is-empty" : ""} ${selected ? "is-selected" : ""}" style="--doctor-color: ${escapeAttribute(identity.color)}" data-report-doctor-id="${escapeAttribute(summary.doctorId)}" role="button" tabindex="0" aria-pressed="${selected ? "true" : "false"}" aria-label="${escapeAttribute(`Show report details for ${name}`)}">
+      ${renderDoctorFlowCardBody(summary, name, identity)}
       <span class="doctor-report-detail-link" aria-hidden="true">
         ${selected ? "Viewing details" : "View details"}
       </span>
     </article>`;
 }
 
-// Plots daily net allocation variance minutes (measured case flow - expected allocation) for one
-// doctor. Zero variance sits on a centered neutral baseline; positive (over expected) rises above it
-// and negative (under expected) drops below, scaled symmetrically by the largest absolute day so the
-// baseline stays meaningful. Honest by construction: a flat run of equal values renders flat, a single
-// day renders a short level mark, and no manufactured wobble is added.
-//
-// preserveAspectRatio="none" lets the SVG stretch to the full card width (matching the metric slab)
-// instead of meet-fitting to its height and floating as a narrow centered line; vector-effect
-// "non-scaling-stroke" keeps the stroke a crisp, uniform weight despite the non-uniform scaling.
-  function renderDoctorSparkline(points) {
-  const w = 100, h = 32, pad = 3;
-  const mid = (h / 2).toFixed(1);
-  const open = `<svg class="doctor-sparkline" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" aria-hidden="true">`;
-  const baseline = `<line x1="${pad}" y1="${mid}" x2="${(w - pad).toFixed(1)}" y2="${mid}" stroke="var(--doctor-color)" stroke-width="0.75" vector-effect="non-scaling-stroke" opacity="0.25"/>`;
-
-  if (!points || points.length === 0) {
-    return `${open}${baseline}</svg>`;
-  }
-
-  const sorted = [...points].sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
-  const values = sorted.map(p => Number(p.netVarianceMinutes) || 0);
-  const maxAbs = Math.max(1, ...values.map(v => Math.abs(v)));
-  const half = (h - 2 * pad) / 2;
-  const zeroY = h / 2;
-  const yOf = v => zeroY - (v / maxAbs) * half;
-
-  if (sorted.length === 1) {
-    const y = yOf(values[0]).toFixed(1);
-    return `${open}${baseline}<line x1="${(w / 2 - 18).toFixed(1)}" y1="${y}" x2="${(w / 2 + 18).toFixed(1)}" y2="${y}" stroke="var(--doctor-color)" stroke-width="1.5" stroke-linecap="round" vector-effect="non-scaling-stroke" opacity="0.85"/></svg>`;
-  }
-
-  const minMs = new Date(sorted[0].date).getTime();
-  const maxMs = new Date(sorted[sorted.length - 1].date).getTime();
-  const msRange = maxMs - minMs || 1;
-  const xScale = w - 2 * pad;
-  const coords = sorted.map((p, i) => {
-    const x = (pad + ((new Date(p.date).getTime() - minMs) / msRange) * xScale).toFixed(1);
-    const y = yOf(values[i]).toFixed(1);
-    return `${x},${y}`;
-  }).join(" ");
-  return `${open}${baseline}<polyline points="${coords}" fill="none" stroke="var(--doctor-color)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke" opacity="0.85"/></svg>`;
-}
-
-  function doctorAllocationSummary(agg, sample = agg.sample || fallbackSampleForObservedCount(agg.count || 0)) {
+  function doctorAllocationSummary(agg, sample = agg.sample) {
   const count = agg.count || 0;
+  if (!sample) {
+    return "Allocation sample context is unavailable for this report response.";
+  }
   if (sample?.state === "Empty") {
     return "No allocation variance cases in this report range.";
   }
@@ -926,38 +917,24 @@ export function createReports({
   return `Measured case flow ran ${formatAbsoluteMinutes(agg.net)} ${direction} across ${count} ${count === 1 ? "case" : "cases"}.`;
 }
 
-  function mainPressurePoint(agg) {
-  if (!agg.count) {
-    return "No cases";
-  }
-
-  const points = [
-    { label: "Over expected", value: agg.over || 0 },
-    { label: "Under expected", value: agg.under || 0 },
-    { label: "At expected", value: agg.at || 0 }
-  ].sort((a, b) => b.value - a.value);
-
-  return points[0].value > 0 ? points[0].label : "No variance";
-}
-
   function renderSelectedDoctorPanel(r, doctors) {
   const panel = document.getElementById("selectedDoctorPanel");
   if (!panel) {
     return;
   }
 
-  const agg = doctors.find(item => item.doctorId === state.reportDoctorId) || doctors[0];
-  if (!agg) {
+  const summary = doctors.find(item => item.doctorId === state.reportDoctorId) || doctors[0];
+  if (!summary) {
     panel.hidden = true;
     panel.innerHTML = "";
     panel.dataset.renderKey = "";
     return;
   }
 
-  const doctor = (getSnapshot()?.doctors || []).find(item => item.id === agg.doctorId);
-  const name = doctor ? doctor.name : getDoctorName(agg.doctorId);
-  const identity = getDoctorIdentity(agg.doctorId, name);
-  const tabs = ["overview", "trends", "procedures", "flow", "audit"];
+  const doctor = (getSnapshot()?.doctors || []).find(item => item.id === summary.doctorId);
+  const name = doctor ? doctor.name : summary.doctorName || getDoctorName(summary.doctorId);
+  const identity = getDoctorIdentity(summary.doctorId, name);
+  const tabs = ["overview", "trends", "procedures", "flow", "schedule", "audit"];
   if (!tabs.includes(state.reportDoctorTab)) {
     state.reportDoctorTab = "overview";
   }
@@ -966,7 +943,7 @@ export function createReports({
   // Tab is included because it drives both the tab-button aria-selected states and the
   // entire tab-panel content. During an active pointer press, defer the rebuild to avoid
   // destroying the tab button mid-click; leave the key stale so the catch-up render applies.
-  const panelToken = `${reportData.getVersion()}|${agg.doctorId}|${state.reportDoctorTab}`;
+  const panelToken = `${reportData.getVersion()}|${summary.doctorId}|${state.reportDoctorTab}`;
   if (panel.dataset.renderKey === panelToken) {
     return;
   }
@@ -982,14 +959,14 @@ export function createReports({
       <span class="doctor-report-initials" aria-hidden="true">${escapeHtml(identity.initials)}</span>
       <div>
         <h2>${escapeHtml(name)}</h2>
-        <p>${escapeHtml(doctorAllocationSummary(agg))}</p>
+        <p>${escapeHtml(doctorFlowSummarySentence(summary))}</p>
       </div>
     </div>
     <div class="selected-doctor-tabs" role="tablist" aria-label="${escapeAttribute(name)} report sections">
       ${tabs.map(tab => renderDoctorReportTabButton(tab)).join("")}
     </div>
     <div class="selected-doctor-tab-panel">
-      ${renderSelectedDoctorTabContent(state.reportDoctorTab, r, agg)}
+      ${renderSelectedDoctorTabContent(state.reportDoctorTab, r, summary)}
     </div>`;
 }
 
@@ -998,7 +975,8 @@ export function createReports({
     overview: "Overview",
     trends: "Trends",
     procedures: "Procedures",
-    flow: "Flow Breakdown",
+    flow: "Room Load / Flow",
+    schedule: "Schedule Fit",
     audit: "Case Audit"
   };
   const selected = state.reportDoctorTab === tab;
@@ -1008,17 +986,21 @@ export function createReports({
     </button>`;
 }
 
-  function renderSelectedDoctorTabContent(tab, r, agg) {
+  function renderSelectedDoctorTabContent(tab, r, summary) {
   if (tab === "audit") {
-    return renderSelectedDoctorAudit(r, agg.doctorId);
+    return renderSelectedDoctorAudit(r, summary.doctorId);
   }
 
   if (tab === "overview") {
-    return renderSelectedDoctorOverview(r, agg);
+    return renderSelectedDoctorOverview(r, summary);
   }
 
   if (tab === "flow") {
-    return renderSelectedDoctorFlow(r, agg);
+    return renderSelectedDoctorFlow(r, summary);
+  }
+
+  if (tab === "schedule") {
+    return renderSelectedDoctorScheduleFit(r, summary);
   }
 
   if (tab === "trends") {
@@ -1029,7 +1011,7 @@ export function createReports({
   }
 
   if (tab === "procedures") {
-    return renderSelectedDoctorProcedures(r, agg);
+    return renderSelectedDoctorProcedures(r, summary);
   }
 
   return renderSelectedDoctorEmptyState("Not Available", "This section isn't available with the current report payload.");
@@ -1048,26 +1030,22 @@ export function createReports({
     </section>`;
 }
 
-  function renderSelectedDoctorOverview(r, agg) {
-  const count = agg.count || 0;
-  const average = count > 0 ? agg.net / count : Number.NaN;
-  const sample = agg.sample || fallbackSampleForObservedCount(count);
-  const samplePresentation = sampledPresentation(sample, String(count));
-  const comparisonAvailable = sampleSupportsComparison(sample);
+  function renderSelectedDoctorOverview(r, summary) {
+  const samples = summary.samples || {};
   return `
     <section class="selected-doctor-overview">
       <div class="selected-doctor-summary">
-        <h3>Range Flow Summary</h3>
-        <p>${escapeHtml(doctorAllocationSummary(agg))}</p>
-        <p class="allocation-footnote">Uses existing doctor allocation aggregates for ${escapeHtml(r.rangeLabel || "the selected range")}.</p>
+        <h3>Observed Flow Summary</h3>
+        <p>${escapeHtml(doctorFlowSummarySentence(summary))}</p>
+        <p class="allocation-footnote">Uses server-defined reporting populations for ${escapeHtml(r.rangeLabel || "the selected range")}.</p>
       </div>
-      <dl class="selected-doctor-kpis">
-        <div><dt>Cases</dt><dd>${escapeHtml(samplePresentation.value)}${renderSampleContext(samplePresentation)}</dd></div>
-        ${comparisonAvailable ? `
-          <div><dt>Net balance</dt><dd class="${escapeAttribute(varianceClass(agg.net))}">${escapeHtml(formatSignedMinutes(agg.net))}</dd></div>
-          <div><dt>Average variance</dt><dd class="${escapeAttribute(varianceClass(average))}">${escapeHtml(formatSignedMinutes(average))}</dd></div>
-          <div><dt>Pressure point</dt><dd>${escapeHtml(mainPressurePoint(agg))}</dd></div>` : `
-          <div><dt>Comparison</dt><dd class="is-unavailable">${escapeHtml(allocationComparisonValue(sample))}</dd></div>`}
+      <dl class="selected-doctor-kpis doctor-flow-metrics">
+        ${renderDoctorFlowMetric("Completed Cases", String(summary.completedCaseCount ?? 0), samples.completedCases)}
+        ${renderDoctorFlowMetric("Median Ready Wait", formatObservedDuration(summary.medianReadyWaitSeconds), samples.readyWait)}
+        ${renderDoctorFlowMetric("Median Doctor Time", formatObservedDuration(summary.medianDoctorTimeSeconds), samples.doctorTime)}
+        ${renderDoctorFlowMetric("Median Observed Clinical Span", formatDurationMinutes(summary.medianObservedClinicalSpanMinutes), samples.observedDays)}
+        ${renderDoctorFlowMetric("Peak Concurrent Rooms", describePeakConcurrentRooms(summary.peakConcurrentRooms), samples.observedDays)}
+        ${renderDoctorFlowMetric("Observed Doctor Days", String(summary.observedDoctorDayCount ?? 0), samples.observedDays)}
       </dl>
     </section>`;
 }
@@ -1077,48 +1055,40 @@ export function createReports({
   return Number.isFinite(number) ? number : 0;
 }
 
-  function renderSelectedDoctorFlow(r, agg) {
-  const days = (r.observedDoctorDays || []).filter(day => day.doctorId === agg.doctorId);
+  function renderSelectedDoctorFlow(r, summary) {
+  const days = (r.observedDoctorFlowDays || []).filter(day => day.doctorId === summary.doctorId);
   if (!days.length) {
     return renderSelectedDoctorEmptyState(
-      "Observed Load",
-      "No observed load data is available for this doctor in the current report range. This usually means there are no completed cycles for this doctor/date selection yet.",
-      "Shows the doctor's observed room-flow load for the selected range. Descriptive only; not a ranking or score."
+      "Room Load / Flow",
+      "No qualifying Ready-anchored observed doctor-day is available for this doctor in the current report range.",
+      "Shows the exact partition of each qualifying Observed Clinical Span by concurrent Doctor Working rooms."
     );
   }
 
   const sorted = [...days].sort((a, b) => String(b.reportDate || "").localeCompare(String(a.reportDate || "")));
   const recent = sorted.slice(0, 10);
 
-  const completedCases = days.reduce((sum, day) => sum + observedLoadNumber(day.encounterCount), 0);
-  const finiteSpans = days.map(day => day.observedClinicalSpanMinutes).filter(Number.isFinite);
-  const avgClinicalSpan = finiteSpans.length
-    ? finiteSpans.reduce((sum, minutes) => sum + minutes, 0) / finiteSpans.length
-    : Number.NaN;
-  const peakActiveRooms = days.reduce(
-    (max, day) => Number.isFinite(day.maxActiveRoomCount) ? Math.max(max, day.maxActiveRoomCount) : max,
-    0
-  );
-  const twoRoomMinutes = days.reduce((sum, day) => sum + observedLoadNumber(day.minutesWithTwoActiveRooms), 0);
-  const threePlusRoomMinutes = days.reduce((sum, day) => sum + observedLoadNumber(day.minutesWithThreeOrMoreActiveRooms), 0);
-  const stackedMinutes = twoRoomMinutes + threePlusRoomMinutes;
-  const overlapSentence = stackedMinutes > 0
-    ? `Observed active room time included ${formatDurationMinutes(stackedMinutes)} with overlapping rooms.`
-    : "Observed active room time stayed in single-room flow for this range.";
+  const completedCases = days.reduce((sum, day) => sum + observedLoadNumber(day.qualifyingCaseCount), 0);
+  const totalSpan = days.reduce((sum, day) => sum + observedLoadNumber(day.observedClinicalSpanMinutes), 0);
+  const totalUnstructured = days.reduce((sum, day) => sum + observedLoadNumber(day.unstructuredTimeMinutes), 0);
+  const totalOneRoom = days.reduce((sum, day) => sum + observedLoadNumber(day.minutesWithOneDoctorWorkingRoom), 0);
+  const totalTwoRooms = days.reduce((sum, day) => sum + observedLoadNumber(day.minutesWithTwoDoctorWorkingRooms), 0);
+  const totalThreePlusRooms = days.reduce((sum, day) => sum + observedLoadNumber(day.minutesWithThreeOrMoreDoctorWorkingRooms), 0);
 
   return `
     <section class="selected-doctor-overview">
       <div class="selected-doctor-summary">
-        <h3>Observed Load${renderHelpIcon("Shows the doctor's observed room-flow load for the selected range. Descriptive only; not a ranking or score.")}</h3>
-        <p>Across ${escapeHtml(String(days.length))} observed day${days.length === 1 ? "" : "s"}, this doctor completed ${escapeHtml(String(completedCases))} case${completedCases === 1 ? "" : "s"} with a typical clinical span of ${escapeHtml(formatApproxDurationMinutes(avgClinicalSpan))} per day.</p>
-        <p>${escapeHtml(overlapSentence)}</p>
-        <p class="allocation-footnote">Observed Load is descriptive only: it shows room overlap and span pressure, not provider ranking or staff performance scoring.</p>
+        <h3>Room Load / Flow${renderHelpIcon("Shows the exact partition of each qualifying Observed Clinical Span by concurrent Doctor Working rooms.")}</h3>
+        <p>Across ${escapeHtml(String(days.length))} observed doctor day${days.length === 1 ? "" : "s"}, ${escapeHtml(String(completedCases))} qualifying completed case${completedCases === 1 ? "" : "s"} contributed to Ready-anchored flow.</p>
+        <p class="allocation-footnote">Unstructured Time is the portion of Observed Clinical Span with no active Doctor Working interval.</p>
       </div>
       <dl class="selected-doctor-kpis">
-        <div><dt>Days observed</dt><dd>${escapeHtml(String(days.length))}</dd></div>
-        <div><dt>Completed cases</dt><dd>${escapeHtml(String(completedCases))}</dd></div>
-        <div><dt>Avg clinical span${renderHelpIcon("Average observed span per day from first seated case through last Doctor Complete.")}</dt><dd>${escapeHtml(formatDurationMinutes(avgClinicalSpan))}</dd></div>
-        <div><dt>Peak active load${renderHelpIcon("Highest number of active rooms overlapping for this doctor on an observed day.")}</dt><dd>${escapeHtml(describePeakActiveLoad(peakActiveRooms))}</dd></div>
+        <div><dt>Clinical Span</dt><dd>${escapeHtml(formatDurationMinutes(totalSpan))}</dd></div>
+        <div><dt>Unstructured Time</dt><dd>${escapeHtml(formatDurationMinutes(totalUnstructured))}</dd></div>
+        <div><dt>1 Doctor Working room</dt><dd>${escapeHtml(formatDurationMinutes(totalOneRoom))}</dd></div>
+        <div><dt>2 Doctor Working rooms</dt><dd>${escapeHtml(formatDurationMinutes(totalTwoRooms))}</dd></div>
+        <div><dt>3+ Doctor Working rooms</dt><dd>${escapeHtml(formatDurationMinutes(totalThreePlusRooms))}</dd></div>
+        <div><dt>Peak Concurrent Rooms</dt><dd>${escapeHtml(describePeakConcurrentRooms(summary.peakConcurrentRooms))}</dd></div>
       </dl>
     </section>
     <div class="selected-doctor-audit">
@@ -1128,24 +1098,24 @@ export function createReports({
             <th>Date</th>
             <th>Cases</th>
             <th>Clinical Span</th>
-            <th>Team Span</th>
-            <th>Peak Load</th>
-            <th>1 room</th>
-            <th>2 rooms</th>
-            <th>3+ rooms</th>
+            <th>Unstructured</th>
+            <th>1 Working</th>
+            <th>2 Working</th>
+            <th>3+ Working</th>
+            <th>Peak Concurrent</th>
           </tr>
         </thead>
         <tbody>
           ${recent.map(day => `
             <tr>
               <td>${escapeHtml(formatObservedDayDate(day.reportDate))}</td>
-              <td>${escapeHtml(Number.isFinite(day.encounterCount) ? String(day.encounterCount) : "--")}</td>
+              <td>${escapeHtml(Number.isFinite(day.qualifyingCaseCount) ? String(day.qualifyingCaseCount) : "--")}</td>
               <td>${escapeHtml(formatDurationMinutes(day.observedClinicalSpanMinutes))}</td>
-              <td>${escapeHtml(formatDurationMinutes(day.observedTeamSpanMinutes))}</td>
-              <td>${escapeHtml(describePeakActiveLoad(day.maxActiveRoomCount))}</td>
-              <td>${escapeHtml(formatAllocationMinutes(day.minutesWithOneActiveRoom))}</td>
-              <td>${escapeHtml(formatAllocationMinutes(day.minutesWithTwoActiveRooms))}</td>
-              <td>${escapeHtml(formatAllocationMinutes(day.minutesWithThreeOrMoreActiveRooms))}</td>
+              <td>${escapeHtml(formatDurationMinutes(day.unstructuredTimeMinutes))}</td>
+              <td>${escapeHtml(formatDurationMinutes(day.minutesWithOneDoctorWorkingRoom))}</td>
+              <td>${escapeHtml(formatDurationMinutes(day.minutesWithTwoDoctorWorkingRooms))}</td>
+              <td>${escapeHtml(formatDurationMinutes(day.minutesWithThreeOrMoreDoctorWorkingRooms))}</td>
+              <td>${escapeHtml(describePeakConcurrentRooms(day.peakConcurrentRooms))}</td>
             </tr>
           `).join("")}
         </tbody>
@@ -1161,17 +1131,51 @@ export function createReports({
   return parsed ? formatReportDateOnly(parsed) : "--";
 }
 
-  function describePeakActiveLoad(maxActiveRoomCount) {
-  if (!Number.isFinite(maxActiveRoomCount) || maxActiveRoomCount < 1) {
+  function describePeakConcurrentRooms(peakConcurrentRooms) {
+  if (!Number.isFinite(peakConcurrentRooms) || peakConcurrentRooms < 1) {
     return "--";
   }
-  if (maxActiveRoomCount === 1) {
-    return "1 room active";
+  if (peakConcurrentRooms === 1) {
+    return "1 room";
   }
-  if (maxActiveRoomCount === 2) {
-    return "2 rooms active";
+  if (peakConcurrentRooms === 2) {
+    return "2 rooms";
   }
-  return "3+ rooms active";
+  return "3+ rooms";
+}
+
+  function renderSelectedDoctorScheduleFit(r, summary) {
+  const allocation = aggregateAllocationByDoctor(r.doctorSummaries || [], r)
+    .find(item => item.doctorId === summary.doctorId);
+  if (!allocation) {
+    return renderSelectedDoctorEmptyState(
+      "Schedule Fit",
+      "No allocation context is available for this doctor in the current report response."
+    );
+  }
+
+  const sample = allocation.sample;
+  const countPresentation = sample
+    ? sampledPresentation(sample, String(allocation.count || 0))
+    : doctorFlowPresentation(null, String(allocation.count || 0));
+  const comparisonAvailable = sampleSupportsComparison(sample);
+  return `
+    <section class="selected-doctor-overview">
+      <div class="selected-doctor-summary">
+        <h3>Schedule Fit</h3>
+        <p>${escapeHtml(doctorAllocationSummary(allocation, sample))}</p>
+        <p class="allocation-footnote">Compares confirmed scheduling allocation with compatible observed case-flow timing. This evaluates the scheduling model, not the doctor.</p>
+      </div>
+      <dl class="selected-doctor-kpis">
+        <div><dt>Allocation Cases</dt><dd>${escapeHtml(countPresentation.value)}${renderSampleContext(countPresentation)}</dd></div>
+        ${comparisonAvailable ? `
+          <div><dt>Net Variance</dt><dd class="${escapeAttribute(varianceClass(allocation.net))}">${escapeHtml(formatSignedMinutes(allocation.net))}</dd></div>
+          <div><dt>Over Expected</dt><dd>${escapeHtml(String(allocation.over || 0))}</dd></div>
+          <div><dt>Under Expected</dt><dd>${escapeHtml(String(allocation.under || 0))}</dd></div>
+          <div><dt>At Expected</dt><dd>${escapeHtml(String(allocation.at || 0))}</dd></div>` : `
+          <div><dt>Comparison</dt><dd class="is-unavailable">${escapeHtml(allocationComparisonValue(sample))}</dd></div>`}
+      </dl>
+    </section>`;
 }
 
   function renderProcedureMix(r) {
@@ -1707,12 +1711,6 @@ export function createReports({
   const hours = Math.floor(totalMinutes / 60);
   const minutes = totalMinutes % 60;
   return minutes === 0 ? `${sign}${hours} hr` : `${sign}${hours} hr ${minutes} min`;
-}
-
-// Approximation wording for narrative report sentences: "about 8 hr 30 min". Non-finite -> "--"
-// (no "about" prefix on an empty value).
-  function formatApproxDurationMinutes(value) {
-  return Number.isFinite(value) ? `about ${formatDurationMinutes(value)}` : "--";
 }
 
 // Neutral allocation variance label. Positive = over expected, negative = under, zero = at.

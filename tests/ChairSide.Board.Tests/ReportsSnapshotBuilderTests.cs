@@ -190,6 +190,8 @@ public sealed class ReportsSnapshotBuilderTests
         var doctorSummaries = new List<DoctorCycleSummary>();
         var trends = new ReportTrendSnapshot("Sentinel", []);
         var observedDoctorDays = new List<ObservedDoctorDay>();
+        var observedDoctorFlowDays = new List<ObservedDoctorFlowDay>();
+        var doctorFlowSummaries = new List<DoctorFlowSummary>();
         var doctorProcedureMix = new List<DoctorProcedureMixRow>();
         var doctorAllocationSamples = new List<ReportDoctorAllocationSampleContext>();
         var exceptionReviewRecords = new List<ExceptionReviewRecord>();
@@ -264,7 +266,9 @@ public sealed class ReportsSnapshotBuilderTests
             {
                 DoctorSummaries = doctorSummaries,
                 DoctorAllocationSamples = doctorAllocationSamples,
+                DoctorFlowSummaries = doctorFlowSummaries,
                 ObservedDoctorDays = observedDoctorDays,
+                ObservedDoctorFlowDays = observedDoctorFlowDays,
                 DoctorProcedureMix = doctorProcedureMix
             },
             ReviewQueue = new ReportReviewQueueSection
@@ -341,6 +345,12 @@ public sealed class ReportsSnapshotBuilderTests
         Assert.Same(composition.Allocation.ScheduleFit, snapshot.ScheduleFit);
         Assert.Same(composition.Timing.Trends, snapshot.Trends);
         Assert.Same(composition.DoctorDetail.ObservedDoctorDays, snapshot.ObservedDoctorDays);
+        Assert.Same(
+            composition.DoctorDetail.ObservedDoctorFlowDays,
+            snapshot.ObservedDoctorFlowDays);
+        Assert.Same(
+            composition.DoctorDetail.DoctorFlowSummaries,
+            snapshot.DoctorFlowSummaries);
         Assert.Same(composition.DoctorDetail.DoctorProcedureMix, snapshot.DoctorProcedureMix);
         Assert.Same(
             composition.ReviewQueue.ExceptionReviewRecords,
@@ -465,7 +475,9 @@ public sealed class ReportsSnapshotBuilderTests
             "query",
             "samples",
             "scopedProcedureGroups",
-            "doctorAllocationSamples"
+            "doctorAllocationSamples",
+            "observedDoctorFlowDays",
+            "doctorFlowSummaries"
         ],
             actualNames);
 
@@ -481,6 +493,8 @@ public sealed class ReportsSnapshotBuilderTests
         Assert.Equal(JsonValueKind.Object, json.GetProperty("samples").ValueKind);
         Assert.Equal(JsonValueKind.Array, json.GetProperty("scopedProcedureGroups").ValueKind);
         Assert.Equal(JsonValueKind.Array, json.GetProperty("doctorAllocationSamples").ValueKind);
+        Assert.Equal(JsonValueKind.Array, json.GetProperty("observedDoctorFlowDays").ValueKind);
+        Assert.Equal(JsonValueKind.Array, json.GetProperty("doctorFlowSummaries").ValueKind);
     }
 
     [Fact]
@@ -529,6 +543,11 @@ public sealed class ReportsSnapshotBuilderTests
         Assert.Equal(1, trend.ReadyWaitSample!.PopulationCount);
         Assert.Equal(1, trend.ReadyWaitSample.ContributingCount);
         Assert.Equal(ReportSampleStates.Limited, trend.ReadyWaitSample.State);
+        var flowSummary = Assert.Single(snapshot.DoctorFlowSummaries!);
+        Assert.Equal("former-doctor", flowSummary.DoctorId);
+        Assert.Equal(1, flowSummary.CompletedCaseCount);
+        Assert.Equal(1, flowSummary.ObservedDoctorDayCount);
+        Assert.Single(snapshot.ObservedDoctorFlowDays!);
     }
 
     [Fact]
@@ -771,6 +790,312 @@ public sealed class ReportsSnapshotBuilderTests
     }
 
     [Fact]
+    public void Build_mixed_canonical_and_legacy_day_keeps_completed_and_phase_metrics_separate()
+    {
+        var canonical = Cycle(
+            1, 1, "EXT",
+            Utc(2026, 8, 10, 8, 0), Utc(2026, 8, 10, 8, 5), Utc(2026, 8, 10, 8, 10),
+            Utc(2026, 8, 10, 8, 30), Utc(2026, 8, 10, 8, 40), 30);
+        var legacy = Cycle(
+            2, 2, "CON",
+            Utc(2026, 8, 10, 8, 20), Utc(2026, 8, 10, 8, 25), Utc(2026, 8, 10, 8, 40),
+            Utc(2026, 8, 10, 10, 0), Utc(2026, 8, 10, 10, 10), 30);
+        legacy.ReadyForDoctorAt = null;
+        legacy.PrepSeconds = null;
+        legacy.ReadyToDoctorSeconds = null;
+
+        var snapshot = CreateBuilder().Build([canonical, legacy], [], ReportQuery.Default);
+
+        var summary = Assert.Single(snapshot.DoctorFlowSummaries!);
+        Assert.Equal(2, summary.CompletedCaseCount);
+        Assert.Equal(300, summary.MedianReadyWaitSeconds);
+        Assert.Equal(3_000, summary.MedianDoctorTimeSeconds);
+        Assert.Equal(2, summary.Samples.CompletedCases.ContributingCount);
+        Assert.Equal(1, summary.Samples.ReadyWait.ContributingCount);
+        Assert.Equal(2, summary.Samples.DoctorTime.ContributingCount);
+        Assert.Equal(1, summary.ObservedDoctorDayCount);
+
+        var day = Assert.Single(snapshot.ObservedDoctorFlowDays!);
+        Assert.Equal(1, day.QualifyingCaseCount);
+        Assert.Equal(canonical.ReadyForDoctorAt, day.FirstAcceptedReadyAt);
+        Assert.Equal(canonical.DoctorCompleteAt, day.LastDoctorCompleteAt);
+        Assert.Equal(25, day.ObservedClinicalSpanMinutes);
+        Assert.Equal(5, day.UnstructuredTimeMinutes);
+        Assert.Equal(20, day.MinutesWithOneDoctorWorkingRoom);
+        Assert.Equal(0, day.MinutesWithTwoDoctorWorkingRooms);
+        Assert.Equal(0, day.MinutesWithThreeOrMoreDoctorWorkingRooms);
+        Assert.Equal(1, day.PeakConcurrentRooms);
+        Assert.Null(legacy.ReadyForDoctorAt);
+
+        var compatibilityDay = Assert.Single(snapshot.ObservedDoctorDays!);
+        Assert.Equal(2, compatibilityDay.EncounterCount);
+        Assert.Equal(legacy.DoctorCompleteAt, compatibilityDay.LastDoctorCompleteAt);
+    }
+
+    [Fact]
+    public void Build_doctor_phase_timing_does_not_require_completed_throughput()
+    {
+        var readyOnly = Cycle(
+            1, 1, "EXT",
+            Utc(2026, 8, 10, 8, 0), Utc(2026, 8, 10, 8, 5), Utc(2026, 8, 10, 8, 12),
+            null, null, 30);
+        var doctorComplete = Cycle(
+            2, 2, "CON",
+            Utc(2026, 8, 10, 9, 0), Utc(2026, 8, 10, 9, 5), Utc(2026, 8, 10, 9, 10),
+            Utc(2026, 8, 10, 9, 30), null, 30);
+
+        var snapshot = CreateBuilder().Build([readyOnly, doctorComplete], [], ReportQuery.Default);
+        var summary = Assert.Single(snapshot.DoctorFlowSummaries!);
+
+        Assert.Equal(0, summary.CompletedCaseCount);
+        Assert.Equal(360, summary.MedianReadyWaitSeconds);
+        Assert.Equal(1_200, summary.MedianDoctorTimeSeconds);
+        Assert.Equal(2, summary.Samples.ReadyWait.PopulationCount);
+        Assert.Equal(2, summary.Samples.ReadyWait.ContributingCount);
+        Assert.Equal(2, summary.Samples.DoctorTime.PopulationCount);
+        Assert.Equal(1, summary.Samples.DoctorTime.ContributingCount);
+        Assert.Empty(snapshot.ObservedDoctorFlowDays!);
+    }
+
+    [Fact]
+    public void Build_canonical_room_load_partitions_single_two_and_three_plus_working_rooms()
+    {
+        var start = Utc(2026, 8, 10, 8, 0);
+        CompletedRoomCycle[] cycles =
+        [
+            Cycle(1, 1, "EXT", start, start, start.AddMinutes(10), start.AddMinutes(50), start.AddMinutes(55), 30),
+            Cycle(2, 2, "CON", start.AddMinutes(5), start.AddMinutes(5), start.AddMinutes(20), start.AddMinutes(40), start.AddMinutes(45), 30),
+            Cycle(3, 3, "BX", start.AddMinutes(15), start.AddMinutes(15), start.AddMinutes(25), start.AddMinutes(35), start.AddMinutes(40), 30)
+        ];
+
+        var day = Assert.Single(CreateBuilder().Build(cycles, [], ReportQuery.Default).ObservedDoctorFlowDays!);
+
+        Assert.Equal(50, day.ObservedClinicalSpanMinutes);
+        Assert.Equal(10, day.UnstructuredTimeMinutes);
+        Assert.Equal(20, day.MinutesWithOneDoctorWorkingRoom);
+        Assert.Equal(10, day.MinutesWithTwoDoctorWorkingRooms);
+        Assert.Equal(10, day.MinutesWithThreeOrMoreDoctorWorkingRooms);
+        Assert.Equal(3, day.PeakConcurrentRooms);
+        Assert.Equal(
+            day.ObservedClinicalSpanMinutes,
+            day.UnstructuredTimeMinutes
+            + day.MinutesWithOneDoctorWorkingRoom
+            + day.MinutesWithTwoDoctorWorkingRooms
+            + day.MinutesWithThreeOrMoreDoctorWorkingRooms);
+    }
+
+    [Fact]
+    public void Build_sequential_working_intervals_count_prearrival_and_between_case_gaps_as_unstructured()
+    {
+        var start = Utc(2026, 8, 10, 8, 0);
+        CompletedRoomCycle[] cycles =
+        [
+            Cycle(1, 1, "EXT", start, start, start.AddMinutes(5), start.AddMinutes(15), start.AddMinutes(18), 30),
+            Cycle(2, 2, "CON", start.AddMinutes(18), start.AddMinutes(20), start.AddMinutes(25), start.AddMinutes(35), start.AddMinutes(50), 30)
+        ];
+
+        var day = Assert.Single(CreateBuilder().Build(cycles, [], ReportQuery.Default).ObservedDoctorFlowDays!);
+
+        Assert.Equal(35, day.ObservedClinicalSpanMinutes);
+        Assert.Equal(15, day.UnstructuredTimeMinutes);
+        Assert.Equal(20, day.MinutesWithOneDoctorWorkingRoom);
+        Assert.Equal(1, day.PeakConcurrentRooms);
+        Assert.Equal(start.AddMinutes(35), day.LastDoctorCompleteAt);
+    }
+
+    [Fact]
+    public void Build_fractional_bucket_minutes_use_stable_largest_remainder_tie_break()
+    {
+        var start = Utc(2026, 8, 10, 8, 0, 0);
+        var end = start.AddMinutes(2);
+        CompletedRoomCycle[] cycles =
+        [
+            Cycle(1, 1, "EXT", start, start, start.AddSeconds(30), end, end.AddMinutes(1), 30),
+            Cycle(2, 2, "CON", start, start, start.AddSeconds(60), end, end.AddMinutes(1), 30),
+            Cycle(3, 3, "BX", start, start, start.AddSeconds(90), end, end.AddMinutes(1), 30)
+        ];
+
+        var day = Assert.Single(CreateBuilder().Build(cycles, [], ReportQuery.Default).ObservedDoctorFlowDays!);
+
+        Assert.Equal(2, day.ObservedClinicalSpanMinutes);
+        Assert.Equal(1, day.UnstructuredTimeMinutes);
+        Assert.Equal(1, day.MinutesWithOneDoctorWorkingRoom);
+        Assert.Equal(0, day.MinutesWithTwoDoctorWorkingRooms);
+        Assert.Equal(0, day.MinutesWithThreeOrMoreDoctorWorkingRooms);
+        Assert.Equal(3, day.PeakConcurrentRooms);
+    }
+
+    [Fact]
+    public void Build_emits_no_canonical_day_for_missing_ready_missing_arrival_or_cross_day_flow()
+    {
+        var legacy = CompletedCycle(1, "EXT");
+        legacy.ReadyForDoctorAt = null;
+        legacy.PrepSeconds = null;
+        legacy.ReadyToDoctorSeconds = null;
+
+        var missingArrival = CompletedCycle(2, "CON");
+        missingArrival.DoctorArrivedAt = null;
+        missingArrival.DoctorInRoomSeconds = null;
+
+        var crossDay = Cycle(
+            3, 3, "BX",
+            Utc(2026, 8, 11, 0, 0), Utc(2026, 8, 10, 23, 50), Utc(2026, 8, 11, 0, 5),
+            Utc(2026, 8, 11, 0, 20), Utc(2026, 8, 11, 0, 30), 30);
+
+        var snapshot = CreateBuilder().Build([legacy, missingArrival, crossDay], [], ReportQuery.Default);
+
+        Assert.Empty(snapshot.ObservedDoctorFlowDays!);
+        var summary = Assert.Single(snapshot.DoctorFlowSummaries!);
+        Assert.Equal(ReportSampleStates.Unavailable, summary.Samples.ObservedDays.State);
+        Assert.Null(summary.MedianObservedClinicalSpanMinutes);
+        Assert.Null(summary.PeakConcurrentRooms);
+    }
+
+    [Fact]
+    public void Build_groups_canonical_days_by_doctor_complete_utc_date()
+    {
+        var offset = TimeSpan.FromHours(-5);
+        var ready = new DateTimeOffset(2026, 8, 10, 19, 10, 0, offset);
+        var cycle = Cycle(
+            1,
+            1,
+            "EXT",
+            ready.AddMinutes(-5),
+            ready,
+            ready.AddMinutes(5),
+            ready.AddMinutes(30),
+            ready.AddMinutes(40),
+            30);
+
+        var day = Assert.Single(CreateBuilder().Build([cycle], [], ReportQuery.Default).ObservedDoctorFlowDays!);
+
+        Assert.Equal("2026-08-11", day.ReportDate);
+        Assert.Equal(ready, day.FirstAcceptedReadyAt);
+        Assert.Equal(ready.AddMinutes(30), day.LastDoctorCompleteAt);
+    }
+
+    [Fact]
+    public void Build_doctor_flow_summary_uses_underlying_medians_across_months()
+    {
+        var january = Cycle(
+            1, 1, "EXT",
+            Utc(2026, 1, 10, 8, 0), Utc(2026, 1, 10, 8, 5), Utc(2026, 1, 10, 9, 45),
+            Utc(2026, 1, 10, 11, 5), Utc(2026, 1, 10, 11, 10), 30);
+        var februaryStart = Utc(2026, 2, 10, 8, 0);
+        CompletedRoomCycle[] cycles =
+        [
+            january,
+            Cycle(2, 2, "CON", februaryStart, februaryStart.AddMinutes(1), februaryStart.AddMinutes(2), februaryStart.AddMinutes(12), februaryStart.AddMinutes(15), 30),
+            Cycle(3, 3, "BX", februaryStart.AddHours(1), februaryStart.AddHours(1).AddMinutes(1), februaryStart.AddHours(1).AddMinutes(3), februaryStart.AddHours(1).AddMinutes(23), februaryStart.AddHours(1).AddMinutes(26), 30),
+            Cycle(4, 4, "EXT", februaryStart.AddHours(2), februaryStart.AddHours(2).AddMinutes(1), februaryStart.AddHours(2).AddMinutes(4), februaryStart.AddHours(2).AddMinutes(34), februaryStart.AddHours(2).AddMinutes(37), 30)
+        ];
+
+        var summary = Assert.Single(CreateBuilder().Build(cycles, [], ReportQuery.Default).DoctorFlowSummaries!);
+
+        Assert.Equal(150, summary.MedianReadyWaitSeconds);
+        Assert.Equal(1_500, summary.MedianDoctorTimeSeconds);
+        Assert.NotEqual(3_075, summary.MedianReadyWaitSeconds);
+    }
+
+    [Fact]
+    public void Build_doctor_flow_summary_uses_median_canonical_span_and_server_sample_states()
+    {
+        var start = Utc(2026, 8, 1, 8, 0);
+        var cycles = Enumerable.Range(0, 5)
+            .Select(index =>
+            {
+                var ready = start.AddDays(index);
+                return Cycle(
+                    index + 1,
+                    index + 1,
+                    index % 2 == 0 ? "EXT" : "CON",
+                    ready,
+                    ready,
+                    ready.AddMinutes(5),
+                    ready.AddMinutes(10 + (index * 10)),
+                    ready.AddMinutes(70 + (index * 10)),
+                    30);
+            })
+            .ToArray();
+
+        var sufficient = Assert.Single(CreateBuilder().Build(cycles, [], ReportQuery.Default).DoctorFlowSummaries!);
+        Assert.Equal(30, sufficient.MedianObservedClinicalSpanMinutes);
+        Assert.Equal(5, sufficient.ObservedDoctorDayCount);
+        Assert.Equal(ReportSampleStates.Sufficient, sufficient.Samples.ObservedDays.State);
+
+        var empty = Assert.Single(CreateBuilder().Build([], [], ReportQuery.Default).DoctorFlowSummaries!);
+        Assert.Equal(ReportSampleStates.Empty, empty.Samples.CompletedCases.State);
+        Assert.Equal(ReportSampleStates.Empty, empty.Samples.ObservedDays.State);
+        Assert.Null(empty.MedianReadyWaitSeconds);
+        Assert.Null(empty.MedianDoctorTimeSeconds);
+
+        var limited = Assert.Single(CreateBuilder().Build([cycles[0]], [], ReportQuery.Default).DoctorFlowSummaries!);
+        Assert.Equal(ReportSampleStates.Limited, limited.Samples.ObservedDays.State);
+    }
+
+    [Fact]
+    public void Build_practice_summary_keeps_active_roster_order_then_historical_and_doctor_scope_is_exact()
+    {
+        Doctor[] allDoctors =
+        [
+            new("otte", "Dr. Otte", "LDO", "#dc2626"),
+            new("pledger", "Dr. Pledger", "JWP", "#16a34a"),
+            new("former", "Dr. Former", "OLD", "#64748b")
+        ];
+        Doctor[] activeDoctors = [allDoctors[0], allDoctors[1]];
+        var historical = CompletedCycle(1, "EXT", "former");
+        var practice = CreateBuilder(allDoctors, activeDoctors).Build([historical], [], ReportQuery.Default);
+        var summaries = Assert.IsAssignableFrom<IReadOnlyList<DoctorFlowSummary>>(practice.DoctorFlowSummaries);
+
+        Assert.Equal(["otte", "pledger", "former"], summaries.Select(row => row.DoctorId));
+        Assert.Equal(ReportSampleStates.Empty, summaries[0].Samples.CompletedCases.State);
+        Assert.Equal(ReportSampleStates.Empty, summaries[1].Samples.CompletedCases.State);
+        Assert.Equal(ReportSampleStates.Limited, summaries[2].Samples.CompletedCases.State);
+
+        var doctorQuery = ReportQuery.FromStrings(
+            null, null, ReportScopeKinds.Doctor, "former", ReportSedationSegments.Sedation,
+            ReportProcedureGroupings.Family);
+        var scoped = CreateBuilder(allDoctors, activeDoctors).Build([historical], [], doctorQuery);
+        var requested = Assert.Single(scoped.DoctorFlowSummaries!);
+        Assert.Equal("former", requested.DoctorId);
+        Assert.Equal(ReportSampleStates.Empty, requested.Samples.CompletedCases.State);
+    }
+
+    [Fact]
+    public void Canonical_and_compatibility_observed_day_json_contracts_remain_distinct()
+    {
+        var snapshot = CreateBuilder().Build([CompletedCycle(1, "EXT")], [], ReportQuery.Default);
+        var json = JsonSerializer.SerializeToElement(snapshot, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        var compatibility = json.GetProperty("observedDoctorDays")[0];
+        var canonical = json.GetProperty("observedDoctorFlowDays")[0];
+
+        Assert.Equal(
+            [
+                "doctorId", "doctorName", "reportDate", "encounterCount", "firstSeatedAt",
+                "firstDoctorArrivedAt", "lastDoctorCompleteAt", "lastRoomAvailableAt",
+                "observedClinicalSpanMinutes", "observedTeamSpanMinutes",
+                "minutesWithOneActiveRoom", "minutesWithTwoActiveRooms",
+                "minutesWithThreeOrMoreActiveRooms", "maxActiveRoomCount"
+            ],
+            compatibility.EnumerateObject().Select(property => property.Name).ToArray());
+        Assert.Equal(
+            [
+                "doctorId", "doctorName", "reportDate", "qualifyingCaseCount",
+                "firstAcceptedReadyAt", "lastDoctorCompleteAt", "observedClinicalSpanMinutes",
+                "minutesWithOneDoctorWorkingRoom", "minutesWithTwoDoctorWorkingRooms",
+                "minutesWithThreeOrMoreDoctorWorkingRooms", "unstructuredTimeMinutes",
+                "peakConcurrentRooms"
+            ],
+            canonical.EnumerateObject().Select(property => property.Name).ToArray());
+
+        var summary = json.GetProperty("doctorFlowSummaries")[0];
+        Assert.Equal(JsonValueKind.Object, summary.GetProperty("samples").ValueKind);
+        Assert.Equal(
+            ["completedCases", "readyWait", "doctorTime", "observedDays"],
+            summary.GetProperty("samples").EnumerateObject().Select(property => property.Name).ToArray());
+    }
+
+    [Fact]
     public void Build_keeps_review_queue_global_to_analytical_scope_but_bounded_by_window()
     {
         var inWindow = new AbortedRoomAssignment
@@ -810,9 +1135,11 @@ public sealed class ReportsSnapshotBuilderTests
         Assert.Empty(snapshot.RecentCompletedCycles);
     }
 
-    private static ReportsSnapshotBuilder CreateBuilder()
+    private static ReportsSnapshotBuilder CreateBuilder(
+        IReadOnlyList<Doctor>? doctors = null,
+        IReadOnlyList<Doctor>? activeDoctors = null)
     {
-        Doctor[] doctors =
+        Doctor[] defaultDoctors =
         [
             new("otte", "Dr. Otte", "LDO", "#dc2626")
         ];
@@ -824,7 +1151,9 @@ public sealed class ReportsSnapshotBuilderTests
             new("biopsy", "BX", "Biopsy", "vial")
         ];
         ProcedureCategory[] activeProcedures = [procedures[0], procedures[1], procedures[3]];
-        return new ReportsSnapshotBuilder(doctors, procedures, activeProcedures);
+        var allDoctors = doctors ?? defaultDoctors;
+        var active = activeDoctors ?? allDoctors;
+        return new ReportsSnapshotBuilder(allDoctors, active, procedures, activeProcedures);
     }
 
     private static ReportsSnapshot BuildScoped(
@@ -926,4 +1255,7 @@ public sealed class ReportsSnapshotBuilderTests
 
     private static DateTimeOffset Utc(int year, int month, int day, int hour, int minute) =>
         new(year, month, day, hour, minute, 0, TimeSpan.Zero);
+
+    private static DateTimeOffset Utc(int year, int month, int day, int hour, int minute, int second) =>
+        new(year, month, day, hour, minute, second, TimeSpan.Zero);
 }

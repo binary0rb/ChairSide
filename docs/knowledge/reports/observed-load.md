@@ -1,52 +1,70 @@
 ---
 title: Observed load
 tags: [reports, doctor-flow, observed-load, reporting-population, domain-rule, active, last-verified]
-last_verified_commit: f74561c
+last_verified_commit: 7e566bd
 ---
 
 # Observed load
 
 ## Intent
 
-Observed load describes how busy a doctor's observed clinic day looked, derived only from ChairSide room events. It is a descriptive read model surfaced in the selected-doctor Flow Breakdown tab. It is not a ranking, a score, or a productivity target, and it does not claim to know the doctor's true schedule, appointment book, or availability. It reports what the room events show, nothing more.
+Observed Doctor Flow describes the room flow ChairSide actually observes for a doctor. It is a descriptive read model surfaced in Doctor Overview and the selected-doctor Room Load / Flow tab. It is not a ranking, score, productivity target, attendance record, or claim about a doctor's schedule. It reports only what ChairSide room events show.
 
-## Approved redesign boundary
+## Canonical implementation
 
-This note describes the currently implemented observed-load read model. The approved target semantics for the reporting redesign are canonical in `docs/design/reporting-design.md`.
+Issue #216 adds two canonical, server-owned projections without changing the older public contract:
 
-Under issue #216:
+- `ObservedDoctorFlowDay` / `observedDoctorFlowDays` is the Ready-anchored day authority for Doctor Flow presentation.
+- `DoctorFlowSummary` / `doctorFlowSummaries` is the range-level Doctor Overview authority. It calculates medians from underlying phase observations and canonical day rows, never from monthly medians.
 
-- Observed Clinical Span changes from the current first-Seated start to the first qualifying accepted Ready handoff;
-- room-load concurrency changes from Seated-to-Doctor-Complete room intervals to Doctor Working intervals (`DoctorArrivedAt -> DoctorCompleteAt`);
-- overlapping Doctor Working intervals use wall-clock union/sweep-line accounting;
-- Unstructured Time becomes the span remainder with no active Doctor Working interval;
-- no-activity doctor-days are omitted rather than represented as zero.
+A case contributes to a canonical observed doctor-day only when it belongs to the scoped standard included completed population and has truthful, ordered Ready, Doctor Arrived, and Doctor Complete timestamps on the same UTC date. The finalized completed-cycle Ready timestamp is the accepted Ready reporting timestamp. Missing Ready is never inferred.
 
-Until #216 lands, keep this note as implementation truth and use the canonical reporting design as target semantic truth. Do not describe the current first-Seated span as the approved redesigned definition.
+Canonical days are grouped by doctor and Doctor Complete UTC date. Dates without qualifying activity are omitted and never zero-filled.
 
-## What it reports
+## Time model
 
-Per doctor and per observed day (`ObservedDoctorDay`):
+For each canonical observed doctor-day:
 
-- Encounter count and the day's first-seated / first-doctor-arrived / last-doctor-complete / last-room-available timestamps.
-- Observed clinical span and observed team span (whole-minute durations across the day).
-- Room-overlap concurrency buckets: minutes with one active room, two active rooms, and three-or-more active rooms, plus the peak active room count.
+- Observed Clinical Span is `[earliest accepted Ready, latest qualifying Doctor Complete)`.
+- Doctor Working is each `[Doctor Arrived, Doctor Complete)` interval.
+- Exact elapsed time is swept into mutually exclusive zero, one, two, and three-or-more Doctor Working room buckets.
+- Unstructured Time is the zero-active Doctor Working portion of Observed Clinical Span. It must not be interpreted as idle, unused, available, unproductive, recoverable, or unscheduled time.
+- Peak Concurrent Rooms is the maximum simultaneous Doctor Working interval count.
+- Room Available does not extend the span, and Seated starts neither the span nor Doctor Working.
 
-Population: built over `standardCompletedCycles`, the same standard completed-cycle population as the other calculated metrics (see [reporting-population](reporting-population.md)). It is additive - it introduced no schema change and did not alter existing metric semantics.
+Exact durations are accumulated before conversion to whole minutes. Largest-remainder apportionment uses stable bucket order - Unstructured, one room, two rooms, three-or-more rooms - and guarantees that the displayed buckets sum exactly to displayed Observed Clinical Span.
+
+## Metric grains
+
+Doctor Overview intentionally uses separate reporting grains:
+
+- Completed Cases uses scoped standard included completed history and therefore requires Room Available.
+- Median Ready Wait and Median Doctor Time use truthful contributors from the scoped standard phase population and do not require Room Available.
+- Median Observed Clinical Span, Peak Concurrent Rooms, and Observed Doctor Days use canonical qualifying `ObservedDoctorFlowDay` rows.
+
+The nested server-owned `ReportSampleContext` values preserve Empty, Unavailable, Limited, and Sufficient states at each metric's proper grain. JavaScript does not recreate the sample threshold.
+
+## Compatibility projection
+
+`ObservedDoctorDay` / `observedDoctorDays` remains an additive compatibility payload with its established first-Seated Observed Clinical Span, Seated-to-Doctor-Complete active-room concurrency, Observed Team Span, and legacy field names. Issue #216 does not redefine or remove those fields.
+
+New Doctor Flow presentation must use `observedDoctorFlowDays`. Future Doctor Trends work should also build from the canonical projection rather than the compatibility model.
 
 ## Constraints
 
-- Present it as descriptive context only. Do not frame observed load as a performance ranking, a capacity guarantee, or recoverable time.
-- Overlap/concurrency is an observation about rooms, not a judgment about a person.
-- Keep it over the standard completed population; do not widen it to include incomplete or reporting-exception cycles.
+- Present canonical flow as descriptive operational context only.
+- Do not create rankings, scores, attendance claims, or productivity interpretations.
+- Keep canonical days over scoped standard included completed history. Phase timing summaries retain their distinct scoped standard phase population.
+- Keep compatibility and canonical projection names explicit in code, tests, and UI selection.
 
 ## Source anchors
 
-- `src/ChairSide.Board/Services/ReportsSnapshotBuilder.cs` - `BuildObservedDoctorDays` and `BuildObservedRoomConcurrency`.
-- `tests/ChairSide.Board.Tests/BoardStoreReportingTests.cs` - `Reports_observed_doctor_days_report_span_fields_for_included_completed_cycles` and `Reports_observed_doctor_days_bucket_active_room_minutes_by_concurrency`.
-- `src/ChairSide.Board/wwwroot/board.js` - selected-doctor Flow Breakdown rendering of observed load.
+- `src/ChairSide.Board/Services/ReportsSnapshotBuilder.cs` - `BuildObservedDoctorFlowDays`, `BuildObservedDoctorWorkingConcurrency`, `BuildDoctorFlowSummaries`, and the separate compatibility `BuildObservedDoctorDays` path.
+- `tests/ChairSide.Board.Tests/ReportsSnapshotBuilderTests.cs` - canonical qualification, mixed legacy/canonical populations, exact concurrency partitioning, medians, samples, ordering, and additive JSON contracts.
+- `tests/ChairSide.Board.Tests/BoardStoreReportingTests.cs` - reissued accepted Ready integration coverage.
+- `src/ChairSide.Board/wwwroot/reports.js` - Doctor Overview and Room Load / Flow presentation from the canonical projections.
 - `docs/knowledge-graph/chairside.graph.md` - reporting-semantics notes reference the observed load read model.
 
 ## Verification notes
 
-Verified at `f74561c`: the current `ObservedDoctorDay` builder still starts Observed Clinical Span at first Seated and builds concurrency from Seated-to-Doctor-Complete intervals over `standardCompletedCycles`. Those current semantics are intentionally superseded by the approved target design once #216 is implemented.
+Verified while implementing issue #216 from baseline `7e566bd`: the new canonical projections are additive. The older `ObservedDoctorDay` semantics remain intact for compatibility, while Doctor Overview and Room Load / Flow use the Ready-anchored `ObservedDoctorFlowDay` and server-owned `DoctorFlowSummary` contracts.

@@ -204,6 +204,17 @@ public sealed record ReportDoctorAllocationSampleContext(
     ReportSampleContext Sample);
 
 /// <summary>
+/// Metric-grain sample context for one canonical doctor-flow summary. Phase timing metrics retain
+/// the scoped standard phase population, completed throughput uses included completed history, and
+/// observed-flow metrics use distinct completed-history dates versus qualifying canonical days.
+/// </summary>
+public sealed record ReportDoctorFlowMetricSampleContext(
+    ReportSampleContext CompletedCases,
+    ReportSampleContext ReadyWait,
+    ReportSampleContext DoctorTime,
+    ReportSampleContext ObservedDays);
+
+/// <summary>
 /// One procedure aggregation row over the current scoped included completed population.
 /// Family grouping folds sedation variants without changing the population selected by the query.
 /// </summary>

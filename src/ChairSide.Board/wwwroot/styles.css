@@ -1466,7 +1466,12 @@ body[data-view="doctor"] .doctor-current-rooms-frame .doctor-list.room-count-1 {
 .reports-shell {
   display: grid;
   gap: 18px;
+  min-width: 0;
   padding-top: 18px;
+}
+
+.reports-shell > * {
+  min-width: 0;
 }
 
 .report-summary {
@@ -1892,6 +1897,10 @@ body[data-view="reports"] .report-range-custom {
   gap: 10px;
 }
 
+body[data-view="reports"] .report-range-custom[hidden] {
+  display: none;
+}
+
 body[data-view="reports"] .report-range-field {
   display: inline-flex;
   align-items: center;
@@ -2308,6 +2317,11 @@ body[data-view="doctor"] .selected-doctor-kpis {
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 10px;
   margin: 0;
+}
+
+body[data-view="reports"] .selected-doctor-kpis.doctor-flow-metrics,
+body[data-view="doctor"] .selected-doctor-kpis.doctor-flow-metrics {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 body[data-view="reports"] .selected-doctor-kpis > div,
@@ -2998,15 +3012,6 @@ button:disabled {
   content: " ->";
 }
 
-.doctor-sparkline {
-  position: relative;
-  z-index: 1;
-  display: block;
-  width: 100%;
-  height: 32px;
-  overflow: visible;
-}
-
 .allocation-row {
   display: grid;
   grid-template-columns: minmax(120px, 200px) 1fr;
@@ -3287,6 +3292,11 @@ button:disabled {
     grid-template-columns: 1fr;
   }
 
+  body[data-view="reports"] .report-filter-group {
+    flex-wrap: wrap;
+    min-width: 0;
+  }
+
   .room-tile {
     min-height: 136px;
   }
@@ -3316,7 +3326,9 @@ button:disabled {
     grid-template-columns: 1fr;
   }
 
-  body[data-view="reports"] .selected-doctor-kpis {
+  body[data-view="reports"] .selected-doctor-kpis,
+  body[data-view="reports"] .selected-doctor-kpis.doctor-flow-metrics,
+  body[data-view="doctor"] .selected-doctor-kpis.doctor-flow-metrics {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }

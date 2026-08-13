@@ -16,19 +16,23 @@ internal sealed class ReportsSnapshotBuilder
     private const string LegacySedationCode = "SED";
 
     private readonly IReadOnlyList<Doctor> _doctors;
+    private readonly IReadOnlyList<Doctor> _activeDoctors;
     private readonly IReadOnlyList<ProcedureCategory> _procedures;
     private readonly IReadOnlyList<ProcedureCategory> _activeProcedures;
 
     public ReportsSnapshotBuilder(
         IEnumerable<Doctor> doctors,
+        IEnumerable<Doctor> activeDoctors,
         IEnumerable<ProcedureCategory> procedures,
         IEnumerable<ProcedureCategory> activeProcedures)
     {
         ArgumentNullException.ThrowIfNull(doctors);
+        ArgumentNullException.ThrowIfNull(activeDoctors);
         ArgumentNullException.ThrowIfNull(procedures);
         ArgumentNullException.ThrowIfNull(activeProcedures);
 
         _doctors = doctors.ToArray();
+        _activeDoctors = activeDoctors.ToArray();
         _procedures = procedures.ToArray();
         _activeProcedures = activeProcedures.ToArray();
     }
@@ -117,6 +121,7 @@ internal sealed class ReportsSnapshotBuilder
 
         var scheduleFit = ScheduleFitReportBuilder.Build(standardCompletedCycles);
         var scopedProcedureGroups = BuildScopedProcedureGroups(standardCompletedCycles, query.ProcedureGrouping);
+        var observedDoctorFlowDays = BuildObservedDoctorFlowDays(standardCompletedCycles);
         var phasePopulationCount = scopedStandardCycles.Count;
         var samples = new ReportMetricSampleContext(
             CompletedCases: ReportSampleContext.ForPopulation(normalCompletedCycles.Count),
@@ -219,7 +224,13 @@ internal sealed class ReportsSnapshotBuilder
             {
                 DoctorSummaries = BuildDoctorSummaries(scopedStandardCycles),
                 DoctorAllocationSamples = BuildDoctorAllocationSamples(scopedStandardCycles, query),
+                DoctorFlowSummaries = BuildDoctorFlowSummaries(
+                    scopedStandardCycles,
+                    standardCompletedCycles,
+                    observedDoctorFlowDays,
+                    query),
                 ObservedDoctorDays = BuildObservedDoctorDays(standardCompletedCycles),
+                ObservedDoctorFlowDays = observedDoctorFlowDays,
                 DoctorProcedureMix = BuildDoctorProcedureMix(standardCompletedCycles)
             },
             ReviewQueue = new ReportReviewQueueSection
@@ -326,6 +337,38 @@ internal sealed class ReportsSnapshotBuilder
             : (ordered[middle - 1] + ordered[middle]) / 2.0;
     }
 
+    private static double? MedianSecondsOrNull(IEnumerable<int?> values)
+    {
+        var ordered = values
+            .Where(value => value.HasValue)
+            .Select(value => value!.Value)
+            .Order()
+            .ToList();
+        if (ordered.Count == 0)
+        {
+            return null;
+        }
+
+        var middle = ordered.Count / 2;
+        return ordered.Count % 2 == 1
+            ? ordered[middle]
+            : (ordered[middle - 1] + ordered[middle]) / 2.0;
+    }
+
+    private static double? MedianWholeMinutesOrNull(IEnumerable<int> values)
+    {
+        var ordered = values.Order().ToList();
+        if (ordered.Count == 0)
+        {
+            return null;
+        }
+
+        var middle = ordered.Count / 2;
+        return ordered.Count % 2 == 1
+            ? ordered[middle]
+            : (ordered[middle - 1] + ordered[middle]) / 2.0;
+    }
+
     private static IReadOnlyList<DoctorCycleSummary> BuildDoctorSummaries(IReadOnlyList<CompletedRoomCycle> cycles) =>
         cycles
             .Where(cycle => cycle.DoctorArrivedAt.HasValue)
@@ -405,6 +448,238 @@ internal sealed class ReportsSnapshotBuilder
             .OrderBy(item => item.DoctorId)
             .ToList();
 
+    private IReadOnlyList<DoctorFlowSummary> BuildDoctorFlowSummaries(
+        IReadOnlyList<CompletedRoomCycle> scopedStandardPhaseCycles,
+        IReadOnlyList<CompletedRoomCycle> scopedStandardCompletedCycles,
+        IReadOnlyList<ObservedDoctorFlowDay> observedDoctorFlowDays,
+        ReportQuery query)
+    {
+        var representedDoctorIds = scopedStandardPhaseCycles
+            .Where(cycle => !string.IsNullOrWhiteSpace(cycle.AssignedDoctor))
+            .Select(cycle => cycle.AssignedDoctor)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        IReadOnlyList<string> doctorIds;
+        if (query.Scope == ReportScopeKinds.Doctor)
+        {
+            doctorIds = string.IsNullOrWhiteSpace(query.DoctorId) ? [] : [query.DoctorId];
+        }
+        else
+        {
+            var activeIds = _activeDoctors.Select(doctor => doctor.Id).ToList();
+            var activeSet = activeIds.ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var historicalIds = representedDoctorIds
+                .Where(doctorId => !activeSet.Contains(doctorId))
+                .OrderBy(doctorId => doctorId, StringComparer.OrdinalIgnoreCase);
+            doctorIds = activeIds.Concat(historicalIds).ToList();
+        }
+
+        return doctorIds
+            .Select(doctorId =>
+            {
+                var phasePopulation = scopedStandardPhaseCycles
+                    .Where(cycle => string.Equals(
+                        cycle.AssignedDoctor,
+                        doctorId,
+                        StringComparison.OrdinalIgnoreCase))
+                    .ToList();
+                var completedPopulation = scopedStandardCompletedCycles
+                    .Where(cycle => string.Equals(
+                        cycle.AssignedDoctor,
+                        doctorId,
+                        StringComparison.OrdinalIgnoreCase))
+                    .ToList();
+                var days = observedDoctorFlowDays
+                    .Where(day => string.Equals(day.DoctorId, doctorId, StringComparison.OrdinalIgnoreCase))
+                    .ToList();
+                var readyWaitValues = phasePopulation
+                    .Select(TruthfulReadyWaitSeconds)
+                    .Where(value => value.HasValue)
+                    .ToList();
+                var doctorTimeValues = phasePopulation
+                    .Select(TruthfulDoctorTimeSeconds)
+                    .Where(value => value.HasValue)
+                    .ToList();
+                var representedCompletedDates = completedPopulation
+                    .Where(cycle => cycle.DoctorCompleteAt.HasValue)
+                    .Select(cycle => DateOnly.FromDateTime(cycle.DoctorCompleteAt!.Value.UtcDateTime))
+                    .Distinct()
+                    .Count();
+                var samples = new ReportDoctorFlowMetricSampleContext(
+                    CompletedCases: ReportSampleContext.ForPopulation(completedPopulation.Count),
+                    ReadyWait: ReportSampleContext.Create(phasePopulation.Count, readyWaitValues.Count),
+                    DoctorTime: ReportSampleContext.Create(phasePopulation.Count, doctorTimeValues.Count),
+                    ObservedDays: ReportSampleContext.Create(representedCompletedDates, days.Count));
+
+                return new DoctorFlowSummary(
+                    doctorId,
+                    ResolveDoctorDisplayName(doctorId) ?? doctorId,
+                    completedPopulation.Count,
+                    MedianSecondsOrNull(readyWaitValues),
+                    MedianSecondsOrNull(doctorTimeValues),
+                    MedianWholeMinutesOrNull(days.Select(day => day.ObservedClinicalSpanMinutes)),
+                    days.Count == 0 ? null : days.Max(day => day.PeakConcurrentRooms),
+                    days.Count,
+                    samples);
+            })
+            .ToList();
+    }
+
+    private static int? TruthfulReadyWaitSeconds(CompletedRoomCycle cycle) =>
+        cycle.ReadyForDoctorAt is { } readyAt
+        && cycle.DoctorArrivedAt is { } arrivedAt
+        && readyAt <= arrivedAt
+        && cycle.ReadyToDoctorSeconds is >= 0
+            ? cycle.ReadyToDoctorSeconds
+            : null;
+
+    private static int? TruthfulDoctorTimeSeconds(CompletedRoomCycle cycle) =>
+        cycle.DoctorArrivedAt is { } arrivedAt
+        && cycle.DoctorCompleteAt is { } completeAt
+        && arrivedAt <= completeAt
+        && cycle.DoctorInRoomSeconds is >= 0
+            ? cycle.DoctorInRoomSeconds
+            : null;
+
+    private IReadOnlyList<ObservedDoctorFlowDay> BuildObservedDoctorFlowDays(
+        IReadOnlyList<CompletedRoomCycle> scopedStandardCompletedCycles) =>
+        scopedStandardCompletedCycles
+            .Where(IsQualifyingObservedDoctorFlowCase)
+            .GroupBy(cycle => new
+            {
+                DoctorId = cycle.AssignedDoctor ?? "",
+                ReportDate = DateOnly.FromDateTime(cycle.DoctorCompleteAt!.Value.UtcDateTime)
+            })
+            .Select(group =>
+            {
+                var qualifyingCycles = group.ToList();
+                var firstAcceptedReadyAt = qualifyingCycles.Min(cycle => cycle.ReadyForDoctorAt!.Value);
+                var lastDoctorCompleteAt = qualifyingCycles.Max(cycle => cycle.DoctorCompleteAt!.Value);
+                var concurrency = BuildObservedDoctorWorkingConcurrency(
+                    firstAcceptedReadyAt,
+                    lastDoctorCompleteAt,
+                    qualifyingCycles);
+
+                return new ObservedDoctorFlowDay(
+                    group.Key.DoctorId,
+                    ResolveDoctorDisplayName(group.Key.DoctorId) ?? group.Key.DoctorId,
+                    group.Key.ReportDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+                    qualifyingCycles.Count,
+                    firstAcceptedReadyAt,
+                    lastDoctorCompleteAt,
+                    concurrency.ObservedClinicalSpanMinutes,
+                    concurrency.MinutesWithOneDoctorWorkingRoom,
+                    concurrency.MinutesWithTwoDoctorWorkingRooms,
+                    concurrency.MinutesWithThreeOrMoreDoctorWorkingRooms,
+                    concurrency.UnstructuredTimeMinutes,
+                    concurrency.PeakConcurrentRooms);
+            })
+            .OrderBy(day => day.ReportDate, StringComparer.Ordinal)
+            .ThenBy(day => day.DoctorId, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+    private static bool IsQualifyingObservedDoctorFlowCase(CompletedRoomCycle cycle)
+    {
+        if (cycle.ReadyForDoctorAt is not { } readyAt
+            || cycle.DoctorArrivedAt is not { } arrivedAt
+            || cycle.DoctorCompleteAt is not { } completeAt
+            || readyAt > arrivedAt
+            || arrivedAt > completeAt)
+        {
+            return false;
+        }
+
+        return readyAt.UtcDateTime.Date == completeAt.UtcDateTime.Date;
+    }
+
+    private static ObservedDoctorWorkingConcurrency BuildObservedDoctorWorkingConcurrency(
+        DateTimeOffset spanStart,
+        DateTimeOffset spanEnd,
+        IReadOnlyList<CompletedRoomCycle> qualifyingCycles)
+    {
+        var events = new List<(DateTimeOffset At, int Delta)>();
+        foreach (var cycle in qualifyingCycles)
+        {
+            var intervalStart = cycle.DoctorArrivedAt!.Value < spanStart
+                ? spanStart
+                : cycle.DoctorArrivedAt.Value;
+            var intervalEnd = cycle.DoctorCompleteAt!.Value > spanEnd
+                ? spanEnd
+                : cycle.DoctorCompleteAt.Value;
+            if (intervalEnd <= intervalStart)
+            {
+                continue;
+            }
+
+            events.Add((intervalStart, 1));
+            events.Add((intervalEnd, -1));
+        }
+
+        var exactTicks = new long[4];
+        var activeCount = 0;
+        var peakConcurrentRooms = 0;
+        var previousAt = spanStart;
+        foreach (var point in events
+            .GroupBy(item => item.At)
+            .OrderBy(group => group.Key)
+            .Select(group => new { At = group.Key, Delta = group.Sum(item => item.Delta) }))
+        {
+            if (point.At > previousAt)
+            {
+                exactTicks[DoctorWorkingBucketIndex(activeCount)] += (point.At - previousAt).Ticks;
+            }
+
+            activeCount += point.Delta;
+            peakConcurrentRooms = Math.Max(peakConcurrentRooms, activeCount);
+            previousAt = point.At;
+        }
+
+        if (spanEnd > previousAt)
+        {
+            exactTicks[DoctorWorkingBucketIndex(activeCount)] += (spanEnd - previousAt).Ticks;
+        }
+
+        var wholeMinutes = ApportionObservedFlowWholeMinutes(exactTicks);
+        return new ObservedDoctorWorkingConcurrency(
+            wholeMinutes.Sum(),
+            wholeMinutes[1],
+            wholeMinutes[2],
+            wholeMinutes[3],
+            wholeMinutes[0],
+            peakConcurrentRooms);
+    }
+
+    private static int DoctorWorkingBucketIndex(int activeCount) => activeCount switch
+    {
+        <= 0 => 0,
+        1 => 1,
+        2 => 2,
+        _ => 3
+    };
+
+    private static int[] ApportionObservedFlowWholeMinutes(IReadOnlyList<long> exactTicks)
+    {
+        var ticksPerMinute = TimeSpan.TicksPerMinute;
+        var wholeMinutes = exactTicks.Select(ticks => (int)(ticks / ticksPerMinute)).ToArray();
+        var targetMinutes = (int)(exactTicks.Sum() / ticksPerMinute);
+        var remainingMinutes = targetMinutes - wholeMinutes.Sum();
+
+        // Stable tie-break order is canonical bucket order: Unstructured, 1 room, 2 rooms, 3+.
+        foreach (var bucket in exactTicks
+            .Select((ticks, index) => new { Index = index, Remainder = ticks % ticksPerMinute })
+            .OrderByDescending(item => item.Remainder)
+            .ThenBy(item => item.Index)
+            .Take(remainingMinutes))
+        {
+            wholeMinutes[bucket.Index]++;
+        }
+
+        return wholeMinutes;
+    }
+
+    // Compatibility projection: preserve the established Seated-based span and concurrency fields.
+    // Canonical #216 Ready-anchored flow is built separately by BuildObservedDoctorFlowDays.
     private IReadOnlyList<ObservedDoctorDay> BuildObservedDoctorDays(IReadOnlyList<CompletedRoomCycle> cycles) =>
         cycles
             .Where(cycle => cycle.DoctorCompleteAt.HasValue && cycle.RoomAvailableAt.HasValue)
