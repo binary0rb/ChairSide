@@ -954,7 +954,7 @@
                   {
                       "path":  "MISTAKES.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  3655,
+                      "sizeBytes":  3706,
                       "typeSymbols":  [
 
                                       ],
@@ -982,7 +982,6 @@
                                        "What not to record",
                                        "Promotion",
                                        "Entry format",
-                                       "YYYY-MM-DD - Short incident title",
                                        "Incident entries"
                                    ]
                   },

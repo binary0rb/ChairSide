@@ -46,11 +46,9 @@ Do not promote a rule automatically after one incident, and do not edit reposito
 
 ## Entry format
 
-Place newest incidents first. Keep entries compact and evidence-based.
+Place newest incidents first. Keep entries compact and evidence-based. Each incident begins with an H2 heading in the form `YYYY-MM-DD - Short incident title`.
 
 ```markdown
-## YYYY-MM-DD - Short incident title
-
 - Area: <subsystem/files/workflow>
 - What happened: <observable failure>
 - Verified root cause: <cause established by evidence>
