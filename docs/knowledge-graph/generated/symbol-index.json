@@ -1,12 +1,12 @@
 ﻿{
     "generatedStamp":  "deterministic",
     "root":  ".",
-    "fileCount":  169,
+    "fileCount":  170,
     "files":  [
                   {
                       "path":  ".github/pull_request_template.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  591,
+                      "sizeBytes":  746,
                       "typeSymbols":  [
 
                                       ],
@@ -27,6 +27,7 @@
                                           ],
                       "headings":  [
                                        "Knowledge impact",
+                                       "Mistakes learning",
                                        "Validation"
                                    ]
                   },
@@ -59,7 +60,7 @@
                   {
                       "path":  "AGENTS.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  19133,
+                      "sizeBytes":  20632,
                       "typeSymbols":  [
 
                                       ],
@@ -85,6 +86,7 @@
                                        "Purpose",
                                        "Scope",
                                        "Repository orientation and token discipline",
+                                       "Verified mistakes and learning",
                                        "Private development knowledge graph",
                                        "PR knowledge-impact check",
                                        "Markdown and documentation formatting",
@@ -947,6 +949,40 @@
                                           ],
                       "headings":  [
 
+                                   ]
+                  },
+                  {
+                      "path":  "MISTAKES.md",
+                      "kind":  "Markdown",
+                      "sizeBytes":  3706,
+                      "typeSymbols":  [
+
+                                      ],
+                      "methodSymbols":  [
+
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+                                       "Verified Mistakes Learning Ledger",
+                                       "Purpose",
+                                       "Authority boundary",
+                                       "When to consult",
+                                       "When to add an entry",
+                                       "What not to record",
+                                       "Promotion",
+                                       "Entry format",
+                                       "Incident entries"
                                    ]
                   },
                   {
