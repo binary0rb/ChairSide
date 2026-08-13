@@ -685,19 +685,16 @@ export function createReports({
   }
 
   const coverage = formatScheduleFitCoverage(summary);
+  const fitPresentation = scheduleFitPresentationState(summary);
   const samplePresentation = sampledPresentation(summary.sample, coverage);
   card.innerHTML = `
     ${pill}
     <h3>Practice Schedule Fit</h3>
-    <p class="allocation-lead">${escapeHtml(coverage)} have a valid historical assigned fit pair.</p>
+    <p class="allocation-lead">${fitPresentation.state === "Empty"
+      ? escapeHtml(fitPresentation.value)
+      : `${escapeHtml(coverage)} have a valid historical assigned fit pair.`}</p>
     ${renderSampleContext(samplePresentation)}
-    <dl class="schedule-fit-kpis">
-      <div><dt>Expected scheduling allocation</dt><dd>${escapeHtml(formatScheduleFitAmount(summary.totalExpectedSeconds))}</dd></div>
-      <div><dt>Observed case flow</dt><dd>${escapeHtml(formatScheduleFitAmount(summary.totalObservedSeconds))}</dd></div>
-      <div><dt>Total scheduling slack</dt><dd>${escapeHtml(formatScheduleFitAmount(summary.totalSlackSeconds))}</dd></div>
-      <div><dt>Total scheduling debt</dt><dd>${escapeHtml(formatScheduleFitAmount(summary.totalDebtSeconds))}</dd></div>
-      <div><dt>Signed net difference</dt><dd>${escapeHtml(formatSignedScheduleFitSeconds(summary.netVarianceSeconds))}</dd></div>
-    </dl>
+    ${renderScheduleFitKpis(summary)}
     <p class="allocation-footnote">Historical assigned Schedule Fit uses finalized Expected Allocation and exact Seated-to-Doctor Complete timing. Slack and debt are calculated per case before totals are combined.</p>`;
 }
 
@@ -755,12 +752,19 @@ export function createReports({
   if (!summary) {
     return "";
   }
+  const fitPresentation = scheduleFitPresentationState(summary);
+  const samplePresentation = sampledPresentation(summary.sample, formatScheduleFitCoverage(summary));
   return `
     <div class="allocation-row schedule-fit-row">
       <span class="allocation-row-name">${escapeHtml(item.doctorName || getDoctorName(item.doctorId))}</span>
       <span class="allocation-row-detail">
-        <strong>${escapeHtml(formatScheduleFitCoverage(summary))}</strong>
-        <small>Historical assigned net ${escapeHtml(formatSignedScheduleFitSeconds(summary.netVarianceSeconds))} · slack ${escapeHtml(formatObservedDuration(summary.totalSlackSeconds))} · debt ${escapeHtml(formatObservedDuration(summary.totalDebtSeconds))}</small>
+        <strong>${escapeHtml(fitPresentation.state === "Empty"
+          ? fitPresentation.value
+          : formatScheduleFitCoverage(summary))}</strong>
+        ${renderSampleContext(samplePresentation)}
+        <small>${fitPresentation.measurementsAvailable
+          ? `Historical assigned net ${escapeHtml(formatSignedScheduleFitSeconds(summary.netVarianceSeconds))} · slack ${escapeHtml(formatObservedDuration(summary.totalSlackSeconds))} · debt ${escapeHtml(formatObservedDuration(summary.totalDebtSeconds))}`
+          : `Historical assigned measurements: ${escapeHtml(fitPresentation.value)}.`}</small>
       </span>
     </div>`;
 }
@@ -1204,21 +1208,23 @@ export function createReports({
   }
 
   const historical = doctorSummary.historicalAssignedFit;
+  const fitPresentation = scheduleFitPresentationState(historical);
+  if (fitPresentation.state === "Empty") {
+    return renderSelectedDoctorEmptyState(
+      "Schedule Fit",
+      "No observation. This doctor has no included completed cases in the selected report population."
+    );
+  }
   const segments = doctorScheduleFitSegments(r, summary.doctorId);
   return `
     <section class="selected-doctor-overview">
       <div class="selected-doctor-summary">
         <h3>Schedule Fit</h3>
         <p>${escapeHtml(formatScheduleFitCoverage(historical))} have a valid historical assigned fit pair.</p>
+        ${renderSampleContext(sampledPresentation(historical.sample, formatScheduleFitCoverage(historical)))}
         <p class="allocation-footnote">Compares finalized historical scheduling allocation with exact observed Seated-to-Doctor Complete case flow. This evaluates the scheduling model, not the doctor.</p>
       </div>
-      <dl class="selected-doctor-kpis schedule-fit-kpis">
-        <div><dt>Expected scheduling allocation</dt><dd>${escapeHtml(formatScheduleFitAmount(historical.totalExpectedSeconds))}</dd></div>
-        <div><dt>Observed case flow</dt><dd>${escapeHtml(formatScheduleFitAmount(historical.totalObservedSeconds))}</dd></div>
-        <div><dt>Total scheduling slack</dt><dd>${escapeHtml(formatObservedDuration(historical.totalSlackSeconds))}</dd></div>
-        <div><dt>Total scheduling debt</dt><dd>${escapeHtml(formatObservedDuration(historical.totalDebtSeconds))}</dd></div>
-        <div><dt>Signed net difference</dt><dd>${escapeHtml(formatSignedScheduleFitSeconds(historical.netVarianceSeconds))}</dd></div>
-      </dl>
+      ${renderScheduleFitKpis(historical, "selected-doctor-kpis schedule-fit-kpis")}
       <div class="selected-doctor-schedule-segments">
         <h4>Procedure Schedule Fit and current-default calibration</h4>
         ${segments.length
@@ -1700,7 +1706,9 @@ export function createReports({
           ${segment.doctorBreakdown.map(doctor => `
             <article class="schedule-fit-doctor-segment">
               <h5>${escapeHtml(doctor.doctorName || getDoctorName(doctor.doctorId))}</h5>
-              <p>${escapeHtml(formatScheduleFitCoverage(doctor.historicalAssignedFit))}; historical assigned net ${escapeHtml(formatSignedScheduleFitSeconds(doctor.historicalAssignedFit.netVarianceSeconds))}.</p>
+              <p>${escapeHtml(formatScheduleFitCoverage(doctor.historicalAssignedFit))}; ${scheduleFitPresentationState(doctor.historicalAssignedFit).measurementsAvailable
+                ? `historical assigned net ${escapeHtml(formatSignedScheduleFitSeconds(doctor.historicalAssignedFit.netVarianceSeconds))}`
+                : `historical assigned measurements: ${escapeHtml(scheduleFitPresentationState(doctor.historicalAssignedFit).value)}`}.</p>
               ${renderCalibrationEvaluation(doctor.currentDefaultCalibration)}
             </article>`).join("")}
         </div>
@@ -1714,8 +1722,10 @@ export function createReports({
       </div>
       <div class="allocation-row-detail">
         <strong>${escapeHtml(formatScheduleFitCoverage(historical))}</strong>
-        <span>Historical assigned: expected ${escapeHtml(formatScheduleFitAmount(historical.totalExpectedSeconds))} · observed ${escapeHtml(formatScheduleFitAmount(historical.totalObservedSeconds))}</span>
-        <small>Net ${escapeHtml(formatSignedScheduleFitSeconds(historical.netVarianceSeconds))} · slack ${escapeHtml(formatObservedDuration(historical.totalSlackSeconds))} · debt ${escapeHtml(formatObservedDuration(historical.totalDebtSeconds))}</small>
+        ${scheduleFitPresentationState(historical).measurementsAvailable ? `
+          <span>Historical assigned: expected ${escapeHtml(formatScheduleFitAmount(historical.totalExpectedSeconds))} · observed ${escapeHtml(formatScheduleFitAmount(historical.totalObservedSeconds))}</span>
+          <small>Net ${escapeHtml(formatSignedScheduleFitSeconds(historical.netVarianceSeconds))} · slack ${escapeHtml(formatObservedDuration(historical.totalSlackSeconds))} · debt ${escapeHtml(formatObservedDuration(historical.totalDebtSeconds))}</small>` : `
+          <span class="allocation-empty">Historical assigned measurements: ${escapeHtml(scheduleFitPresentationState(historical).value)}.</span>`}
         ${renderCalibrationEvaluation(segment.currentDefaultCalibration)}
         ${doctorBreakdown}
       </div>
@@ -1775,6 +1785,32 @@ export function createReports({
     return "less than the tolerance";
   }
   return "within the At expected tolerance";
+}
+
+  function scheduleFitPresentationState(summary) {
+  const state = summary?.sample?.state;
+  if (state === "Empty") {
+    return { state, measurementsAvailable: false, value: "No observation" };
+  }
+  if (state === "Limited" || state === "Sufficient") {
+    return { state, measurementsAvailable: true, value: null };
+  }
+  return { state: "Unavailable", measurementsAvailable: false, value: "Unavailable" };
+}
+
+  function renderScheduleFitKpis(summary, className = "schedule-fit-kpis") {
+  const presentation = scheduleFitPresentationState(summary);
+  if (!presentation.measurementsAvailable) {
+    return `<p class="allocation-empty">Historical assigned Schedule Fit measurements: ${escapeHtml(presentation.value)}.</p>`;
+  }
+  return `
+    <dl class="${escapeAttribute(className)}">
+      <div><dt>Expected scheduling allocation</dt><dd>${escapeHtml(formatScheduleFitAmount(summary.totalExpectedSeconds))}</dd></div>
+      <div><dt>Observed case flow</dt><dd>${escapeHtml(formatScheduleFitAmount(summary.totalObservedSeconds))}</dd></div>
+      <div><dt>Total scheduling slack</dt><dd>${escapeHtml(formatScheduleFitAmount(summary.totalSlackSeconds))}</dd></div>
+      <div><dt>Total scheduling debt</dt><dd>${escapeHtml(formatScheduleFitAmount(summary.totalDebtSeconds))}</dd></div>
+      <div><dt>Signed net difference</dt><dd>${escapeHtml(formatSignedScheduleFitSeconds(summary.netVarianceSeconds))}</dd></div>
+    </dl>`;
 }
 
   function formatScheduleFitCoverage(summary) {

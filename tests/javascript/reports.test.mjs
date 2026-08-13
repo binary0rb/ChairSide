@@ -1142,6 +1142,16 @@ async function openDoctorProceduresTab(harness) {
   });
 }
 
+async function openDoctorScheduleFitTab(harness) {
+  const scheduleTab = new FakeElement();
+  scheduleTab.dataset.reportDoctorTab = "schedule";
+  await harness.document.dispatch("click", {
+    target: targetFor(new Map([
+      ["[data-report-doctor-tab]", scheduleTab]
+    ]))
+  });
+}
+
 function allocationPayload(populationCount, contributingCount) {
   const net = contributingCount >= 5 ? 10 : contributingCount > 0 ? 4 : 0;
   const context = sample(populationCount, contributingCount);
@@ -1854,18 +1864,116 @@ test("Practice scope Doctor Procedures guidance does not mutate scope or reuse P
   assert.equal(harness.reloadCount, 0);
 });
 
-test("nonempty Schedule Fit populations with zero pairs preserve unavailable sample context", () => {
+test("Practice Empty Schedule Fit shows No observation without measured zero aggregates", () => {
+  const harness = createHarness({ payload: reportPayload({ otteCases: 0, pledgerCases: 0 }) });
+
+  harness.reports.render();
+
+  const html = harness.elements.get("allocationBalanceCard").innerHTML;
+  assert.match(html, /No observation/);
+  assert.match(html, /Empty - N=0/);
+  assert.doesNotMatch(html, /schedule-fit-kpis|Expected scheduling allocation|Observed case flow|Signed net difference|00:00/);
+});
+
+test("Practice Unavailable Schedule Fit keeps coverage without measured zero aggregates", () => {
   const harness = createHarness({ payload: allocationPayload(6, 0) });
 
   harness.reports.render();
-  const html = allocationSurfaceHtml(harness);
+  const html = harness.elements.get("allocationBalanceCard").innerHTML;
 
   assert.match(html, /Unavailable/);
+  assert.match(html, /0 of 6 included completed cases \(0% coverage\)/);
   assert.match(html, /0 of 6 contributors/);
-  assert.doesNotMatch(harness.elements.get("allocationBalanceCard").innerHTML, /0 min expected|0 min measured/);
-  for (const id of ["allocationBalanceCard", "procedureAllocationList"]) {
-    assert.doesNotMatch(harness.elements.get(id).innerHTML, /No observation/);
-  }
+  assert.doesNotMatch(html, /schedule-fit-kpis|Expected scheduling allocation|Observed case flow|Signed net difference|00:00|0 blocks/);
+  assert.doesNotMatch(html, /No observation/);
+});
+
+test("Doctor Empty Schedule Fit row and selected tab never show measured zero", async () => {
+  const harness = createHarness({ payload: reportPayload({ otteCases: 0, pledgerCases: 0 }) });
+  harness.reports.wire();
+  harness.reports.render();
+
+  const rows = harness.elements.get("doctorAllocationList").innerHTML;
+  assert.match(rows, /Dr\. Otte[\s\S]*?No observation/);
+  assert.doesNotMatch(rows, /Historical assigned net|00:00/);
+
+  await openDoctorScheduleFitTab(harness);
+  const panel = harness.elements.get("selectedDoctorPanel").innerHTML;
+  assert.match(panel, /Schedule Fit/);
+  assert.match(panel, /No observation/);
+  assert.doesNotMatch(panel, /Expected scheduling allocation|Signed net difference|00:00/);
+});
+
+test("Doctor Unavailable Schedule Fit row and selected tab preserve coverage without measured zero", async () => {
+  const harness = createHarness({ payload: allocationPayload(6, 0) });
+  harness.reports.wire();
+  harness.reports.render();
+
+  const rows = harness.elements.get("doctorAllocationList").innerHTML;
+  assert.match(rows, /Dr\. Otte[\s\S]*?0 of 6 included completed cases \(0% coverage\)/);
+  assert.match(rows, /Historical assigned measurements: Unavailable/);
+  assert.doesNotMatch(rows, /Historical assigned net|00:00/);
+
+  await openDoctorScheduleFitTab(harness);
+  const panel = harness.elements.get("selectedDoctorPanel").innerHTML;
+  assert.match(panel, /0 of 6 included completed cases \(0% coverage\)/);
+  assert.match(panel, /Historical assigned Schedule Fit measurements: Unavailable/);
+  assert.doesNotMatch(panel, /Expected scheduling allocation|Signed net difference|00:00|0 blocks/);
+});
+
+test("Procedure and doctor x procedure Unavailable fit preserve coverage without measured zero", () => {
+  const payload = allocationPayload(6, 0);
+  const unavailable = scheduleFitSummary(6, 0);
+  payload.scheduleFit.procedureSegments = [{
+    procedureCode: "EXT",
+    procedureLabel: "Extraction",
+    baseProcedureCode: "EXT",
+    procedureGrouping: "Family",
+    isSedationCase: null,
+    currentDefaultAllocationMinutes: 30,
+    historicalAssignedFit: unavailable,
+    currentDefaultCalibration: calibrationEvaluation({
+      decision: "BelowMinimumSample",
+      totalPairedCaseCount: 6
+    }),
+    doctorBreakdown: [{
+      doctorId: "otte",
+      doctorName: "Dr. Otte",
+      historicalAssignedFit: unavailable,
+      currentDefaultCalibration: calibrationEvaluation({
+        decision: "BelowMinimumSample",
+        totalPairedCaseCount: 6
+      })
+    }]
+  }];
+  const harness = createHarness({ payload });
+
+  harness.reports.render();
+
+  const html = harness.elements.get("procedureAllocationList").innerHTML;
+  assert.match(html, /Extraction/);
+  assert.match(html, /0 of 6 included completed cases \(0% coverage\)/);
+  assert.match(html, /Historical assigned measurements: Unavailable/);
+  assert.match(html, /Doctor × procedure detail/);
+  assert.match(html, /Dr\. Otte[\s\S]*?historical assigned measurements: Unavailable/);
+  assert.doesNotMatch(html, /Historical assigned: expected|historical assigned net|00:00|0 blocks/);
+});
+
+test("Truthful zero Schedule Fit remains numeric when valid pairs exist", () => {
+  const payload = allocationPayload(1, 1);
+  payload.scheduleFit.practice = scheduleFitSummary(1, 1);
+  const harness = createHarness({ payload });
+
+  harness.reports.render();
+
+  const html = harness.elements.get("allocationBalanceCard").innerHTML;
+  assert.match(html, /1 of 1 included completed case \(100% coverage\)/);
+  assert.match(html, /Expected scheduling allocation[\s\S]*?30:00/);
+  assert.match(html, /Observed case flow[\s\S]*?30:00/);
+  assert.match(html, /Total scheduling slack[\s\S]*?00:00/);
+  assert.match(html, /Total scheduling debt[\s\S]*?00:00/);
+  assert.match(html, /Signed net difference[\s\S]*?00:00/);
+  assert.doesNotMatch(html, /No observation|Unavailable/);
 });
 
 test("Limited historical Schedule Fit remains descriptive and suppresses Calibration insight", () => {
