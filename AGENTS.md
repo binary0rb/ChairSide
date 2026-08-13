@@ -54,6 +54,17 @@ For small UI/status/version tasks, start with the graph, then likely inspect:
 
 Do not load generated graph JSON wholesale unless needed. Prefer targeted search/read of the relevant entries.
 
+## Verified mistakes and learning
+
+`MISTAKES.md` is a historical evidence ledger for verified, materially preventable development failures. It is not authoritative for current behavior and must not override the current repository, tests and enforceable checks, canonical project/design documentation, or this file.
+
+- Do not load or read the complete ledger for every task. After scoping the relevant subsystem or workflow, search it selectively when prior incidents may be relevant.
+- During unusual or recurring debugging, search it for overlapping symptoms, files, commands, platforms, or workflows before repeating an investigation from scratch.
+- Treat matches as evidence to investigate. Verify every retrieved lesson against the current code, tests, documentation, and task requirements before acting on it.
+- Add an entry only after an actual, materially preventable failure whose symptom is understood and whose root cause is verified by evidence. Do not record speculation, routine design iteration, preference changes, trivial editing mistakes, or unverified causal claims.
+- Consider repeated, systemic, or sufficiently important patterns for deliberate promotion into stronger controls such as instructions, tests, lint rules, validation scripts, deployment checks, or CI. Do not promote a rule automatically because one entry was added.
+- Do not backfill speculative history from memory, old conversations, or suggestive changes without evidence establishing a useful verified incident.
+
 ## Private development knowledge graph
 
 ChairSide includes a private development knowledge graph under `docs/knowledge-graph/`.

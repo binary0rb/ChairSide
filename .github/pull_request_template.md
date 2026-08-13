@@ -13,6 +13,10 @@ Choose one:
 Notes:
 <!-- Briefly explain why. -->
 
+## Mistakes learning
+
+- [ ] Reviewed - no verified, reusable preventable failure occurred during this work, or any such failure was recorded in `MISTAKES.md`
+
 ## Validation
 
 - [ ] Not run - docs/process only
