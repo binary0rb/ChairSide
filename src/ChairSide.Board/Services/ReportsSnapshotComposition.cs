@@ -97,6 +97,7 @@ internal sealed record ReportDoctorDetailSection
     public required IReadOnlyList<DoctorCycleSummary> DoctorSummaries { get; init; }
     public required IReadOnlyList<ReportDoctorAllocationSampleContext> DoctorAllocationSamples { get; init; }
     public required IReadOnlyList<DoctorFlowSummary> DoctorFlowSummaries { get; init; }
+    public required IReadOnlyList<DoctorFlowTrendSeries> DoctorFlowTrends { get; init; }
     public required IReadOnlyList<ObservedDoctorDay>? ObservedDoctorDays { get; init; }
     public required IReadOnlyList<ObservedDoctorFlowDay>? ObservedDoctorFlowDays { get; init; }
     public required IReadOnlyList<DoctorProcedureMixRow>? DoctorProcedureMix { get; init; }
@@ -166,6 +167,7 @@ internal static class ReportsSnapshotAdapter
             ScopedProcedureGroups: composition.Procedures.ScopedProcedureGroups,
             DoctorAllocationSamples: composition.DoctorDetail.DoctorAllocationSamples,
             ObservedDoctorFlowDays: composition.DoctorDetail.ObservedDoctorFlowDays,
-            DoctorFlowSummaries: composition.DoctorDetail.DoctorFlowSummaries);
+            DoctorFlowSummaries: composition.DoctorDetail.DoctorFlowSummaries,
+            DoctorFlowTrends: composition.DoctorDetail.DoctorFlowTrends);
     }
 }

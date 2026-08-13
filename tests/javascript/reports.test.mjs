@@ -422,6 +422,87 @@ function observedDoctorFlowDay(doctorId, doctorName, reportDate, caseCount) {
   };
 }
 
+function doctorFlowTrendBucket({
+  startDate,
+  endDate,
+  effectiveStartDate = startDate,
+  effectiveEndDate = endDate,
+  isPartial = false,
+  readyWait = null,
+  doctorTime = null,
+  completedCases = null,
+  clinicalSpan = null,
+  readyWaitSample = sample(readyWait === null ? 0 : 1),
+  doctorTimeSample = sample(doctorTime === null ? 0 : 1),
+  completedSample = sample(completedCases === null ? 0 : completedCases),
+  clinicalSpanSample = sample(clinicalSpan === null ? 0 : 1)
+}) {
+  return {
+    startDate,
+    endDate,
+    effectiveStartDate,
+    effectiveEndDate,
+    isPartial,
+    medianReadyWaitSeconds: readyWait,
+    medianDoctorTimeSeconds: doctorTime,
+    completedCaseCount: completedCases,
+    medianObservedClinicalSpanMinutes: clinicalSpan,
+    samples: {
+      readyWait: readyWaitSample,
+      doctorTime: doctorTimeSample,
+      completedCases: completedSample,
+      observedClinicalSpan: clinicalSpanSample
+    }
+  };
+}
+
+function doctorFlowTrendSeries(doctorId, doctorName, caseCount) {
+  const observed = caseCount > 0;
+  return {
+    doctorId,
+    doctorName,
+    bucketSize: "Week",
+    effectiveStartDate: "2026-07-01",
+    effectiveEndDate: "2026-07-30",
+    buckets: [
+      doctorFlowTrendBucket({
+        startDate: "2026-06-29",
+        endDate: "2026-07-06",
+        effectiveStartDate: "2026-07-01",
+        effectiveEndDate: "2026-07-06",
+        isPartial: true
+      }),
+      doctorFlowTrendBucket({
+        startDate: "2026-07-06",
+        endDate: "2026-07-13",
+        readyWait: observed ? 120 : null,
+        doctorTime: observed ? 900 : null,
+        completedCases: observed ? caseCount : null,
+        clinicalSpan: observed ? 45 : null,
+        readyWaitSample: sample(caseCount),
+        doctorTimeSample: sample(caseCount),
+        completedSample: sample(caseCount),
+        clinicalSpanSample: sample(observed ? 1 : 0)
+      }),
+      doctorFlowTrendBucket({
+        startDate: "2026-07-13",
+        endDate: "2026-07-20"
+      }),
+      doctorFlowTrendBucket({
+        startDate: "2026-07-20",
+        endDate: "2026-07-27"
+      }),
+      doctorFlowTrendBucket({
+        startDate: "2026-07-27",
+        endDate: "2026-08-03",
+        effectiveStartDate: "2026-07-27",
+        effectiveEndDate: "2026-07-30",
+        isPartial: true
+      })
+    ]
+  };
+}
+
 function reportPayload({
   otteCases = 0,
   pledgerCases = 2,
@@ -464,6 +545,10 @@ function reportPayload({
     doctorFlowSummaries: [
       doctorFlowSummary("otte", "Dr. Otte", otteCases),
       doctorFlowSummary("pledger", "Dr. Pledger", pledgerCases)
+    ],
+    doctorFlowTrends: [
+      doctorFlowTrendSeries("otte", "Dr. Otte", otteCases),
+      doctorFlowTrendSeries("pledger", "Dr. Pledger", pledgerCases)
     ],
     observedDoctorFlowDays: [
       ...(otteCases > 0 ? [observedDoctorFlowDay("otte", "Dr. Otte", "2026-07-14", otteCases)] : []),
@@ -1165,7 +1250,7 @@ test("missing doctor-flow contributors stay Unavailable and Limited context stay
   assert.doesNotMatch(limitedCards, /Pressure point|over expected|under expected|best|worst/i);
 });
 
-test("Trends remains a placeholder and Schedule Fit stays isolated from Doctor Overview", async () => {
+test("Doctor Trends renders four descriptive weekly metrics while Schedule Fit stays isolated", async () => {
   const harness = createHarness({ payload: reportPayload({ otteCases: 5, pledgerCases: 0 }) });
   harness.reports.wire();
   harness.reports.render();
@@ -1178,7 +1263,16 @@ test("Trends remains a placeholder and Schedule Fit stays isolated from Doctor O
   await harness.document.dispatch("click", {
     target: targetFor(new Map([["[data-report-doctor-tab]", trendsTab]]))
   });
-  assert.match(harness.elements.get("selectedDoctorPanel").innerHTML, /Trend charts are planned/);
+  const trends = harness.elements.get("selectedDoctorPanel").innerHTML;
+  assert.match(trends, /Weekly Doctor Trends/);
+  assert.match(trends, /Median Ready Wait/);
+  assert.match(trends, /Median Doctor Time/);
+  assert.match(trends, /Completed Cases/);
+  assert.match(trends, /Median Observed Clinical Span/);
+  assert.match(trends, /Limited - N=5|Sufficient - N=5/);
+  assert.match(trends, /Selected portion:/);
+  assert.match(trends, /No observation/);
+  assert.doesNotMatch(trends, /improved|declined|better|worse|forecast|target|ranking/i);
 
   const scheduleTab = new FakeElement();
   scheduleTab.dataset.reportDoctorTab = "schedule";
@@ -1189,6 +1283,108 @@ test("Trends remains a placeholder and Schedule Fit stays isolated from Doctor O
   assert.match(schedule, /Schedule Fit/);
   assert.match(schedule, /Net Variance/);
   assert.doesNotMatch(schedule, /Calibration Insights|automatic|recommendation/i);
+});
+
+test("Doctor Trends keeps gaps, server sample states, truthful zero, and local doctor selection", async () => {
+  const payload = reportPayload({ otteCases: 5, pledgerCases: 5 });
+  payload.doctorFlowTrends = [
+    {
+      doctorId: "otte",
+      doctorName: "Dr. Otte",
+      bucketSize: "Week",
+      effectiveStartDate: "2026-07-06",
+      effectiveEndDate: "2026-07-27",
+      buckets: [
+        doctorFlowTrendBucket({
+          startDate: "2026-07-06",
+          endDate: "2026-07-13",
+          readyWait: 0,
+          doctorTime: null,
+          completedCases: 5,
+          clinicalSpan: 45,
+          readyWaitSample: sample(5),
+          doctorTimeSample: sample(3, 0),
+          completedSample: sample(5),
+          clinicalSpanSample: sample(3)
+        }),
+        doctorFlowTrendBucket({
+          startDate: "2026-07-13",
+          endDate: "2026-07-20"
+        }),
+        doctorFlowTrendBucket({
+          startDate: "2026-07-20",
+          endDate: "2026-07-27",
+          readyWait: 180,
+          doctorTime: 1200,
+          completedCases: 2,
+          clinicalSpan: 60,
+          readyWaitSample: sample(2),
+          doctorTimeSample: sample(2),
+          completedSample: sample(2),
+          clinicalSpanSample: sample(2)
+        })
+      ]
+    },
+    {
+      doctorId: "pledger",
+      doctorName: "Dr. Pledger",
+      bucketSize: "Week",
+      effectiveStartDate: "2026-07-06",
+      effectiveEndDate: "2026-07-27",
+      buckets: [
+        doctorFlowTrendBucket({ startDate: "2026-07-06", endDate: "2026-07-13" }),
+        doctorFlowTrendBucket({ startDate: "2026-07-13", endDate: "2026-07-20" }),
+        doctorFlowTrendBucket({
+          startDate: "2026-07-20",
+          endDate: "2026-07-27",
+          readyWait: 777,
+          doctorTime: 888,
+          completedCases: 5,
+          clinicalSpan: 99,
+          readyWaitSample: sample(5),
+          doctorTimeSample: sample(5),
+          completedSample: sample(5),
+          clinicalSpanSample: sample(5)
+        })
+      ]
+    }
+  ];
+  const harness = createHarness({ payload });
+  harness.reports.wire();
+  harness.reports.render();
+
+  const trendsTab = new FakeElement();
+  trendsTab.dataset.reportDoctorTab = "trends";
+  await harness.document.dispatch("click", {
+    target: targetFor(new Map([["[data-report-doctor-tab]", trendsTab]]))
+  });
+  const otte = harness.elements.get("selectedDoctorPanel").innerHTML;
+  assert.match(otte, />00:00</);
+  assert.match(otte, /Unavailable - 0 of 3 contributors/);
+  assert.match(otte, /Limited - N=3/);
+  assert.match(otte, /No observation/);
+  assert.doesNotMatch(otte, />777</);
+  assert.doesNotMatch(otte, /<svg|<path|<polyline/i);
+
+  const pledgerCard = new FakeElement();
+  pledgerCard.dataset.reportDoctorId = "pledger";
+  await harness.document.dispatch("click", {
+    target: targetFor(new Map([["[data-report-doctor-id]", pledgerCard]]))
+  });
+  await harness.document.dispatch("click", {
+    target: targetFor(new Map([["[data-report-doctor-tab]", trendsTab]]))
+  });
+  const pledger = harness.elements.get("selectedDoctorPanel").innerHTML;
+  assert.match(pledger, /12:57/);
+  assert.doesNotMatch(pledger, /Unavailable - 0 of 3 contributors/);
+  assert.equal(harness.reloadCount, 0);
+
+  const trendSource = moduleSource.slice(
+    moduleSource.indexOf("function renderSelectedDoctorTrends"),
+    moduleSource.indexOf("function renderSelectedDoctorEmptyState"));
+  assert.doesNotMatch(trendSource, /observedDoctorDays|limitedSampleThreshold|contributingCount\s*<\s*5/);
+  assert.match(trendSource, /canonicalDoctorFlowTrends/);
+  assert.match(moduleSource, /return Array\.isArray\(report\?\.doctorFlowTrends\) \? report\.doctorFlowTrends : \[\]/);
 });
 
 test("first-class Procedure Mix renders the server total, shares, labels, and row order", () => {
@@ -1676,6 +1872,17 @@ test("Doctor View stays pinned to the route doctor while its selected tab surviv
   assert.match(panel.innerHTML, /Dr\. Pledger/);
   assert.doesNotMatch(panel.innerHTML, /Dr\. Otte/);
 
+  const trendsTab = new FakeElement();
+  trendsTab.dataset.reportDoctorTab = "trends";
+  await harness.document.dispatch("click", {
+    target: targetFor(new Map([
+      ["[data-report-doctor-tab]", trendsTab]
+    ]))
+  });
+  harness.reports.renderDoctorCockpit(routeDoctor);
+  assert.match(panel.innerHTML, /Weekly Doctor Trends for Dr\. Pledger/);
+  assert.doesNotMatch(panel.innerHTML, /Weekly Doctor Trends for Dr\. Otte/);
+
   const auditTab = new FakeElement();
   auditTab.dataset.reportDoctorTab = "audit";
   await harness.document.dispatch("click", {
@@ -1683,7 +1890,7 @@ test("Doctor View stays pinned to the route doctor while its selected tab surviv
       ["[data-report-doctor-tab]", auditTab]
     ]))
   });
-  assert.equal(harness.renderPageCount, 1);
+  assert.equal(harness.renderPageCount, 2);
 
   harness.setPayload(reportPayload({
     otteCases: 4,

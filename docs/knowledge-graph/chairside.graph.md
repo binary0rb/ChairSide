@@ -74,6 +74,9 @@ flowchart LR
     ReportingDesign --> MedianFirst["DesignDecision: Median-first prominent timing"]
     ReportingDesign --> ObservedDoctorDay["ReportMetric: Observed Doctor Day"]
     ObservedDoctorDay --> ObservedClinicalSpan["ReportMetric: Observed Clinical Span"]
+    ObservedDoctorDay --> DoctorTrends["UiSurface: Doctor weekly trends"]
+    StandardPopulation --> DoctorTrends
+    Reports --> DoctorTrends
     ObservedClinicalSpan --> DoctorWorkingUnion["ReportMetric: Doctor Working wall-clock union"]
     DoctorWorkingUnion --> ConcurrencyBuckets["ReportMetric: Doctor Working concurrency buckets"]
     ObservedClinicalSpan --> UnstructuredTime["ReportMetric: Unstructured Time"]
@@ -159,6 +162,7 @@ flowchart LR
 - Ready Wait is accepted Ready -> Doctor Arrived; Seated -> Doctor remains a distinct total seated interval.
 - Prominent operational timing is median-first, with averages secondary/detail.
 - Observed Doctor Days exist only for qualifying same-day Ready-anchored observed flow and are never zero-filled for unobserved dates.
+- Doctor weekly trends use one shared Monday-start UTC calendar skeleton of at most 12 buckets within the selected report range. DoctorCompleteAt anchors case timing and completed counts; canonical Observed Doctor Flow dates anchor clinical span. Missing buckets are gaps, clipped edge weeks are explicit, and #217 adds no comparison language.
 - Observed Clinical Span is first qualifying accepted Ready -> last same-day Doctor Complete.
 - Doctor Working elapsed time uses wall-clock unions of Doctor Arrived -> Doctor Complete intervals. Concurrency buckets partition the same wall-clock span without double-counting.
 - Unstructured Time is the span remainder with no active Doctor Working interval and must not be described as idle, available, unused, absent, unscheduled, or recoverable time.

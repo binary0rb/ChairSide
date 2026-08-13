@@ -603,6 +603,12 @@ public sealed partial class BoardStoreTests
         var flowSummary = Assert.Single(reports.DoctorFlowSummaries!, summary => summary.DoctorId == "otte");
         Assert.Equal(180, flowSummary.MedianReadyWaitSeconds);
         Assert.Equal(1, flowSummary.ObservedDoctorDayCount);
+        var doctorTrend = Assert.Single(reports.DoctorFlowTrends!, series => series.DoctorId == "otte");
+        var doctorTrendBucket = Assert.Single(
+            doctorTrend.Buckets,
+            item => item.Samples.ReadyWait.ContributingCount == 1);
+        Assert.Equal(180, doctorTrendBucket.MedianReadyWaitSeconds);
+        Assert.Equal(20, doctorTrendBucket.MedianObservedClinicalSpanMinutes);
     }
 
     // -------------------------------------------------------------------------

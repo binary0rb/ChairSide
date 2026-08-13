@@ -808,6 +808,12 @@ export function createReports({
   return Array.isArray(report?.doctorFlowSummaries) ? report.doctorFlowSummaries : [];
 }
 
+// Issue #217 canonical Doctor Trends authority. This is deliberately separate from the existing
+// practice-level report.trends compatibility contract and from observedDoctorDays.
+  function canonicalDoctorFlowTrends(report) {
+  return Array.isArray(report?.doctorFlowTrends) ? report.doctorFlowTrends : [];
+}
+
   function emptyDoctorFlowSummary(doctorId, doctorName) {
   return {
     doctorId,
@@ -1012,10 +1018,7 @@ export function createReports({
   }
 
   if (tab === "trends") {
-    return renderSelectedDoctorEmptyState(
-      "Trends",
-      "Trend charts are planned for this doctor view. Once enabled, this tab will show week-to-week or month-to-month movement for timing and flow metrics."
-    );
+    return renderSelectedDoctorTrends(r, summary);
   }
 
   if (tab === "procedures") {
@@ -1023,6 +1026,103 @@ export function createReports({
   }
 
   return renderSelectedDoctorEmptyState("Not Available", "This section isn't available with the current report payload.");
+}
+
+  function renderSelectedDoctorTrends(r, summary) {
+  const series = canonicalDoctorFlowTrends(r)
+    .find(item => item.doctorId === summary.doctorId);
+  if (!series || !Array.isArray(series.buckets) || series.buckets.length === 0) {
+    return renderSelectedDoctorEmptyState(
+      "Weekly Doctor Trends",
+      "No dateable Doctor Complete observation is available for this doctor trend window. No calendar history was invented."
+    );
+  }
+
+  const metricDefinitions = [
+    {
+      key: "readyWait",
+      label: "Median Ready Wait",
+      valueKey: "medianReadyWaitSeconds",
+      format: formatObservedDuration
+    },
+    {
+      key: "doctorTime",
+      label: "Median Doctor Time",
+      valueKey: "medianDoctorTimeSeconds",
+      format: formatObservedDuration
+    },
+    {
+      key: "completedCases",
+      label: "Completed Cases",
+      valueKey: "completedCaseCount",
+      format: value => Number.isFinite(value) ? String(value) : "--"
+    },
+    {
+      key: "observedClinicalSpan",
+      label: "Median Observed Clinical Span",
+      valueKey: "medianObservedClinicalSpanMinutes",
+      format: formatDurationMinutes
+    }
+  ];
+  const effectiveRange = formatExclusiveDateRange(series.effectiveStartDate, series.effectiveEndDate);
+
+  return `
+    <section class="doctor-trends" aria-label="Weekly Doctor Trends for ${escapeAttribute(series.doctorName || summary.doctorName || summary.doctorId)}">
+      <header class="doctor-trends__head">
+        <div>
+          <h3>Weekly Doctor Trends</h3>
+          <p>Monday-start UTC buckets within ${escapeHtml(effectiveRange)}. Missing observations remain visible gaps.</p>
+        </div>
+        <span class="doctor-trends__window">${escapeHtml(String(series.buckets.length))} week${series.buckets.length === 1 ? "" : "s"}</span>
+      </header>
+      <div class="doctor-trend-metrics">
+        ${metricDefinitions.map(metric => renderDoctorTrendMetric(series.buckets, metric)).join("")}
+      </div>
+    </section>`;
+}
+
+  function renderDoctorTrendMetric(buckets, metric) {
+  return `
+    <section class="doctor-trend-metric" aria-label="${escapeAttribute(`${metric.label} by week`)}">
+      <h4>${escapeHtml(metric.label)}</h4>
+      <div class="doctor-trend-grid" role="list" style="--doctor-trend-bucket-count: ${buckets.length}">
+        ${buckets.map(bucket => renderDoctorTrendBucket(bucket, metric)).join("")}
+      </div>
+    </section>`;
+}
+
+  function renderDoctorTrendBucket(bucket, metric) {
+  const sample = bucket?.samples?.[metric.key];
+  const formattedValue = metric.format(bucket?.[metric.valueKey]);
+  const presentation = doctorFlowPresentation(sample, formattedValue);
+  const stateClass = presentation.state ? presentation.state.toLowerCase() : "unavailable";
+  const gap = presentation.state === "Empty" || presentation.state === "Unavailable";
+  const calendarRange = formatTrendBucketRange(bucket);
+  const effectiveRange = formatExclusiveDateRange(bucket?.effectiveStartDate, bucket?.effectiveEndDate);
+  const dateLabel = bucket?.isPartial
+    ? `${calendarRange}; selected portion ${effectiveRange}`
+    : calendarRange;
+  const sampleLabel = presentation.state
+    ? `${presentation.state}, ${presentation.detail}`
+    : "sample context unavailable";
+
+  return `
+    <article class="doctor-trend-bucket doctor-trend-bucket--${escapeAttribute(stateClass)} ${gap ? "is-gap" : ""} ${bucket?.isPartial ? "is-partial" : ""}" role="listitem" aria-label="${escapeAttribute(`${metric.label}, ${dateLabel}, ${presentation.value}, ${sampleLabel}`)}">
+      <span class="doctor-trend-bucket__date">${escapeHtml(calendarRange)}</span>
+      ${bucket?.isPartial ? `<span class="doctor-trend-bucket__partial">Selected portion: ${escapeHtml(effectiveRange)}</span>` : ""}
+      <strong>${escapeHtml(presentation.value)}</strong>
+      ${renderSampleContext(presentation)}
+    </article>`;
+}
+
+  function formatExclusiveDateRange(startValue, endExclusiveValue) {
+  const start = parseReportDateOnly(startValue);
+  const endExclusive = parseReportDateOnly(endExclusiveValue);
+  if (!start || !endExclusive) {
+    return "the selected report range";
+  }
+  const endInclusive = new Date(endExclusive.getTime() - 86_400_000);
+  return `${formatReportDateOnly(start)} - ${formatReportDateOnly(endInclusive)}`;
 }
 
 // Shared empty/placeholder card for selected-doctor tabs: a heading (with optional help bubble)

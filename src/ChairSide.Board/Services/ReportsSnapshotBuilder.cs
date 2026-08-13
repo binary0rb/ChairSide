@@ -122,6 +122,18 @@ internal sealed class ReportsSnapshotBuilder
         var scheduleFit = ScheduleFitReportBuilder.Build(standardCompletedCycles);
         var scopedProcedureGroups = BuildScopedProcedureGroups(standardCompletedCycles, query.ProcedureGrouping);
         var observedDoctorFlowDays = BuildObservedDoctorFlowDays(standardCompletedCycles);
+        var doctorFlowIdentities = BuildDoctorFlowIdentities(scopedStandardCycles, query);
+        var doctorFlowSummaries = BuildDoctorFlowSummaries(
+            scopedStandardCycles,
+            standardCompletedCycles,
+            observedDoctorFlowDays,
+            doctorFlowIdentities);
+        var doctorFlowTrends = DoctorFlowTrendSnapshotBuilder.BuildWeekly(
+            doctorFlowIdentities,
+            scopedStandardCycles,
+            standardCompletedCycles,
+            observedDoctorFlowDays,
+            query.Window);
         var phasePopulationCount = scopedStandardCycles.Count;
         var samples = new ReportMetricSampleContext(
             CompletedCases: ReportSampleContext.ForPopulation(normalCompletedCycles.Count),
@@ -224,11 +236,8 @@ internal sealed class ReportsSnapshotBuilder
             {
                 DoctorSummaries = BuildDoctorSummaries(scopedStandardCycles),
                 DoctorAllocationSamples = BuildDoctorAllocationSamples(scopedStandardCycles, query),
-                DoctorFlowSummaries = BuildDoctorFlowSummaries(
-                    scopedStandardCycles,
-                    standardCompletedCycles,
-                    observedDoctorFlowDays,
-                    query),
+                DoctorFlowSummaries = doctorFlowSummaries,
+                DoctorFlowTrends = doctorFlowTrends,
                 ObservedDoctorDays = BuildObservedDoctorDays(standardCompletedCycles),
                 ObservedDoctorFlowDays = observedDoctorFlowDays,
                 DoctorProcedureMix = BuildDoctorProcedureMix(standardCompletedCycles)
@@ -337,7 +346,7 @@ internal sealed class ReportsSnapshotBuilder
             : (ordered[middle - 1] + ordered[middle]) / 2.0;
     }
 
-    private static double? MedianSecondsOrNull(IEnumerable<int?> values)
+    internal static double? MedianSecondsOrNull(IEnumerable<int?> values)
     {
         var ordered = values
             .Where(value => value.HasValue)
@@ -355,7 +364,7 @@ internal sealed class ReportsSnapshotBuilder
             : (ordered[middle - 1] + ordered[middle]) / 2.0;
     }
 
-    private static double? MedianWholeMinutesOrNull(IEnumerable<int> values)
+    internal static double? MedianWholeMinutesOrNull(IEnumerable<int> values)
     {
         var ordered = values.Order().ToList();
         if (ordered.Count == 0)
@@ -448,10 +457,8 @@ internal sealed class ReportsSnapshotBuilder
             .OrderBy(item => item.DoctorId)
             .ToList();
 
-    private IReadOnlyList<DoctorFlowSummary> BuildDoctorFlowSummaries(
+    private IReadOnlyList<DoctorFlowTrendIdentity> BuildDoctorFlowIdentities(
         IReadOnlyList<CompletedRoomCycle> scopedStandardPhaseCycles,
-        IReadOnlyList<CompletedRoomCycle> scopedStandardCompletedCycles,
-        IReadOnlyList<ObservedDoctorFlowDay> observedDoctorFlowDays,
         ReportQuery query)
     {
         var representedDoctorIds = scopedStandardPhaseCycles
@@ -476,8 +483,22 @@ internal sealed class ReportsSnapshotBuilder
         }
 
         return doctorIds
-            .Select(doctorId =>
+            .Select(doctorId => new DoctorFlowTrendIdentity(
+                doctorId,
+                ResolveDoctorDisplayName(doctorId) ?? doctorId))
+            .ToList();
+    }
+
+    private static IReadOnlyList<DoctorFlowSummary> BuildDoctorFlowSummaries(
+        IReadOnlyList<CompletedRoomCycle> scopedStandardPhaseCycles,
+        IReadOnlyList<CompletedRoomCycle> scopedStandardCompletedCycles,
+        IReadOnlyList<ObservedDoctorFlowDay> observedDoctorFlowDays,
+        IReadOnlyList<DoctorFlowTrendIdentity> doctorIdentities)
+    {
+        return doctorIdentities
+            .Select(identity =>
             {
+                var doctorId = identity.DoctorId;
                 var phasePopulation = scopedStandardPhaseCycles
                     .Where(cycle => string.Equals(
                         cycle.AssignedDoctor,
@@ -514,7 +535,7 @@ internal sealed class ReportsSnapshotBuilder
 
                 return new DoctorFlowSummary(
                     doctorId,
-                    ResolveDoctorDisplayName(doctorId) ?? doctorId,
+                    identity.DoctorName,
                     completedPopulation.Count,
                     MedianSecondsOrNull(readyWaitValues),
                     MedianSecondsOrNull(doctorTimeValues),
@@ -526,7 +547,7 @@ internal sealed class ReportsSnapshotBuilder
             .ToList();
     }
 
-    private static int? TruthfulReadyWaitSeconds(CompletedRoomCycle cycle) =>
+    internal static int? TruthfulReadyWaitSeconds(CompletedRoomCycle cycle) =>
         cycle.ReadyForDoctorAt is { } readyAt
         && cycle.DoctorArrivedAt is { } arrivedAt
         && readyAt <= arrivedAt
@@ -534,7 +555,7 @@ internal sealed class ReportsSnapshotBuilder
             ? cycle.ReadyToDoctorSeconds
             : null;
 
-    private static int? TruthfulDoctorTimeSeconds(CompletedRoomCycle cycle) =>
+    internal static int? TruthfulDoctorTimeSeconds(CompletedRoomCycle cycle) =>
         cycle.DoctorArrivedAt is { } arrivedAt
         && cycle.DoctorCompleteAt is { } completeAt
         && arrivedAt <= completeAt

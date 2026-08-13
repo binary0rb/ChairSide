@@ -192,6 +192,7 @@ public sealed class ReportsSnapshotBuilderTests
         var observedDoctorDays = new List<ObservedDoctorDay>();
         var observedDoctorFlowDays = new List<ObservedDoctorFlowDay>();
         var doctorFlowSummaries = new List<DoctorFlowSummary>();
+        var doctorFlowTrends = new List<DoctorFlowTrendSeries>();
         var doctorProcedureMix = new List<DoctorProcedureMixRow>();
         var doctorAllocationSamples = new List<ReportDoctorAllocationSampleContext>();
         var exceptionReviewRecords = new List<ExceptionReviewRecord>();
@@ -267,6 +268,7 @@ public sealed class ReportsSnapshotBuilderTests
                 DoctorSummaries = doctorSummaries,
                 DoctorAllocationSamples = doctorAllocationSamples,
                 DoctorFlowSummaries = doctorFlowSummaries,
+                DoctorFlowTrends = doctorFlowTrends,
                 ObservedDoctorDays = observedDoctorDays,
                 ObservedDoctorFlowDays = observedDoctorFlowDays,
                 DoctorProcedureMix = doctorProcedureMix
@@ -351,6 +353,9 @@ public sealed class ReportsSnapshotBuilderTests
         Assert.Same(
             composition.DoctorDetail.DoctorFlowSummaries,
             snapshot.DoctorFlowSummaries);
+        Assert.Same(
+            composition.DoctorDetail.DoctorFlowTrends,
+            snapshot.DoctorFlowTrends);
         Assert.Same(composition.DoctorDetail.DoctorProcedureMix, snapshot.DoctorProcedureMix);
         Assert.Same(
             composition.ReviewQueue.ExceptionReviewRecords,
@@ -477,7 +482,8 @@ public sealed class ReportsSnapshotBuilderTests
             "scopedProcedureGroups",
             "doctorAllocationSamples",
             "observedDoctorFlowDays",
-            "doctorFlowSummaries"
+            "doctorFlowSummaries",
+            "doctorFlowTrends"
         ],
             actualNames);
 
