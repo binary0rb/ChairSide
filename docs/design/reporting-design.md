@@ -619,9 +619,23 @@ At publication of #212:
 - current observed-load reporting does not yet expose Unstructured Time under this definition;
 - current Procedure Mix is doctor-scoped; Practice Procedure Mix is future work under #215;
 - #219 adds the exact-second Reports Schedule Fit authority and server-owned current-default Calibration while preserving the legacy integer-minute Workshop compatibility contract;
-- current Data Quality and exception detail exist, while progressive disclosure is future work under #220.
+- #220 adds progressive Data Quality reconciliation, a paged server-owned audit/evidence query, and separate pending and reviewed exception disclosures.
 
 These are implementation gaps, not permission to reinterpret the canonical definitions in this document.
+
+## Audit and evidence authority
+
+Reports keeps three evidence populations distinct:
+
+1. Completed-case audit is normal, non-manual-exception history with `RoomAvailableAt`. Practice includes both standard-included and reporting-excluded facts; Doctor and segmented completed drill-downs use the standard included population. Reporting-excluded rows remain visible with neutral reasons.
+2. Metric evidence is the exact scoped standard contributor population for the selected metric. It may contain truthful phase evidence from a historical cycle object that has not reached Room Available, and it must not be labeled completed throughput.
+3. Exception review contains pending completed exceptions, pending aborted assignments, and a separate read-only reviewed history. It never joins the normal audit population.
+
+`POST /api/reports/audit/query` owns contributor selection, exact-second projection, deterministic sorting, and offset paging. Audit requests inherit the normalized parent `report.query`; a Practice doctor segment is an additional `segmentDoctorId`, not a rewritten Doctor base scope. Sort, page, and audit-local standing changes never mutate or reload the parent report.
+
+Normal completed audit retains `DoctorCompleteAt` as its report-window anchor. Review selection is built separately: completed exceptions use `DoctorCompleteAt ?? DoctorArrivedAt ?? SeatedAt ?? PrestageStartedAt`, while aborted assignments use `TerminatedAt`. These review anchors do not redefine completed reporting dates.
+
+The compatibility `RecentCompletedCycles` projection remains bounded recent context and is not historical audit authority. Calibration replaces its independent inline case list with the unified audit query and passes the exact server-qualified completed-cycle and accepted-handoff identities for reconciliation.
 
 ## Deferred design and future reporting
 

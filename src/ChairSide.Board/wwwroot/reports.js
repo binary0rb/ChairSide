@@ -28,7 +28,8 @@ export function createReports({
     reportScopeDoctors: new Map(),
     reportDoctorTab: "overview",
     reportPressActive: false,
-    procedureIntelligenceExpanded: new Set()
+    procedureIntelligenceExpanded: new Set(),
+    auditViews: new Map()
   };
   const reportActionStates = new Map();
   const reportActionElements = new Map();
@@ -220,15 +221,19 @@ export function createReports({
   renderProcedureMix(r);
   renderProcedureIntelligence(r);
   renderAllocationReports(r);
+  renderAuditEvidence(r);
+  renderReviewEvidence(r);
   renderGroupedInsights(r, hasData);
   renderFullMetrics(r, hasData);
 
-  const completedCycles = r.recentCompletedCycles || [];
   const exceptionCycles = r.exceptionReviewRecords || r.exceptionCycles || [];
+  const compatibilityCycles = r.recentCompletedCycles || [];
   const focusTransfer = captureReportActionFocusBeforeRender(
-    completedCycles,
+    compatibilityCycles,
     exceptionCycles);
-  renderCompletedCycles(completedCycles);
+  // Compatibility renderers remain callable for older embedded markup, but the canonical Reports
+  // document no longer contains these capped-table targets.
+  renderCompletedCycles(compatibilityCycles);
   renderExceptionCycles(exceptionCycles);
   if (focusTransfer) {
     queueMicrotask(() => completeReportActionFocusAfterRender(focusTransfer));
@@ -255,21 +260,29 @@ export function createReports({
   }
 
   headline.classList.remove("is-empty");
+  const doctorScope = r.query?.scope === "Doctor";
+  const completedCount = doctorScope
+    ? (r.includedCompletedCycleCount ?? 0)
+    : (r.completedRoomCyclesCount ?? 0);
+  const completedSample = doctorScope
+    ? r.samples?.includedCompletedCases
+    : r.samples?.completedCases;
   headline.innerHTML = [
-    renderHeadlineCard("Completed Cases", String(r.completedRoomCyclesCount ?? 0), null, r.samples?.completedCases),
-    renderHeadlineCard("Median Ready Wait", formatObservedDuration(r.medianReadyToDoctorSeconds), "Accepted Ready to Doctor Arrived.", r.samples?.readyWait),
-    renderHeadlineCard("Median Seated -> Doctor", formatObservedDuration(r.medianSeatedToDoctorSeconds), "Total observed interval from Seated to Doctor Arrived.", r.samples?.seatedToDoctor),
-    renderHeadlineCard("Median Turnover", formatObservedDuration(r.medianTurnoverSeconds), "Doctor Complete to Room Available.", r.samples?.turnover)
+    renderHeadlineCard("Completed Cases", String(completedCount), null, completedSample, doctorScope ? "IncludedCompletedCases" : "PracticeCompletedCases"),
+    renderHeadlineCard("Median Ready Wait", formatObservedDuration(r.medianReadyToDoctorSeconds), "Accepted Ready to Doctor Arrived.", r.samples?.readyWait, "ReadyWait"),
+    renderHeadlineCard("Median Seated -> Doctor", formatObservedDuration(r.medianSeatedToDoctorSeconds), "Total observed interval from Seated to Doctor Arrived.", r.samples?.seatedToDoctor, "SeatedToDoctor"),
+    renderHeadlineCard("Median Turnover", formatObservedDuration(r.medianTurnoverSeconds), "Doctor Complete to Room Available.", r.samples?.turnover, "Turnover")
   ].join("");
 }
 
-  function renderHeadlineCard(label, value, helpText, sample = null) {
+  function renderHeadlineCard(label, value, helpText, sample = null, contributorKind = null) {
   const presentation = sampledPresentation(sample, value);
   return `
     <article class="metric-card headline-card">
       <span>${escapeHtml(label)}</span>${helpText ? renderHelpIcon(helpText) : ""}
       <strong>${escapeHtml(presentation.value)}</strong>
       ${renderSampleContext(presentation)}
+      ${contributorKind ? renderAuditAction(contributorKind, `View cases contributing to ${label}`) : ""}
     </article>
   `;
 }
@@ -695,6 +708,7 @@ export function createReports({
       : `${escapeHtml(coverage)} have a valid historical assigned fit pair.`}</p>
     ${renderSampleContext(samplePresentation)}
     ${renderScheduleFitKpis(summary)}
+    ${renderAuditAction("HistoricalScheduleFit", "View Practice paired cases")}
     <p class="allocation-footnote">Historical assigned Schedule Fit uses finalized Expected Allocation and exact Seated-to-Doctor Complete timing. Slack and debt are calculated per case before totals are combined.</p>`;
 }
 
@@ -704,32 +718,47 @@ export function createReports({
     return;
   }
 
-  const included = r.includedCompletedCycleCount || 0;
-  const excluded = r.excludedCompletedCycleCount || 0;
-  const reviewCount = (r.exceptionReviewRecords || r.exceptionCycles || []).length;
-
+  const quality = r.dataQuality || {};
+  const included = quality.includedCount ?? r.includedCompletedCycleCount ?? 0;
+  const excluded = quality.reportingExcludedCount ?? r.excludedCompletedCycleCount ?? 0;
+  const reviewCount = quality.pendingReviewCount ?? (r.exceptionReviewRecords || r.exceptionCycles || []).length;
+  const reviewedCount = quality.reviewedExceptionCount ?? 0;
+  const status = document.getElementById("dataQualityStatus");
+  if (status) {
+  const completed = quality.completedCount ?? included + excluded;
+    const exclusionText = excluded > 0 ? `; ${excluded} excluded from standard metrics` : "";
+    const reviewText = reviewCount > 0 ? `; ${reviewCount} ${reviewCount === 1 ? "item requires" : "items require"} review` : "";
+    status.textContent = `${included} of ${completed} completed cases included${exclusionText}${reviewText}.`;
+  }
   if (excluded === 0 && reviewCount === 0) {
     card.hidden = true;
     card.innerHTML = "";
     return;
   }
-
   card.hidden = false;
   const exclusionDetail = excluded > 0
     ? `<p class="allocation-note">${excluded} ${excluded === 1 ? "record is" : "records are"} excluded from standard metrics.</p>`
     : "";
   const reviewDetail = reviewCount > 0
     ? `<p class="allocation-note">${reviewCount} ${reviewCount === 1 ? "item requires" : "items require"} review in the action queue.</p>
-       <button type="button" class="secondary-button utility-button" data-action="open-review-queue" aria-controls="reportDetail">Open review queue</button>`
+       <button type="button" class="secondary-button utility-button" data-action="open-review-queue" aria-controls="reportReviewQueue">Open review queue</button>`
+    : "";
+  const excludedAction = excluded > 0
+    ? renderAuditAction("PracticeCompletedCases", "View reporting-excluded cases", { analyticalStanding: "ReportingExcluded" })
+    : "";
+  const reviewedAction = reviewedCount > 0
+    ? `<button type="button" class="secondary-button utility-button" data-action="open-reviewed-history" aria-controls="reportReviewedHistory">View reviewed history (${reviewedCount})</button>`
     : "";
 
   card.innerHTML = `
     <span class="layer-pill layer-pill--data-quality">Data Quality</span>
     <h3>Data Quality</h3>
-    <p class="allocation-counts">${included} included · ${excluded} excluded</p>
+    <p class="allocation-counts">${included} included · ${excluded} reporting-excluded</p>
     ${exclusionDetail}
     ${reviewDetail}
-    <p class="allocation-footnote">Included/excluded records are a separate layer from allocation-calculable cases above.</p>`;
+    ${excludedAction}
+    ${reviewedAction}
+    <p class="allocation-footnote">Completed = included + reporting-excluded. Review counts use source-specific lifecycle anchors in the same UTC window.</p>`;
 }
 
   function renderDoctorAllocation(r) {
@@ -765,6 +794,7 @@ export function createReports({
         <small>${fitPresentation.measurementsAvailable
           ? `Historical assigned net ${escapeHtml(formatSignedScheduleFitSeconds(summary.netVarianceSeconds))} · slack ${escapeHtml(formatObservedDuration(summary.totalSlackSeconds))} · debt ${escapeHtml(formatObservedDuration(summary.totalDebtSeconds))}`
           : `Historical assigned measurements: ${escapeHtml(fitPresentation.value)}.`}</small>
+        ${renderAuditAction("HistoricalScheduleFit", `View paired cases for ${item.doctorName || getDoctorName(item.doctorId)}`, { segmentDoctorId: item.doctorId })}
       </span>
     </div>`;
 }
@@ -806,12 +836,13 @@ export function createReports({
   return sampledPresentation(sample, measuredValue);
 }
 
-  function renderDoctorFlowMetric(label, measuredValue, sample, helpText = null) {
+  function renderDoctorFlowMetric(label, measuredValue, sample, helpText = null, contributorKind = null, auditOptions = {}) {
   const presentation = doctorFlowPresentation(sample, measuredValue);
   return `
     <div>
       <dt>${escapeHtml(label)}${helpText ? renderHelpIcon(helpText) : ""}</dt>
       <dd>${escapeHtml(presentation.value)}${renderSampleContext(presentation)}</dd>
+      ${contributorKind ? renderAuditAction(contributorKind, `View contributing cases for ${label}`, auditOptions) : ""}
     </div>`;
 }
 
@@ -1093,9 +1124,9 @@ export function createReports({
         <p class="allocation-footnote">Uses server-defined reporting populations for ${escapeHtml(r.rangeLabel || "the selected range")}.</p>
       </div>
       <dl class="selected-doctor-kpis doctor-flow-metrics">
-        ${renderDoctorFlowMetric("Completed Cases", String(summary.completedCaseCount ?? 0), samples.completedCases)}
-        ${renderDoctorFlowMetric("Median Ready Wait", formatObservedDuration(summary.medianReadyWaitSeconds), samples.readyWait)}
-        ${renderDoctorFlowMetric("Median Doctor Time", formatObservedDuration(summary.medianDoctorTimeSeconds), samples.doctorTime)}
+        ${renderDoctorFlowMetric("Completed Cases", String(summary.completedCaseCount ?? 0), samples.completedCases, null, "IncludedCompletedCases", { segmentDoctorId: summary.doctorId })}
+        ${renderDoctorFlowMetric("Median Ready Wait", formatObservedDuration(summary.medianReadyWaitSeconds), samples.readyWait, null, "ReadyWait", { segmentDoctorId: summary.doctorId })}
+        ${renderDoctorFlowMetric("Median Doctor Time", formatObservedDuration(summary.medianDoctorTimeSeconds), samples.doctorTime, null, "DoctorTime", { segmentDoctorId: summary.doctorId })}
         ${renderDoctorFlowMetric("Median Observed Clinical Span", formatDurationMinutes(summary.medianObservedClinicalSpanMinutes), samples.observedDays)}
         ${renderDoctorFlowMetric("Peak Concurrent Rooms", describePeakConcurrentRooms(summary.peakConcurrentRooms), samples.observedDays)}
         ${renderDoctorFlowMetric("Observed Doctor Days", String(summary.observedDoctorDayCount ?? 0), samples.observedDays)}
@@ -1225,6 +1256,7 @@ export function createReports({
         <p class="allocation-footnote">Compares finalized historical scheduling allocation with exact observed Seated-to-Doctor Complete case flow. This evaluates the scheduling model, not the doctor.</p>
       </div>
       ${renderScheduleFitKpis(historical, "selected-doctor-kpis schedule-fit-kpis")}
+      ${renderAuditAction("HistoricalScheduleFit", `View paired cases for ${summary.doctorName || summary.doctorId}`, { segmentDoctorId: summary.doctorId })}
       <div class="selected-doctor-schedule-segments">
         <h4>Procedure Schedule Fit and current-default calibration</h4>
         ${segments.length
@@ -1304,7 +1336,12 @@ export function createReports({
                 <tr>
                   <td>${escapeHtml(row.procedureLabel || "Procedure")}</td>
                   <td>${escapeHtml(Number.isFinite(row.caseCount) ? String(row.caseCount) : "--")}</td>
-                  <td>${escapeHtml(formatProcedureShare(row.shareOfScopedCases))}</td>
+                  <td>
+                    ${escapeHtml(formatProcedureShare(row.shareOfScopedCases))}
+                    ${renderAuditAction("ProcedureMix", `View contributing cases for ${row.procedureLabel || "procedure"}`, r?.query?.procedureGrouping === "DetailedVariant"
+                      ? { procedureCode: row.procedureCode }
+                      : { baseProcedureCode: row.baseProcedureCode || row.procedureCode })}
+                  </td>
                 </tr>
               `).join("")}
             </tbody>
@@ -1405,6 +1442,9 @@ export function createReports({
   const doctorBreakdown = showDoctors && Array.isArray(row?.doctorBreakdown)
     ? row.doctorBreakdown
     : [];
+  const auditProcedure = row?.procedureGrouping === "DetailedVariant"
+    ? { procedureCode: row.procedureCode }
+    : { baseProcedureCode: row.baseProcedureCode || row.procedureCode };
 
   return `
     <article class="procedure-intelligence-card">
@@ -1446,6 +1486,12 @@ export function createReports({
           metrics.seatedToDoctorCompleteSample,
           "Observed case flow from Seated to Doctor Complete; turnover is not included."
         )}
+      </div>
+      <div class="procedure-intelligence-audit-actions">
+        ${renderAuditAction("ProcedureMix", `View completed cases for ${label}`, auditProcedure)}
+        ${renderAuditAction("ProcedureIntelligenceDoctorTime", `View Doctor Time cases for ${label}`, auditProcedure)}
+        ${renderAuditAction("ProcedureIntelligenceReadyWait", `View Ready Wait cases for ${label}`, auditProcedure)}
+        ${renderAuditAction("ProcedureIntelligenceSeatedToDoctorComplete", `View Seated to Doctor Complete cases for ${label}`, auditProcedure)}
       </div>
       <button type="button"
         class="procedure-intelligence-toggle"
@@ -1635,43 +1681,296 @@ export function createReports({
   return Number.isFinite(share) ? `${Math.round(share * 100)}%` : "--";
 }
 
-  function renderSelectedDoctorAudit(r, doctorId) {
-  const cycles = (r.recentCompletedCycles || []).filter(cycle => cycle.assignedDoctor === doctorId);
-  if (!cycles.length) {
-    return renderSelectedDoctorEmptyState(
-      "Case Audit",
-      "No completed cycles are available for this doctor in the selected range yet. They'll appear here once cases wrap up."
-    );
+  function renderAuditAction(contributorKind, label = "View contributing cases", options = {}) {
+  return `<button type="button" class="secondary-button utility-button report-audit-action"
+    data-audit-kind="${escapeAttribute(contributorKind)}"
+    ${options.segmentDoctorId ? `data-audit-doctor="${escapeAttribute(options.segmentDoctorId)}"` : ""}
+    ${options.procedureCode ? `data-audit-procedure="${escapeAttribute(options.procedureCode)}"` : ""}
+    ${options.baseProcedureCode ? `data-audit-base-procedure="${escapeAttribute(options.baseProcedureCode)}"` : ""}
+    ${options.evidenceIds ? `data-audit-evidence="${escapeAttribute(JSON.stringify(options.evidenceIds))}"` : ""}
+    ${options.analyticalStanding ? `data-audit-standing="${escapeAttribute(options.analyticalStanding)}"` : ""}>
+    ${escapeHtml(label)}
+  </button>`;
+}
+
+  function auditSelection(r, contributorKind, options = {}) {
+  const query = r?.query || {};
+  return {
+    from: query.rangeStartDate || null,
+    to: query.rangeEndDate || null,
+    scope: query.scope || "Practice",
+    doctorId: query.doctorId || null,
+    sedation: query.sedation || "All",
+    procedureGrouping: query.procedureGrouping || "Family",
+    contributorKind,
+    segmentDoctorId: options.segmentDoctorId || null,
+    procedureCode: options.procedureCode || null,
+    baseProcedureCode: options.baseProcedureCode || null,
+    analyticalStanding: options.analyticalStanding || "All",
+    evidenceIds: options.evidenceIds || [],
+    sort: options.sort || "MostRecent",
+    offset: Number.isFinite(options.offset) ? options.offset : 0,
+    limit: Number.isFinite(options.limit) ? options.limit : 50
+  };
+}
+
+  function auditViewSignature(selection) {
+  return JSON.stringify({ ...selection, offset: 0 });
+}
+
+  async function ensureAuditView(viewId, targetId, selection, { append = false } = {}) {
+  const reportVersion = reportData.getVersion();
+  const signature = auditViewSignature(selection);
+  const current = state.auditViews.get(viewId);
+  if (!append
+      && current?.reportVersion === reportVersion
+      && current.signature === signature
+      && (current.loading || current.page || current.error)) {
+    renderAuditView(viewId, targetId);
+    return;
+  }
+  const canAppend = append && current?.reportVersion === reportVersion;
+  const entry = {
+    reportVersion,
+    signature,
+    targetId,
+    selection,
+    loading: true,
+    page: canAppend ? current?.page || null : null,
+    error: null
+  };
+  state.auditViews.set(viewId, entry);
+  renderAuditView(viewId, targetId);
+  try {
+    if (typeof reportData.queryAudit !== "function") {
+      throw new Error("Audit evidence is not available in this client.");
+    }
+    const page = await reportData.queryAudit(selection);
+    if (state.auditViews.get(viewId) !== entry || !page) {
+      return;
+    }
+    entry.selection = normalizedAuditSelection(entry.selection, page.normalizedSelection);
+    entry.page = canAppend && entry.page
+      ? {
+          ...page,
+          rows: [...(entry.page.rows || []), ...(page.rows || [])],
+          reviewRows: [...(entry.page.reviewRows || []), ...(page.reviewRows || [])]
+        }
+      : page;
+  } catch (error) {
+    if (state.auditViews.get(viewId) === entry) {
+      entry.error = error?.message || "Audit evidence could not be loaded.";
+    }
+  } finally {
+    if (state.auditViews.get(viewId) === entry) {
+      entry.loading = false;
+      renderAuditView(viewId, targetId);
+    }
+  }
+}
+
+// Automatic Reports rendering owns only initialization for the current parent payload.
+// Same-version renders preserve user-selected audit scope, sort, filters, and accumulated pages.
+// A new reportData version invalidates the old view and initializes its deterministic default.
+  function initializeAuditViewForReportVersion(viewId, targetId, selection) {
+  const reportVersion = reportData.getVersion();
+  const current = state.auditViews.get(viewId);
+  if (current?.reportVersion === reportVersion) {
+    queueMicrotask(() => {
+      if (state.auditViews.get(viewId)?.reportVersion === reportVersion) {
+        renderAuditView(viewId, targetId);
+      }
+    });
+    return;
   }
 
-  return `
-    <div class="selected-doctor-audit">
-      <table class="report-table">
-        <thead>
-          <tr>
-            <th>Room</th>
-            <th>Procedure</th>
-            <th>Doctor Complete</th>
-            <th>Expected</th>
-            <th>Measured</th>
-            <th>Variance</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${cycles.map(cycle => `
-            <tr>
-              <td>Room ${cycle.roomId}</td>
-              <td>${renderCycleProcedureCell(cycle)}</td>
-              <td>${formatDateTime(cycle.doctorCompleteAt)}</td>
-              <td>${formatAllocationMinutes(cycle.expectedAllocationMinutes)}</td>
-              <td>${formatAllocationMinutes(cycle.measuredCaseFlowMinutes)}</td>
-              <td>${renderVarianceBadge(cycle.allocationVarianceMinutes)}</td>
-            </tr>
-          `).join("")}
-        </tbody>
-      </table>
-      <p class="allocation-footnote">Case Audit is limited to the recent completed cycles returned by the current report payload.</p>
-    </div>`;
+  state.auditViews.delete(viewId);
+  queueMicrotask(() => {
+    if (reportData.getVersion() !== reportVersion) {
+      return;
+    }
+    if (state.auditViews.get(viewId)?.reportVersion === reportVersion) {
+      renderAuditView(viewId, targetId);
+      return;
+    }
+    ensureAuditView(viewId, targetId, selection);
+  });
+}
+
+  function normalizedAuditSelection(requestSelection, normalized) {
+  if (!normalized?.query) {
+    return requestSelection;
+  }
+  return {
+    ...requestSelection,
+    from: normalized.query.rangeStartDate || null,
+    to: normalized.query.rangeEndDate || null,
+    scope: normalized.query.scope || requestSelection.scope,
+    doctorId: normalized.query.doctorId || null,
+    sedation: normalized.query.sedation || requestSelection.sedation,
+    procedureGrouping: normalized.query.procedureGrouping || requestSelection.procedureGrouping,
+    contributorKind: normalized.contributorKind || requestSelection.contributorKind,
+    segmentDoctorId: normalized.segmentDoctorId || null,
+    procedureCode: normalized.procedureCode || null,
+    baseProcedureCode: normalized.baseProcedureCode || null,
+    analyticalStanding: normalized.analyticalStanding || requestSelection.analyticalStanding,
+    evidenceIds: normalized.evidenceIds || requestSelection.evidenceIds
+  };
+}
+
+  function renderAuditEvidence(r) {
+  const kind = r.query?.scope === "Doctor" ? "IncludedCompletedCases" : "PracticeCompletedCases";
+  initializeAuditViewForReportVersion("primary", "reportAuditBody", auditSelection(r, kind));
+}
+
+  function renderReviewEvidence(r) {
+  const quality = r.dataQuality || {};
+  const pendingCount = quality.pendingReviewCount ?? (r.exceptionReviewRecords || r.exceptionCycles || []).length;
+  const reviewedCount = quality.reviewedExceptionCount ?? 0;
+  const pendingLabel = document.getElementById("reportReviewQueueCount");
+  const reviewedLabel = document.getElementById("reportReviewedHistoryCount");
+  if (pendingLabel) pendingLabel.textContent = `(${pendingCount})`;
+  if (reviewedLabel) reviewedLabel.textContent = `(${reviewedCount})`;
+  initializeAuditViewForReportVersion("pending", "reportReviewQueueBody", auditSelection(r, "PendingReview"));
+  initializeAuditViewForReportVersion("reviewed", "reportReviewedHistoryBody", auditSelection(r, "ReviewedExceptionHistory"));
+}
+
+  function renderAuditView(viewId, targetId) {
+  const target = document.getElementById(targetId);
+  const entry = state.auditViews.get(viewId);
+  if (!target || !entry) {
+    return;
+  }
+  if (entry.error) {
+    target.innerHTML = `<p class="report-table-context">${escapeHtml(entry.error)}</p>`;
+    return;
+  }
+  if (!entry.page) {
+    target.innerHTML = `<p class="report-table-context">Loading source-backed evidence...</p>`;
+    return;
+  }
+  const page = entry.page;
+  const rows = page.mode === "ExceptionReview"
+    ? renderReviewAuditRows(page.reviewRows || [], viewId === "pending")
+    : renderCompletedAuditRows(page.rows || []);
+  const sortOptions = (page.supportedSorts || []).map(sort =>
+    `<option value="${escapeAttribute(sort)}" ${sort === page.activeSort ? "selected" : ""}>${escapeHtml(formatAuditSort(sort))}</option>`
+  ).join("");
+  const standingFilter = page.mode === "ExceptionReview" ? "" : `
+      <label>Standing
+        <select data-audit-standing-filter data-audit-view="${escapeAttribute(viewId)}">
+          ${["All", "Included", "ReportingExcluded"].map(value => `<option value="${value}" ${entry.selection.analyticalStanding === value ? "selected" : ""}>${formatAuditSort(value)}</option>`).join("")}
+        </select>
+      </label>`;
+  const modeLabel = page.mode === "MetricEvidence"
+    ? "Metric evidence"
+    : page.mode === "ExceptionReview"
+      ? "Exception review evidence"
+      : "Completed-case audit";
+  const visibleCount = page.mode === "ExceptionReview"
+    ? (page.reviewRows || []).length
+    : (page.rows || []).length;
+  target.innerHTML = `
+    <div class="report-audit-toolbar">
+      <p><strong>${modeLabel}</strong> - ${page.totalMatchingCount} matching ${page.totalMatchingCount === 1 ? "record" : "records"}; showing ${visibleCount}.</p>
+      <label>Sort <select data-audit-sort data-audit-view="${escapeAttribute(viewId)}">${sortOptions}</select></label>
+      ${standingFilter}
+    </div>
+    <div class="report-audit-list">${rows || `<p class="report-table-context">No evidence matches this selection.</p>`}</div>
+    ${page.hasMore ? `<button type="button" class="secondary-button utility-button" data-audit-load-more data-audit-view="${escapeAttribute(viewId)}">Load more</button>` : ""}
+    ${entry.loading ? `<p class="report-table-context">Loading more evidence...</p>` : ""}`;
+}
+
+  function renderCompletedAuditRows(rows) {
+  return rows.map(row => `
+    <details class="report-audit-row">
+      <summary>
+        <span>${formatDateTime(row.doctorCompleteAt)}</span>
+        <span>Room ${row.roomId}</span>
+        <span>${escapeHtml(row.doctorName || row.doctorId)}</span>
+        <span>${escapeHtml(row.procedureLabel || row.procedureCode)}</span>
+        <span>Ready ${formatObservedDuration(row.readyWaitSeconds)}</span>
+        <span>Doctor ${formatObservedDuration(row.doctorTimeSeconds)}</span>
+        <span>Fit ${formatAllocationMinutes(row.expectedAllocationMinutes)} / ${formatObservedDuration(row.exactObservedScheduleFitSeconds)} / ${formatExactVariance(row.exactScheduleFitVarianceSeconds)}</span>
+        <span>${escapeHtml(row.analyticalStanding)}</span>
+      </summary>
+      <dl class="report-audit-facts">
+        <div><dt>Prestage</dt><dd>${formatDateTime(row.prestageStartedAt)}</dd></div>
+        <div><dt>Seated</dt><dd>${formatDateTime(row.seatedAt)}</dd></div>
+        <div><dt>Accepted Ready</dt><dd>${formatDateTime(row.readyForDoctorAt)}</dd></div>
+        <div><dt>Doctor Arrived</dt><dd>${formatDateTime(row.doctorArrivedAt)}</dd></div>
+        <div><dt>Doctor Complete</dt><dd>${formatDateTime(row.doctorCompleteAt)}</dd></div>
+        <div><dt>Room Available</dt><dd>${formatDateTime(row.roomAvailableAt)}</dd></div>
+        <div><dt>Prep</dt><dd>${formatObservedDuration(row.prepSeconds)}</dd></div>
+        <div><dt>Seated -> Doctor</dt><dd>${formatObservedDuration(row.seatedToDoctorSeconds)}</dd></div>
+        <div><dt>Ready Wait</dt><dd>${formatObservedDuration(row.readyWaitSeconds)}</dd></div>
+        <div><dt>Doctor Time</dt><dd>${formatObservedDuration(row.doctorTimeSeconds)}</dd></div>
+        <div><dt>Seated -> Complete</dt><dd>${formatObservedDuration(row.seatedToDoctorCompleteSeconds)}</dd></div>
+        <div><dt>Turnover</dt><dd>${formatObservedDuration(row.turnoverSeconds)}</dd></div>
+        <div><dt>Total cycle</dt><dd>${formatObservedDuration(row.totalRoomCycleSeconds)}</dd></div>
+        <div><dt>Expected</dt><dd>${formatAllocationMinutes(row.expectedAllocationMinutes)}</dd></div>
+        <div><dt>Exact variance</dt><dd>${formatExactVariance(row.exactScheduleFitVarianceSeconds)}</dd></div>
+        <div><dt>Captured default</dt><dd>${row.originalDefaultExpectedUnits ? `${row.originalDefaultExpectedUnits} units` : "--"}</dd></div>
+        <div><dt>Add-on</dt><dd>${row.isAddOn ? "Yes" : "No"}</dd></div>
+        <div><dt>Ready urgency</dt><dd>Aging ${row.agingThresholdReached ? "Yes" : "No"}; stale ${row.staleThresholdReached ? "Yes" : "No"}</dd></div>
+        <div><dt>Evidence identity</dt><dd>Cycle ${row.completedCycleId}${row.acceptedReadyHandoffId ? `; handoff ${escapeHtml(row.acceptedReadyHandoffId)}` : ""}</dd></div>
+      </dl>
+      ${row.calibrationEvidence ? `<dl class="report-audit-facts calibration-evidence-facts">
+        <div><dt>Calibration baseline</dt><dd>${escapeHtml(row.calibrationEvidence.baselineSource)} - ${row.calibrationEvidence.baselineMinutesUsed} min</dd></div>
+        <div><dt>Observed exact</dt><dd>${formatExactSeconds(row.calibrationEvidence.observedCaseFlowSeconds)}</dd></div>
+        <div><dt>Paired variance</dt><dd>${formatExactVariance(row.calibrationEvidence.pairedVarianceSeconds)}</dd></div>
+        <div><dt>Raw direction</dt><dd>${escapeHtml(row.calibrationEvidence.rawDirection)}</dd></div>
+        <div><dt>Tolerance</dt><dd>${escapeHtml(row.calibrationEvidence.toleranceClassification)}</dd></div>
+      </dl>` : ""}
+      ${(row.reportingExclusionReasons || []).length ? `<p class="report-table-context">Excluded: ${escapeHtml(row.reportingExclusionReasons.join("; "))}</p>` : ""}
+      ${row.canMarkException ? `<button class="secondary-button utility-button" data-action="mark-exception" data-completed-cycle-id="${row.completedCycleId}" data-room-id="${row.roomId}" data-seated-at="${escapeAttribute(row.seatedAt || "")}">Mark Exception</button>` : ""}
+    </details>`).join("");
+}
+
+  function renderReviewAuditRows(rows, pending) {
+  return rows.map(row => {
+    const recordKey = reviewRecordKey(row.sourceType, row.reviewRecordId);
+    return `<details class="report-audit-row" data-report-action-row data-report-record-key="${escapeAttribute(recordKey)}">
+      <summary><span>Room ${row.roomId}</span><span>${escapeHtml(row.doctorName)}</span><span>${escapeHtml(row.procedureLabel)}</span><span>${formatDateTime(row.reviewAnchor)}</span><span>${escapeHtml(row.reviewStatus)}</span></summary>
+      <dl class="report-audit-facts">
+        <div><dt>Source</dt><dd>${escapeHtml(row.sourceType)}</dd></div>
+        <div><dt>Final state</dt><dd>${escapeHtml(row.finalState || "--")}</dd></div>
+        <div><dt>Reason</dt><dd>${escapeHtml(row.reason || "--")}</dd></div>
+        <div><dt>Suggested action</dt><dd>${escapeHtml(row.suggestedAction || "--")}</dd></div>
+        <div><dt>Reviewed</dt><dd>${formatDateTime(row.reviewedAt)}</dd></div>
+      </dl>
+      ${pending ? `<button class="secondary-button utility-button" data-action="confirm-exclusion" data-review-source="${escapeAttribute(row.sourceType)}" data-review-record-id="${row.reviewRecordId}" data-room-id="${row.roomId}" data-report-record-key="${escapeAttribute(recordKey)}">Confirm Exclusion</button>` : ""}
+    </details>`;
+  }).join("");
+}
+
+  function formatAuditSort(value) {
+  return String(value || "").replace(/([a-z])([A-Z])/g, "$1 $2");
+}
+
+  function formatExactVariance(seconds) {
+  if (!Number.isFinite(seconds)) return "--";
+  const sign = seconds > 0 ? "+" : "";
+  return `${sign}${formatExactNumber(seconds)} sec`;
+}
+
+  function formatExactSeconds(seconds) {
+  return Number.isFinite(seconds) ? `${formatExactNumber(seconds)} sec` : "--";
+}
+
+  function formatExactNumber(value) {
+  return Number.isInteger(value)
+    ? String(value)
+    : value.toFixed(3).replace(/0+$/, "").replace(/\.$/, "");
+}
+
+  function renderSelectedDoctorAudit(r, doctorId) {
+  initializeAuditViewForReportVersion(
+    "doctor",
+    "doctorAuditBody",
+    auditSelection(r, "IncludedCompletedCases", { segmentDoctorId: doctorId })
+  );
+  return `<div class="selected-doctor-audit" id="doctorAuditBody" aria-live="polite"><p>Loading source-backed case audit...</p></div>`;
 }
 
   function renderProcedureAllocation(r) {
@@ -1697,6 +1996,9 @@ export function createReports({
   const context = segment.procedureGrouping === "DetailedVariant"
     ? (segment.isSedationCase ? "Detailed variant · Sedation" : "Detailed variant")
     : "Procedure family";
+  const procedureOptions = segment.procedureGrouping === "DetailedVariant"
+    ? { procedureCode: segment.procedureCode }
+    : { baseProcedureCode: segment.baseProcedureCode || segment.procedureCode };
   const doctorBreakdown = includeDoctorBreakdown && Array.isArray(segment.doctorBreakdown)
     && segment.doctorBreakdown.length
     ? `
@@ -1709,7 +2011,8 @@ export function createReports({
               <p>${escapeHtml(formatScheduleFitCoverage(doctor.historicalAssignedFit))}; ${scheduleFitPresentationState(doctor.historicalAssignedFit).measurementsAvailable
                 ? `historical assigned net ${escapeHtml(formatSignedScheduleFitSeconds(doctor.historicalAssignedFit.netVarianceSeconds))}`
                 : `historical assigned measurements: ${escapeHtml(scheduleFitPresentationState(doctor.historicalAssignedFit).value)}`}.</p>
-              ${renderCalibrationEvaluation(doctor.currentDefaultCalibration)}
+              ${renderAuditAction("HistoricalScheduleFit", `View paired cases for ${doctor.doctorName || getDoctorName(doctor.doctorId)} and ${segment.procedureLabel || segment.procedureCode}`, { ...procedureOptions, segmentDoctorId: doctor.doctorId })}
+              ${renderCalibrationEvaluation(doctor.currentDefaultCalibration, { ...procedureOptions, segmentDoctorId: doctor.doctorId })}
             </article>`).join("")}
         </div>
       </details>`
@@ -1726,13 +2029,14 @@ export function createReports({
           <span>Historical assigned: expected ${escapeHtml(formatScheduleFitAmount(historical.totalExpectedSeconds))} · observed ${escapeHtml(formatScheduleFitAmount(historical.totalObservedSeconds))}</span>
           <small>Net ${escapeHtml(formatSignedScheduleFitSeconds(historical.netVarianceSeconds))} · slack ${escapeHtml(formatObservedDuration(historical.totalSlackSeconds))} · debt ${escapeHtml(formatObservedDuration(historical.totalDebtSeconds))}</small>` : `
           <span class="allocation-empty">Historical assigned measurements: ${escapeHtml(scheduleFitPresentationState(historical).value)}.</span>`}
-        ${renderCalibrationEvaluation(segment.currentDefaultCalibration)}
+        ${renderAuditAction("HistoricalScheduleFit", `View paired cases for ${segment.procedureLabel || segment.procedureCode}`, procedureOptions)}
+        ${renderCalibrationEvaluation(segment.currentDefaultCalibration, procedureOptions)}
         ${doctorBreakdown}
       </div>
     </article>`;
 }
 
-  function renderCalibrationEvaluation(evaluation) {
+  function renderCalibrationEvaluation(evaluation, auditOptions = {}) {
   if (!evaluation) {
     return "";
   }
@@ -1756,35 +2060,24 @@ export function createReports({
       <strong>Calibration insight</strong>
       <p>Observed case flow was typically about ${escapeHtml(formatObservedDuration(Math.abs(insight.medianDifferenceSeconds)))} ${relation} the current ${escapeHtml(baseline)} roster default in this selected population.</p>
       <p>${escapeHtml(String(insight.directionalCaseCount))} of ${escapeHtml(String(insight.totalPairedCaseCount))} cases were ${rawRelation} the current roster default. Review the scheduling assumption.</p>
-      ${renderCalibrationEvidence(insight)}
+      ${renderCalibrationEvidence(insight, auditOptions)}
     </aside>`;
 }
 
-  function renderCalibrationEvidence(insight) {
+  function renderCalibrationEvidence(insight, auditOptions = {}) {
   const evidence = Array.isArray(insight?.evidence) ? insight.evidence : [];
   if (!evidence.length) {
     return "";
   }
+  const evidenceIds = evidence.map(item => ({
+    completedCycleId: item.completedCycleId,
+    acceptedReadyHandoffId: item.acceptedReadyHandoffId
+      ? String(item.acceptedReadyHandoffId)
+      : null
+  }));
   return `
-    <details class="calibration-evidence">
-      <summary>View ${evidence.length} contributing case records</summary>
-      <ul>
-        ${evidence.map(item => `
-          <li>
-            Case record ${escapeHtml(String(item.completedCycleId))}: observed ${escapeHtml(formatObservedDuration(item.observedCaseFlowSeconds))}; difference ${escapeHtml(formatSignedScheduleFitSeconds(item.pairedVarianceSeconds))}; ${escapeHtml(formatCalibrationTolerance(item.toleranceClassification))}.
-          </li>`).join("")}
-      </ul>
-    </details>`;
-}
-
-  function formatCalibrationTolerance(value) {
-  if (value === "MoreTimeThanAllocation") {
-    return "more than the tolerance";
-  }
-  if (value === "LessTimeThanAllocation") {
-    return "less than the tolerance";
-  }
-  return "within the At expected tolerance";
+    <p class="calibration-evidence-summary">${evidence.length} exact paired case ${evidence.length === 1 ? "record" : "records"}; evidence identities are server-qualified.</p>
+    ${renderAuditAction("CalibrationEvidence", "Review contributing cases", { ...auditOptions, evidenceIds })}`;
 }
 
   function scheduleFitPresentationState(summary) {
@@ -2931,6 +3224,7 @@ export function createReports({
   // One-time delegated listeners on the document. The reports views are re-rendered
   // on every poll, so we cannot attach to individual elements.
   document.addEventListener("click", handleReportsActionClick);
+  document.addEventListener("change", handleAuditSelectionChange);
   // Keyboard activation for the role="button" doctor cards (clicks are already covered above).
   document.addEventListener("keydown", handleReportsCardKeydown);
   globalThis.addEventListener?.("beforeunload", clearAllReportActions, { once: true });
@@ -3094,13 +3388,62 @@ export function createReports({
   if (handleProcedureIntelligenceClick(event)) {
     return;
   }
+  const auditButton = event.target.closest("[data-audit-kind]");
+  if (auditButton) {
+    const reports = reportData.getReports();
+    let evidenceIds = [];
+    if (auditButton.dataset.auditEvidence) {
+      try {
+        evidenceIds = JSON.parse(auditButton.dataset.auditEvidence);
+      } catch {
+        evidenceIds = [];
+      }
+    }
+    const selection = auditSelection(reports, auditButton.dataset.auditKind, {
+      segmentDoctorId: auditButton.dataset.auditDoctor || null,
+      procedureCode: auditButton.dataset.auditProcedure || null,
+      baseProcedureCode: auditButton.dataset.auditBaseProcedure || null,
+      analyticalStanding: auditButton.dataset.auditStanding || "All",
+      evidenceIds
+    });
+    const disclosure = document.getElementById("reportAuditEvidence");
+    if (disclosure) disclosure.open = true;
+    await ensureAuditView("primary", "reportAuditBody", selection);
+    document.getElementById("reportAuditBody")?.focus();
+    return;
+  }
+
+  const loadMore = event.target.closest("[data-audit-load-more]");
+  if (loadMore) {
+    const viewId = loadMore.dataset.auditView;
+    const entry = state.auditViews.get(viewId);
+    if (entry?.page?.hasMore && !entry.loading) {
+      await ensureAuditView(viewId, entry.targetId, {
+        ...entry.selection,
+        offset: entry.page.offset + entry.page.returnedCount
+      }, { append: true });
+    }
+    return;
+  }
+
   const openReviewQueueButton = event.target.closest("[data-action='open-review-queue']");
   if (openReviewQueueButton) {
-    const detail = document.getElementById("reportDetail");
+    const detail = document.getElementById("reportReviewQueue");
     if (detail) {
       detail.open = true;
     }
-    document.getElementById("exceptionCyclesBody")?.focus();
+    const compatibilityDetail = document.getElementById("reportDetail");
+    if (compatibilityDetail) compatibilityDetail.open = true;
+    const reviewBody = document.getElementById("reportReviewQueueBody");
+    (reviewBody?.querySelector?.("button") || reviewBody)?.focus();
+    return;
+  }
+
+  const openReviewedHistoryButton = event.target.closest("[data-action='open-reviewed-history']");
+  if (openReviewedHistoryButton) {
+    const detail = document.getElementById("reportReviewedHistory");
+    if (detail) detail.open = true;
+    document.getElementById("reportReviewedHistoryBody")?.focus();
     return;
   }
 
@@ -3203,6 +3546,26 @@ export function createReports({
     roomId,
     seatedAt
   }, button);
+}
+
+  async function handleAuditSelectionChange(event) {
+  const select = event.target.closest?.("[data-audit-sort], [data-audit-standing-filter]");
+  if (!select) {
+    return;
+  }
+  const viewId = select.dataset.auditView;
+  const entry = state.auditViews.get(viewId);
+  if (!entry || entry.loading) {
+    return;
+  }
+  await ensureAuditView(viewId, entry.targetId, {
+    ...entry.selection,
+    sort: select.dataset.auditSort !== undefined ? select.value : entry.selection.sort,
+    analyticalStanding: select.dataset.auditStandingFilter !== undefined
+      ? select.value
+      : entry.selection.analyticalStanding,
+    offset: 0
+  });
 }
 
   async function handleConfirmExclusionClick(button) {

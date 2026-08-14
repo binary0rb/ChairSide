@@ -51,6 +51,8 @@ Only a server decision of `Qualified` creates a visible Calibration Insight. Non
 
 Qualified insights include non-PHI evidence for every paired case: completed-cycle ID, accepted Ready handoff ID when available, `CurrentRosterDefault` baseline and minutes, exact observed seconds, paired variance seconds, raw direction, and tolerance classification. Evidence reconciles to pair, direction, AtExpected, and median populations.
 
+Reports shows a compact evidence count and `Review contributing cases` action instead of an independent inline case list. The unified audit request passes the exact qualified completed-cycle and accepted-handoff identities plus inherited report scope and procedure identity. The server re-evaluates and reconciles those identities; JavaScript neither broadens the population nor re-runs Qualification.
+
 Callouts use neutral language such as `Calibration insight` and `Review the scheduling assumption.` They remain visually subtle and never use efficiency, performance, grade, score, warning, failure, slow, or fast framing.
 
 ## Source anchors
@@ -58,7 +60,8 @@ Callouts use neutral language such as `Calibration insight` and `Review the sche
 - `src/ChairSide.Board/Services/CalibrationInsightReport.cs` - additive DTOs, exact-second historical fit, rule metadata, Calibration decisions, and evidence.
 - `src/ChairSide.Board/Services/ReportsSnapshotBuilder.cs` - standard scoped populations, active roster default resolution, grouping, and doctor ordering.
 - `src/ChairSide.Board/Services/ScheduleFitReport.cs` - preserved compatibility Overall plus additive Reports projection.
-- `src/ChairSide.Board/wwwroot/reports.js` - neutral Practice, procedure, doctor, and evidence presentation.
+- `src/ChairSide.Board/Services/ReportAudit.cs` and `ReportsSnapshotBuilder.Audit.cs` - typed audit selection, exact evidence projection, reconciliation, sorting, and paging.
+- `src/ChairSide.Board/wwwroot/reports.js` - neutral Practice, procedure, doctor, and unified evidence presentation.
 - `tests/ChairSide.Board.Tests/CalibrationInsightReportTests.cs` - exact math, paired median, gates, boundary, separation, and evidence guards.
 - `tests/ChairSide.Board.Tests/ReportsSnapshotBuilderTests.cs` - population, grouping, scope, roster, and exact projection integration guards.
 - `tests/javascript/reports.test.mjs` - server-authority and presentation guards.

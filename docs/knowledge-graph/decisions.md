@@ -152,6 +152,12 @@ This file records decisions that should survive across tasks, PRs, and debugging
 
 **Decision:** Healthy Data Quality remains quiet; exclusions, limited samples, and pending review use progressive disclosure while audit remains the evidence layer behind calculations and insights. Provider ranking, efficiency scoring, attendance inference, idle-time reporting, grades, quotas, and punitive staff metrics are prohibited.
 
+**Decision:** Issue #220 separates completed-case audit, exact Metric evidence, pending exception review, and read-only reviewed exception history. The admin-protected audit query owns contributor membership, exact seconds, stable sorting, and paging; browser code inherits normalized report scope and never treats `RecentCompletedCycles` as historical authority.
+
+**Decision:** Normal audit preserves `DoctorCompleteAt` window anchoring. Completed exception review instead uses the latest truthful lifecycle timestamp and aborted review uses `TerminatedAt`; review remains global within the selected window and is not narrowed by analytical Doctor or Sedation filters.
+
+**Decision:** Practice Completed Cases remains normal included plus reporting-excluded completed history. Doctor Completed Cases uses the scoped standard included completed population and its matching sample context.
+
 **Rationale:** The reporting redesign must explain observed operational flow and scheduling-model fit without converting incomplete observation into judgments about doctors or staff. Precise shared semantics prevent later report slices from inventing incompatible denominators, time intervals, or interpretation language.
 
 **Review point:** Reconsider the version-one N=10 and 80 percent operational review thresholds after enough production history exists to evaluate actual procedure and doctor x procedure segment volumes.

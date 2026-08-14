@@ -69,6 +69,12 @@
                       "path":  "docs/knowledge/product/non-phi-boundary.md"
                   },
                   {
+                      "id":  "file:docs/knowledge/reports/audit-evidence.md",
+                      "label":  "docs/knowledge/reports/audit-evidence.md",
+                      "type":  "File",
+                      "path":  "docs/knowledge/reports/audit-evidence.md"
+                  },
+                  {
                       "id":  "file:docs/knowledge/reports/observed-load.md",
                       "label":  "docs/knowledge/reports/observed-load.md",
                       "type":  "File",
@@ -453,10 +459,22 @@
                       "path":  "src/ChairSide.Board/Services/ReadyHandoffPersistenceRecords.cs"
                   },
                   {
+                      "id":  "file:src/ChairSide.Board/Services/ReportAudit.cs",
+                      "label":  "src/ChairSide.Board/Services/ReportAudit.cs",
+                      "type":  "File",
+                      "path":  "src/ChairSide.Board/Services/ReportAudit.cs"
+                  },
+                  {
                       "id":  "file:src/ChairSide.Board/Services/ReportQuery.cs",
                       "label":  "src/ChairSide.Board/Services/ReportQuery.cs",
                       "type":  "File",
                       "path":  "src/ChairSide.Board/Services/ReportQuery.cs"
+                  },
+                  {
+                      "id":  "file:src/ChairSide.Board/Services/ReportsSnapshotBuilder.Audit.cs",
+                      "label":  "src/ChairSide.Board/Services/ReportsSnapshotBuilder.Audit.cs",
+                      "type":  "File",
+                      "path":  "src/ChairSide.Board/Services/ReportsSnapshotBuilder.Audit.cs"
                   },
                   {
                       "id":  "file:src/ChairSide.Board/Services/ReportsSnapshotBuilder.cs",
@@ -879,6 +897,12 @@
                       "path":  "tests/ChairSide.Board.Tests/ReadyHandoffPersistenceTests.cs"
                   },
                   {
+                      "id":  "file:tests/ChairSide.Board.Tests/ReportAuditBuilderTests.cs",
+                      "label":  "tests/ChairSide.Board.Tests/ReportAuditBuilderTests.cs",
+                      "type":  "File",
+                      "path":  "tests/ChairSide.Board.Tests/ReportAuditBuilderTests.cs"
+                  },
+                  {
                       "id":  "file:tests/ChairSide.Board.Tests/ReportQueryTests.cs",
                       "label":  "tests/ChairSide.Board.Tests/ReportQueryTests.cs",
                       "type":  "File",
@@ -1109,6 +1133,12 @@
                   {
                       "id":  "route:/api/reports/aborted-assignments/{abortedAssignmentId:long}/confirm-exclusion",
                       "label":  "/api/reports/aborted-assignments/{abortedAssignmentId:long}/confirm-exclusion",
+                      "type":  "Route",
+                      "path":  "src/ChairSide.Board/Program.cs"
+                  },
+                  {
+                      "id":  "route:/api/reports/audit/query",
+                      "label":  "/api/reports/audit/query",
                       "type":  "Route",
                       "path":  "src/ChairSide.Board/Program.cs"
                   },
@@ -2385,6 +2415,84 @@
                       "path":  "src/ChairSide.Board/Services/ReportsSnapshotComposition.cs"
                   },
                   {
+                      "id":  "symbol:type:ReportAuditBuilderTests",
+                      "label":  "ReportAuditBuilderTests",
+                      "type":  "CodeType",
+                      "path":  "tests/ChairSide.Board.Tests/ReportAuditBuilderTests.cs"
+                  },
+                  {
+                      "id":  "symbol:type:ReportAuditContributorKinds",
+                      "label":  "ReportAuditContributorKinds",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/ReportAudit.cs"
+                  },
+                  {
+                      "id":  "symbol:type:ReportAuditEvidenceIdentity",
+                      "label":  "ReportAuditEvidenceIdentity",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/ReportAudit.cs"
+                  },
+                  {
+                      "id":  "symbol:type:ReportAuditModes",
+                      "label":  "ReportAuditModes",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/ReportAudit.cs"
+                  },
+                  {
+                      "id":  "symbol:type:ReportAuditPage",
+                      "label":  "ReportAuditPage",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/ReportAudit.cs"
+                  },
+                  {
+                      "id":  "symbol:type:ReportAuditQueryException",
+                      "label":  "ReportAuditQueryException",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/ReportAudit.cs"
+                  },
+                  {
+                      "id":  "symbol:type:ReportAuditRequest",
+                      "label":  "ReportAuditRequest",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/ReportAudit.cs"
+                  },
+                  {
+                      "id":  "symbol:type:ReportAuditRow",
+                      "label":  "ReportAuditRow",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/ReportAudit.cs"
+                  },
+                  {
+                      "id":  "symbol:type:ReportAuditSelection",
+                      "label":  "ReportAuditSelection",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/ReportAudit.cs"
+                  },
+                  {
+                      "id":  "symbol:type:ReportAuditSorts",
+                      "label":  "ReportAuditSorts",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/ReportAudit.cs"
+                  },
+                  {
+                      "id":  "symbol:type:ReportAuditStanding",
+                      "label":  "ReportAuditStanding",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/ReportAudit.cs"
+                  },
+                  {
+                      "id":  "symbol:type:ReportDataQualityReasonCount",
+                      "label":  "ReportDataQualityReasonCount",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/ReportAudit.cs"
+                  },
+                  {
+                      "id":  "symbol:type:ReportDataQualitySummary",
+                      "label":  "ReportDataQualitySummary",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/ReportAudit.cs"
+                  },
+                  {
                       "id":  "symbol:type:ReportDoctorAllocationSampleContext",
                       "label":  "ReportDoctorAllocationSampleContext",
                       "type":  "CodeType",
@@ -2457,6 +2565,12 @@
                       "path":  "tests/ChairSide.Board.Tests/ReportQueryTests.cs"
                   },
                   {
+                      "id":  "symbol:type:ReportReviewAuditRow",
+                      "label":  "ReportReviewAuditRow",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/ReportAudit.cs"
+                  },
+                  {
                       "id":  "symbol:type:ReportReviewQueueSection",
                       "label":  "ReportReviewQueueSection",
                       "type":  "CodeType",
@@ -2502,7 +2616,7 @@
                       "id":  "symbol:type:ReportsSnapshotBuilder",
                       "label":  "ReportsSnapshotBuilder",
                       "type":  "CodeType",
-                      "path":  "src/ChairSide.Board/Services/ReportsSnapshotBuilder.cs"
+                      "path":  "src/ChairSide.Board/Services/ReportsSnapshotBuilder.Audit.cs"
                   },
                   {
                       "id":  "symbol:type:ReportsSnapshotBuilderTests",
@@ -3020,6 +3134,11 @@
                   {
                       "from":  "file:src/ChairSide.Board/Program.cs",
                       "to":  "route:/api/reports/aborted-assignments/{abortedAssignmentId:long}/confirm-exclusion",
+                      "label":  "maps"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Program.cs",
+                      "to":  "route:/api/reports/audit/query",
                       "label":  "maps"
                   },
                   {
@@ -3898,6 +4017,71 @@
                       "label":  "declares"
                   },
                   {
+                      "from":  "file:src/ChairSide.Board/Services/ReportAudit.cs",
+                      "to":  "symbol:type:ReportAuditContributorKinds",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/ReportAudit.cs",
+                      "to":  "symbol:type:ReportAuditEvidenceIdentity",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/ReportAudit.cs",
+                      "to":  "symbol:type:ReportAuditModes",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/ReportAudit.cs",
+                      "to":  "symbol:type:ReportAuditPage",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/ReportAudit.cs",
+                      "to":  "symbol:type:ReportAuditQueryException",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/ReportAudit.cs",
+                      "to":  "symbol:type:ReportAuditRequest",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/ReportAudit.cs",
+                      "to":  "symbol:type:ReportAuditRow",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/ReportAudit.cs",
+                      "to":  "symbol:type:ReportAuditSelection",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/ReportAudit.cs",
+                      "to":  "symbol:type:ReportAuditSorts",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/ReportAudit.cs",
+                      "to":  "symbol:type:ReportAuditStanding",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/ReportAudit.cs",
+                      "to":  "symbol:type:ReportDataQualityReasonCount",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/ReportAudit.cs",
+                      "to":  "symbol:type:ReportDataQualitySummary",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/ReportAudit.cs",
+                      "to":  "symbol:type:ReportReviewAuditRow",
+                      "label":  "declares"
+                  },
+                  {
                       "from":  "file:src/ChairSide.Board/Services/ReportQuery.cs",
                       "to":  "symbol:type:ReportDoctorAllocationSampleContext",
                       "label":  "declares"
@@ -3955,6 +4139,11 @@
                   {
                       "from":  "file:src/ChairSide.Board/Services/ReportQuery.cs",
                       "to":  "symbol:type:struct",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/ReportsSnapshotBuilder.Audit.cs",
+                      "to":  "symbol:type:ReportsSnapshotBuilder",
                       "label":  "declares"
                   },
                   {
@@ -4413,6 +4602,11 @@
                       "label":  "declares"
                   },
                   {
+                      "from":  "file:tests/ChairSide.Board.Tests/ReportAuditBuilderTests.cs",
+                      "to":  "symbol:type:ReportAuditBuilderTests",
+                      "label":  "declares"
+                  },
+                  {
                       "from":  "file:tests/ChairSide.Board.Tests/ReportQueryTests.cs",
                       "to":  "symbol:type:ReportQueryTests",
                       "label":  "declares"
@@ -4560,6 +4754,11 @@
                   {
                       "from":  "repo:chairside",
                       "to":  "file:docs/knowledge/product/non-phi-boundary.md",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:docs/knowledge/reports/audit-evidence.md",
                       "label":  "contains"
                   },
                   {
@@ -4884,7 +5083,17 @@
                   },
                   {
                       "from":  "repo:chairside",
+                      "to":  "file:src/ChairSide.Board/Services/ReportAudit.cs",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
                       "to":  "file:src/ChairSide.Board/Services/ReportQuery.cs",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:src/ChairSide.Board/Services/ReportsSnapshotBuilder.Audit.cs",
                       "label":  "contains"
                   },
                   {
@@ -5235,6 +5444,11 @@
                   {
                       "from":  "repo:chairside",
                       "to":  "file:tests/ChairSide.Board.Tests/ReadyHandoffPersistenceTests.cs",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:tests/ChairSide.Board.Tests/ReportAuditBuilderTests.cs",
                       "label":  "contains"
                   },
                   {

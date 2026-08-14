@@ -94,6 +94,12 @@ flowchart LR
     ScheduleFit --> CalibrationInsights["UiSurface: Calibration Insights"]
     CurrentDefaultCalibration --> CalibrationInsights
     Reports --> DataQualityAudit["UiSurface: Data Quality and case audit"]
+    DataQualityAudit --> AuditQuery["Contract: Protected read-only paged audit query"]
+    AuditQuery --> CompletedAudit["ReportPopulation: Normal completed history"]
+    AuditQuery --> MetricEvidence["ReportPopulation: Exact metric contributors"]
+    AuditQuery --> ExceptionEvidence["ReportPopulation: Pending and reviewed exception history"]
+    CalibrationEvidence --> AuditQuery
+    ReportScope --> AuditQuery
 
     DoctorRoster["ConfigOption: Doctor roster"] --> CanonicalAssignment
     ProcedureRoster["ConfigOption: Procedure roster"] --> CanonicalAssignment

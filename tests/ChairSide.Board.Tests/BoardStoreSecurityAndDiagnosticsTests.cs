@@ -256,6 +256,7 @@ public sealed partial class BoardStoreTests
         Assert.True(AdminAccessGuard.IsProtectedPath("/api/reports"));
         // Admin mutation endpoints nested under /api/reports are also protected.
         Assert.True(AdminAccessGuard.IsProtectedPath("/api/reports/cycles/mark-exception"));
+        Assert.True(AdminAccessGuard.IsProtectedPath("/api/reports/audit/query"));
 
         Assert.False(AdminAccessGuard.IsProtectedPath("/"));
         Assert.False(AdminAccessGuard.IsProtectedPath("/master.html"));

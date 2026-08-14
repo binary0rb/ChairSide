@@ -433,7 +433,7 @@ public sealed class ReportsSnapshotBuilderTests
     }
 
     [Fact]
-    public void Reports_snapshot_web_json_property_contract_appends_procedure_intelligence()
+    public void Reports_snapshot_web_json_property_contract_appends_data_quality()
     {
         var snapshot = CreateBuilder().Build([], [], ReportDateRange.AllTime);
 
@@ -489,7 +489,8 @@ public sealed class ReportsSnapshotBuilderTests
             "observedDoctorFlowDays",
             "doctorFlowSummaries",
             "doctorFlowTrends",
-            "procedureIntelligenceRows"
+            "procedureIntelligenceRows",
+            "dataQuality"
         ],
             actualNames);
 
@@ -501,6 +502,7 @@ public sealed class ReportsSnapshotBuilderTests
         Assert.Equal(JsonValueKind.Array, json.GetProperty("observedDoctorDays").ValueKind);
         Assert.Equal(JsonValueKind.Array, json.GetProperty("doctorProcedureMix").ValueKind);
         Assert.Equal(JsonValueKind.Array, json.GetProperty("procedureIntelligenceRows").ValueKind);
+        Assert.Equal(JsonValueKind.Object, json.GetProperty("dataQuality").ValueKind);
         Assert.Equal(JsonValueKind.Array, json.GetProperty("exceptionReviewRecords").ValueKind);
         Assert.Equal(JsonValueKind.Object, json.GetProperty("query").ValueKind);
         Assert.Equal(JsonValueKind.Object, json.GetProperty("samples").ValueKind);

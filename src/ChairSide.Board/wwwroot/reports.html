@@ -103,6 +103,7 @@
     <section class="report-procedure-intelligence" id="reportProcedureIntelligence" aria-labelledby="reportProcedureIntelligenceHeading" hidden></section>
 
     <section class="report-allocation" id="reportAllocation" aria-label="Schedule Fit">
+      <p class="report-table-context" id="dataQualityStatus" aria-label="Data quality reconciliation"></p>
       <div class="allocation-summary-grid">
         <article class="report-card layer-rail--allocation" id="allocationBalanceCard" aria-label="Practice Schedule Fit summary"></article>
         <article class="report-card layer-rail--data-quality" id="dataQualityCard" aria-label="Data quality"></article>
@@ -146,8 +147,23 @@
            aria-atomic="false"></div>
     </div>
 
+    <section class="report-audit-evidence" aria-labelledby="reportAuditHeading">
+      <details class="report-disclosure" id="reportAuditEvidence">
+        <summary><span id="reportAuditHeading">Case audit and metric evidence</span></summary>
+        <div id="reportAuditBody" tabindex="-1" aria-live="polite"></div>
+      </details>
+      <details class="report-disclosure" id="reportReviewQueue">
+        <summary>Exceptions requiring review <span id="reportReviewQueueCount"></span></summary>
+        <div id="reportReviewQueueBody" tabindex="-1" aria-live="polite"></div>
+      </details>
+      <details class="report-disclosure" id="reportReviewedHistory">
+        <summary>Reviewed exception history <span id="reportReviewedHistoryCount"></span></summary>
+        <div id="reportReviewedHistoryBody" tabindex="-1" aria-live="polite"></div>
+      </details>
+    </section>
+
     <details class="report-disclosure report-detail" id="reportDetail">
-      <summary>Detail &amp; audit</summary>
+      <summary>Procedure baseline detail</summary>
       <section class="report-table-section">
         <h2>Procedure Baselines</h2>
         <div class="report-table-wrap">
@@ -165,67 +181,6 @@
               </tr>
             </thead>
             <tbody id="procedureSummariesBody"></tbody>
-          </table>
-        </div>
-      </section>
-      <section class="report-table-section">
-        <h2>Exceptions Requiring Review</h2>
-        <p class="report-table-context">Action-required review items remain global within the selected date window.</p>
-        <div class="report-table-wrap">
-          <table class="report-table">
-            <thead>
-              <tr>
-                <th>Started</th>
-                <th>Room</th>
-                <th>Doctor</th>
-                <th>Procedure</th>
-                <th>Doctor Arrived</th>
-                <th>Doctor Complete</th>
-                <th>Available</th>
-                <th>Last State</th>
-                <th>Reason</th>
-                <th>Suggested Action</th>
-                <th>Review Status</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody id="exceptionCyclesBody"></tbody>
-          </table>
-        </div>
-      </section>
-      <section class="report-table-section">
-        <h2>Recent Completed Cycles</h2>
-        <p class="report-table-context">This analytical Case Audit follows the selected Practice or Doctor and sedation scope.</p>
-        <div class="report-table-wrap">
-          <table class="report-table">
-            <thead>
-              <tr>
-                <th>Room</th>
-                <th>Doctor</th>
-                <th>Procedure</th>
-                <th>Seated</th>
-                <th>Ready</th>
-                <th>Doctor Arrived</th>
-                <th>Doctor Complete</th>
-                <th>Available</th>
-                <th>Prep Time</th>
-                <th>Ready-to-Doctor Wait</th>
-                <th>Doctor Occupied Wait</th>
-                <th>Doctor Available Wait</th>
-                <th>Total to Doctor</th>
-                <th>In Room</th>
-                <th>Turnover</th>
-                <th>Total</th>
-                <th>Expected</th>
-                <th>Measured</th>
-                <th>Variance</th>
-                <th>Wait State</th>
-                <th>Aging</th>
-                <th>Stale</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody id="completedCyclesBody"></tbody>
           </table>
         </div>
       </section>

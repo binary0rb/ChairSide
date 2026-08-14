@@ -201,6 +201,24 @@ app.MapGet("/api/reports", (
         sedation,
         procedureGrouping)));
 
+// Read-only, server-owned evidence projection. POST keeps the selection contract typed and avoids
+// placing potentially long calibration evidence identities in a query string.
+app.MapPost("/api/reports/audit/query", (DemoBoardStore store, ReportAuditRequest request) =>
+{
+    try
+    {
+        return Results.Ok(store.QueryReportAudit(request));
+    }
+    catch (ReportAuditQueryException exception)
+    {
+        return Results.BadRequest(new
+        {
+            code = "invalid-audit-query",
+            message = exception.Message
+        });
+    }
+});
+
 // Development-only: populate deterministic, non-PHI synthetic completed cycles for local
 // reporting smoke tests. Training and Production never map this endpoint.
 if (deploymentEnvironment.IsDevelopment)
