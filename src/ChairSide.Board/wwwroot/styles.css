@@ -1603,6 +1603,81 @@ body[data-view="reports"] .insight-metrics .metric-sample {
   font-weight: 700;
 }
 
+.report-audit-evidence {
+  display: grid;
+  gap: 0.8rem;
+  margin-top: 1rem;
+}
+
+.report-audit-toolbar {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  justify-content: space-between;
+  padding: 0.8rem 0;
+}
+
+.report-audit-toolbar p {
+  margin: 0;
+}
+
+.report-audit-toolbar select {
+  margin-left: 0.35rem;
+}
+
+.report-audit-list {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.report-audit-row {
+  background: var(--surface-raised, #fff);
+  border: 1px solid var(--border-subtle, #d8dee8);
+  border-radius: 0.6rem;
+  padding: 0.65rem 0.8rem;
+}
+
+.report-audit-row > summary {
+  cursor: pointer;
+  display: grid;
+  gap: 0.45rem;
+  grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+}
+
+.report-audit-facts {
+  display: grid;
+  gap: 0.65rem;
+  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+  margin: 0.9rem 0;
+}
+
+.report-audit-facts div {
+  min-width: 0;
+}
+
+.report-audit-facts dt {
+  color: var(--text-muted, #596579);
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.report-audit-facts dd {
+  margin: 0.2rem 0 0;
+  overflow-wrap: anywhere;
+}
+
+.report-audit-action {
+  margin-top: 0.6rem;
+}
+
+@media (max-width: 760px) {
+  .report-audit-row > summary {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
 .report-table-wrap {
   overflow-x: auto;
   max-width: 100%;

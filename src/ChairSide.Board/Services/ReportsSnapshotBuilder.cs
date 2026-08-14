@@ -7,7 +7,7 @@ namespace ChairSide.Board.Services;
 /// Population selection and aggregation are intentionally independent of live room mutation,
 /// persistence, and lifecycle synchronization.
 /// </summary>
-internal sealed class ReportsSnapshotBuilder
+internal sealed partial class ReportsSnapshotBuilder
 {
     private sealed record ScopedProcedurePopulation(
         string ProcedureCode,
@@ -112,11 +112,15 @@ internal sealed class ReportsSnapshotBuilder
             .Where(cycle => cycle.RoomAvailableAt is not null)
             .ToList();
 
-        // "Exceptions Requiring Review" is a pending-review queue: only exceptions that still
-        // require review appear here. A reviewed exception remains IsException (and therefore
-        // excluded from normal metrics) but drops out of this queue once its review is confirmed.
-        var exceptionCycles = allCycles
-            .Where(cycle => cycle.IsException && cycle.RequiresReview)
+        // Review populations use their own truthful source anchors. In particular, post-arrival
+        // exceptions without DoctorCompleteAt remain discoverable by their latest observed lifecycle
+        // timestamp instead of being lost by the completed-case window.
+        var reviewCompletedCycles = completedCycles
+            .Where(cycle => cycle.IsException && query.Window.Includes(ReviewAnchor(cycle)))
+            .Select(CopyCompletedCycle)
+            .ToList();
+        var exceptionCycles = reviewCompletedCycles
+            .Where(cycle => cycle.RequiresReview)
             .OrderByDescending(cycle => cycle.SeatedAt)
             .ToList();
         var exceptionReviewRecords = BuildExceptionReviewRecords(exceptionCycles, detachedAbortedAssignments);
@@ -204,7 +208,13 @@ internal sealed class ReportsSnapshotBuilder
                 RecentCompletedCycles = normalCompletedCycles.Take(25).ToList(),
                 IncludedCompletedCycleCount = standardCompletedCycles.Count,
                 ExcludedCompletedCycleCount = normalCompletedCycles.Count - standardCompletedCycles.Count,
-                ExceptionCount = normalCompletedCycles.Count(cycle => cycle.HasReportingException)
+                ExceptionCount = normalCompletedCycles.Count(cycle => cycle.HasReportingException),
+                DataQuality = BuildDataQualitySummary(
+                    normalCompletedCycles,
+                    standardCompletedCycles,
+                    completedCycles,
+                    abortedAssignments,
+                    query)
             },
             Window = new ReportWindowSection
             {

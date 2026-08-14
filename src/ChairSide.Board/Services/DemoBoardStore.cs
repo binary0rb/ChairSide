@@ -1131,6 +1131,21 @@ public sealed class DemoBoardStore
     }
 
     /// <summary>
+    /// Returns a bounded, read-only evidence page over server-owned report populations. This does
+    /// not mutate reporting state or reuse the compatibility RecentCompletedCycles cap.
+    /// </summary>
+    public ReportAuditPage QueryReportAudit(ReportAuditRequest request)
+    {
+        lock (_syncRoot)
+        {
+            return _reportsSnapshotBuilder.BuildAudit(
+                _completedCycles.ToArray(),
+                _repository.LoadAbortedAssignments().ToArray(),
+                request);
+        }
+    }
+
+    /// <summary>
     /// Maintenance only: clears all completed cycles and resets every active room to Available, then
     /// repopulates clean, deterministic, non-PHI synthetic training data. Taking a timestamped backup
     /// first is the caller's responsibility (the maintenance script). Idempotent - re-running converges
@@ -3295,7 +3310,10 @@ public sealed record ReportsSnapshot(
     // Procedure Intelligence is additive and shares the exact grouped underlying completed-case
     // populations used by ScopedProcedureGroups. Legacy procedure and allocation contracts remain
     // unchanged; new clients use this projection for median-first procedure timing presentation.
-    IReadOnlyList<ProcedureIntelligenceRow>? ProcedureIntelligenceRows = null);
+    IReadOnlyList<ProcedureIntelligenceRow>? ProcedureIntelligenceRows = null,
+    // Compact reconciliation for the selected analytical population and separate review window.
+    // Healthy state stays presentation-quiet; exclusions and review work retain source-backed counts.
+    ReportDataQualitySummary? DataQuality = null);
 
 public sealed record DoctorProcedureMixRow(
     string DoctorId,

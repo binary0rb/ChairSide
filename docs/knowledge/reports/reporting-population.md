@@ -1,7 +1,7 @@
 ---
 title: Reporting population
 tags: [reports, reporting-population, reporting-metrics, exception-handling, domain-rule, active, last-verified]
-last_verified_commit: ca75b09
+last_verified_commit: fe60949
 ---
 
 # Reporting population
@@ -24,7 +24,17 @@ last_verified_commit: ca75b09
 - Practice or historical/current Doctor plus Sedation scope selects the analytical population.
 - Procedure Family or Detailed Variant selects aggregation without filtering population membership.
 
-Doctor scopes accept historical doctor IDs independently of the active assignment roster. The analytical Case Audit follows Doctor and Sedation scope. The action-required Review Queue ignores analytical scope and remains global within the selected date window.
+Doctor scopes accept historical doctor IDs independently of the active assignment roster. Audit requests inherit the normalized parent query. A doctor segment under Practice remains Practice scope plus `segmentDoctorId`; it is not rewritten as a Doctor query. The action-required Review Queue ignores analytical Doctor and Sedation scope and remains global within the selected date window.
+
+## Evidence population boundaries
+
+- Completed-case audit includes normal history with Room Available. Practice audit includes reporting-excluded facts with neutral standing and reasons; included or segmented audit uses the standard included population.
+- Metric evidence selects the exact standard contributor population for Ready Wait, Seated -> Doctor, Doctor Time, Turnover, Procedure Mix, or Schedule Fit. Truthful phase evidence may be shown before Room Available and is labeled Metric evidence rather than completed throughput.
+- Exception review is separate from both populations. Pending records remain actionable; reviewed records remain in a quiet read-only history.
+
+Normal audit and analytical evidence preserve `DoctorCompleteAt` window authority. Review is selected independently: completed exceptions use the latest truthful anchor in `DoctorCompleteAt`, `DoctorArrivedAt`, `SeatedAt`, then `PrestageStartedAt`; aborted assignments use `TerminatedAt`. Review counts therefore do not disappear merely because an exception lacks Doctor Complete.
+
+The paged audit endpoint owns population membership, exact-second projection, sort, and local standing narrowing. `RecentCompletedCycles` remains compatibility context only and is not audit authority.
 
 `ReportSampleContext` carries population count, contributing count, state, threshold, and comparison eligibility. Empty is `N = 0`, Limited is `N = 1-4`, and Sufficient is `N >= 5`. A metric with a nonempty population and zero contributors is Unavailable. Comparison language requires every compared population to be Sufficient. Calibration Insights retain separate, stricter N >= 10 evidence eligibility without reclassifying the general descriptive sample state; the full server-owned rule is documented in `schedule-fit.md`.
 

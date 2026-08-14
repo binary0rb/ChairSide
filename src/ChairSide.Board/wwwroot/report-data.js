@@ -141,6 +141,31 @@ export function createReportData(adapter = {}) {
     return load();
   }
 
+  async function queryAudit(selection) {
+    const response = await request("/api/reports/audit/query", {
+      method: "POST",
+      cache: "no-store",
+      headers: {
+        ...currentAdminHeaders(),
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(selection || {})
+    });
+
+    if (response.status === 401 || response.status === 403) {
+      if (response.status === 403) {
+        clearRejectedToken();
+      }
+      adapter.onAccessDenied?.(response.status);
+      return null;
+    }
+    if (!response.ok) {
+      const problem = await response.json().catch(() => null);
+      throw new Error(problem?.message || `Audit query failed with HTTP ${response.status}.`);
+    }
+    return response.json();
+  }
+
   function reloadAfterCurrent() {
     if (guaranteedReloadBatch && !guaranteedReloadBatch.started) {
       guaranteedReloadBatch.requestContext = createReportRequestContext(dateRange, analyticalScope);
@@ -261,6 +286,7 @@ export function createReportData(adapter = {}) {
     getReports,
     getVersion,
     load,
+    queryAudit,
     reload,
     reloadAfterCurrent,
     setDateRange,

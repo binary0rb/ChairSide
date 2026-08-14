@@ -581,3 +581,44 @@ test("query change during an active request runs a guaranteed fresh request with
   assert.equal(harness.controller.getQuery().doctorId, "pledger");
   assert.equal(harness.controller.getQuery().sedation, "Sedation");
 });
+
+test("audit query uses protected POST transport without mutating parent report state", async () => {
+  const page = { mode: "MetricEvidence", rows: [{ completedCycleId: 42 }] };
+  const harness = createHarness({ fetch: async () => response(200, page) });
+  const beforeQuery = harness.controller.getQuery();
+  const beforeVersion = harness.controller.getVersion();
+  const selection = {
+    from: "2026-07-01",
+    to: "2026-07-31",
+    scope: "Practice",
+    contributorKind: "ReadyWait",
+    segmentDoctorId: "otte",
+    sort: "LongestReadyWait",
+    offset: 50,
+    limit: 50
+  };
+
+  const result = await harness.controller.queryAudit(selection);
+
+  assert.deepEqual(result, page);
+  assert.equal(harness.calls[0].url, "/api/reports/audit/query");
+  assert.equal(harness.calls[0].options.method, "POST");
+  assert.equal(harness.calls[0].options.cache, "no-store");
+  assert.equal(harness.calls[0].options.headers["X-ChairSide-Admin-Token"], "admin-token");
+  assert.equal(harness.calls[0].options.headers["Content-Type"], "application/json");
+  assert.deepEqual(JSON.parse(harness.calls[0].options.body), selection);
+  assert.deepEqual(harness.controller.getQuery(), beforeQuery);
+  assert.equal(harness.controller.getVersion(), beforeVersion);
+});
+
+test("audit query preserves reports access-denied behavior", async () => {
+  const unauthorized = createHarness({ fetch: async () => response(401) });
+  assert.equal(await unauthorized.controller.queryAudit({}), null);
+  assert.deepEqual(unauthorized.access, [["initial", 401]]);
+  assert.equal(unauthorized.clearCount, 0);
+
+  const forbidden = createHarness({ fetch: async () => response(403) });
+  assert.equal(await forbidden.controller.queryAudit({}), null);
+  assert.deepEqual(forbidden.access, [["initial", 403]]);
+  assert.equal(forbidden.clearCount, 1);
+});

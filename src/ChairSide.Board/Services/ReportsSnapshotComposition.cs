@@ -30,6 +30,7 @@ internal sealed record ReportPopulationSection
     public required int IncludedCompletedCycleCount { get; init; }
     public required int ExcludedCompletedCycleCount { get; init; }
     public required int ExceptionCount { get; init; }
+    public ReportDataQualitySummary? DataQuality { get; init; }
 }
 
 /// <summary>
@@ -170,6 +171,7 @@ internal static class ReportsSnapshotAdapter
             ObservedDoctorFlowDays: composition.DoctorDetail.ObservedDoctorFlowDays,
             DoctorFlowSummaries: composition.DoctorDetail.DoctorFlowSummaries,
             DoctorFlowTrends: composition.DoctorDetail.DoctorFlowTrends,
-            ProcedureIntelligenceRows: composition.Procedures.ProcedureIntelligenceRows);
+            ProcedureIntelligenceRows: composition.Procedures.ProcedureIntelligenceRows,
+            DataQuality: composition.Population.DataQuality);
     }
 }

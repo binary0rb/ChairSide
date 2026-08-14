@@ -1,7 +1,7 @@
 ﻿{
     "generatedStamp":  "deterministic",
     "root":  ".",
-    "fileCount":  178,
+    "fileCount":  182,
     "files":  [
                   {
                       "path":  ".github/pull_request_template.md",
@@ -60,7 +60,7 @@
                   {
                       "path":  "AGENTS.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  21069,
+                      "sizeBytes":  21070,
                       "typeSymbols":  [
 
                                       ],
@@ -200,7 +200,7 @@
                   {
                       "path":  "docs/design/reporting-design.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  34459,
+                      "sizeBytes":  36370,
                       "typeSymbols":  [
 
                                       ],
@@ -269,6 +269,7 @@
                                        "Audit evidence",
                                        "Non-punitive interpretation constraints",
                                        "Current implementation compatibility and known gaps",
+                                       "Audit and evidence authority",
                                        "Deferred design and future reporting",
                                        "Implementation and test derivation rules",
                                        "Delivery relationship"
@@ -402,6 +403,37 @@
                                    ]
                   },
                   {
+                      "path":  "docs/knowledge/reports/audit-evidence.md",
+                      "kind":  "Markdown",
+                      "sizeBytes":  2758,
+                      "typeSymbols":  [
+
+                                      ],
+                      "methodSymbols":  [
+
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+                                       "Report audit and metric evidence",
+                                       "Three separate populations",
+                                       "Query and scope transfer",
+                                       "Time and identity authority",
+                                       "Compatibility",
+                                       "Source and test anchors"
+                                   ]
+                  },
+                  {
                       "path":  "docs/knowledge/reports/observed-load.md",
                       "kind":  "Markdown",
                       "sizeBytes":  7164,
@@ -439,7 +471,7 @@
                   {
                       "path":  "docs/knowledge/reports/procedure-intelligence.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  5007,
+                      "sizeBytes":  5010,
                       "typeSymbols":  [
 
                                       ],
@@ -504,7 +536,7 @@
                   {
                       "path":  "docs/knowledge/reports/reporting-population.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  4818,
+                      "sizeBytes":  6209,
                       "typeSymbols":  [
 
                                       ],
@@ -527,6 +559,7 @@
                                        "Reporting population",
                                        "Population funnel",
                                        "Reusable report query and sample state",
+                                       "Evidence population boundaries",
                                        "Assignment and handoff attribution",
                                        "Termination populations",
                                        "Source and test anchors"
@@ -535,7 +568,7 @@
                   {
                       "path":  "docs/knowledge/reports/schedule-fit.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  5925,
+                      "sizeBytes":  6573,
                       "typeSymbols":  [
 
                                       ],
@@ -726,7 +759,7 @@
                   {
                       "path":  "docs/knowledge-graph/chairside.graph.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  19555,
+                      "sizeBytes":  19980,
                       "typeSymbols":  [
 
                                       ],
@@ -757,7 +790,7 @@
                   {
                       "path":  "docs/knowledge-graph/decisions.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  22955,
+                      "sizeBytes":  23850,
                       "typeSymbols":  [
 
                                       ],
@@ -1648,7 +1681,7 @@
                   {
                       "path":  "src/ChairSide.Board/Program.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  73070,
+                      "sizeBytes":  73629,
                       "typeSymbols":  [
                                           "LegacyRoomOneRedirect",
                                           "BeginPrestageRequest",
@@ -1684,6 +1717,7 @@
                                      "/boardHub",
                                      "/api/board",
                                      "/api/reports",
+                                     "/api/reports/audit/query",
                                      "/api/dev/seed-report-data",
                                      "/api/reports/cycles/mark-exception",
                                      "/api/reports/cycles/{completedCycleId:long}/confirm-exclusion",
@@ -1773,7 +1807,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/CalibrationInsightReport.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  14060,
+                      "sizeBytes":  14412,
                       "typeSymbols":  [
                                           "ScheduleFitToleranceClassifications",
                                           "CalibrationRawDirections",
@@ -1949,7 +1983,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/DemoBoardStore.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  189565,
+                      "sizeBytes":  190356,
                       "typeSymbols":  [
                                           "ExceptionReasons",
                                           "ReportingExceptionReasons",
@@ -2018,6 +2052,7 @@
                                             "MarkDoctorComplete",
                                             "MarkRoomAvailable",
                                             "GetReports",
+                                            "QueryReportAudit",
                                             "ResetAndSeedSyntheticTrainingData",
                                             "ResetAllDataForEmptyBeta",
                                             "ClearCompletedAndResetRoomsLocked",
@@ -2025,8 +2060,7 @@
                                             "ResetAndSeedLargeSyntheticReportData",
                                             "SeedLargeSyntheticReportData",
                                             "ApplySyntheticPlan",
-                                            "UpsertSyntheticCycle",
-                                            "ResetAndSeedStressFixture"
+                                            "UpsertSyntheticCycle"
                                         ],
                       "routes":  [
 
@@ -2521,6 +2555,44 @@
                                    ]
                   },
                   {
+                      "path":  "src/ChairSide.Board/Services/ReportAudit.cs",
+                      "kind":  "CSharp",
+                      "sizeBytes":  5863,
+                      "typeSymbols":  [
+                                          "ReportAuditContributorKinds",
+                                          "ReportAuditModes",
+                                          "ReportAuditStanding",
+                                          "ReportAuditSorts",
+                                          "ReportAuditEvidenceIdentity",
+                                          "ReportAuditRequest",
+                                          "ReportAuditSelection",
+                                          "ReportAuditRow",
+                                          "ReportReviewAuditRow",
+                                          "ReportAuditPage",
+                                          "ReportDataQualityReasonCount",
+                                          "ReportDataQualitySummary",
+                                          "ReportAuditQueryException"
+                                      ],
+                      "methodSymbols":  [
+
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
                       "path":  "src/ChairSide.Board/Services/ReportQuery.cs",
                       "kind":  "CSharp",
                       "sizeBytes":  7796,
@@ -2565,9 +2637,57 @@
                                    ]
                   },
                   {
+                      "path":  "src/ChairSide.Board/Services/ReportsSnapshotBuilder.Audit.cs",
+                      "kind":  "CSharp",
+                      "sizeBytes":  23118,
+                      "typeSymbols":  [
+                                          "ReportsSnapshotBuilder"
+                                      ],
+                      "methodSymbols":  [
+                                            "BuildAudit",
+                                            "BuildDataQualitySummary",
+                                            "ReviewAnchor",
+                                            "BuildReviewAuditPage",
+                                            "BuildReviewRows",
+                                            "SelectContributorPopulation",
+                                            "ToAuditRow",
+                                            "ResolveDoctorName",
+                                            "ApplyStanding",
+                                            "MatchesProcedure",
+                                            "MatchesSegmentDoctor",
+                                            "HasReadyWait",
+                                            "HasSeatedToDoctor",
+                                            "HasDoctorTime",
+                                            "HasTurnover",
+                                            "HasObservedScheduleFit",
+                                            "HasHistoricalScheduleFit",
+                                            "OrderedSeconds",
+                                            "OrderAuditRows",
+                                            "OrderReviewRows",
+                                            "NormalizeContributorKind",
+                                            "NormalizeStanding",
+                                            "NormalizeOptional"
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
                       "path":  "src/ChairSide.Board/Services/ReportsSnapshotBuilder.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  74567,
+                      "sizeBytes":  75124,
                       "typeSymbols":  [
                                           "ReportsSnapshotBuilder",
                                           "ScopedProcedurePopulation"
@@ -2633,7 +2753,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/ReportsSnapshotComposition.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  9893,
+                      "sizeBytes":  10015,
                       "typeSymbols":  [
                                           "ReportsSnapshotComposition",
                                           "ReportPopulationSection",
@@ -2887,7 +3007,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/ScheduleFitReport.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  2858,
+                      "sizeBytes":  2871,
                       "typeSymbols":  [
                                           "ScheduleFitReport",
                                           "ScheduleFitReportBuilder"
@@ -3433,7 +3553,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/report-data.js",
                       "kind":  "JavaScript",
-                      "sizeBytes":  9074,
+                      "sizeBytes":  9827,
                       "typeSymbols":  [
 
                                       ],
@@ -3468,6 +3588,7 @@
                                               "startLoad",
                                               "load",
                                               "reload",
+                                              "queryAudit",
                                               "reloadAfterCurrent",
                                               "reportsRequestUrl",
                                               "request",
@@ -3486,7 +3607,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/reports.html",
                       "kind":  "Html",
-                      "sizeBytes":  11702,
+                      "sizeBytes":  10440,
                       "typeSymbols":  [
 
                                       ],
@@ -3512,7 +3633,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/reports.js",
                       "kind":  "JavaScript",
-                      "sizeBytes":  134272,
+                      "sizeBytes":  155136,
                       "typeSymbols":  [
 
                                       ],
@@ -3600,15 +3721,15 @@
                                               "renderDoctorProcedureIntelligence",
                                               "handleProcedureIntelligenceClick",
                                               "formatProcedureShare",
-                                              "renderSelectedDoctorAudit",
-                                              "renderProcedureAllocation",
-                                              "renderScheduleFitSegment",
-                                              "renderCalibrationEvaluation",
-                                              "renderCalibrationEvidence",
-                                              "formatCalibrationTolerance",
-                                              "formatScheduleFitCoverage",
-                                              "formatScheduleFitAmount",
-                                              "formatSignedScheduleFitSeconds"
+                                              "renderAuditAction",
+                                              "auditSelection",
+                                              "auditViewSignature",
+                                              "ensureAuditView",
+                                              "normalizedAuditSelection",
+                                              "renderAuditEvidence",
+                                              "renderReviewEvidence",
+                                              "renderAuditView",
+                                              "renderCompletedAuditRows"
                                           ],
                       "headings":  [
 
@@ -3835,7 +3956,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/styles.css",
                       "kind":  "Css",
-                      "sizeBytes":  112014,
+                      "sizeBytes":  113396,
                       "typeSymbols":  [
 
                                       ],
@@ -4518,7 +4639,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/BoardStoreSecurityAndDiagnosticsTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  22307,
+                      "sizeBytes":  22389,
                       "typeSymbols":  [
                                           "BoardStoreTests"
                                       ],
@@ -4575,7 +4696,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/CalibrationInsightReportTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  12765,
+                      "sizeBytes":  13058,
                       "typeSymbols":  [
                                           "CalibrationInsightReportTests"
                                       ],
@@ -5497,6 +5618,44 @@
                                    ]
                   },
                   {
+                      "path":  "tests/ChairSide.Board.Tests/ReportAuditBuilderTests.cs",
+                      "kind":  "CSharp",
+                      "sizeBytes":  15036,
+                      "typeSymbols":  [
+                                          "ReportAuditBuilderTests"
+                                      ],
+                      "methodSymbols":  [
+                                            "Completed_and_metric_evidence_populations_remain_distinct_and_exact",
+                                            "Broad_completed_audit_marks_reporting_exclusions_but_included_audit_omits_them",
+                                            "Exact_projection_keeps_truthful_zero_and_reversed_intervals_null",
+                                            "Query_inherits_base_scope_and_stacks_segment_sedation_and_grouping_filters",
+                                            "Review_queries_use_source_specific_anchors_and_ignore_analytical_scope",
+                                            "Data_quality_reconciles_analytical_counts_and_separate_review_counts",
+                                            "Paging_clamps_to_one_hundred_and_preserves_stable_server_sorting",
+                                            "Every_supported_sort_is_server_owned_and_membership_preserving",
+                                            "CreateBuilder",
+                                            "Cycle",
+                                            "Aborted",
+                                            "Seconds",
+                                            "Utc"
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
                       "path":  "tests/ChairSide.Board.Tests/ReportQueryTests.cs",
                       "kind":  "CSharp",
                       "sizeBytes":  2171,
@@ -5526,7 +5685,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/ReportsSnapshotBuilderTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  76634,
+                      "sizeBytes":  76760,
                       "typeSymbols":  [
                                           "ReportsSnapshotBuilderTests"
                                       ],
@@ -5710,7 +5869,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/ScheduleFitReportTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  10847,
+                      "sizeBytes":  10881,
                       "typeSymbols":  [
                                           "ScheduleFitReportTests"
                                       ],
@@ -6238,7 +6397,7 @@
                   {
                       "path":  "tests/javascript/report-data.test.mjs",
                       "kind":  "JavaScript",
-                      "sizeBytes":  18792,
+                      "sizeBytes":  20610,
                       "typeSymbols":  [
 
                                       ],
@@ -6266,7 +6425,7 @@
                   {
                       "path":  "tests/javascript/reports.test.mjs",
                       "kind":  "JavaScript",
-                      "sizeBytes":  125150,
+                      "sizeBytes":  136991,
                       "typeSymbols":  [
 
                                       ],
@@ -6311,6 +6470,7 @@
                                               "deferred",
                                               "selectedCard",
                                               "openDoctorProceduresTab",
+                                              "openDoctorScheduleFitTab",
                                               "allocationPayload",
                                               "allocationSurfaceHtml",
                                               "trendBucket"
