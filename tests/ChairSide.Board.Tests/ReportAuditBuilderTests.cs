@@ -32,6 +32,75 @@ public sealed class ReportAuditBuilderTests
     }
 
     [Fact]
+    public void Procedure_intelligence_timing_uses_completed_contributors_while_generic_phase_kinds_remain_broader()
+    {
+        var completed = Cycle(1, "otte", "EXT", Utc(8, 0), available: 55);
+        var phaseOnly = Cycle(2, "otte", "EXT", Utc(9, 0), available: null);
+        var noAllocation = Cycle(3, "otte", "EXT", Utc(10, 0), available: 55, expected: 0);
+        var cycles = new[] { completed, phaseOnly, noAllocation };
+        var builder = CreateBuilder();
+
+        var genericReady = builder.BuildAudit(
+            cycles, [],
+            new ReportAuditRequest(ContributorKind: ReportAuditContributorKinds.ReadyWait));
+        var genericDoctor = builder.BuildAudit(
+            cycles, [],
+            new ReportAuditRequest(ContributorKind: ReportAuditContributorKinds.DoctorTime));
+        var procedureReady = builder.BuildAudit(
+            cycles, [],
+            new ReportAuditRequest(ContributorKind: ReportAuditContributorKinds.ProcedureIntelligenceReadyWait));
+        var procedureDoctor = builder.BuildAudit(
+            cycles, [],
+            new ReportAuditRequest(ContributorKind: ReportAuditContributorKinds.ProcedureIntelligenceDoctorTime));
+        var procedureSeatedToComplete = builder.BuildAudit(
+            cycles, [],
+            new ReportAuditRequest(ContributorKind: ReportAuditContributorKinds.ProcedureIntelligenceSeatedToDoctorComplete));
+        var historicalScheduleFit = builder.BuildAudit(
+            cycles, [],
+            new ReportAuditRequest(ContributorKind: ReportAuditContributorKinds.HistoricalScheduleFit));
+
+        Assert.Equal([1L, 2L, 3L], genericReady.Rows.Select(row => row.CompletedCycleId).Order());
+        Assert.Equal([1L, 2L, 3L], genericDoctor.Rows.Select(row => row.CompletedCycleId).Order());
+        Assert.Equal([1L, 3L], procedureReady.Rows.Select(row => row.CompletedCycleId).Order());
+        Assert.Equal([1L, 3L], procedureDoctor.Rows.Select(row => row.CompletedCycleId).Order());
+        Assert.Equal([1L, 3L], procedureSeatedToComplete.Rows.Select(row => row.CompletedCycleId).Order());
+        Assert.Contains(procedureSeatedToComplete.Rows, row => row.CompletedCycleId == 3 && row.ExpectedAllocationMinutes == 0);
+        Assert.DoesNotContain(historicalScheduleFit.Rows, row => row.CompletedCycleId == 3);
+    }
+
+    [Fact]
+    public void Procedure_intelligence_contributors_inherit_scope_segment_sedation_and_grouping_filters()
+    {
+        var otteBase = Cycle(1, "otte", "EXT", Utc(8, 0));
+        var otteSedation = Cycle(2, "otte", "EXT+SED", Utc(9, 0));
+        var pledgerSedation = Cycle(3, "pledger", "EXT+SED", Utc(10, 0));
+        var cycles = new[] { otteBase, otteSedation, pledgerSedation };
+        var builder = CreateBuilder();
+
+        var practiceFamilySegment = builder.BuildAudit(
+            cycles, [],
+            new ReportAuditRequest(
+                Scope: ReportScopeKinds.Practice,
+                Sedation: ReportSedationSegments.Sedation,
+                ProcedureGrouping: ReportProcedureGroupings.Family,
+                ContributorKind: ReportAuditContributorKinds.ProcedureIntelligenceReadyWait,
+                SegmentDoctorId: "pledger",
+                BaseProcedureCode: "EXT"));
+        var doctorDetailed = builder.BuildAudit(
+            cycles, [],
+            new ReportAuditRequest(
+                Scope: ReportScopeKinds.Doctor,
+                DoctorId: "otte",
+                Sedation: ReportSedationSegments.Sedation,
+                ProcedureGrouping: ReportProcedureGroupings.DetailedVariant,
+                ContributorKind: ReportAuditContributorKinds.ProcedureIntelligenceDoctorTime,
+                ProcedureCode: "EXT+SED"));
+
+        Assert.Equal([3L], practiceFamilySegment.Rows.Select(row => row.CompletedCycleId));
+        Assert.Equal([2L], doctorDetailed.Rows.Select(row => row.CompletedCycleId));
+    }
+
+    [Fact]
     public void Broad_completed_audit_marks_reporting_exclusions_but_included_audit_omits_them()
     {
         var included = Cycle(1, "otte", "EXT", Utc(8, 0));

@@ -12,6 +12,7 @@ ChairSide uses one shared presentation but does not merge the underlying evidenc
 
 - Completed-case audit is normal completed history with Room Available. Practice includes reporting-excluded facts with explicit neutral standing; standard included audit omits them.
 - Metric evidence is the exact contributor population for a selected server metric. Phase contributors may lack Room Available and are never described as completed throughput.
+- Procedure Intelligence timing evidence begins with its standard included completed row population and then applies the selected metric's truthful interval requirement. Its Ready Wait and Doctor Time drill-down therefore do not reuse the broader generic phase populations, and its Seated to Doctor Complete evidence does not require a positive scheduling allocation.
 - Exception review contains pending completed and aborted exceptions. Reviewed exception history is a separate read-only disclosure with no actions.
 
 Manual exceptions and aborted assignments never appear in completed-case audit or metric evidence.

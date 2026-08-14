@@ -1824,6 +1824,11 @@ test("Procedure Intelligence presents median-first timing, Type 7 range, and neu
   assert.match(html, /type="button"/);
   assert.match(html, /aria-expanded="false"/);
   assert.match(html, /aria-controls="practice-procedure-intelligence-detail-0"/);
+  assert.match(html, /data-audit-kind="ProcedureMix"/);
+  assert.match(html, /data-audit-kind="ProcedureIntelligenceDoctorTime"/);
+  assert.match(html, /data-audit-kind="ProcedureIntelligenceReadyWait"/);
+  assert.match(html, /data-audit-kind="ProcedureIntelligenceSeatedToDoctorComplete"/);
+  assert.doesNotMatch(html, /data-audit-kind="(?:DoctorTime|ReadyWait|HistoricalScheduleFit)"/);
 
   const detail = html.match(/<div class="procedure-intelligence-detail"[\s\S]*?<\/article>/)?.[0];
   assert.ok(detail);
@@ -3774,6 +3779,8 @@ test("audit load more appends server pages without a main report reload", async 
   assert.match(html, /Room 1/);
   assert.match(html, /Room 2/);
   assert.match(html, /unmapped/);
+  assert.match(html, /2 matching records; showing 2/);
+  assert.doesNotMatch(html, /showing 1/);
 });
 
 test("Calibration audit passes exact qualified evidence identities without browser qualification", async () => {

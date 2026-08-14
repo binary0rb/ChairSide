@@ -405,7 +405,7 @@
                   {
                       "path":  "docs/knowledge/reports/audit-evidence.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  2758,
+                      "sizeBytes":  3126,
                       "typeSymbols":  [
 
                                       ],
@@ -2557,7 +2557,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/ReportAudit.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  5863,
+                      "sizeBytes":  6163,
                       "typeSymbols":  [
                                           "ReportAuditContributorKinds",
                                           "ReportAuditModes",
@@ -2639,7 +2639,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/ReportsSnapshotBuilder.Audit.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  23118,
+                      "sizeBytes":  23874,
                       "typeSymbols":  [
                                           "ReportsSnapshotBuilder"
                                       ],
@@ -3633,7 +3633,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/reports.js",
                       "kind":  "JavaScript",
-                      "sizeBytes":  155136,
+                      "sizeBytes":  155397,
                       "typeSymbols":  [
 
                                       ],
@@ -5620,19 +5620,23 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/ReportAuditBuilderTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  15036,
+                      "sizeBytes":  21545,
                       "typeSymbols":  [
                                           "ReportAuditBuilderTests"
                                       ],
                       "methodSymbols":  [
                                             "Completed_and_metric_evidence_populations_remain_distinct_and_exact",
+                                            "Procedure_intelligence_timing_uses_completed_contributors_while_generic_phase_kinds_remain_broader",
+                                            "Procedure_intelligence_contributors_inherit_scope_segment_sedation_and_grouping_filters",
                                             "Broad_completed_audit_marks_reporting_exclusions_but_included_audit_omits_them",
                                             "Exact_projection_keeps_truthful_zero_and_reversed_intervals_null",
                                             "Query_inherits_base_scope_and_stacks_segment_sedation_and_grouping_filters",
                                             "Review_queries_use_source_specific_anchors_and_ignore_analytical_scope",
                                             "Data_quality_reconciles_analytical_counts_and_separate_review_counts",
                                             "Paging_clamps_to_one_hundred_and_preserves_stable_server_sorting",
+                                            "Calibration_uses_and_reconciles_exact_server_qualified_evidence_identities",
                                             "Every_supported_sort_is_server_owned_and_membership_preserving",
+                                            "Most_recent_and_metric_ties_use_descending_completed_cycle_identity",
                                             "CreateBuilder",
                                             "Cycle",
                                             "Aborted",
@@ -5685,7 +5689,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/ReportsSnapshotBuilderTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  76760,
+                      "sizeBytes":  76861,
                       "typeSymbols":  [
                                           "ReportsSnapshotBuilderTests"
                                       ],
@@ -5693,7 +5697,7 @@
                                             "Compose_characterizes_all_reporting_populations_without_mutating_source_history",
                                             "Adapter_preserves_every_named_section_value_in_flat_contract",
                                             "Build_applies_completion_window_before_every_population_and_keeps_all_time_total",
-                                            "Reports_snapshot_web_json_property_contract_appends_procedure_intelligence",
+                                            "Reports_snapshot_web_json_property_contract_appends_data_quality",
                                             "Build_applies_historical_doctor_and_sedation_scope_without_treating_grouping_as_a_filter",
                                             "Build_scoped_procedure_groups_reconcile_family_and_detailed_variant_populations",
                                             "Build_scoped_procedure_groups_recompute_sedation_populations_and_shares",
@@ -6425,7 +6429,7 @@
                   {
                       "path":  "tests/javascript/reports.test.mjs",
                       "kind":  "JavaScript",
-                      "sizeBytes":  136991,
+                      "sizeBytes":  138610,
                       "typeSymbols":  [
 
                                       ],

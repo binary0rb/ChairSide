@@ -1489,9 +1489,9 @@ export function createReports({
       </div>
       <div class="procedure-intelligence-audit-actions">
         ${renderAuditAction("ProcedureMix", `View completed cases for ${label}`, auditProcedure)}
-        ${renderAuditAction("DoctorTime", `View Doctor Time cases for ${label}`, auditProcedure)}
-        ${renderAuditAction("ReadyWait", `View Ready Wait cases for ${label}`, auditProcedure)}
-        ${renderAuditAction("HistoricalScheduleFit", `View Seated to Doctor Complete cases for ${label}`, auditProcedure)}
+        ${renderAuditAction("ProcedureIntelligenceDoctorTime", `View Doctor Time cases for ${label}`, auditProcedure)}
+        ${renderAuditAction("ProcedureIntelligenceReadyWait", `View Ready Wait cases for ${label}`, auditProcedure)}
+        ${renderAuditAction("ProcedureIntelligenceSeatedToDoctorComplete", `View Seated to Doctor Complete cases for ${label}`, auditProcedure)}
       </div>
       <button type="button"
         class="procedure-intelligence-toggle"
@@ -1833,9 +1833,12 @@ export function createReports({
     : page.mode === "ExceptionReview"
       ? "Exception review evidence"
       : "Completed-case audit";
+  const visibleCount = page.mode === "ExceptionReview"
+    ? (page.reviewRows || []).length
+    : (page.rows || []).length;
   target.innerHTML = `
     <div class="report-audit-toolbar">
-      <p><strong>${modeLabel}</strong> - ${page.totalMatchingCount} matching ${page.totalMatchingCount === 1 ? "record" : "records"}; showing ${page.returnedCount}.</p>
+      <p><strong>${modeLabel}</strong> - ${page.totalMatchingCount} matching ${page.totalMatchingCount === 1 ? "record" : "records"}; showing ${visibleCount}.</p>
       <label>Sort <select data-audit-sort data-audit-view="${escapeAttribute(viewId)}">${sortOptions}</select></label>
       ${standingFilter}
     </div>

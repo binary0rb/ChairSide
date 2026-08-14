@@ -248,6 +248,12 @@ internal sealed partial class ReportsSnapshotBuilder
             ReportAuditContributorKinds.Turnover => standard.Where(HasTurnover),
             ReportAuditContributorKinds.ProcedureMix =>
                 standard.Where(cycle => cycle.RoomAvailableAt.HasValue),
+            ReportAuditContributorKinds.ProcedureIntelligenceReadyWait =>
+                standard.Where(cycle => cycle.RoomAvailableAt.HasValue).Where(HasReadyWait),
+            ReportAuditContributorKinds.ProcedureIntelligenceDoctorTime =>
+                standard.Where(cycle => cycle.RoomAvailableAt.HasValue).Where(HasDoctorTime),
+            ReportAuditContributorKinds.ProcedureIntelligenceSeatedToDoctorComplete =>
+                standard.Where(cycle => cycle.RoomAvailableAt.HasValue).Where(HasObservedScheduleFit),
             ReportAuditContributorKinds.HistoricalScheduleFit => standard.Where(HasHistoricalScheduleFit),
             ReportAuditContributorKinds.CalibrationEvidence => standard.Where(HasObservedScheduleFit),
             _ => throw new ReportAuditQueryException($"Unsupported contributorKind '{selection.ContributorKind}'.")
@@ -481,6 +487,9 @@ internal sealed partial class ReportsSnapshotBuilder
             ReportAuditContributorKinds.DoctorTime,
             ReportAuditContributorKinds.Turnover,
             ReportAuditContributorKinds.ProcedureMix,
+            ReportAuditContributorKinds.ProcedureIntelligenceReadyWait,
+            ReportAuditContributorKinds.ProcedureIntelligenceDoctorTime,
+            ReportAuditContributorKinds.ProcedureIntelligenceSeatedToDoctorComplete,
             ReportAuditContributorKinds.HistoricalScheduleFit,
             ReportAuditContributorKinds.CalibrationEvidence,
             ReportAuditContributorKinds.PendingReview,

@@ -9,6 +9,9 @@ public static class ReportAuditContributorKinds
     public const string DoctorTime = "DoctorTime";
     public const string Turnover = "Turnover";
     public const string ProcedureMix = "ProcedureMix";
+    public const string ProcedureIntelligenceReadyWait = "ProcedureIntelligenceReadyWait";
+    public const string ProcedureIntelligenceDoctorTime = "ProcedureIntelligenceDoctorTime";
+    public const string ProcedureIntelligenceSeatedToDoctorComplete = "ProcedureIntelligenceSeatedToDoctorComplete";
     public const string HistoricalScheduleFit = "HistoricalScheduleFit";
     public const string CalibrationEvidence = "CalibrationEvidence";
     public const string PendingReview = "PendingReview";
@@ -175,4 +178,3 @@ public sealed record ReportDataQualitySummary(
     string ReviewWindowDescription);
 
 public sealed class ReportAuditQueryException(string message) : Exception(message);
-
