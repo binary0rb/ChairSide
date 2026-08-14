@@ -1719,18 +1719,24 @@ export function createReports({
 }
 
   async function ensureAuditView(viewId, targetId, selection, { append = false } = {}) {
-  const signature = `${reportData.getVersion()}|${auditViewSignature(selection)}`;
+  const reportVersion = reportData.getVersion();
+  const signature = auditViewSignature(selection);
   const current = state.auditViews.get(viewId);
-  if (!append && current?.signature === signature && (current.loading || current.page || current.error)) {
+  if (!append
+      && current?.reportVersion === reportVersion
+      && current.signature === signature
+      && (current.loading || current.page || current.error)) {
     renderAuditView(viewId, targetId);
     return;
   }
+  const canAppend = append && current?.reportVersion === reportVersion;
   const entry = {
+    reportVersion,
     signature,
     targetId,
     selection,
     loading: true,
-    page: append ? current?.page || null : null,
+    page: canAppend ? current?.page || null : null,
     error: null
   };
   state.auditViews.set(viewId, entry);
@@ -1744,7 +1750,7 @@ export function createReports({
       return;
     }
     entry.selection = normalizedAuditSelection(entry.selection, page.normalizedSelection);
-    entry.page = append && entry.page
+    entry.page = canAppend && entry.page
       ? {
           ...page,
           rows: [...(entry.page.rows || []), ...(page.rows || [])],
@@ -1761,6 +1767,34 @@ export function createReports({
       renderAuditView(viewId, targetId);
     }
   }
+}
+
+// Automatic Reports rendering owns only initialization for the current parent payload.
+// Same-version renders preserve user-selected audit scope, sort, filters, and accumulated pages.
+// A new reportData version invalidates the old view and initializes its deterministic default.
+  function initializeAuditViewForReportVersion(viewId, targetId, selection) {
+  const reportVersion = reportData.getVersion();
+  const current = state.auditViews.get(viewId);
+  if (current?.reportVersion === reportVersion) {
+    queueMicrotask(() => {
+      if (state.auditViews.get(viewId)?.reportVersion === reportVersion) {
+        renderAuditView(viewId, targetId);
+      }
+    });
+    return;
+  }
+
+  state.auditViews.delete(viewId);
+  queueMicrotask(() => {
+    if (reportData.getVersion() !== reportVersion) {
+      return;
+    }
+    if (state.auditViews.get(viewId)?.reportVersion === reportVersion) {
+      renderAuditView(viewId, targetId);
+      return;
+    }
+    ensureAuditView(viewId, targetId, selection);
+  });
 }
 
   function normalizedAuditSelection(requestSelection, normalized) {
@@ -1786,7 +1820,7 @@ export function createReports({
 
   function renderAuditEvidence(r) {
   const kind = r.query?.scope === "Doctor" ? "IncludedCompletedCases" : "PracticeCompletedCases";
-  queueMicrotask(() => ensureAuditView("primary", "reportAuditBody", auditSelection(r, kind)));
+  initializeAuditViewForReportVersion("primary", "reportAuditBody", auditSelection(r, kind));
 }
 
   function renderReviewEvidence(r) {
@@ -1797,8 +1831,8 @@ export function createReports({
   const reviewedLabel = document.getElementById("reportReviewedHistoryCount");
   if (pendingLabel) pendingLabel.textContent = `(${pendingCount})`;
   if (reviewedLabel) reviewedLabel.textContent = `(${reviewedCount})`;
-  queueMicrotask(() => ensureAuditView("pending", "reportReviewQueueBody", auditSelection(r, "PendingReview")));
-  queueMicrotask(() => ensureAuditView("reviewed", "reportReviewedHistoryBody", auditSelection(r, "ReviewedExceptionHistory")));
+  initializeAuditViewForReportVersion("pending", "reportReviewQueueBody", auditSelection(r, "PendingReview"));
+  initializeAuditViewForReportVersion("reviewed", "reportReviewedHistoryBody", auditSelection(r, "ReviewedExceptionHistory"));
 }
 
   function renderAuditView(viewId, targetId) {
@@ -1931,11 +1965,11 @@ export function createReports({
 }
 
   function renderSelectedDoctorAudit(r, doctorId) {
-  queueMicrotask(() => ensureAuditView(
+  initializeAuditViewForReportVersion(
     "doctor",
     "doctorAuditBody",
     auditSelection(r, "IncludedCompletedCases", { segmentDoctorId: doctorId })
-  ));
+  );
   return `<div class="selected-doctor-audit" id="doctorAuditBody" aria-live="polite"><p>Loading source-backed case audit...</p></div>`;
 }
 

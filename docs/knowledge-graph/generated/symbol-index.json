@@ -2639,7 +2639,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/ReportsSnapshotBuilder.Audit.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  23874,
+                      "sizeBytes":  24051,
                       "typeSymbols":  [
                                           "ReportsSnapshotBuilder"
                                       ],
@@ -3633,7 +3633,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/reports.js",
                       "kind":  "JavaScript",
-                      "sizeBytes":  155397,
+                      "sizeBytes":  156575,
                       "typeSymbols":  [
 
                                       ],
@@ -3725,11 +3725,11 @@
                                               "auditSelection",
                                               "auditViewSignature",
                                               "ensureAuditView",
+                                              "initializeAuditViewForReportVersion",
                                               "normalizedAuditSelection",
                                               "renderAuditEvidence",
                                               "renderReviewEvidence",
-                                              "renderAuditView",
-                                              "renderCompletedAuditRows"
+                                              "renderAuditView"
                                           ],
                       "headings":  [
 
@@ -5620,7 +5620,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/ReportAuditBuilderTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  21545,
+                      "sizeBytes":  22148,
                       "typeSymbols":  [
                                           "ReportAuditBuilderTests"
                                       ],
@@ -6429,7 +6429,7 @@
                   {
                       "path":  "tests/javascript/reports.test.mjs",
                       "kind":  "JavaScript",
-                      "sizeBytes":  138610,
+                      "sizeBytes":  147419,
                       "typeSymbols":  [
 
                                       ],

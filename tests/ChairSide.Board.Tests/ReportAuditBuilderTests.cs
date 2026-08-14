@@ -37,7 +37,11 @@ public sealed class ReportAuditBuilderTests
         var completed = Cycle(1, "otte", "EXT", Utc(8, 0), available: 55);
         var phaseOnly = Cycle(2, "otte", "EXT", Utc(9, 0), available: null);
         var noAllocation = Cycle(3, "otte", "EXT", Utc(10, 0), available: 55, expected: 0);
-        var cycles = new[] { completed, phaseOnly, noAllocation };
+        var negativeReady = Cycle(4, "otte", "EXT", Utc(11, 0), available: 55);
+        negativeReady.ReadyToDoctorSeconds = -1;
+        var negativeDoctor = Cycle(5, "otte", "EXT", Utc(12, 0), available: 55);
+        negativeDoctor.DoctorInRoomSeconds = -1;
+        var cycles = new[] { completed, phaseOnly, noAllocation, negativeReady, negativeDoctor };
         var builder = CreateBuilder();
 
         var genericReady = builder.BuildAudit(
@@ -59,13 +63,17 @@ public sealed class ReportAuditBuilderTests
             cycles, [],
             new ReportAuditRequest(ContributorKind: ReportAuditContributorKinds.HistoricalScheduleFit));
 
-        Assert.Equal([1L, 2L, 3L], genericReady.Rows.Select(row => row.CompletedCycleId).Order());
-        Assert.Equal([1L, 2L, 3L], genericDoctor.Rows.Select(row => row.CompletedCycleId).Order());
-        Assert.Equal([1L, 3L], procedureReady.Rows.Select(row => row.CompletedCycleId).Order());
-        Assert.Equal([1L, 3L], procedureDoctor.Rows.Select(row => row.CompletedCycleId).Order());
-        Assert.Equal([1L, 3L], procedureSeatedToComplete.Rows.Select(row => row.CompletedCycleId).Order());
+        Assert.Equal([1L, 2L, 3L, 4L, 5L], genericReady.Rows.Select(row => row.CompletedCycleId).Order());
+        Assert.Equal([1L, 2L, 3L, 4L, 5L], genericDoctor.Rows.Select(row => row.CompletedCycleId).Order());
+        Assert.Equal([1L, 3L, 5L], procedureReady.Rows.Select(row => row.CompletedCycleId).Order());
+        Assert.Equal([1L, 3L, 4L], procedureDoctor.Rows.Select(row => row.CompletedCycleId).Order());
+        Assert.Equal([1L, 3L, 4L, 5L], procedureSeatedToComplete.Rows.Select(row => row.CompletedCycleId).Order());
         Assert.Contains(procedureSeatedToComplete.Rows, row => row.CompletedCycleId == 3 && row.ExpectedAllocationMinutes == 0);
         Assert.DoesNotContain(historicalScheduleFit.Rows, row => row.CompletedCycleId == 3);
+
+        var intelligence = Assert.Single(builder.Build(cycles, [], ReportQuery.Default).ProcedureIntelligenceRows!);
+        Assert.Equal(3, intelligence.Metrics.ReadyWaitSample.ContributingCount);
+        Assert.Equal(3, intelligence.Metrics.DoctorTimeSample.ContributingCount);
     }
 
     [Fact]
