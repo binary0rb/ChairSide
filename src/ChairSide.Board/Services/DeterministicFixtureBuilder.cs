@@ -118,7 +118,10 @@ internal sealed class DeterministicFixtureBuilder
             Clean(7, 2, "IMP", today.AddDays(-2).AddHours(2), 10, 15, 245, 10),
             Clean(8, 3, "EXT", today.AddDays(-2).AddHours(23).AddMinutes(50), 5, 5, 15, 5),
             MissingTiming(9, 0, "POST", today.AddDays(-2).AddHours(14), 50, 10),
-            Clean(10, 1, "BX", today.AddDays(-1).AddHours(9), 8, 12, 28, 8, ManualCandidateSuggestion)
+            Clean(10, 1, "BX", today.AddDays(-1).AddHours(9), 8, 12, 28, 8, ManualCandidateSuggestion),
+            Clean(11, 0, "CON", today.AddDays(-5).AddHours(9).AddMinutes(2), 5, 5, 60, 5),
+            Clean(12, 0, "POST", today.AddDays(-5).AddHours(9).AddMinutes(12), 5, 5, 50, 5),
+            Clean(13, 0, "BX", today.AddDays(-5).AddHours(9).AddMinutes(22), 5, 5, 40, 5)
         ];
 
         CleanCompletedCycleFixture Clean(

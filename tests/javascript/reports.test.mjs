@@ -830,6 +830,9 @@ function createHarness({
         "reportInsightsHeading",
         "reportsMain",
         "reportDateRange",
+        "reportRangeCustom",
+        "reportRangeStart",
+        "reportRangeEnd",
         "reportActionFeedback",
         "reportActionStatusPolite",
         "reportActionStatusAssertive",
@@ -1251,6 +1254,61 @@ test("wire initializes only the applicable Reports or Doctor interaction surface
   assert.equal(
     doctorHarness.pressGuards[0].selector,
     "[data-report-doctor-tab]");
+});
+
+test("custom date draft survives ordinary Reports rerenders until Apply", async () => {
+  const harness = createHarness();
+  harness.reports.wire();
+  const customChip = new FakeElement();
+  customChip.dataset.rangePreset = "custom";
+  await harness.elements.get("reportDateRange").dispatch("click", {
+    target: targetFor(new Map([
+      [".report-range-chip", customChip]
+    ]))
+  });
+
+  const start = harness.elements.get("reportRangeStart");
+  const end = harness.elements.get("reportRangeEnd");
+  start.value = "2026-08-12";
+  await harness.elements.get("reportDateRange").dispatch("input", { target: start });
+  harness.reports.render();
+  assert.equal(start.value, "2026-08-12");
+  assert.equal(end.value, "2026-07-29");
+
+  end.value = "2026-08-13";
+  await harness.elements.get("reportDateRange").dispatch("input", { target: end });
+  harness.reports.render();
+  assert.equal(start.value, "2026-08-12");
+  assert.equal(end.value, "2026-08-13");
+
+  await harness.elements.get("reportDateRange").dispatch("click", {
+    target: targetFor(new Map([
+      ["#reportRangeApply", new FakeElement()]
+    ]))
+  });
+  assert.deepEqual(harness.reloadQueries.at(-1).window, {
+    preset: "custom",
+    start: "2026-08-12",
+    end: "2026-08-13"
+  });
+});
+
+test("Doctor scope preserves the server name for represented historical doctors", () => {
+  const harness = createHarness({
+    payload: {
+      ...reportPayload(),
+      doctorFlowSummaries: [
+        doctorFlowSummary("otte", "Dr. Otte", 5),
+        doctorFlowSummary("schroeder", "Dr. Schroeder", 5)
+      ]
+    }
+  });
+  harness.reports.wire();
+  harness.reports.render();
+
+  const options = harness.elements.get("reportScopeDoctor").innerHTML;
+  assert.match(options, /value="schroeder">Dr\. Schroeder<\/option>/);
+  assert.doesNotMatch(options, /value="schroeder">schroeder<\/option>/);
 });
 
 test("filter, doctor, and tab state survive ordinary rerenders and refreshed payloads", async () => {
@@ -1722,18 +1780,43 @@ test("Procedure Mix keeps Limited composition descriptive and empty scope truthf
   assert.doesNotMatch(emptyHtml, /0%/);
 });
 
-test("Procedure Mix and Procedure Intelligence sections follow filters and precede allocation", () => {
+test("Reports markup preserves the accepted integrated reading order", () => {
   const filterIndex = reportsHtmlSource.indexOf('id="reportFilterBar"');
+  const headlineIndex = reportsHtmlSource.indexOf('id="reportHeadline"');
+  const trendsIndex = reportsHtmlSource.indexOf('id="reportTrendPanel"');
   const mixIndex = reportsHtmlSource.indexOf('id="reportProcedureMix"');
+  const doctorIndex = reportsHtmlSource.indexOf('id="doctorReportDashboard"');
+  const selectedDoctorIndex = reportsHtmlSource.indexOf('id="selectedDoctorPanel"');
   const intelligenceIndex = reportsHtmlSource.indexOf('id="reportProcedureIntelligence"');
   const allocationIndex = reportsHtmlSource.indexOf('id="reportAllocation"');
   const insightsIndex = reportsHtmlSource.indexOf('id="reportInsights"');
+  const auditIndex = reportsHtmlSource.indexOf('class="report-audit-evidence"');
 
   assert.ok(filterIndex >= 0);
-  assert.ok(filterIndex < mixIndex);
-  assert.ok(mixIndex < intelligenceIndex);
+  assert.ok(filterIndex < headlineIndex);
+  assert.ok(headlineIndex < trendsIndex);
+  assert.ok(trendsIndex < mixIndex);
+  assert.ok(mixIndex < doctorIndex);
+  assert.ok(doctorIndex < selectedDoctorIndex);
+  assert.ok(selectedDoctorIndex < intelligenceIndex);
   assert.ok(intelligenceIndex < allocationIndex);
   assert.ok(allocationIndex < insightsIndex);
+  assert.ok(insightsIndex < auditIndex);
+});
+
+test("tablet report filters keep the selected doctor readable before wrapping", () => {
+  assert.match(
+    reportsHtmlSource,
+    /styles\.css\?v=20260817-report-acceptance/);
+  assert.match(
+    stylesSource,
+    /\.report-scope-doctor\s*\{[\s\S]*?flex:\s*0 0 auto;/);
+  assert.match(
+    stylesSource,
+    /\.report-scope-doctor select\s*\{[\s\S]*?width:\s*220px;/);
+  assert.match(
+    stylesSource,
+    /@media \(max-width: 700px\)[\s\S]*?\.report-filter-group\s*\{[\s\S]*?flex-wrap:\s*wrap;/);
 });
 
 test("matching Doctor scope reuses canonical Procedure Mix markup in the Doctor Procedures tab", async () => {

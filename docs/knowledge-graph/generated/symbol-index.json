@@ -200,7 +200,7 @@
                   {
                       "path":  "docs/design/reporting-design.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  36370,
+                      "sizeBytes":  36386,
                       "typeSymbols":  [
 
                                       ],
@@ -405,7 +405,7 @@
                   {
                       "path":  "docs/knowledge/reports/audit-evidence.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  3126,
+                      "sizeBytes":  3170,
                       "typeSymbols":  [
 
                                       ],
@@ -536,7 +536,7 @@
                   {
                       "path":  "docs/knowledge/reports/reporting-population.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  6209,
+                      "sizeBytes":  6221,
                       "typeSymbols":  [
 
                                       ],
@@ -568,7 +568,7 @@
                   {
                       "path":  "docs/knowledge/reports/schedule-fit.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  6573,
+                      "sizeBytes":  6578,
                       "typeSymbols":  [
 
                                       ],
@@ -631,7 +631,7 @@
                   {
                       "path":  "docs/knowledge/tests/deterministic-stress-fixtures.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  3683,
+                      "sizeBytes":  3731,
                       "typeSymbols":  [
 
                                       ],
@@ -759,7 +759,7 @@
                   {
                       "path":  "docs/knowledge-graph/chairside.graph.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  19980,
+                      "sizeBytes":  19987,
                       "typeSymbols":  [
 
                                       ],
@@ -790,7 +790,7 @@
                   {
                       "path":  "docs/knowledge-graph/decisions.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  23850,
+                      "sizeBytes":  23857,
                       "typeSymbols":  [
 
                                       ],
@@ -1141,7 +1141,7 @@
                   {
                       "path":  "README.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  39713,
+                      "sizeBytes":  39773,
                       "typeSymbols":  [
 
                                       ],
@@ -1681,7 +1681,7 @@
                   {
                       "path":  "src/ChairSide.Board/Program.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  73629,
+                      "sizeBytes":  73649,
                       "typeSymbols":  [
                                           "LegacyRoomOneRedirect",
                                           "BeginPrestageRequest",
@@ -1983,7 +1983,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/DemoBoardStore.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  190356,
+                      "sizeBytes":  190377,
                       "typeSymbols":  [
                                           "ExceptionReasons",
                                           "ReportingExceptionReasons",
@@ -2112,7 +2112,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/DeterministicFixtureBuilder.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  14576,
+                      "sizeBytes":  14854,
                       "typeSymbols":  [
                                           "DeterministicFixtureBuilder",
                                           "DeterministicFixturePlan",
@@ -2557,7 +2557,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/ReportAudit.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  6163,
+                      "sizeBytes":  6343,
                       "typeSymbols":  [
                                           "ReportAuditContributorKinds",
                                           "ReportAuditModes",
@@ -2639,7 +2639,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/ReportsSnapshotBuilder.Audit.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  24051,
+                      "sizeBytes":  24571,
                       "typeSymbols":  [
                                           "ReportsSnapshotBuilder"
                                       ],
@@ -2687,7 +2687,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/ReportsSnapshotBuilder.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  75124,
+                      "sizeBytes":  75146,
                       "typeSymbols":  [
                                           "ReportsSnapshotBuilder",
                                           "ScopedProcedurePopulation"
@@ -2753,7 +2753,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/ReportsSnapshotComposition.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  10015,
+                      "sizeBytes":  10020,
                       "typeSymbols":  [
                                           "ReportsSnapshotComposition",
                                           "ReportPopulationSection",
@@ -3553,7 +3553,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/report-data.js",
                       "kind":  "JavaScript",
-                      "sizeBytes":  9827,
+                      "sizeBytes":  9857,
                       "typeSymbols":  [
 
                                       ],
@@ -3607,7 +3607,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/reports.html",
                       "kind":  "Html",
-                      "sizeBytes":  10440,
+                      "sizeBytes":  10458,
                       "typeSymbols":  [
 
                                       ],
@@ -3633,7 +3633,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/reports.js",
                       "kind":  "JavaScript",
-                      "sizeBytes":  156575,
+                      "sizeBytes":  158044,
                       "typeSymbols":  [
 
                                       ],
@@ -3956,7 +3956,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/styles.css",
                       "kind":  "Css",
-                      "sizeBytes":  113396,
+                      "sizeBytes":  113609,
                       "typeSymbols":  [
 
                                       ],
@@ -4292,7 +4292,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/BoardStoreFixtureTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  48590,
+                      "sizeBytes":  49631,
                       "typeSymbols":  [
                                           "BoardStoreTests"
                                       ],
@@ -4639,7 +4639,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/BoardStoreSecurityAndDiagnosticsTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  22389,
+                      "sizeBytes":  22391,
                       "typeSymbols":  [
                                           "BoardStoreTests"
                                       ],
@@ -5620,7 +5620,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/ReportAuditBuilderTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  22148,
+                      "sizeBytes":  22595,
                       "typeSymbols":  [
                                           "ReportAuditBuilderTests"
                                       ],
@@ -5689,7 +5689,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/ReportsSnapshotBuilderTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  76861,
+                      "sizeBytes":  76866,
                       "typeSymbols":  [
                                           "ReportsSnapshotBuilderTests"
                                       ],
@@ -6401,7 +6401,7 @@
                   {
                       "path":  "tests/javascript/report-data.test.mjs",
                       "kind":  "JavaScript",
-                      "sizeBytes":  20610,
+                      "sizeBytes":  20653,
                       "typeSymbols":  [
 
                                       ],
@@ -6429,7 +6429,7 @@
                   {
                       "path":  "tests/javascript/reports.test.mjs",
                       "kind":  "JavaScript",
-                      "sizeBytes":  147419,
+                      "sizeBytes":  150961,
                       "typeSymbols":  [
 
                                       ],

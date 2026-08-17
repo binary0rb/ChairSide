@@ -29,7 +29,8 @@ export function createReports({
     reportDoctorTab: "overview",
     reportPressActive: false,
     procedureIntelligenceExpanded: new Set(),
-    auditViews: new Map()
+    auditViews: new Map(),
+    customDateRangeDraft: null
   };
   const reportActionStates = new Map();
   const reportActionElements = new Map();
@@ -39,11 +40,17 @@ export function createReports({
   async function selectDateRangePreset(preset) {
   clearCompletedReportAction();
   if (preset === "custom") {
+    const currentRange = reportData.getDateRange();
+    state.customDateRangeDraft = {
+      start: currentRange.start || "",
+      end: currentRange.end || ""
+    };
     reportData.setDateRange({ ...reportData.getDateRange(), preset: "custom" });
     syncDateRangeControls();
     return; // wait for explicit Apply
   }
 
+  state.customDateRangeDraft = null;
   if (preset === "all") {
     reportData.setDateRange({ preset: "all", start: null, end: null });
   } else {
@@ -65,6 +72,7 @@ export function createReports({
 
   clearCompletedReportAction();
   reportData.setDateRange({ preset: "custom", start, end });
+  state.customDateRangeDraft = null;
   syncDateRangeControls();
   await reportData.reloadAfterCurrent();
 }
@@ -85,11 +93,12 @@ export function createReports({
   if (reportData.getDateRange().preset === "custom") {
     const startInput = document.getElementById("reportRangeStart");
     const endInput = document.getElementById("reportRangeEnd");
-    if (startInput && reportData.getDateRange().start) {
-      startInput.value = reportData.getDateRange().start;
+    const draft = state.customDateRangeDraft;
+    if (startInput) {
+      startInput.value = draft ? draft.start : reportData.getDateRange().start || "";
     }
-    if (endInput && reportData.getDateRange().end) {
-      endInput.value = reportData.getDateRange().end;
+    if (endInput) {
+      endInput.value = draft ? draft.end : reportData.getDateRange().end || "";
     }
   }
 }
@@ -110,6 +119,17 @@ export function createReports({
     if (event.target.closest("#reportRangeApply")) {
       applyCustomDateRange();
     }
+  });
+
+  container.addEventListener("input", event => {
+    if (event.target.id !== "reportRangeStart" && event.target.id !== "reportRangeEnd") {
+      return;
+    }
+
+    state.customDateRangeDraft = {
+      start: document.getElementById("reportRangeStart")?.value || "",
+      end: document.getElementById("reportRangeEnd")?.value || ""
+    };
   });
 
   syncDateRangeControls();
@@ -2213,7 +2233,14 @@ export function createReports({
       state.reportScopeDoctors.set(row.doctorId, getDoctorName(row.doctorId));
     }
   }
-  if (r?.query?.doctorId) {
+  for (const summary of r?.doctorFlowSummaries || []) {
+    if (summary.doctorId) {
+      state.reportScopeDoctors.set(
+        summary.doctorId,
+        summary.doctorName || getDoctorName(summary.doctorId));
+    }
+  }
+  if (r?.query?.doctorId && !state.reportScopeDoctors.has(r.query.doctorId)) {
     state.reportScopeDoctors.set(r.query.doctorId, getDoctorName(r.query.doctorId));
   }
 
