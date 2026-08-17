@@ -1892,11 +1892,13 @@ body[data-view="reports"] .report-filter-group {
 
 body[data-view="reports"] .report-scope-doctor {
   display: inline-flex;
+  flex: 0 0 auto;
   align-items: center;
   gap: 8px;
 }
 
 body[data-view="reports"] .report-scope-doctor select {
+  width: 220px;
   min-height: 40px;
   max-width: 220px;
   padding: 0 34px 0 12px;
@@ -3816,6 +3818,11 @@ button:disabled {
 @media (max-width: 700px) {
   .doctor-report-card-grid {
     grid-template-columns: 1fr;
+  }
+
+  body[data-view="reports"] .report-filter-group {
+    flex-wrap: wrap;
+    min-width: 0;
   }
 
   body[data-view="reports"] .report-trend-header {

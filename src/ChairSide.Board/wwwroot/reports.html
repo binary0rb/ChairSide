@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>ChairSide Board - Reports</title>
-  <link rel="stylesheet" href="/styles.css?v=20260730-inline-report-feedback">
+  <link rel="stylesheet" href="/styles.css?v=20260817-report-acceptance">
 </head>
 <body data-view="reports">
   <header class="app-header compact">
@@ -55,23 +55,6 @@
       <p class="report-range-window" id="reportRangeWindow" aria-live="polite"></p>
     </section>
 
-    <section class="report-headline" id="reportHeadline" aria-label="Report summary"></section>
-
-    <section class="report-trend-panel" id="reportTrendPanel" aria-label="Report trends" hidden></section>
-
-    <section class="doctor-report-dashboard" id="doctorReportDashboard" aria-label="Doctor reports" hidden>
-      <div class="doctor-report-dashboard-head">
-        <div>
-          <span class="layer-pill layer-pill--population">Doctor Reports</span>
-          <h2>Doctor Report Overview</h2>
-        </div>
-        <p>Observed clinical flow by doctor for the selected report range.</p>
-      </div>
-      <div class="doctor-report-card-grid" id="doctorReportCards"></div>
-    </section>
-
-    <section class="selected-doctor-panel" id="selectedDoctorPanel" aria-label="Selected doctor report" hidden></section>
-
     <section class="report-filter-bar" id="reportFilterBar" aria-label="Report filters" hidden>
       <div class="report-filter-group" role="group" aria-label="Analytical scope">
         <span class="report-filter-label">Scope</span>
@@ -98,7 +81,24 @@
       </details>
     </section>
 
+    <section class="report-headline" id="reportHeadline" aria-label="Report summary"></section>
+
+    <section class="report-trend-panel" id="reportTrendPanel" aria-label="Report trends" hidden></section>
+
     <section class="report-procedure-mix" id="reportProcedureMix" aria-labelledby="reportProcedureMixHeading" hidden></section>
+
+    <section class="doctor-report-dashboard" id="doctorReportDashboard" aria-label="Doctor reports" hidden>
+      <div class="doctor-report-dashboard-head">
+        <div>
+          <span class="layer-pill layer-pill--population">Doctor Reports</span>
+          <h2>Doctor Report Overview</h2>
+        </div>
+        <p>Observed clinical flow by doctor for the selected report range.</p>
+      </div>
+      <div class="doctor-report-card-grid" id="doctorReportCards"></div>
+    </section>
+
+    <section class="selected-doctor-panel" id="selectedDoctorPanel" aria-label="Selected doctor report" hidden></section>
 
     <section class="report-procedure-intelligence" id="reportProcedureIntelligence" aria-labelledby="reportProcedureIntelligenceHeading" hidden></section>
 

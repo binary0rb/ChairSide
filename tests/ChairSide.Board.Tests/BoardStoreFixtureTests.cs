@@ -864,6 +864,28 @@ public sealed partial class BoardStoreTests
     }
 
     [Fact]
+    public void Scenario_rich_includes_deterministic_three_room_doctor_overlap()
+    {
+        using var workspace = TestWorkspace.Create();
+        var now = new DateTimeOffset(2026, 6, 15, 14, 0, 0, TimeSpan.Zero);
+        var context = StoreContext.Create(
+            workspace,
+            environmentName: Environments.Production,
+            roomCount: 12,
+            timeProvider: new ManualTimeProvider(now));
+
+        context.Store.ResetAndSeedStressFixture(MaintenanceCommands.ProfileScenarioRich, null);
+
+        var reportDate = DateOnly.FromDateTime(now.AddDays(-5).UtcDateTime.Date);
+        var reports = context.Store.GetReports(ReportDateRange.FromDates(reportDate, reportDate));
+        var day = Assert.Single(
+            reports.ObservedDoctorFlowDays!,
+            item => item.DoctorId == "otte" && item.ReportDate == reportDate.ToString("yyyy-MM-dd"));
+        Assert.True(day.PeakConcurrentRooms >= 3);
+        Assert.True(day.MinutesWithThreeOrMoreDoctorWorkingRooms > 0);
+    }
+
+    [Fact]
     public void All_scenarios_composes_live_board_reporting_volume_and_scenario_rich_with_exact_ground_truth_count()
     {
         using var workspace = TestWorkspace.Create();
@@ -885,11 +907,11 @@ public sealed partial class BoardStoreTests
         Assert.Equal(2, result.InProgressCycleRowsSeeded);
 
         // Exact deterministic total: 500 large-synthetic cycles + 363 scenario-rich bulk-history
-        // cycles (121 days x 3/day) + 10 explicit scenario-rich edge cases = 873, with zero rows
+        // cycles (121 days x 3/day) + 13 explicit scenario-rich edge cases = 876, with zero rows
         // lost to collision (the day-offset shift keeps the bulk history's calendar days disjoint
         // from the large-synthetic seed's range). CyclesSeeded is ground-truth (ties out exactly to
         // the persisted completed-cycle count), not a sum of sub-seeder self-reports.
-        Assert.Equal(873, result.CyclesSeeded);
+        Assert.Equal(876, result.CyclesSeeded);
         var persistedCompletedCount = context.Repository.LoadCompletedCycles().Count(cycle => cycle.RoomAvailableAt is not null);
         Assert.Equal(persistedCompletedCount, result.CyclesSeeded);
         Assert.Equal(4, result.DoctorsRepresented);
@@ -921,14 +943,14 @@ public sealed partial class BoardStoreTests
         // Date-range buckets are populated: the Today marker (plus the large-synthetic seed's own
         // recent cycles) land in Today. TotalCompletedCycleCount (not CompletedRoomCyclesCount) is
         // the ground-truth all-time total independent of the selected window: CompletedRoomCyclesCount
-        // deliberately excludes the manual-audit-candidate cycle (IsException = true), so it reads 872
-        // here, one less than the raw 873 - that exclusion is correct reporting behavior, not a
+        // deliberately excludes the manual-audit-candidate cycle (IsException = true), so it reads 875
+        // here, one less than the raw 876 - that exclusion is correct reporting behavior, not a
         // collision or a miscount.
         var today = DateOnly.FromDateTime(now.UtcDateTime.Date);
         var todayCount = context.Store.GetReports(ReportDateRange.FromDates(today, today)).CompletedRoomCyclesCount;
         var allTimeTotal = context.Store.GetReports(ReportDateRange.AllTime).TotalCompletedCycleCount;
         Assert.True(todayCount > 0, "Expected at least one completed cycle in the Today window.");
-        Assert.Equal(873, allTimeTotal);
+        Assert.Equal(876, allTimeTotal);
     }
 
     [Fact]
@@ -944,8 +966,8 @@ public sealed partial class BoardStoreTests
 
         var result = context.Store.ResetAndSeedStressFixture(MaintenanceCommands.ProfileAllScenarios, null);
 
-        // 1000 (default) + 363 (scenario-rich bulk history) + 10 (edge cases) = 1373.
-        Assert.Equal(1373, result.CyclesSeeded);
+        // 1000 (default) + 363 (scenario-rich bulk history) + 13 (edge cases) = 1376.
+        Assert.Equal(1376, result.CyclesSeeded);
     }
 
     // Seats, readies, completes, and frees one room across the given minute offsets from seatedAt.

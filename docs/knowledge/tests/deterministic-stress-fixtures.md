@@ -22,7 +22,7 @@ Directly seeded `DoctorInRoom` and `Turnover` rooms retain their matching in-pro
 - `live-board-stress` fills the board with every presentation posture: Available, Seated, Ready with None/Aging/Stale urgency, Doctor In Room, and Turnover.
 - `doctor-view-stress` creates the fixed 1/3/4/4 assigned-room posture.
 - `doctor-view-overflow-stress` gives one doctor five assigned rooms.
-- `scenario-rich` creates bounded clean history, date-window markers, isolated derived exceptions, and one manual review candidate.
+- `scenario-rich` creates bounded clean history, date-window markers, isolated derived exceptions, one manual review candidate, and a deterministic same-doctor three-room overlap.
 - `full-stress` composes live-board and scenario-rich fixtures.
 - `all-scenarios` adds reporting-volume history and shifts bulk scenario history to avoid shared `(RoomId, SeatedAt)` slots.
 
