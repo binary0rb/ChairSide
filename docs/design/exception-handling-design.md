@@ -17,6 +17,16 @@ Lifecycle truth remains owned by `docs/design/prestage-assignment-lifecycle.md`.
 - Normal reports show the best current effective interpretation of what happened. The administrative ledger explains how that interpretation changed.
 - Review and correction history is append-only. Prior administrative events are never silently rewritten or deleted.
 
+## Three-layer truth model
+
+Keep three layers explicit and separate:
+
+1. **Immutable lifecycle truth** is the accepted Ready handoff, lifecycle event stream, and truthful timestamps. It is never edited by historical review.
+2. **Current effective encounter metadata** is the doctor, procedure, sedation, Add-on, allocation, and other approved metadata after applying the latest correction overlays.
+3. **Administrative and reporting interpretation** is the anomaly source, review provenance, current disposition, and resulting administrative reporting gate.
+
+Normal reporting uses current effective metadata only when the administrative gate and ordinary metric eligibility allow it. The ledger connects the layers without collapsing or rewriting them.
+
 ## Canonical vocabulary
 
 - **Anomaly**: a candidate or observed abnormal condition that warrants review, not a final judgment.
@@ -43,6 +53,8 @@ A system finding records the exact original rule as immutable evidence. Later re
 The canonical action name is **Mark for Review**, replacing the older conceptual name **Mark Exception**.
 
 Manual Mark for Review applies only to a durable historical encounter, whether completed or aborted/incomplete. It does not apply to an active live room. Active encounters continue to use normal live-workflow correction rules.
+
+Mark for Review belongs to the encounter as a whole, not to an individual lifecycle event or transaction.
 
 The action requires one small structured reason:
 
@@ -102,6 +114,8 @@ A later explicit historical metadata correction may become the current effective
 Ready timestamps and other lifecycle timestamps are never fabricated or corrected through this layer. Metrics that require missing truthful lifecycle timestamps continue to omit the encounter or observation under their ordinary metric-specific eligibility rules.
 
 ## Pending review and dispositions
+
+The same two final dispositions - Cleared for Reporting and Confirmed Exception - apply whether the anomaly originated from manual Mark for Review or an objective system finding.
 
 ### Needs Review
 
@@ -168,6 +182,15 @@ These rules apply independently of canonical live-room lifecycle compare-and-swa
 - ChairSide reporting is a live analytical view, not a period-close accounting system.
 - Ordinary reports do not need prominent historical-adjustment banners. Provenance remains available in Data Quality and audit/history.
 
+Successful administrative actions affect the live analytical view immediately:
+
+- Mark for Review and Reopen Review immediately enter Needs Review and exclude the encounter provisionally.
+- Metadata corrections save immediately as current effective values, while the encounter remains excluded pending an explicit disposition.
+- Cleared immediately removes the administrative gate and restores ordinary reporting eligibility.
+- Confirmed Exception remains excluded as a whole encounter.
+
+There is no separate publish, apply, period-close, or nightly-processing step for these effects.
+
 ## Data Quality scope and reconciliation
 
 Data Quality is derivative of the active report population, not an independently scoped second report. It inherits all applicable active report filters, including:
@@ -191,6 +214,13 @@ Summary-first Data Quality may show counts such as:
 
 Needs Review is the strongest action-required state. Healthy Data Quality may remain visually quiet.
 
+Presentation preserves the provenance hierarchy:
+
+- Needs Review is prominent and action-required.
+- Reviewed is quiet durable provenance, not a current warning by itself.
+- Cleared does not retain warning treatment after the administrative gate is removed.
+- Confirmed Exception may use stronger excluded treatment in audit/history while remaining fully inspectable.
+
 Current anomaly disposition, reporting eligibility, and review provenance are separate concepts. A Cleared encounter may already be back in the normal eligible population, so Cleared, Reviewed, and Historical Correction counts are not blindly additive reconciliation buckets.
 
 A non-normal encounter appears in a filtered Data Quality population only when its current effective recorded facts satisfy that filter. Missing doctor, procedure, or sedation membership is never inferred.
@@ -207,6 +237,19 @@ Preserve the existing truthful exception-review anchors:
 Review uses the same whole-UTC-day report-window semantics. These anchors do not redefine `DoctorCompleteAt` as the canonical window authority for normal completed-cycle reporting.
 
 ## Audit and raw-history experience
+
+Encounter review detail must be self-contained enough for an admin to decide in one place. It includes:
+
+- durable encounter identity and current effective metadata;
+- anomaly source and structured reason;
+- the truthful lifecycle timeline;
+- triggering rule or other system evidence;
+- current reporting and Data Quality exclusions;
+- permitted metadata corrections;
+- bounded non-PHI note entry and chronological review history;
+- Clear, Confirm Exception, and applicable Reopen controls.
+
+Deeper transaction-level and raw evidence remains available on demand without making it a prerequisite for ordinary review.
 
 - Preserve the raw-data/audit drawer as the exhaustive historical investigation surface.
 - Do not create a separate anomaly-management application.

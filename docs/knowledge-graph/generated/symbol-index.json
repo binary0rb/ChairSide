@@ -161,7 +161,7 @@
                   {
                       "path":  "docs/design/exception-handling-design.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  15684,
+                      "sizeBytes":  18297,
                       "typeSymbols":  [
 
                                       ],
@@ -184,6 +184,7 @@
                                        "ChairSide Canonical Exception and Anomaly Handling Design",
                                        "Status and authority",
                                        "Core model",
+                                       "Three-layer truth model",
                                        "Canonical vocabulary",
                                        "Anomaly creation",
                                        "Manual Mark for Review",
@@ -454,7 +455,7 @@
                   {
                       "path":  "docs/knowledge/reports/audit-evidence.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  4424,
+                      "sizeBytes":  4557,
                       "typeSymbols":  [
 
                                       ],
@@ -475,9 +476,11 @@
                                           ],
                       "headings":  [
                                        "Report audit and metric evidence",
+                                       "Status boundary",
                                        "Evidence modes and populations",
                                        "Query and scope transfer",
                                        "Time and identity authority",
+                                       "Approved target under #234",
                                        "Compatibility",
                                        "Source and test anchors"
                                    ]
@@ -585,7 +588,7 @@
                   {
                       "path":  "docs/knowledge/reports/reporting-population.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  7346,
+                      "sizeBytes":  7658,
                       "typeSymbols":  [
 
                                       ],
@@ -606,11 +609,13 @@
                                           ],
                       "headings":  [
                                        "Reporting population",
+                                       "Status boundary",
                                        "Population funnel",
                                        "Reusable report query and sample state",
                                        "Evidence population boundaries",
                                        "Assignment and handoff attribution",
                                        "Termination populations",
+                                       "Approved target under #234",
                                        "Source and test anchors"
                                    ]
                   },
@@ -745,7 +750,7 @@
                   {
                       "path":  "docs/knowledge/workflow/room-lifecycle.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  9659,
+                      "sizeBytes":  10254,
                       "typeSymbols":  [
 
                                       ],
@@ -766,9 +771,11 @@
                                           ],
                       "headings":  [
                                        "Room lifecycle",
+                                       "Status boundary",
                                        "Canonical sequence",
                                        "Ready handoff and urgency",
                                        "Cancellation, expiration, and recovery",
+                                       "Approved target under #234",
                                        "Capability and integrity authority",
                                        "Concurrency and durability",
                                        "Authorization and conflict handling",

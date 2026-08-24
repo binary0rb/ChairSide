@@ -1,10 +1,16 @@
 ---
 title: Room lifecycle
-tags: [room, board, room-lifecycle, data-persistence, permissions, device-binding, exception-handling, domain-rule, active, last-verified]
+tags: [room, board, room-lifecycle, data-persistence, permissions, device-binding, domain-rule, active, last-verified]
 last_verified_commit: b516481
 ---
 
 # Room lifecycle
+
+## Status boundary
+
+**Current implementation:** The `active` tag and `last_verified_commit` apply to the lifecycle, persistence, and existing exception-projection behavior described below.
+
+**Approved target under #234:** The separately labeled target section describes only the later administrative interpretation layer. PR #235 does not implement it or change live-room lifecycle behavior.
 
 ## Canonical sequence
 
@@ -32,13 +38,17 @@ A valid legacy `Aging` or `Stale` row with a matching owned Active handoff may w
 
 ## Cancellation, expiration, and recovery
 
-Pre-arrival cancellation and max-duration expiration create aborted-assignment history, not throughput. The nightly after-hours sweep also preserves pre-arrival truth in aborted-assignment history and appends an objective `AfterHoursSweep` system finding to the encounter's continuous administrative ledger, entering Needs Review. Faulted pre-arrival Ready rows remain visible and safely cancellable; unrelated or invalid handoff records are not rewritten. Post-arrival expiration creates review-required history without inventing `DoctorCompleteAt` or other lifecycle timestamps. Later administrative correction or disposition follows `docs/design/exception-handling-design.md` and never rewrites this lifecycle evidence.
+Pre-arrival cancellation and max-duration expiration create aborted-assignment history, not throughput. The nightly after-hours sweep also preserves pre-arrival truth in aborted-assignment history, but marks those records as `AfterHoursSweep` exceptions and projects them into the same administrative review queue as post-arrival exceptions. Faulted pre-arrival Ready rows remain visible and safely cancellable; unrelated or invalid handoff records are not rewritten. Post-arrival expiration creates a review-required exception cycle without inventing `DoctorCompleteAt` or other lifecycle timestamps.
 
 The after-hours sweep processes each active room in its existing per-room transaction. A committed room remains Available if a later room fails. The failed and later active rooms remain retryable because the clinic day is marked complete only after the entire pass succeeds; restart recovery likewise skips durably Available rooms and processes only active rooms.
 
 Restart recovery restores durable truth and projects urgency and integrity without mutating the database. Live room state changes only after the repository transaction succeeds.
 
 Canonical `DoctorInRoom` and `Turnover` progression revalidates the room assignment and in-progress reporting-cycle attribution against the immutable Accepted handoff. Contradictory recovered state projects or returns `integrity-fault` and blocks Doctor Complete or Room Available without mutating room, handoff, cycle, timestamps, reports, events, or live state. Legitimate legacy arrived rooms without handoff metadata retain their compatibility completion path.
+
+## Approved target under #234
+
+The future administrative layer records objective system findings and Local Admin review in one append-only encounter ledger, with correction overlays, dispositions, and reopen history. It does not rewrite the accepted Ready handoff, the lifecycle event stream, or any lifecycle timestamp described in this note.
 
 ## Capability and integrity authority
 
