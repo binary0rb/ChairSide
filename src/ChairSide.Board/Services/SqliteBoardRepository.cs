@@ -1624,11 +1624,12 @@ public sealed class SqliteBoardRepository
         AddWindowPredicates(command, completedPredicates, completedAnchor, window);
         AddWindowPredicatesWithSuffix(command, abortedPredicates, "terminated_at", window, "Abort");
         var union = $"""
-            SELECT source_type, source_id, review_anchor, doctor_sort, procedure_sort
+            SELECT source_type, source_id, source_rank, review_anchor, doctor_sort, procedure_sort
             FROM (
                 SELECT
                     '{HistoricalEncounterSourceTypes.CompletedCycle}' AS source_type,
                     id AS source_id,
+                    0 AS source_rank,
                     {completedAnchor} AS review_anchor,
                     assigned_doctor_display_name AS doctor_sort,
                     procedure_category AS procedure_sort
@@ -1638,6 +1639,7 @@ public sealed class SqliteBoardRepository
                 SELECT
                     '{HistoricalEncounterSourceTypes.AbortedAssignment}' AS source_type,
                     id AS source_id,
+                    1 AS source_rank,
                     terminated_at AS review_anchor,
                     COALESCE(assigned_doctor_display_name, assigned_doctor_id, '') AS doctor_sort,
                     COALESCE(procedure_category, procedure_code, '') AS procedure_sort
@@ -1655,10 +1657,10 @@ public sealed class SqliteBoardRepository
         var orderBy = sort switch
         {
             ReportAuditSorts.Doctor =>
-                " ORDER BY doctor_sort COLLATE NOCASE, review_anchor DESC, source_id DESC",
+                " ORDER BY doctor_sort COLLATE NOCASE, review_anchor DESC, source_id DESC, source_rank",
             ReportAuditSorts.Procedure =>
-                " ORDER BY procedure_sort COLLATE NOCASE, review_anchor DESC, source_id DESC",
-            _ => " ORDER BY review_anchor DESC, source_id DESC"
+                " ORDER BY procedure_sort COLLATE NOCASE, review_anchor DESC, source_id DESC, source_rank",
+            _ => " ORDER BY review_anchor DESC, source_id DESC, source_rank"
         };
         command.CommandText = union + orderBy + " LIMIT $limit OFFSET $offset;";
         command.Parameters.AddWithValue("$limit", limit);

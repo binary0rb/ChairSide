@@ -3174,7 +3174,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/SqliteBoardRepository.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  144337,
+                      "sizeBytes":  144465,
                       "typeSymbols":  [
                                           "SqliteBoardRepository",
                                           "DoctorWorkingRoomRecord",
@@ -5317,7 +5317,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/HistoricalQueryPersistenceTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  22285,
+                      "sizeBytes":  26644,
                       "typeSymbols":  [
                                           "HistoricalQueryPersistenceTests"
                                       ],
@@ -5327,6 +5327,7 @@
                                             "Typed_durable_identity_loads_exactly_one_source_record",
                                             "Review_anchor_falls_back_to_prestage_started_at",
                                             "Review_page_combines_sources_and_applies_limit_offset_before_materialization",
+                                            "Combined_review_pages_use_typed_identity_to_break_cross_source_id_ties",
                                             "Store_audit_returns_exact_paged_result_across_multiple_persistence_batches",
                                             "Store_startup_has_no_lifetime_completed_cycle_collection",
                                             "All_time_and_scoped_counts_remain_exact",

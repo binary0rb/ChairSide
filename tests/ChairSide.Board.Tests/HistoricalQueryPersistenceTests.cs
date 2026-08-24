@@ -165,6 +165,106 @@ public sealed class HistoricalQueryPersistenceTests
         Assert.Equal(5, storePage.ReviewRows.Count(row => row.SourceType == ExceptionReviewSources.AbortedAssignment));
     }
 
+    [Theory]
+    [InlineData(ReportAuditSorts.MostRecent)]
+    [InlineData(ReportAuditSorts.Doctor)]
+    [InlineData(ReportAuditSorts.Procedure)]
+    public void Combined_review_pages_use_typed_identity_to_break_cross_source_id_ties(string sort)
+    {
+        using var workspace = TestWorkspace.Create();
+        var context = StoreContext.Create(workspace, Environments.Production);
+        var tiedAnchor = new DateTimeOffset(2026, 5, 1, 8, 0, 0, TimeSpan.Zero);
+        var completedIds = new List<long>();
+
+        var tiedCycle = SaveCycle(context, 1, tiedAnchor.AddMinutes(-15));
+        tiedCycle.IsException = true;
+        tiedCycle.RequiresReview = true;
+        tiedCycle.ExceptionReason = ExceptionReasons.ManualReview;
+        context.Repository.SaveCompletedCycle(tiedCycle, context.Doctors, context.Procedures);
+        completedIds.Add(tiedCycle.CompletedCycleId);
+
+        var tiedAbort = new AbortedRoomAssignment
+        {
+            EpisodeId = "typed-review-tie-abort",
+            RoomId = 2,
+            AssignedDoctor = "otte",
+            ProcedureCode = "CON",
+            PrestageStartedAt = tiedAnchor.AddMinutes(-5),
+            TerminatedAt = tiedAnchor,
+            TerminatedFromState = RoomStates.Prestaging,
+            TerminationKind = TerminationKinds.AfterHoursExpired,
+            IsException = true,
+            RequiresReview = true,
+            ExceptionReason = ExceptionReasons.AfterHoursSweep
+        };
+        context.Repository.TerminateIncompleteAssignment(
+            tiedAbort,
+            new RoomState(tiedAbort.RoomId),
+            context.Doctors,
+            context.Procedures);
+        Assert.Equal(tiedCycle.CompletedCycleId, tiedAbort.AbortedAssignmentId);
+
+        for (var index = 1; index <= 99; index++)
+        {
+            var reviewAnchor = tiedAnchor.AddMinutes(index);
+            var cycle = SaveCycle(context, index + 2, reviewAnchor.AddMinutes(-15));
+            cycle.IsException = true;
+            cycle.RequiresReview = true;
+            cycle.ExceptionReason = ExceptionReasons.ManualReview;
+            context.Repository.SaveCompletedCycle(cycle, context.Doctors, context.Procedures);
+            completedIds.Add(cycle.CompletedCycleId);
+        }
+
+        var firstPage = context.Repository.LoadReviewEncounterKeysPage(
+            ReportDateRange.AllTime,
+            requiresReview: true,
+            sort,
+            offset: 0,
+            limit: 100);
+        var secondPage = context.Repository.LoadReviewEncounterKeysPage(
+            ReportDateRange.AllTime,
+            requiresReview: true,
+            sort,
+            offset: 100,
+            limit: 100);
+        var repeatedFirstPage = context.Repository.LoadReviewEncounterKeysPage(
+            ReportDateRange.AllTime,
+            requiresReview: true,
+            sort,
+            offset: 0,
+            limit: 100);
+        var repeatedSecondPage = context.Repository.LoadReviewEncounterKeysPage(
+            ReportDateRange.AllTime,
+            requiresReview: true,
+            sort,
+            offset: 100,
+            limit: 100);
+
+        Assert.Equal(101, firstPage.TotalMatchingCount);
+        Assert.Equal(101, secondPage.TotalMatchingCount);
+        Assert.Equal(100, firstPage.Rows.Count);
+        Assert.True(firstPage.HasMore);
+        Assert.Single(secondPage.Rows);
+        Assert.False(secondPage.HasMore);
+        Assert.Equal(firstPage.Rows, repeatedFirstPage.Rows);
+        Assert.Equal(secondPage.Rows, repeatedSecondPage.Rows);
+
+        var keys = firstPage.Rows.Concat(secondPage.Rows).ToList();
+        var typedIdentities = keys.Select(key => (key.SourceType, key.SourceRecordId)).ToList();
+        var expectedIdentities = completedIds
+            .Select(id => (HistoricalEncounterSourceTypes.CompletedCycle, id))
+            .Append((HistoricalEncounterSourceTypes.AbortedAssignment, tiedAbort.AbortedAssignmentId))
+            .ToHashSet();
+        Assert.Equal(101, typedIdentities.Distinct().Count());
+        Assert.True(expectedIdentities.SetEquals(typedIdentities));
+        Assert.Equal(
+            (HistoricalEncounterSourceTypes.CompletedCycle, tiedCycle.CompletedCycleId),
+            typedIdentities[99]);
+        Assert.Equal(
+            (HistoricalEncounterSourceTypes.AbortedAssignment, tiedAbort.AbortedAssignmentId),
+            typedIdentities[100]);
+    }
+
     [Fact]
     public void Store_audit_returns_exact_paged_result_across_multiple_persistence_batches()
     {
