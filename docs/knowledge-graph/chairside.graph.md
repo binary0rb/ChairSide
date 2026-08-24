@@ -59,6 +59,13 @@ flowchart LR
     PostArrivalExpiration["DomainConcept: Post-arrival expiration"] --> SystemFinding
     PostArrivalExpiration --> Cycles
     HistoricalEncounter["DomainConcept: Durable historical encounter"] --> ReviewLedger["DomainConcept: Append-only administrative ledger"]
+    HistoricalEncounter --> AdminProjection["PersistenceModel: historical_encounter_admin_state"]
+    HistoricalEncounter --> LedgerPersistence["PersistenceModel: historical_encounter_ledger"]
+    AdminProjection --> CorrectionOverlay
+    AdminProjection --> NeedsReview
+    AdminProjection --> Cleared
+    AdminProjection --> ConfirmedException
+    LedgerPersistence --> ReviewLedger
     Aborts --> HistoricalEncounter
     Cycles --> HistoricalEncounter
     ManualReview["LifecycleEvent: Local Admin Mark for Review"] --> ReviewLedger

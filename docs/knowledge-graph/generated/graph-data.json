@@ -81,6 +81,12 @@
                       "path":  "docs/knowledge/reports/audit-evidence.md"
                   },
                   {
+                      "id":  "file:docs/knowledge/reports/historical-administrative-persistence.md",
+                      "label":  "docs/knowledge/reports/historical-administrative-persistence.md",
+                      "type":  "File",
+                      "path":  "docs/knowledge/reports/historical-administrative-persistence.md"
+                  },
+                  {
                       "id":  "file:docs/knowledge/reports/observed-load.md",
                       "label":  "docs/knowledge/reports/observed-load.md",
                       "type":  "File",
@@ -427,6 +433,12 @@
                       "label":  "src/ChairSide.Board/Services/ExceptionReviewRecords.cs",
                       "type":  "File",
                       "path":  "src/ChairSide.Board/Services/ExceptionReviewRecords.cs"
+                  },
+                  {
+                      "id":  "file:src/ChairSide.Board/Services/HistoricalAdministrativePersistence.cs",
+                      "label":  "src/ChairSide.Board/Services/HistoricalAdministrativePersistence.cs",
+                      "type":  "File",
+                      "path":  "src/ChairSide.Board/Services/HistoricalAdministrativePersistence.cs"
                   },
                   {
                       "id":  "file:src/ChairSide.Board/Services/HistoricalEncounterQuery.cs",
@@ -859,6 +871,12 @@
                       "label":  "tests/ChairSide.Board.Tests/FaultedReadyCancellationTests.cs",
                       "type":  "File",
                       "path":  "tests/ChairSide.Board.Tests/FaultedReadyCancellationTests.cs"
+                  },
+                  {
+                      "id":  "file:tests/ChairSide.Board.Tests/HistoricalAdministrativePersistenceTests.cs",
+                      "label":  "tests/ChairSide.Board.Tests/HistoricalAdministrativePersistenceTests.cs",
+                      "type":  "File",
+                      "path":  "tests/ChairSide.Board.Tests/HistoricalAdministrativePersistenceTests.cs"
                   },
                   {
                       "id":  "file:tests/ChairSide.Board.Tests/HistoricalQueryPersistenceTests.cs",
@@ -1581,6 +1599,12 @@
                       "path":  "src/ChairSide.Board/Program.cs"
                   },
                   {
+                      "id":  "symbol:type:CommittedHistoricalAdministrativeWrite",
+                      "label":  "CommittedHistoricalAdministrativeWrite",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/HistoricalAdministrativePersistence.cs"
+                  },
+                  {
                       "id":  "symbol:type:CommittedReadyHandoffResult",
                       "label":  "CommittedReadyHandoffResult",
                       "type":  "CodeType",
@@ -2071,6 +2095,48 @@
                       "label":  "Harness",
                       "type":  "CodeType",
                       "path":  "tests/ChairSide.Board.Tests/PrestagingLifecycleEndpointTests.cs"
+                  },
+                  {
+                      "id":  "symbol:type:HistoricalAdministrativeActorClasses",
+                      "label":  "HistoricalAdministrativeActorClasses",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/HistoricalAdministrativePersistence.cs"
+                  },
+                  {
+                      "id":  "symbol:type:HistoricalAdministrativeDispositions",
+                      "label":  "HistoricalAdministrativeDispositions",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/HistoricalAdministrativePersistence.cs"
+                  },
+                  {
+                      "id":  "symbol:type:HistoricalAdministrativeLedgerEventTypes",
+                      "label":  "HistoricalAdministrativeLedgerEventTypes",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/HistoricalAdministrativePersistence.cs"
+                  },
+                  {
+                      "id":  "symbol:type:HistoricalAdministrativePersistenceTests",
+                      "label":  "HistoricalAdministrativePersistenceTests",
+                      "type":  "CodeType",
+                      "path":  "tests/ChairSide.Board.Tests/HistoricalAdministrativePersistenceTests.cs"
+                  },
+                  {
+                      "id":  "symbol:type:HistoricalAdministrativeReasonSources",
+                      "label":  "HistoricalAdministrativeReasonSources",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/HistoricalAdministrativePersistence.cs"
+                  },
+                  {
+                      "id":  "symbol:type:HistoricalEncounterAdministrativeLedgerEvent",
+                      "label":  "HistoricalEncounterAdministrativeLedgerEvent",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/HistoricalAdministrativePersistence.cs"
+                  },
+                  {
+                      "id":  "symbol:type:HistoricalEncounterAdministrativeState",
+                      "label":  "HistoricalEncounterAdministrativeState",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/HistoricalAdministrativePersistence.cs"
                   },
                   {
                       "id":  "symbol:type:HistoricalEncounterRecord",
@@ -3886,6 +3952,41 @@
                       "label":  "declares"
                   },
                   {
+                      "from":  "file:src/ChairSide.Board/Services/HistoricalAdministrativePersistence.cs",
+                      "to":  "symbol:type:CommittedHistoricalAdministrativeWrite",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/HistoricalAdministrativePersistence.cs",
+                      "to":  "symbol:type:HistoricalAdministrativeActorClasses",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/HistoricalAdministrativePersistence.cs",
+                      "to":  "symbol:type:HistoricalAdministrativeDispositions",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/HistoricalAdministrativePersistence.cs",
+                      "to":  "symbol:type:HistoricalAdministrativeLedgerEventTypes",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/HistoricalAdministrativePersistence.cs",
+                      "to":  "symbol:type:HistoricalAdministrativeReasonSources",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/HistoricalAdministrativePersistence.cs",
+                      "to":  "symbol:type:HistoricalEncounterAdministrativeLedgerEvent",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/HistoricalAdministrativePersistence.cs",
+                      "to":  "symbol:type:HistoricalEncounterAdministrativeState",
+                      "label":  "declares"
+                  },
+                  {
                       "from":  "file:src/ChairSide.Board/Services/HistoricalEncounterQuery.cs",
                       "to":  "symbol:type:HistoricalEncounterRecord",
                       "label":  "declares"
@@ -4641,6 +4742,11 @@
                       "label":  "declares"
                   },
                   {
+                      "from":  "file:tests/ChairSide.Board.Tests/HistoricalAdministrativePersistenceTests.cs",
+                      "to":  "symbol:type:HistoricalAdministrativePersistenceTests",
+                      "label":  "declares"
+                  },
+                  {
                       "from":  "file:tests/ChairSide.Board.Tests/HistoricalQueryPersistenceTests.cs",
                       "to":  "symbol:type:HistoricalQueryPersistenceTests",
                       "label":  "declares"
@@ -4903,6 +5009,11 @@
                   {
                       "from":  "repo:chairside",
                       "to":  "file:docs/knowledge/reports/audit-evidence.md",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:docs/knowledge/reports/historical-administrative-persistence.md",
                       "label":  "contains"
                   },
                   {
@@ -5193,6 +5304,11 @@
                   {
                       "from":  "repo:chairside",
                       "to":  "file:src/ChairSide.Board/Services/ExceptionReviewRecords.cs",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:src/ChairSide.Board/Services/HistoricalAdministrativePersistence.cs",
                       "label":  "contains"
                   },
                   {
@@ -5553,6 +5669,11 @@
                   {
                       "from":  "repo:chairside",
                       "to":  "file:tests/ChairSide.Board.Tests/FaultedReadyCancellationTests.cs",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:tests/ChairSide.Board.Tests/HistoricalAdministrativePersistenceTests.cs",
                       "label":  "contains"
                   },
                   {

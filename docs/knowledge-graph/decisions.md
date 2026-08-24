@@ -132,6 +132,8 @@ This file records decisions that should survive across tasks, PRs, and debugging
 
 **Decision:** Administrative state and its ledger event commit atomically. Stale administrative writes are rejected. Ledger events are append-only, non-deletable through normal UI, bounded and non-PHI, retained indefinitely by default, and loaded through bounded/paged historical access rather than complete in-memory history.
 
+**Decision:** Canonical administrative persistence uses `historical_encounter_admin_state` for the optional current disposition, proven review evidence, current correction overrides, and revision, plus `historical_encounter_ledger` for chronological append-only provenance. Both use the #237 `(SourceType, SourceRecordId)` durable identity directly; repository writes validate the corresponding completed or aborted source row rather than adding a synthetic historical-encounter table. Legacy import starts at revision 0, uses one idempotent `LegacyStateImported` event whose timestamp means import time, preserves only parseable review time and the application-owned Local Admin marker, and maps uncertain exception state to Needs Review.
+
 **Rationale:** Normal reports need the best current effective interpretation, while the ledger must explain every change without fabricating lifecycle facts, partially including Confirmed Exceptions, losing prior decisions, or hiding review work outside the active analytical scope.
 
 ## Canonical reporting semantics
