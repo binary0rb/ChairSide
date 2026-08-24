@@ -1,7 +1,7 @@
 ﻿{
     "generatedStamp":  "deterministic",
     "root":  ".",
-    "fileCount":  189,
+    "fileCount":  194,
     "files":  [
                   {
                       "path":  ".github/pull_request_template.md",
@@ -161,7 +161,7 @@
                   {
                       "path":  "docs/design/exception-handling-design.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  18975,
+                      "sizeBytes":  20387,
                       "typeSymbols":  [
 
                                       ],
@@ -198,6 +198,7 @@
                                        "Reopen Review",
                                        "Notes, actors, and minimum ledger fields",
                                        "Atomicity and concurrency",
+                                       "Implemented server contract",
                                        "Reporting period and effective truth",
                                        "Data Quality scope and reconciliation",
                                        "Temporal navigation",
@@ -488,7 +489,7 @@
                   {
                       "path":  "docs/knowledge/reports/historical-administrative-persistence.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  4466,
+                      "sizeBytes":  7147,
                       "typeSymbols":  [
 
                                       ],
@@ -511,6 +512,7 @@
                                        "Historical administrative persistence",
                                        "Durable identity and tables",
                                        "Integrity and atomicity",
+                                       "Canonical anomaly operations",
                                        "Correction override foundation",
                                        "Legacy migration",
                                        "Retention and reset",
@@ -847,7 +849,7 @@
                   {
                       "path":  "docs/knowledge-graph/chairside.graph.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  23151,
+                      "sizeBytes":  23565,
                       "typeSymbols":  [
 
                                       ],
@@ -878,7 +880,7 @@
                   {
                       "path":  "docs/knowledge-graph/decisions.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  28676,
+                      "sizeBytes":  29312,
                       "typeSymbols":  [
 
                                       ],
@@ -1771,7 +1773,7 @@
                   {
                       "path":  "src/ChairSide.Board/Program.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  73848,
+                      "sizeBytes":  74977,
                       "typeSymbols":  [
                                           "LegacyRoomOneRedirect",
                                           "BeginPrestageRequest",
@@ -1812,6 +1814,12 @@
                                      "/api/reports/cycles/mark-exception",
                                      "/api/reports/cycles/{completedCycleId:long}/confirm-exclusion",
                                      "/api/reports/aborted-assignments/{abortedAssignmentId:long}/confirm-exclusion",
+                                     "/api/reports/anomalies/{sourceType}/{sourceRecordId:long}/mark-for-review",
+                                     "/api/reports/anomalies/{sourceType}/{sourceRecordId:long}/refine-reason",
+                                     "/api/reports/anomalies/{sourceType}/{sourceRecordId:long}/note",
+                                     "/api/reports/anomalies/{sourceType}/{sourceRecordId:long}/clear",
+                                     "/api/reports/anomalies/{sourceType}/{sourceRecordId:long}/confirm",
+                                     "/api/reports/anomalies/{sourceType}/{sourceRecordId:long}/reopen",
                                      "/api/rooms/{roomNumber:int}",
                                      "/api/client-errors",
                                      "/api/rooms/{roomNumber:int}/prestage",
@@ -2120,7 +2128,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/DemoBoardStore.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  199709,
+                      "sizeBytes":  200518,
                       "typeSymbols":  [
                                           "ExceptionReasons",
                                           "ReportingExceptionReasons",
@@ -2424,7 +2432,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/HistoricalAdministrativePersistence.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  3624,
+                      "sizeBytes":  3720,
                       "typeSymbols":  [
                                           "HistoricalAdministrativeDispositions",
                                           "HistoricalAdministrativeActorClasses",
@@ -2436,6 +2444,88 @@
                                       ],
                       "methodSymbols":  [
                                             "IsValid"
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
+                      "path":  "src/ChairSide.Board/Services/HistoricalAnomalyAdministrationService.cs",
+                      "kind":  "CSharp",
+                      "sizeBytes":  14746,
+                      "typeSymbols":  [
+                                          "HistoricalManualReviewReasons",
+                                          "HistoricalSystemFindingKind",
+                                          "HistoricalSystemFindingReasons",
+                                          "HistoricalAdministrativeOperationOutcome",
+                                          "HistoricalAdministrativeOperationResult",
+                                          "GuardedHistoricalAdministrativePersistenceOutcome",
+                                          "GuardedHistoricalAdministrativePersistenceResult",
+                                          "HistoricalAnomalyAdministrationService"
+                                      ],
+                      "methodSymbols":  [
+                                            "IsValid",
+                                            "FromKind",
+                                            "MarkForReview",
+                                            "RefineReason",
+                                            "AddNote",
+                                            "ClearForReporting",
+                                            "ConfirmException",
+                                            "ReopenReview",
+                                            "RecordSystemFinding",
+                                            "ChangeDisposition",
+                                            "Mutate",
+                                            "CreateMutation",
+                                            "BaseState",
+                                            "ValidateCommon",
+                                            "InvalidTransition"
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
+                      "path":  "src/ChairSide.Board/Services/HistoricalAnomalyEndpointHandler.cs",
+                      "kind":  "CSharp",
+                      "sizeBytes":  9552,
+                      "typeSymbols":  [
+                                          "HistoricalAnomalyEndpointHandler",
+                                          "struct"
+                                      ],
+                      "methodSymbols":  [
+                                            "MarkForReviewAsync",
+                                            "RefineReasonAsync",
+                                            "AddNoteAsync",
+                                            "ClearForReportingAsync",
+                                            "ConfirmExceptionAsync",
+                                            "ReopenReviewAsync",
+                                            "TryParse",
+                                            "ToHttpResult",
+                                            "Error"
                                         ],
                       "routes":  [
 
@@ -3238,7 +3328,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/SqliteBoardRepository.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  164648,
+                      "sizeBytes":  182923,
                       "typeSymbols":  [
                                           "SqliteBoardRepository",
                                           "DoctorWorkingRoomRecord",
@@ -3305,7 +3395,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/SqliteBoardSchema.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  61717,
+                      "sizeBytes":  61956,
                       "typeSymbols":  [
                                           "SqliteBoardSchema",
                                           "SqliteBoardInitialization",
@@ -5384,7 +5474,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/HistoricalAdministrativePersistenceTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  33815,
+                      "sizeBytes":  34491,
                       "typeSymbols":  [
                                           "HistoricalAdministrativePersistenceTests"
                                       ],
@@ -5406,6 +5496,73 @@
                                             "ReadNames",
                                             "ReadColumns",
                                             "OpenConnection"
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
+                      "path":  "tests/ChairSide.Board.Tests/HistoricalAnomalyAdministrationTests.cs",
+                      "kind":  "CSharp",
+                      "sizeBytes":  17312,
+                      "typeSymbols":  [
+                                          "HistoricalAnomalyAdministrationTests"
+                                      ],
+                      "methodSymbols":  [
+                                            "Local_admin_flow_writes_one_event_per_revision_and_preserves_projection_evidence",
+                                            "Invalid_inputs_and_transitions_do_not_mutate_state_or_ledger",
+                                            "Concurrent_absent_projection_writers_with_expected_zero_yield_one_success_and_one_stale_write",
+                                            "Stale_and_failed_guarded_writes_leave_projection_and_ledger_unchanged",
+                                            "Approved_system_finding_reopens_resolved_state_and_repeated_findings_append",
+                                            "Every_manual_reason_is_accepted_and_pending_mark_can_be_reapplied",
+                                            "AssertSuccess",
+                                            "CreateAbortedSource",
+                                            "CreateCompletedSource",
+                                            "Event"
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
+                      "path":  "tests/ChairSide.Board.Tests/HistoricalAnomalyEndpointTests.cs",
+                      "kind":  "CSharp",
+                      "sizeBytes":  11038,
+                      "typeSymbols":  [
+                                          "HistoricalAnomalyEndpointTests"
+                                      ],
+                      "methodSymbols":  [
+                                            "Canonical_routes_expose_full_transition_flow_and_stale_revision_conflicts",
+                                            "Strict_mark_request_rejects_malformed_or_disallowed_inputs",
+                                            "Endpoint_maps_invalid_source_missing_source_and_note_length_without_mutation",
+                                            "Canonical_anomaly_routes_are_admin_protected",
+                                            "Program_maps_only_local_admin_anomaly_mutations_and_no_public_system_finding_route",
+                                            "CreateSource",
+                                            "FindRepositoryRoot"
                                         ],
                       "routes":  [
 
@@ -5447,6 +5604,41 @@
                                             "Historical_query_indexes_are_idempotently_present",
                                             "SaveCycle",
                                             "AssertQueryPlanUses"
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
+                      "path":  "tests/ChairSide.Board.Tests/HistoricalSystemFindingProducerTests.cs",
+                      "kind":  "CSharp",
+                      "sizeBytes":  10528,
+                      "typeSymbols":  [
+                                          "HistoricalSystemFindingProducerTests"
+                                      ],
+                      "methodSymbols":  [
+                                            "After_hours_sweep_atomically_attaches_approved_findings_to_both_source_types",
+                                            "Max_duration_expiration_attaches_findings_without_changing_legacy_pre_arrival_reporting_flags",
+                                            "Producer_ledger_failure_rolls_back_handoff_archive_admin_state_and_room_reset",
+                                            "Reporting_only_exception_classification_never_creates_administrative_state",
+                                            "ActivateArrived",
+                                            "AssertFinding",
+                                            "InstallLedgerFailureTrigger",
+                                            "DropLedgerFailureTrigger",
+                                            "Scalar",
+                                            "Open"
                                         ],
                       "routes":  [
 

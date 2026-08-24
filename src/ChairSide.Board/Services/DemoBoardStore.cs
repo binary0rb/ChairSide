@@ -2385,11 +2385,24 @@ public sealed class DemoBoardStore
         };
         if (!string.IsNullOrWhiteSpace(snapshot.ActiveReadyHandoffId))
         {
-            _repository.TerminateReadyHandoffAndIncompleteAssignment(record, snapshot, snapshot.ActiveReadyHandoffId, now, ReadyHandoffTerminationKinds.Expired, _doctors, _procedures);
+            _repository.TerminateReadyHandoffAndIncompleteAssignment(
+                record,
+                snapshot,
+                snapshot.ActiveReadyHandoffId,
+                now,
+                ReadyHandoffTerminationKinds.Expired,
+                _doctors,
+                _procedures,
+                SystemFindingFromReason(reason));
         }
         else
         {
-            _repository.TerminateIncompleteAssignment(record, new RoomState(room.RoomId), _doctors, _procedures);
+            _repository.TerminateIncompleteAssignment(
+                record,
+                new RoomState(room.RoomId),
+                _doctors,
+                _procedures,
+                SystemFindingFromReason(reason));
         }
         ResetRoom(room);
         AddEvent(new RoomEvent(room.RoomId, "ForceExpired", now, record.AssignedDoctor, record.ProcedureCode));
@@ -2451,11 +2464,24 @@ public sealed class DemoBoardStore
         cycle.ReviewStatus = ReviewStatuses.PendingReview;
 
         // Persist durably before mutating live state.
-        _repository.SaveCompletedCycleAndRoom(cycle, new RoomState(room.RoomId), _doctors, _procedures);
+        _repository.SaveCompletedCycleAndRoom(
+            cycle,
+            new RoomState(room.RoomId),
+            _doctors,
+            _procedures,
+            SystemFindingFromReason(reason),
+            now);
 
         ResetRoom(room);
         AddEvent(new RoomEvent(room.RoomId, "ForceExpired", now, snapshot.AssignedDoctor, snapshot.ProcedureCode));
     }
+
+    private static HistoricalSystemFindingKind SystemFindingFromReason(string reason) => reason switch
+    {
+        ExceptionReasons.AfterHoursSweep => HistoricalSystemFindingKind.AfterHoursSweep,
+        ExceptionReasons.ExceededMaxActiveDuration => HistoricalSystemFindingKind.ExceededMaxActiveDuration,
+        _ => throw new ArgumentOutOfRangeException(nameof(reason), reason, "Unsupported expiration system finding.")
+    };
 
     // Returns null if timeZone is a non-blank, non-UTC value that cannot be resolved.
     // Callers must treat null as "fail closed" - do not substitute UTC silently.

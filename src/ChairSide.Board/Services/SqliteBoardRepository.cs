@@ -736,11 +736,22 @@ public sealed class SqliteBoardRepository
         CompletedRoomCycle cycle,
         RoomState room,
         IReadOnlyList<Doctor> doctors,
-        IReadOnlyList<ProcedureCategory> procedures)
+        IReadOnlyList<ProcedureCategory> procedures,
+        HistoricalSystemFindingKind? systemFinding = null,
+        DateTimeOffset? systemFindingOccurredAt = null)
     {
         using var connection = OpenConnection();
         using var transaction = connection.BeginTransaction();
         SaveCompletedCycle(connection, transaction, cycle, doctors, procedures);
+        if (systemFinding.HasValue)
+        {
+            PersistSystemFinding(
+                connection,
+                transaction,
+                new HistoricalEncounterKey(HistoricalEncounterSourceTypes.CompletedCycle, cycle.CompletedCycleId),
+                systemFinding.Value,
+                systemFindingOccurredAt ?? DateTimeOffset.UtcNow);
+        }
         SaveRoom(connection, transaction, room, doctors, procedures);
         transaction.Commit();
         return new CommittedRoomResult(CopyRoomForPersistence(room), CopyCompletedCycleForPersistence(cycle));
@@ -757,11 +768,21 @@ public sealed class SqliteBoardRepository
         AbortedRoomAssignment record,
         RoomState room,
         IReadOnlyList<Doctor> doctors,
-        IReadOnlyList<ProcedureCategory> procedures)
+        IReadOnlyList<ProcedureCategory> procedures,
+        HistoricalSystemFindingKind? systemFinding = null)
     {
         using var connection = OpenConnection();
         using var transaction = connection.BeginTransaction();
         InsertAbortedAssignment(connection, transaction, record, doctors, procedures);
+        if (systemFinding.HasValue)
+        {
+            PersistSystemFinding(
+                connection,
+                transaction,
+                new HistoricalEncounterKey(HistoricalEncounterSourceTypes.AbortedAssignment, record.AbortedAssignmentId),
+                systemFinding.Value,
+                record.TerminatedAt);
+        }
         SaveRoom(connection, transaction, room, doctors, procedures);
         transaction.Commit();
     }
@@ -1439,7 +1460,8 @@ public sealed class SqliteBoardRepository
         DateTimeOffset terminatedAt,
         string readyHandoffTerminationKind,
         IReadOnlyList<Doctor> doctors,
-        IReadOnlyList<ProcedureCategory> procedures)
+        IReadOnlyList<ProcedureCategory> procedures,
+        HistoricalSystemFindingKind? systemFinding = null)
     {
         ArgumentNullException.ThrowIfNull(record);
         ArgumentNullException.ThrowIfNull(room);
@@ -1458,6 +1480,17 @@ public sealed class SqliteBoardRepository
         persistedRecord.TerminalReadyHandoffId = handoffId;
         var persistedRoom = new RoomState(room.RoomId);
         InsertAbortedAssignment(connection, transaction, persistedRecord, doctors, procedures);
+        if (systemFinding.HasValue)
+        {
+            PersistSystemFinding(
+                connection,
+                transaction,
+                new HistoricalEncounterKey(
+                    HistoricalEncounterSourceTypes.AbortedAssignment,
+                    persistedRecord.AbortedAssignmentId),
+                systemFinding.Value,
+                record.TerminatedAt);
+        }
         SaveRoom(connection, transaction, persistedRoom, doctors, procedures);
         transaction.Commit();
         return new CommittedReadyHandoffResult(
@@ -1714,9 +1747,8 @@ public sealed class SqliteBoardRepository
     }
 
     /// <summary>
-    /// Storage-only transaction seam for later canonical administrative operations. This method
-    /// deliberately performs no Clear/Confirm/Reopen policy and no administrative CAS; #239 owns
-    /// those behaviors. It exposes no separate projection-write or ledger-append operation.
+    /// Storage-only seam retained for migration-foundation tests. Canonical administrative
+    /// operations use the guarded method below; neither seam exposes projection-only writes.
     /// </summary>
     internal CommittedHistoricalAdministrativeWrite PersistHistoricalAdministrativeStateAndLedger(
         HistoricalEncounterAdministrativeState state,
@@ -1843,6 +1875,166 @@ public sealed class SqliteBoardRepository
         return new CommittedHistoricalAdministrativeWrite(
             state,
             ledgerEvent with { LedgerId = ledgerId });
+    }
+
+    /// <summary>
+    /// Canonical administrative write seam. A missing projection has logical revision zero. The
+    /// source check, decisive revision comparison, projection write, and one ledger append execute
+    /// under one immediate SQLite transaction so competing first writers cannot both succeed.
+    /// </summary>
+    internal GuardedHistoricalAdministrativePersistenceResult PersistHistoricalAdministrativeStateAndLedgerGuarded(
+        int expectedRevision,
+        HistoricalEncounterAdministrativeState state,
+        HistoricalEncounterAdministrativeLedgerEvent ledgerEvent,
+        Action? afterStatePersisted = null)
+    {
+        ValidateHistoricalAdministrativeWrite(state, ledgerEvent);
+        if (expectedRevision < 0
+            || state.AdministrativeRevision != expectedRevision + 1)
+        {
+            throw new ArgumentException(
+                "A guarded administrative write must increment the expected revision exactly once.",
+                nameof(expectedRevision));
+        }
+
+        using var connection = OpenConnection();
+        using var transaction = connection.BeginTransaction(deferred: false);
+        if (!HistoricalSourceExists(connection, transaction, state.Key))
+        {
+            transaction.Rollback();
+            return new GuardedHistoricalAdministrativePersistenceResult(
+                GuardedHistoricalAdministrativePersistenceOutcome.NotFound);
+        }
+
+        var current = LoadHistoricalAdministrativeState(connection, transaction, state.Key);
+        var currentRevision = current?.AdministrativeRevision ?? 0;
+        if (currentRevision != expectedRevision)
+        {
+            transaction.Rollback();
+            return new GuardedHistoricalAdministrativePersistenceResult(
+                GuardedHistoricalAdministrativePersistenceOutcome.StaleWrite,
+                CurrentState: current,
+                CurrentRevision: currentRevision);
+        }
+
+        using (var stateCommand = connection.CreateCommand())
+        {
+            stateCommand.Transaction = transaction;
+            stateCommand.CommandText = current is null
+                ? """
+                    INSERT INTO historical_encounter_admin_state (
+                        source_type,
+                        source_record_id,
+                        disposition,
+                        current_reason,
+                        reason_source,
+                        known_reviewed_at,
+                        known_reviewed_actor_class,
+                        override_doctor_id,
+                        override_procedure_code,
+                        override_sedation_state,
+                        override_is_add_on,
+                        override_expected_allocation_state,
+                        override_expected_allocation_suggested_units,
+                        override_expected_allocation_confirmed_units,
+                        administrative_revision
+                    )
+                    VALUES (
+                        $sourceType,
+                        $sourceRecordId,
+                        $disposition,
+                        $currentReason,
+                        $reasonSource,
+                        $knownReviewedAt,
+                        $knownReviewedActorClass,
+                        $overrideDoctorId,
+                        $overrideProcedureCode,
+                        $overrideSedationState,
+                        $overrideIsAddOn,
+                        $overrideExpectedAllocationState,
+                        $overrideExpectedAllocationSuggestedUnits,
+                        $overrideExpectedAllocationConfirmedUnits,
+                        $administrativeRevision
+                    );
+                    """
+                : """
+                    UPDATE historical_encounter_admin_state
+                    SET disposition = $disposition,
+                        current_reason = $currentReason,
+                        reason_source = $reasonSource,
+                        known_reviewed_at = $knownReviewedAt,
+                        known_reviewed_actor_class = $knownReviewedActorClass,
+                        override_doctor_id = $overrideDoctorId,
+                        override_procedure_code = $overrideProcedureCode,
+                        override_sedation_state = $overrideSedationState,
+                        override_is_add_on = $overrideIsAddOn,
+                        override_expected_allocation_state = $overrideExpectedAllocationState,
+                        override_expected_allocation_suggested_units = $overrideExpectedAllocationSuggestedUnits,
+                        override_expected_allocation_confirmed_units = $overrideExpectedAllocationConfirmedUnits,
+                        administrative_revision = $administrativeRevision
+                    WHERE source_type = $sourceType
+                      AND source_record_id = $sourceRecordId
+                      AND administrative_revision = $expectedRevision;
+                    """;
+            AddHistoricalAdministrativeStateParameters(stateCommand, state);
+            if (current is not null)
+            {
+                stateCommand.Parameters.AddWithValue("$expectedRevision", expectedRevision);
+            }
+            if (stateCommand.ExecuteNonQuery() != 1)
+            {
+                throw new InvalidOperationException("A guarded administrative projection write must affect exactly one row.");
+            }
+        }
+
+        afterStatePersisted?.Invoke();
+
+        long ledgerId;
+        using (var ledgerCommand = connection.CreateCommand())
+        {
+            ledgerCommand.Transaction = transaction;
+            ledgerCommand.CommandText = """
+                INSERT INTO historical_encounter_ledger (
+                    source_type,
+                    source_record_id,
+                    event_type,
+                    occurred_at,
+                    actor_class,
+                    reason_source,
+                    structured_reason,
+                    previous_value,
+                    new_value,
+                    admin_note,
+                    administrative_revision
+                )
+                VALUES (
+                    $sourceType,
+                    $sourceRecordId,
+                    $eventType,
+                    $occurredAt,
+                    $actorClass,
+                    $reasonSource,
+                    $structuredReason,
+                    $previousValue,
+                    $newValue,
+                    $adminNote,
+                    $administrativeRevision
+                );
+                SELECT last_insert_rowid();
+                """;
+            AddHistoricalAdministrativeLedgerParameters(ledgerCommand, ledgerEvent);
+            ledgerId = Convert.ToInt64(ledgerCommand.ExecuteScalar());
+        }
+
+        transaction.Commit();
+        var committed = new CommittedHistoricalAdministrativeWrite(
+            state,
+            ledgerEvent with { LedgerId = ledgerId });
+        return new GuardedHistoricalAdministrativePersistenceResult(
+            GuardedHistoricalAdministrativePersistenceOutcome.Success,
+            committed,
+            state,
+            state.AdministrativeRevision);
     }
 
     public HistoricalQueryPage<HistoricalEncounterKey> LoadReviewEncounterKeysPage(
@@ -3274,6 +3466,208 @@ public sealed class SqliteBoardRepository
         command.Parameters.AddWithValue("$overrideExpectedAllocationSuggestedUnits", ToDbValue(state.OverrideExpectedAllocationSuggestedUnits));
         command.Parameters.AddWithValue("$overrideExpectedAllocationConfirmedUnits", ToDbValue(state.OverrideExpectedAllocationConfirmedUnits));
         command.Parameters.AddWithValue("$administrativeRevision", state.AdministrativeRevision);
+    }
+
+    private static void AddHistoricalAdministrativeLedgerParameters(
+        SqliteCommand command,
+        HistoricalEncounterAdministrativeLedgerEvent ledgerEvent)
+    {
+        command.Parameters.AddWithValue("$sourceType", ledgerEvent.Key.SourceType);
+        command.Parameters.AddWithValue("$sourceRecordId", ledgerEvent.Key.SourceRecordId);
+        command.Parameters.AddWithValue("$eventType", ledgerEvent.EventType);
+        command.Parameters.AddWithValue("$occurredAt", FormatDateTimeOffset(ledgerEvent.OccurredAt));
+        command.Parameters.AddWithValue("$actorClass", ledgerEvent.ActorClass);
+        command.Parameters.AddWithValue("$reasonSource", ToDbValue(ledgerEvent.ReasonSource));
+        command.Parameters.AddWithValue("$structuredReason", ToDbValue(ledgerEvent.StructuredReason));
+        command.Parameters.AddWithValue("$previousValue", ToDbValue(ledgerEvent.PreviousValue));
+        command.Parameters.AddWithValue("$newValue", ToDbValue(ledgerEvent.NewValue));
+        command.Parameters.AddWithValue("$adminNote", ToDbValuePreservingEmpty(ledgerEvent.AdminNote));
+        command.Parameters.AddWithValue("$administrativeRevision", ledgerEvent.AdministrativeRevision);
+    }
+
+    private static HistoricalEncounterAdministrativeState? LoadHistoricalAdministrativeState(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        HistoricalEncounterKey key)
+    {
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = """
+            SELECT
+                disposition,
+                current_reason,
+                reason_source,
+                known_reviewed_at,
+                known_reviewed_actor_class,
+                override_doctor_id,
+                override_procedure_code,
+                override_sedation_state,
+                override_is_add_on,
+                override_expected_allocation_state,
+                override_expected_allocation_suggested_units,
+                override_expected_allocation_confirmed_units,
+                administrative_revision
+            FROM historical_encounter_admin_state
+            WHERE source_type = $sourceType
+              AND source_record_id = $sourceRecordId;
+            """;
+        command.Parameters.AddWithValue("$sourceType", key.SourceType);
+        command.Parameters.AddWithValue("$sourceRecordId", key.SourceRecordId);
+        using var reader = command.ExecuteReader();
+        return reader.Read() ? ReadHistoricalAdministrativeState(reader, key) : null;
+    }
+
+    private static void PersistSystemFinding(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        HistoricalEncounterKey key,
+        HistoricalSystemFindingKind finding,
+        DateTimeOffset occurredAt)
+    {
+        var reason = HistoricalSystemFindingReasons.FromKind(finding);
+        var current = LoadHistoricalAdministrativeState(connection, transaction, key);
+        var expectedRevision = current?.AdministrativeRevision ?? 0;
+        var revision = expectedRevision + 1;
+        var state = (current ?? new HistoricalEncounterAdministrativeState(
+            key,
+            HistoricalAdministrativeDispositions.NoAnomaly,
+            CurrentReason: null,
+            ReasonSource: null,
+            KnownReviewedAt: null,
+            KnownReviewedActorClass: null,
+            OverrideDoctorId: null,
+            OverrideProcedureCode: null,
+            OverrideSedationState: null,
+            OverrideIsAddOn: null,
+            OverrideExpectedAllocationState: null,
+            OverrideExpectedAllocationSuggestedUnits: null,
+            OverrideExpectedAllocationConfirmedUnits: null,
+            AdministrativeRevision: 0)) with
+        {
+            Disposition = HistoricalAdministrativeDispositions.NeedsReview,
+            CurrentReason = reason,
+            ReasonSource = HistoricalAdministrativeReasonSources.System,
+            AdministrativeRevision = revision
+        };
+        var ledgerEvent = new HistoricalEncounterAdministrativeLedgerEvent(
+            LedgerId: 0,
+            Key: key,
+            EventType: HistoricalAdministrativeLedgerEventTypes.SystemFinding,
+            OccurredAt: occurredAt,
+            ActorClass: HistoricalAdministrativeActorClasses.System,
+            ReasonSource: HistoricalAdministrativeReasonSources.System,
+            StructuredReason: reason,
+            PreviousValue: current?.Disposition ?? HistoricalAdministrativeDispositions.NoAnomaly,
+            NewValue: HistoricalAdministrativeDispositions.NeedsReview,
+            AdminNote: null,
+            AdministrativeRevision: revision);
+        ValidateHistoricalAdministrativeWrite(state, ledgerEvent);
+
+        using (var stateCommand = connection.CreateCommand())
+        {
+            stateCommand.Transaction = transaction;
+            stateCommand.CommandText = current is null
+                ? """
+                    INSERT INTO historical_encounter_admin_state (
+                        source_type,
+                        source_record_id,
+                        disposition,
+                        current_reason,
+                        reason_source,
+                        known_reviewed_at,
+                        known_reviewed_actor_class,
+                        override_doctor_id,
+                        override_procedure_code,
+                        override_sedation_state,
+                        override_is_add_on,
+                        override_expected_allocation_state,
+                        override_expected_allocation_suggested_units,
+                        override_expected_allocation_confirmed_units,
+                        administrative_revision
+                    )
+                    VALUES (
+                        $sourceType,
+                        $sourceRecordId,
+                        $disposition,
+                        $currentReason,
+                        $reasonSource,
+                        $knownReviewedAt,
+                        $knownReviewedActorClass,
+                        $overrideDoctorId,
+                        $overrideProcedureCode,
+                        $overrideSedationState,
+                        $overrideIsAddOn,
+                        $overrideExpectedAllocationState,
+                        $overrideExpectedAllocationSuggestedUnits,
+                        $overrideExpectedAllocationConfirmedUnits,
+                        $administrativeRevision
+                    );
+                    """
+                : """
+                    UPDATE historical_encounter_admin_state
+                    SET disposition = $disposition,
+                        current_reason = $currentReason,
+                        reason_source = $reasonSource,
+                        known_reviewed_at = $knownReviewedAt,
+                        known_reviewed_actor_class = $knownReviewedActorClass,
+                        override_doctor_id = $overrideDoctorId,
+                        override_procedure_code = $overrideProcedureCode,
+                        override_sedation_state = $overrideSedationState,
+                        override_is_add_on = $overrideIsAddOn,
+                        override_expected_allocation_state = $overrideExpectedAllocationState,
+                        override_expected_allocation_suggested_units = $overrideExpectedAllocationSuggestedUnits,
+                        override_expected_allocation_confirmed_units = $overrideExpectedAllocationConfirmedUnits,
+                        administrative_revision = $administrativeRevision
+                    WHERE source_type = $sourceType
+                      AND source_record_id = $sourceRecordId
+                      AND administrative_revision = $expectedRevision;
+                    """;
+            AddHistoricalAdministrativeStateParameters(stateCommand, state);
+            if (current is not null)
+            {
+                stateCommand.Parameters.AddWithValue("$expectedRevision", expectedRevision);
+            }
+            if (stateCommand.ExecuteNonQuery() != 1)
+            {
+                throw new InvalidOperationException("A system finding projection write must affect exactly one row.");
+            }
+        }
+
+        using var ledgerCommand = connection.CreateCommand();
+        ledgerCommand.Transaction = transaction;
+        ledgerCommand.CommandText = """
+            INSERT INTO historical_encounter_ledger (
+                source_type,
+                source_record_id,
+                event_type,
+                occurred_at,
+                actor_class,
+                reason_source,
+                structured_reason,
+                previous_value,
+                new_value,
+                admin_note,
+                administrative_revision
+            )
+            VALUES (
+                $sourceType,
+                $sourceRecordId,
+                $eventType,
+                $occurredAt,
+                $actorClass,
+                $reasonSource,
+                $structuredReason,
+                $previousValue,
+                $newValue,
+                $adminNote,
+                $administrativeRevision
+            );
+            """;
+        AddHistoricalAdministrativeLedgerParameters(ledgerCommand, ledgerEvent);
+        if (ledgerCommand.ExecuteNonQuery() != 1)
+        {
+            throw new InvalidOperationException("A system finding must append exactly one ledger row.");
+        }
     }
 
     private static bool HistoricalSourceExists(
