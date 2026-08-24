@@ -290,6 +290,74 @@ internal static class SqliteBoardSchema
                     UNIQUE(episode_id)
                 );
 
+                CREATE TABLE IF NOT EXISTS historical_encounter_admin_state (
+                    source_type TEXT NOT NULL CHECK (source_type IN ('CompletedCycle', 'AbortedAssignment')),
+                    source_record_id INTEGER NOT NULL CHECK (source_record_id > 0),
+                    disposition TEXT NOT NULL CHECK (disposition IN ('NoAnomaly', 'NeedsReview', 'ClearedForReporting', 'ConfirmedException')),
+                    current_reason TEXT NULL,
+                    reason_source TEXT NULL CHECK (reason_source IS NULL OR reason_source IN ('System', 'LocalAdmin', 'Legacy')),
+                    known_reviewed_at TEXT NULL,
+                    known_reviewed_actor_class TEXT NULL CHECK (known_reviewed_actor_class IS NULL OR known_reviewed_actor_class IN ('System', 'LocalAdmin')),
+                    override_doctor_id TEXT NULL CHECK (override_doctor_id IS NULL OR length(trim(override_doctor_id)) > 0),
+                    override_procedure_code TEXT NULL CHECK (override_procedure_code IS NULL OR length(trim(override_procedure_code)) > 0),
+                    override_sedation_state TEXT NULL CHECK (
+                        override_sedation_state IS NULL
+                        OR override_sedation_state IN ('UnavailableNoProcedure', 'UnavailableProcedureIneligible', 'EligibleUnresolved', 'EligibleYes', 'EligibleNo')
+                    ),
+                    override_is_add_on INTEGER NULL CHECK (override_is_add_on IS NULL OR override_is_add_on IN (0, 1)),
+                    override_expected_allocation_state TEXT NULL CHECK (
+                        override_expected_allocation_state IS NULL
+                        OR override_expected_allocation_state IN ('ConfirmedSuggestedValue', 'ConfirmedAdjustedValue')
+                    ),
+                    override_expected_allocation_suggested_units INTEGER NULL CHECK (
+                        override_expected_allocation_suggested_units IS NULL
+                        OR override_expected_allocation_suggested_units > 0
+                    ),
+                    override_expected_allocation_confirmed_units INTEGER NULL CHECK (
+                        override_expected_allocation_confirmed_units IS NULL
+                        OR override_expected_allocation_confirmed_units > 0
+                    ),
+                    administrative_revision INTEGER NOT NULL DEFAULT 0 CHECK (administrative_revision >= 0),
+                    PRIMARY KEY (source_type, source_record_id),
+                    CHECK (
+                        (override_expected_allocation_state IS NULL
+                            AND override_expected_allocation_suggested_units IS NULL
+                            AND override_expected_allocation_confirmed_units IS NULL)
+                        OR (override_expected_allocation_state = 'ConfirmedSuggestedValue'
+                            AND override_expected_allocation_suggested_units IS NOT NULL
+                            AND override_expected_allocation_confirmed_units = override_expected_allocation_suggested_units)
+                        OR (override_expected_allocation_state = 'ConfirmedAdjustedValue'
+                            AND override_expected_allocation_confirmed_units IS NOT NULL
+                            AND (override_expected_allocation_suggested_units IS NULL
+                                OR override_expected_allocation_confirmed_units <> override_expected_allocation_suggested_units))
+                    )
+                );
+
+                CREATE TABLE IF NOT EXISTS historical_encounter_ledger (
+                    ledger_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    source_type TEXT NOT NULL CHECK (source_type IN ('CompletedCycle', 'AbortedAssignment')),
+                    source_record_id INTEGER NOT NULL CHECK (source_record_id > 0),
+                    event_type TEXT NOT NULL CHECK (event_type IN (
+                        'ManualFlag',
+                        'SystemFinding',
+                        'ReasonRefined',
+                        'MetadataCorrected',
+                        'NoteAdded',
+                        'ClearedForReporting',
+                        'ConfirmedException',
+                        'ReviewReopened',
+                        'LegacyStateImported'
+                    )),
+                    occurred_at TEXT NOT NULL CHECK (length(trim(occurred_at)) > 0),
+                    actor_class TEXT NOT NULL CHECK (actor_class IN ('System', 'LocalAdmin')),
+                    reason_source TEXT NULL CHECK (reason_source IS NULL OR reason_source IN ('System', 'LocalAdmin', 'Legacy')),
+                    structured_reason TEXT NULL,
+                    previous_value TEXT NULL,
+                    new_value TEXT NULL,
+                    admin_note TEXT NULL CHECK (admin_note IS NULL OR length(admin_note) <= 500),
+                    administrative_revision INTEGER NOT NULL CHECK (administrative_revision >= 0)
+                );
+
                 CREATE TABLE IF NOT EXISTS ready_handoffs (
                     handoff_id TEXT PRIMARY KEY CHECK (length(trim(handoff_id)) > 0),
                     episode_id TEXT NOT NULL CHECK (length(trim(episode_id)) > 0),
@@ -330,6 +398,7 @@ internal static class SqliteBoardSchema
 
         CreateReadyHandoffIndexes(connection, transaction);
         CreateHistoricalQueryIndexes(connection, transaction);
+        CreateHistoricalAdministrativeIndexes(connection, transaction);
     }
 
     private static void InitializeSchemaAndMigrations(SqliteConnection connection)
@@ -407,8 +476,10 @@ internal static class SqliteBoardSchema
         // the table if needed. Wrapped in a transaction - safe to retry on restart.
         MigrateNullableDoctorArrivedAt(connection);
         MigrateAbortedAssignmentCanonicalSchema(connection);
+        MigrateLegacyAdministrativeState(connection, DateTimeOffset.UtcNow);
         CreateReadyHandoffIndexes(connection);
         CreateHistoricalQueryIndexes(connection);
+        CreateHistoricalAdministrativeIndexes(connection);
     }
 
     // Canonical CREATE for completed_room_cycles (current schema: explicit id primary key,
@@ -892,6 +963,160 @@ internal static class SqliteBoardSchema
                     WHERE is_exception = 1;
                 """);
         }
+    }
+
+    private static void CreateHistoricalAdministrativeIndexes(
+        SqliteConnection connection,
+        SqliteTransaction? transaction = null)
+    {
+        ExecuteOptional(connection, transaction, """
+            CREATE INDEX IF NOT EXISTS ix_historical_admin_state_disposition
+                ON historical_encounter_admin_state(disposition, source_type, source_record_id);
+
+            CREATE INDEX IF NOT EXISTS ix_historical_encounter_ledger_chronology
+                ON historical_encounter_ledger(source_type, source_record_id, occurred_at, ledger_id);
+
+            CREATE UNIQUE INDEX IF NOT EXISTS ux_historical_encounter_ledger_legacy_import
+                ON historical_encounter_ledger(source_type, source_record_id)
+                WHERE event_type = 'LegacyStateImported';
+            """);
+    }
+
+    /// <summary>
+    /// Conservatively imports legacy exception/review columns into the canonical administrative
+    /// projection and ledger. The supplied timestamp records when import occurred; it is never
+    /// represented as the original anomaly time. Typed-key conflict handling plus the partial
+    /// unique ledger index make this non-overwriting and idempotent across repeated initialization.
+    /// </summary>
+    internal static void MigrateLegacyAdministrativeState(
+        SqliteConnection connection,
+        DateTimeOffset importedAt,
+        Action? afterProjectionRowsImported = null)
+    {
+        ArgumentNullException.ThrowIfNull(connection);
+        using var transaction = connection.BeginTransaction();
+        ImportLegacyAdministrativeState(
+            connection,
+            transaction,
+            "completed_room_cycles",
+            HistoricalEncounterSourceTypes.CompletedCycle,
+            importedAt,
+            importLedger: false);
+        ImportLegacyAdministrativeState(
+            connection,
+            transaction,
+            "aborted_room_assignments",
+            HistoricalEncounterSourceTypes.AbortedAssignment,
+            importedAt,
+            importLedger: false);
+
+        afterProjectionRowsImported?.Invoke();
+
+        ImportLegacyAdministrativeState(
+            connection,
+            transaction,
+            "completed_room_cycles",
+            HistoricalEncounterSourceTypes.CompletedCycle,
+            importedAt,
+            importLedger: true);
+        ImportLegacyAdministrativeState(
+            connection,
+            transaction,
+            "aborted_room_assignments",
+            HistoricalEncounterSourceTypes.AbortedAssignment,
+            importedAt,
+            importLedger: true);
+        transaction.Commit();
+    }
+
+    private static void ImportLegacyAdministrativeState(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        string sourceTable,
+        string sourceType,
+        DateTimeOffset importedAt,
+        bool importLedger)
+    {
+        var dispositionExpression = """
+            CASE
+                WHEN requires_review = 1 THEN 'NeedsReview'
+                WHEN requires_review = 0
+                    AND review_status = 'Reviewed'
+                    AND julianday(reviewed_at) IS NOT NULL
+                    AND reviewed_by = 'local-admin'
+                    THEN 'ConfirmedException'
+                ELSE 'NeedsReview'
+            END
+            """;
+        var reasonSourceExpression = """
+            CASE
+                WHEN exception_reason = 'ManualReview' THEN 'LocalAdmin'
+                WHEN exception_reason IN ('ExceededMaxActiveDuration', 'AfterHoursSweep') THEN 'System'
+                ELSE 'Legacy'
+            END
+            """;
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = importLedger
+            ? $"""
+                INSERT INTO historical_encounter_ledger (
+                    source_type,
+                    source_record_id,
+                    event_type,
+                    occurred_at,
+                    actor_class,
+                    reason_source,
+                    structured_reason,
+                    previous_value,
+                    new_value,
+                    admin_note,
+                    administrative_revision
+                )
+                SELECT
+                    $sourceType,
+                    id,
+                    'LegacyStateImported',
+                    $importedAt,
+                    'System',
+                    {reasonSourceExpression},
+                    exception_reason,
+                    NULL,
+                    {dispositionExpression},
+                    NULL,
+                    0
+                FROM {sourceTable}
+                WHERE is_exception = 1
+                ON CONFLICT(source_type, source_record_id)
+                    WHERE event_type = 'LegacyStateImported'
+                    DO NOTHING;
+                """
+            : $"""
+                INSERT INTO historical_encounter_admin_state (
+                    source_type,
+                    source_record_id,
+                    disposition,
+                    current_reason,
+                    reason_source,
+                    known_reviewed_at,
+                    known_reviewed_actor_class,
+                    administrative_revision
+                )
+                SELECT
+                    $sourceType,
+                    id,
+                    {dispositionExpression},
+                    exception_reason,
+                    {reasonSourceExpression},
+                    CASE WHEN julianday(reviewed_at) IS NOT NULL THEN reviewed_at ELSE NULL END,
+                    CASE WHEN reviewed_by = 'local-admin' THEN 'LocalAdmin' ELSE NULL END,
+                    0
+                FROM {sourceTable}
+                WHERE is_exception = 1
+                ON CONFLICT(source_type, source_record_id) DO NOTHING;
+                """;
+        command.Parameters.AddWithValue("$sourceType", sourceType);
+        command.Parameters.AddWithValue("$importedAt", importedAt.ToUniversalTime().ToString("O"));
+        command.ExecuteNonQuery();
     }
 
     private static void EnableWal(

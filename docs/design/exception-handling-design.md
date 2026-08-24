@@ -6,6 +6,8 @@ This document is the canonical design authority for historical anomaly review, a
 
 It defines the intended meaning that later persistence, API, UI, reporting, migration, and test work must implement. It does not change production behavior by itself.
 
+Issue #238 implements the durable storage foundation: one optional current administrative projection and one append-only ledger keyed by the typed durable historical source identity. It truthfully imports legacy exception/review state without implementing the canonical review operations, reporting consumption, or browser workflow deferred to later children of #236.
+
 Lifecycle truth remains owned by `docs/design/prestage-assignment-lifecycle.md`. Reporting metrics and ordinary metric-specific eligibility remain owned by `docs/design/reporting-design.md`. This document adds the historical administrative interpretation layer over those durable facts. When another document describes accepted Ready attribution as permanently final, the narrower rule here supersedes that description only for an explicit historical metadata correction. The accepted Ready handoff itself remains immutable lifecycle evidence.
 
 ## Core model

@@ -261,6 +261,12 @@ public sealed class SqliteBoardRepository
         {
             resetCommand.Transaction = transaction;
             resetCommand.CommandText = """
+                DELETE FROM historical_encounter_ledger
+                WHERE source_type = 'CompletedCycle';
+
+                DELETE FROM historical_encounter_admin_state
+                WHERE source_type = 'CompletedCycle';
+
                 DELETE FROM completed_room_cycles;
 
                 DELETE FROM ready_handoffs
@@ -1606,6 +1612,237 @@ public sealed class SqliteBoardRepository
             .Where(record => record != null)
             .Cast<HistoricalEncounterRecord>()
             .ToList();
+    }
+
+    internal HistoricalEncounterAdministrativeState? LoadHistoricalAdministrativeState(
+        HistoricalEncounterKey key)
+    {
+        if (!key.IsValid) return null;
+
+        using var connection = OpenConnection();
+        using var command = connection.CreateCommand();
+        command.CommandText = """
+            SELECT
+                disposition,
+                current_reason,
+                reason_source,
+                known_reviewed_at,
+                known_reviewed_actor_class,
+                override_doctor_id,
+                override_procedure_code,
+                override_sedation_state,
+                override_is_add_on,
+                override_expected_allocation_state,
+                override_expected_allocation_suggested_units,
+                override_expected_allocation_confirmed_units,
+                administrative_revision
+            FROM historical_encounter_admin_state
+            WHERE source_type = $sourceType
+              AND source_record_id = $sourceRecordId;
+            """;
+        command.Parameters.AddWithValue("$sourceType", key.SourceType);
+        command.Parameters.AddWithValue("$sourceRecordId", key.SourceRecordId);
+        using var reader = command.ExecuteReader();
+        return reader.Read() ? ReadHistoricalAdministrativeState(reader, key) : null;
+    }
+
+    internal HistoricalQueryPage<HistoricalEncounterAdministrativeLedgerEvent> LoadHistoricalAdministrativeLedger(
+        HistoricalEncounterKey key,
+        int offset,
+        int limit)
+    {
+        if (!key.IsValid)
+        {
+            throw new ArgumentException("Historical encounter key must use a supported source type and positive record ID.", nameof(key));
+        }
+        ValidatePage(offset, limit);
+
+        using var connection = OpenConnection();
+        using var countCommand = connection.CreateCommand();
+        countCommand.CommandText = """
+            SELECT COUNT(*)
+            FROM historical_encounter_ledger
+            WHERE source_type = $sourceType
+              AND source_record_id = $sourceRecordId;
+            """;
+        countCommand.Parameters.AddWithValue("$sourceType", key.SourceType);
+        countCommand.Parameters.AddWithValue("$sourceRecordId", key.SourceRecordId);
+        var total = Convert.ToInt32(countCommand.ExecuteScalar());
+
+        using var command = connection.CreateCommand();
+        command.CommandText = """
+            SELECT
+                ledger_id,
+                event_type,
+                occurred_at,
+                actor_class,
+                reason_source,
+                structured_reason,
+                previous_value,
+                new_value,
+                admin_note,
+                administrative_revision
+            FROM historical_encounter_ledger
+            WHERE source_type = $sourceType
+              AND source_record_id = $sourceRecordId
+            ORDER BY occurred_at, ledger_id
+            LIMIT $limit OFFSET $offset;
+            """;
+        command.Parameters.AddWithValue("$sourceType", key.SourceType);
+        command.Parameters.AddWithValue("$sourceRecordId", key.SourceRecordId);
+        command.Parameters.AddWithValue("$limit", limit);
+        command.Parameters.AddWithValue("$offset", offset);
+        var rows = new List<HistoricalEncounterAdministrativeLedgerEvent>();
+        using var reader = command.ExecuteReader();
+        while (reader.Read())
+        {
+            rows.Add(new HistoricalEncounterAdministrativeLedgerEvent(
+                reader.GetInt64(0),
+                key,
+                reader.GetString(1),
+                ReadRequiredDateTimeOffset(reader, 2),
+                reader.GetString(3),
+                ReadNullableString(reader, 4),
+                ReadNullableString(reader, 5),
+                ReadNullableString(reader, 6),
+                ReadNullableString(reader, 7),
+                ReadNullableString(reader, 8),
+                reader.GetInt32(9)));
+        }
+        ObserveHistoricalPage(rows.Count);
+        return new HistoricalQueryPage<HistoricalEncounterAdministrativeLedgerEvent>(rows, total, offset, limit);
+    }
+
+    /// <summary>
+    /// Storage-only transaction seam for later canonical administrative operations. This method
+    /// deliberately performs no Clear/Confirm/Reopen policy and no administrative CAS; #239 owns
+    /// those behaviors. It exposes no separate projection-write or ledger-append operation.
+    /// </summary>
+    internal CommittedHistoricalAdministrativeWrite PersistHistoricalAdministrativeStateAndLedger(
+        HistoricalEncounterAdministrativeState state,
+        HistoricalEncounterAdministrativeLedgerEvent ledgerEvent,
+        Action? afterStatePersisted = null)
+    {
+        ValidateHistoricalAdministrativeWrite(state, ledgerEvent);
+
+        using var connection = OpenConnection();
+        using var transaction = connection.BeginTransaction();
+        if (!HistoricalSourceExists(connection, transaction, state.Key))
+        {
+            throw new InvalidOperationException(
+                $"Historical encounter '{state.Key.SourceType}/{state.Key.SourceRecordId}' does not exist.");
+        }
+
+        using (var stateCommand = connection.CreateCommand())
+        {
+            stateCommand.Transaction = transaction;
+            stateCommand.CommandText = """
+                INSERT INTO historical_encounter_admin_state (
+                    source_type,
+                    source_record_id,
+                    disposition,
+                    current_reason,
+                    reason_source,
+                    known_reviewed_at,
+                    known_reviewed_actor_class,
+                    override_doctor_id,
+                    override_procedure_code,
+                    override_sedation_state,
+                    override_is_add_on,
+                    override_expected_allocation_state,
+                    override_expected_allocation_suggested_units,
+                    override_expected_allocation_confirmed_units,
+                    administrative_revision
+                )
+                VALUES (
+                    $sourceType,
+                    $sourceRecordId,
+                    $disposition,
+                    $currentReason,
+                    $reasonSource,
+                    $knownReviewedAt,
+                    $knownReviewedActorClass,
+                    $overrideDoctorId,
+                    $overrideProcedureCode,
+                    $overrideSedationState,
+                    $overrideIsAddOn,
+                    $overrideExpectedAllocationState,
+                    $overrideExpectedAllocationSuggestedUnits,
+                    $overrideExpectedAllocationConfirmedUnits,
+                    $administrativeRevision
+                )
+                ON CONFLICT(source_type, source_record_id) DO UPDATE SET
+                    disposition = excluded.disposition,
+                    current_reason = excluded.current_reason,
+                    reason_source = excluded.reason_source,
+                    known_reviewed_at = excluded.known_reviewed_at,
+                    known_reviewed_actor_class = excluded.known_reviewed_actor_class,
+                    override_doctor_id = excluded.override_doctor_id,
+                    override_procedure_code = excluded.override_procedure_code,
+                    override_sedation_state = excluded.override_sedation_state,
+                    override_is_add_on = excluded.override_is_add_on,
+                    override_expected_allocation_state = excluded.override_expected_allocation_state,
+                    override_expected_allocation_suggested_units = excluded.override_expected_allocation_suggested_units,
+                    override_expected_allocation_confirmed_units = excluded.override_expected_allocation_confirmed_units,
+                    administrative_revision = excluded.administrative_revision;
+                """;
+            AddHistoricalAdministrativeStateParameters(stateCommand, state);
+            stateCommand.ExecuteNonQuery();
+        }
+
+        afterStatePersisted?.Invoke();
+
+        long ledgerId;
+        using (var ledgerCommand = connection.CreateCommand())
+        {
+            ledgerCommand.Transaction = transaction;
+            ledgerCommand.CommandText = """
+                INSERT INTO historical_encounter_ledger (
+                    source_type,
+                    source_record_id,
+                    event_type,
+                    occurred_at,
+                    actor_class,
+                    reason_source,
+                    structured_reason,
+                    previous_value,
+                    new_value,
+                    admin_note,
+                    administrative_revision
+                )
+                VALUES (
+                    $sourceType,
+                    $sourceRecordId,
+                    $eventType,
+                    $occurredAt,
+                    $actorClass,
+                    $reasonSource,
+                    $structuredReason,
+                    $previousValue,
+                    $newValue,
+                    $adminNote,
+                    $administrativeRevision
+                );
+                SELECT last_insert_rowid();
+                """;
+            ledgerCommand.Parameters.AddWithValue("$sourceType", ledgerEvent.Key.SourceType);
+            ledgerCommand.Parameters.AddWithValue("$sourceRecordId", ledgerEvent.Key.SourceRecordId);
+            ledgerCommand.Parameters.AddWithValue("$eventType", ledgerEvent.EventType);
+            ledgerCommand.Parameters.AddWithValue("$occurredAt", FormatDateTimeOffset(ledgerEvent.OccurredAt));
+            ledgerCommand.Parameters.AddWithValue("$actorClass", ledgerEvent.ActorClass);
+            ledgerCommand.Parameters.AddWithValue("$reasonSource", ToDbValue(ledgerEvent.ReasonSource));
+            ledgerCommand.Parameters.AddWithValue("$structuredReason", ToDbValue(ledgerEvent.StructuredReason));
+            ledgerCommand.Parameters.AddWithValue("$previousValue", ToDbValue(ledgerEvent.PreviousValue));
+            ledgerCommand.Parameters.AddWithValue("$newValue", ToDbValue(ledgerEvent.NewValue));
+            ledgerCommand.Parameters.AddWithValue("$adminNote", ToDbValuePreservingEmpty(ledgerEvent.AdminNote));
+            ledgerCommand.Parameters.AddWithValue("$administrativeRevision", ledgerEvent.AdministrativeRevision);
+            ledgerId = Convert.ToInt64(ledgerCommand.ExecuteScalar());
+        }
+
+        transaction.Commit();
+        return new CommittedHistoricalAdministrativeWrite(
+            state,
+            ledgerEvent with { LedgerId = ledgerId });
     }
 
     public HistoricalQueryPage<HistoricalEncounterKey> LoadReviewEncounterKeysPage(
@@ -2992,6 +3229,164 @@ public sealed class SqliteBoardRepository
 
     private static object ToDbValue(int? value) =>
         value.HasValue ? value.Value : DBNull.Value;
+
+    private static object ToDbValue(bool? value) =>
+        value.HasValue ? value.Value ? 1 : 0 : DBNull.Value;
+
+    private static object ToDbValuePreservingEmpty(string? value) =>
+        value is null ? DBNull.Value : value;
+
+    private static HistoricalEncounterAdministrativeState ReadHistoricalAdministrativeState(
+        SqliteDataReader reader,
+        HistoricalEncounterKey key) =>
+        new(
+            key,
+            reader.GetString(0),
+            ReadNullableString(reader, 1),
+            ReadNullableString(reader, 2),
+            ReadNullableDateTimeOffset(reader, 3),
+            ReadNullableString(reader, 4),
+            ReadNullableString(reader, 5),
+            ReadNullableString(reader, 6),
+            ReadNullableEnum<SedationState>(reader, 7),
+            reader.IsDBNull(8) ? null : reader.GetInt32(8) == 1,
+            ReadNullableEnum<ExpectedAllocationState>(reader, 9),
+            ReadNullableInt32(reader, 10),
+            ReadNullableInt32(reader, 11),
+            reader.GetInt32(12));
+
+    private static void AddHistoricalAdministrativeStateParameters(
+        SqliteCommand command,
+        HistoricalEncounterAdministrativeState state)
+    {
+        command.Parameters.AddWithValue("$sourceType", state.Key.SourceType);
+        command.Parameters.AddWithValue("$sourceRecordId", state.Key.SourceRecordId);
+        command.Parameters.AddWithValue("$disposition", state.Disposition);
+        command.Parameters.AddWithValue("$currentReason", ToDbValue(state.CurrentReason));
+        command.Parameters.AddWithValue("$reasonSource", ToDbValue(state.ReasonSource));
+        command.Parameters.AddWithValue("$knownReviewedAt", ToDbValue(state.KnownReviewedAt));
+        command.Parameters.AddWithValue("$knownReviewedActorClass", ToDbValue(state.KnownReviewedActorClass));
+        command.Parameters.AddWithValue("$overrideDoctorId", ToDbValue(state.OverrideDoctorId));
+        command.Parameters.AddWithValue("$overrideProcedureCode", ToDbValue(state.OverrideProcedureCode));
+        command.Parameters.AddWithValue("$overrideSedationState", ToDbValue(state.OverrideSedationState));
+        command.Parameters.AddWithValue("$overrideIsAddOn", ToDbValue(state.OverrideIsAddOn));
+        command.Parameters.AddWithValue("$overrideExpectedAllocationState", ToDbValue(state.OverrideExpectedAllocationState));
+        command.Parameters.AddWithValue("$overrideExpectedAllocationSuggestedUnits", ToDbValue(state.OverrideExpectedAllocationSuggestedUnits));
+        command.Parameters.AddWithValue("$overrideExpectedAllocationConfirmedUnits", ToDbValue(state.OverrideExpectedAllocationConfirmedUnits));
+        command.Parameters.AddWithValue("$administrativeRevision", state.AdministrativeRevision);
+    }
+
+    private static bool HistoricalSourceExists(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        HistoricalEncounterKey key)
+    {
+        var sourceTable = key.SourceType switch
+        {
+            HistoricalEncounterSourceTypes.CompletedCycle => "completed_room_cycles",
+            HistoricalEncounterSourceTypes.AbortedAssignment => "aborted_room_assignments",
+            _ => throw new ArgumentException("Unsupported historical encounter source type.", nameof(key))
+        };
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = $"SELECT EXISTS(SELECT 1 FROM {sourceTable} WHERE id = $sourceRecordId);";
+        command.Parameters.AddWithValue("$sourceRecordId", key.SourceRecordId);
+        return Convert.ToInt32(command.ExecuteScalar()) == 1;
+    }
+
+    private static void ValidateHistoricalAdministrativeWrite(
+        HistoricalEncounterAdministrativeState state,
+        HistoricalEncounterAdministrativeLedgerEvent ledgerEvent)
+    {
+        ArgumentNullException.ThrowIfNull(state);
+        ArgumentNullException.ThrowIfNull(ledgerEvent);
+        if (!state.Key.IsValid)
+        {
+            throw new ArgumentException("Historical encounter key must use a supported source type and positive record ID.", nameof(state));
+        }
+        if (state.Key != ledgerEvent.Key)
+        {
+            throw new ArgumentException("Administrative state and ledger event must use the same typed encounter key.", nameof(ledgerEvent));
+        }
+        if (!HistoricalAdministrativeDispositions.IsValid(state.Disposition))
+        {
+            throw new ArgumentException("Administrative disposition is not supported.", nameof(state));
+        }
+        if (state.ReasonSource is not null && !HistoricalAdministrativeReasonSources.IsValid(state.ReasonSource))
+        {
+            throw new ArgumentException("Administrative reason source is not supported.", nameof(state));
+        }
+        if (state.KnownReviewedActorClass is not null
+            && !HistoricalAdministrativeActorClasses.IsValid(state.KnownReviewedActorClass))
+        {
+            throw new ArgumentException("Known review actor class is not supported.", nameof(state));
+        }
+        if (state.AdministrativeRevision < 0 || ledgerEvent.AdministrativeRevision != state.AdministrativeRevision)
+        {
+            throw new ArgumentException("State and ledger must use the same non-negative administrative revision.", nameof(ledgerEvent));
+        }
+        if (string.IsNullOrWhiteSpace(state.OverrideDoctorId) && state.OverrideDoctorId is not null
+            || string.IsNullOrWhiteSpace(state.OverrideProcedureCode) && state.OverrideProcedureCode is not null)
+        {
+            throw new ArgumentException("Administrative doctor and procedure overrides cannot be blank.", nameof(state));
+        }
+
+        var hasAllocationOverride = state.OverrideExpectedAllocationState.HasValue
+            || state.OverrideExpectedAllocationSuggestedUnits.HasValue
+            || state.OverrideExpectedAllocationConfirmedUnits.HasValue;
+        if (hasAllocationOverride)
+        {
+            if (state.OverrideExpectedAllocationState is not { } allocationState)
+            {
+                throw new ArgumentException("An allocation override requires its canonical state.", nameof(state));
+            }
+            var allocation = ExpectedAllocationContract.Create(
+                allocationState,
+                state.OverrideExpectedAllocationSuggestedUnits,
+                state.OverrideExpectedAllocationConfirmedUnits);
+            if (!allocation.SatisfiesAssignmentCompleteness)
+            {
+                throw new ArgumentException("A historical allocation override must be an explicit confirmed value.", nameof(state));
+            }
+        }
+
+        if (ledgerEvent.LedgerId != 0)
+        {
+            throw new ArgumentException("A new administrative ledger event cannot supply a durable ledger ID.", nameof(ledgerEvent));
+        }
+        if (!HistoricalAdministrativeLedgerEventTypes.IsValid(ledgerEvent.EventType))
+        {
+            throw new ArgumentException("Administrative ledger event type is not supported.", nameof(ledgerEvent));
+        }
+        if (!HistoricalAdministrativeActorClasses.IsValid(ledgerEvent.ActorClass))
+        {
+            throw new ArgumentException("Administrative actor class is not supported.", nameof(ledgerEvent));
+        }
+        if (ledgerEvent.ReasonSource is not null
+            && !HistoricalAdministrativeReasonSources.IsValid(ledgerEvent.ReasonSource))
+        {
+            throw new ArgumentException("Ledger reason source is not supported.", nameof(ledgerEvent));
+        }
+        if (ledgerEvent.EventType == HistoricalAdministrativeLedgerEventTypes.LegacyStateImported
+            && ledgerEvent.ActorClass != HistoricalAdministrativeActorClasses.System)
+        {
+            throw new ArgumentException("Legacy state import must be attributed to System.", nameof(ledgerEvent));
+        }
+        if (ledgerEvent.EventType == HistoricalAdministrativeLedgerEventTypes.SystemFinding
+            && ledgerEvent.ActorClass != HistoricalAdministrativeActorClasses.System)
+        {
+            throw new ArgumentException("A system finding must be attributed to System.", nameof(ledgerEvent));
+        }
+        if (ledgerEvent.EventType == HistoricalAdministrativeLedgerEventTypes.ManualFlag
+            && ledgerEvent.ActorClass != HistoricalAdministrativeActorClasses.LocalAdmin)
+        {
+            throw new ArgumentException("A manual flag must be attributed to LocalAdmin.", nameof(ledgerEvent));
+        }
+        if (ledgerEvent.AdminNote?.Length > 500)
+        {
+            throw new ArgumentOutOfRangeException(nameof(ledgerEvent), "Administrative notes cannot exceed 500 characters.");
+        }
+    }
 
     private static string? ReadNullableString(SqliteDataReader reader, int ordinal) =>
         reader.IsDBNull(ordinal) ? null : reader.GetString(ordinal);
