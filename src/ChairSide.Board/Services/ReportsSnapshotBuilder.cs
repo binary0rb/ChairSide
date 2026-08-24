@@ -56,6 +56,19 @@ internal sealed partial class ReportsSnapshotBuilder
         ReportQuery query) =>
         ReportsSnapshotAdapter.ToSnapshot(Compose(completedCycles, abortedAssignments, query));
 
+    public ReportsSnapshot Build(
+        IReadOnlyList<CompletedRoomCycle> reportWindowCompletedCycles,
+        IReadOnlyList<CompletedRoomCycle> reviewWindowCompletedCycles,
+        IReadOnlyList<AbortedRoomAssignment> reviewWindowAbortedAssignments,
+        ReportQuery query,
+        int totalCompletedAllTime) =>
+        ReportsSnapshotAdapter.ToSnapshot(Compose(
+            reportWindowCompletedCycles,
+            reviewWindowCompletedCycles,
+            reviewWindowAbortedAssignments,
+            query,
+            totalCompletedAllTime));
+
     internal ReportsSnapshotComposition Compose(
         IReadOnlyList<CompletedRoomCycle> completedCycles,
         IReadOnlyList<AbortedRoomAssignment> abortedAssignments,
@@ -66,12 +79,26 @@ internal sealed partial class ReportsSnapshotBuilder
         IReadOnlyList<CompletedRoomCycle> completedCycles,
         IReadOnlyList<AbortedRoomAssignment> abortedAssignments,
         ReportQuery query)
+        => Compose(
+            completedCycles,
+            completedCycles,
+            abortedAssignments,
+            query,
+            null);
+
+    private ReportsSnapshotComposition Compose(
+        IReadOnlyList<CompletedRoomCycle> completedCycles,
+        IReadOnlyList<CompletedRoomCycle> reviewCompletedCycles,
+        IReadOnlyList<AbortedRoomAssignment> abortedAssignments,
+        ReportQuery query,
+        int? totalCompletedAllTimeOverride)
     {
         ArgumentNullException.ThrowIfNull(completedCycles);
+        ArgumentNullException.ThrowIfNull(reviewCompletedCycles);
         ArgumentNullException.ThrowIfNull(abortedAssignments);
 
         // All-time completed total (for "X of Y" context), independent of the selected window.
-        var totalCompletedAllTime = completedCycles.Count(cycle =>
+        var totalCompletedAllTime = totalCompletedAllTimeOverride ?? completedCycles.Count(cycle =>
             cycle.RoomAvailableAt is not null && query.IncludesAnalyticalCycle(cycle));
 
         // Apply the completion window before copying or deriving report-time annotations. This
@@ -115,11 +142,11 @@ internal sealed partial class ReportsSnapshotBuilder
         // Review populations use their own truthful source anchors. In particular, post-arrival
         // exceptions without DoctorCompleteAt remain discoverable by their latest observed lifecycle
         // timestamp instead of being lost by the completed-case window.
-        var reviewCompletedCycles = completedCycles
+        var selectedReviewCompletedCycles = reviewCompletedCycles
             .Where(cycle => cycle.IsException && query.Window.Includes(ReviewAnchor(cycle)))
             .Select(CopyCompletedCycle)
             .ToList();
-        var exceptionCycles = reviewCompletedCycles
+        var exceptionCycles = selectedReviewCompletedCycles
             .Where(cycle => cycle.RequiresReview)
             .OrderByDescending(cycle => cycle.SeatedAt)
             .ToList();
@@ -212,7 +239,7 @@ internal sealed partial class ReportsSnapshotBuilder
                 DataQuality = BuildDataQualitySummary(
                     normalCompletedCycles,
                     standardCompletedCycles,
-                    completedCycles,
+                    reviewCompletedCycles,
                     abortedAssignments,
                     query)
             },

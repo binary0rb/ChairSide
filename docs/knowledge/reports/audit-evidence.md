@@ -45,9 +45,13 @@ Data Quality and its default review drill-down inherit the active report's appli
 
 `RecentCompletedCycles` remains a bounded compatibility projection. The canonical Practice audit, Doctor Case Audit, metric drill-down, historical sort, and Calibration evidence flow do not use it.
 
+Historical audit and review retrieval is storage-bounded. SQLite applies report or review window predicates and returns fixed-size candidate pages; the application retains only a request-bounded ordered working set plus the exact match count. Review pages combine completed and aborted durable identities before retrieving the selected source records. The completed review anchor is `DoctorCompleteAt ?? DoctorArrivedAt ?? SeatedAt ?? PrestageStartedAt`; aborted review remains anchored by `TerminatedAt`.
+
 ## Source and test anchors
 
 - `src/ChairSide.Board/Services/ReportAudit.cs`
+- `src/ChairSide.Board/Services/HistoricalEncounterQuery.cs`
+- `src/ChairSide.Board/Services/SqliteBoardRepository.cs`
 - `src/ChairSide.Board/Services/ReportsSnapshotBuilder.Audit.cs`
 - `src/ChairSide.Board/wwwroot/report-data.js`
 - `src/ChairSide.Board/wwwroot/reports.js`

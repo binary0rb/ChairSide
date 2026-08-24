@@ -34,6 +34,7 @@ $fixtureRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("chairside-knowledge
 $fixturePath = Join-Path $fixtureRoot "ExtractorFixture.cs"
 $moduleFixturePath = Join-Path $fixtureRoot "eslint.config.mjs"
 $workflowFixturePath = Join-Path $fixtureRoot "WorkflowFixture.yml"
+$playwrightFixturePath = Join-Path $fixtureRoot ".playwright-mcp/page.yml"
 $outputPath = Join-Path $fixtureRoot "docs/knowledge-graph/generated"
 
 $fixture = @'
@@ -77,6 +78,8 @@ try {
     [System.IO.File]::WriteAllText($fixturePath, $fixture, [System.Text.UTF8Encoding]::new($false))
     [System.IO.File]::WriteAllText($moduleFixturePath, $moduleFixture, [System.Text.UTF8Encoding]::new($false))
     [System.IO.File]::WriteAllText($workflowFixturePath, $workflowFixture, [System.Text.UTF8Encoding]::new($false))
+    New-Item -ItemType Directory -Force -Path (Split-Path -Parent $playwrightFixturePath) | Out-Null
+    [System.IO.File]::WriteAllText($playwrightFixturePath, "transient: true", [System.Text.UTF8Encoding]::new($false))
 
     & $generatorPath -Root $fixtureRoot | Out-Null
 
@@ -84,6 +87,9 @@ try {
     $graphDataPath = Join-Path $outputPath "graph-data.json"
     $symbolIndex = Get-Content -Raw $symbolIndexPath | ConvertFrom-Json
     $graphData = Get-Content -Raw $graphDataPath | ConvertFrom-Json
+    if (@($symbolIndex.files | Where-Object { $_.path -like ".playwright-mcp/*" }).Count -ne 0) {
+        throw "Transient .playwright-mcp artifacts must be excluded from generated knowledge indexes."
+    }
     $entry = @($symbolIndex.files | Where-Object { $_.path -eq "ExtractorFixture.cs" })
 
     if ($entry.Count -ne 1) {

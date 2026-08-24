@@ -423,6 +423,12 @@
                       "path":  "src/ChairSide.Board/Services/ExceptionReviewRecords.cs"
                   },
                   {
+                      "id":  "file:src/ChairSide.Board/Services/HistoricalEncounterQuery.cs",
+                      "label":  "src/ChairSide.Board/Services/HistoricalEncounterQuery.cs",
+                      "type":  "File",
+                      "path":  "src/ChairSide.Board/Services/HistoricalEncounterQuery.cs"
+                  },
+                  {
                       "id":  "file:src/ChairSide.Board/Services/IReparsePointInspector.cs",
                       "label":  "src/ChairSide.Board/Services/IReparsePointInspector.cs",
                       "type":  "File",
@@ -847,6 +853,12 @@
                       "label":  "tests/ChairSide.Board.Tests/FaultedReadyCancellationTests.cs",
                       "type":  "File",
                       "path":  "tests/ChairSide.Board.Tests/FaultedReadyCancellationTests.cs"
+                  },
+                  {
+                      "id":  "file:tests/ChairSide.Board.Tests/HistoricalQueryPersistenceTests.cs",
+                      "label":  "tests/ChairSide.Board.Tests/HistoricalQueryPersistenceTests.cs",
+                      "type":  "File",
+                      "path":  "tests/ChairSide.Board.Tests/HistoricalQueryPersistenceTests.cs"
                   },
                   {
                       "id":  "file:tests/ChairSide.Board.Tests/LifecycleFixtureCorrectionTests.cs",
@@ -2031,10 +2043,34 @@
                       "path":  "tests/ChairSide.Board.Tests/PrestagingLifecycleEndpointTests.cs"
                   },
                   {
+                      "id":  "symbol:type:HistoricalEncounterRecord",
+                      "label":  "HistoricalEncounterRecord",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/HistoricalEncounterQuery.cs"
+                  },
+                  {
+                      "id":  "symbol:type:HistoricalEncounterSourceTypes",
+                      "label":  "HistoricalEncounterSourceTypes",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/HistoricalEncounterQuery.cs"
+                  },
+                  {
                       "id":  "symbol:type:HistoricalPair",
                       "label":  "HistoricalPair",
                       "type":  "CodeType",
                       "path":  "src/ChairSide.Board/Services/CalibrationInsightReport.cs"
+                  },
+                  {
+                      "id":  "symbol:type:HistoricalQueryPage",
+                      "label":  "HistoricalQueryPage",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/HistoricalEncounterQuery.cs"
+                  },
+                  {
+                      "id":  "symbol:type:HistoricalQueryPersistenceTests",
+                      "label":  "HistoricalQueryPersistenceTests",
+                      "type":  "CodeType",
+                      "path":  "tests/ChairSide.Board.Tests/HistoricalQueryPersistenceTests.cs"
                   },
                   {
                       "id":  "symbol:type:IReparsePointInspector",
@@ -3778,6 +3814,26 @@
                       "label":  "declares"
                   },
                   {
+                      "from":  "file:src/ChairSide.Board/Services/HistoricalEncounterQuery.cs",
+                      "to":  "symbol:type:HistoricalEncounterRecord",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/HistoricalEncounterQuery.cs",
+                      "to":  "symbol:type:HistoricalEncounterSourceTypes",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/HistoricalEncounterQuery.cs",
+                      "to":  "symbol:type:HistoricalQueryPage",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/HistoricalEncounterQuery.cs",
+                      "to":  "symbol:type:struct",
+                      "label":  "declares"
+                  },
+                  {
                       "from":  "file:src/ChairSide.Board/Services/IReparsePointInspector.cs",
                       "to":  "symbol:type:FileSystemReparsePointInspector",
                       "label":  "declares"
@@ -4513,6 +4569,11 @@
                       "label":  "declares"
                   },
                   {
+                      "from":  "file:tests/ChairSide.Board.Tests/HistoricalQueryPersistenceTests.cs",
+                      "to":  "symbol:type:HistoricalQueryPersistenceTests",
+                      "label":  "declares"
+                  },
+                  {
                       "from":  "file:tests/ChairSide.Board.Tests/LifecycleFixtureCorrectionTests.cs",
                       "to":  "symbol:type:AbortedSnapshot",
                       "label":  "declares"
@@ -5059,6 +5120,11 @@
                   },
                   {
                       "from":  "repo:chairside",
+                      "to":  "file:src/ChairSide.Board/Services/HistoricalEncounterQuery.cs",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
                       "to":  "file:src/ChairSide.Board/Services/IReparsePointInspector.cs",
                       "label":  "contains"
                   },
@@ -5410,6 +5476,11 @@
                   {
                       "from":  "repo:chairside",
                       "to":  "file:tests/ChairSide.Board.Tests/FaultedReadyCancellationTests.cs",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:tests/ChairSide.Board.Tests/HistoricalQueryPersistenceTests.cs",
                       "label":  "contains"
                   },
                   {

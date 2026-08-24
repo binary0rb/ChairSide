@@ -134,7 +134,7 @@ internal sealed partial class ReportsSnapshotBuilder
     internal static DateTimeOffset? ReviewAnchor(CompletedRoomCycle cycle) =>
         cycle.DoctorCompleteAt
         ?? cycle.DoctorArrivedAt
-        ?? cycle.SeatedAt;
+        ?? (cycle.SeatedAt == default ? cycle.PrestageStartedAt : cycle.SeatedAt);
 
     private ReportAuditPage BuildReviewAuditPage(
         IReadOnlyList<CompletedRoomCycle> completedCycles,
@@ -456,6 +456,11 @@ internal sealed partial class ReportsSnapshotBuilder
             .ThenByDescending(row => row.DoctorCompleteAt)
             .ThenByDescending(row => row.CompletedCycleId);
     }
+
+    internal static IReadOnlyList<ReportAuditRow> OrderProjectedAuditRows(
+        IReadOnlyList<ReportAuditRow> rows,
+        string sort) =>
+        OrderAuditRows(rows, sort).ToList();
 
     private static IEnumerable<ReportReviewAuditRow> OrderReviewRows(
         IReadOnlyList<ReportReviewAuditRow> rows,

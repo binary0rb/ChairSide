@@ -62,7 +62,8 @@ function Test-ExcludedPath {
         "/TestResults/",
         "/publish/",
         "/artifacts/",
-        "/.claude/"
+        "/.claude/",
+        "/.playwright-mcp/"
     )
 
     foreach ($segment in $excludedSegments) {

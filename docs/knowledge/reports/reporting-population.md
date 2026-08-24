@@ -22,6 +22,8 @@ last_verified_commit: fe60949
 
 `standardCompletedCycles` remains the shared denominator for standard throughput, procedure, sedation, allocation, schedule-fit, trend, observed-day, and doctor procedure-mix calculations. Phase-complete timing surfaces retain their existing deliberately broader rules.
 
+Ordinary startup and live-board operation do not retain lifetime completed history. Report reads obtain completed rows through the selected `DoctorCompleteAt` window, obtain exception review rows through their separate truthful review anchors, and ask SQLite for the exact scoped all-time completed count. Operational lifecycle updates and integrity checks retrieve only the single durable completed cycle belonging to the active room episode.
+
 ## Reusable report query and sample state
 
 `ReportQuery` keeps three responsibilities distinct:

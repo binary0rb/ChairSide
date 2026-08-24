@@ -65,7 +65,6 @@ public sealed class DemoBoardStore
 
     private readonly List<RoomState> _rooms;
     private readonly List<RoomEvent> _events = [];
-    private readonly List<CompletedRoomCycle> _completedCycles = [];
 
     // After-hours sweep: track the last clinic day the sweep ran to ensure at-most-once per day.
     // Volatile - intentionally resets on app restart; available rooms are unaffected by re-check.
@@ -113,8 +112,6 @@ public sealed class DemoBoardStore
             SeedDemoRooms(now);
             _repository.SaveRooms(_rooms, _doctors, _procedures);
         }
-
-        _completedCycles = _repository.LoadCompletedCycles().ToList();
     }
 
     public BoardSnapshot GetSnapshot()
@@ -803,7 +800,6 @@ public sealed class DemoBoardStore
                 var committed = persistence.Committed
                     ?? throw new InvalidOperationException("Successful guarded Doctor Arrived persistence must return committed state.");
                 ApplyCommittedRoom(room, committed.Room);
-                if (committed.CompletedCycle is not null) _completedCycles.Add(committed.CompletedCycle);
                 AddEvent(new RoomEvent(
                     room.RoomId,
                     "DoctorArrived",
@@ -946,25 +942,25 @@ public sealed class DemoBoardStore
         snapshot.State = RoomStates.DoctorInRoom;
         var cycle = new CompletedRoomCycle
         {
-                RoomId = snapshot.RoomId,
-                AssignedDoctor = snapshot.AssignedDoctor ?? "",
-                ProcedureCode = snapshot.ProcedureCode ?? "",
-                SeatedAt = snapshot.SeatedAt!.Value,
-                ReadyForDoctorAt = snapshot.ReadyForDoctorAt,
-                DoctorArrivedAt = now,
-                EpisodeId = snapshot.EpisodeId,
-                PrestageStartedAt = snapshot.PrestageStartedAt,
-                SeatedToDoctorSeconds = seatedToDoctorSeconds,
-                PrepSeconds = prepSeconds,
-                ReadyToDoctorSeconds = readyToDoctorSeconds,
-                FinalWaitState = RoomStates.ReadyForDoctor,
-                AgingThresholdReached = urgency is ReadyUrgency.Aging or ReadyUrgency.Stale,
-                StaleThresholdReached = urgency == ReadyUrgency.Stale,
-                OriginalDefaultExpectedUnits = snapshot.OriginalDefaultExpectedUnits,
-                ExpectedAllocationUnits = snapshot.ExpectedAllocationUnits,
-                ExpectedAllocationMinutes = snapshot.ExpectedAllocationMinutes,
-                AllocationAdjustedFromDefault = snapshot.AllocationAdjustedFromDefault,
-                IsAddOn = snapshot.IsAddOn
+            RoomId = snapshot.RoomId,
+            AssignedDoctor = snapshot.AssignedDoctor ?? "",
+            ProcedureCode = snapshot.ProcedureCode ?? "",
+            SeatedAt = snapshot.SeatedAt!.Value,
+            ReadyForDoctorAt = snapshot.ReadyForDoctorAt,
+            DoctorArrivedAt = now,
+            EpisodeId = snapshot.EpisodeId,
+            PrestageStartedAt = snapshot.PrestageStartedAt,
+            SeatedToDoctorSeconds = seatedToDoctorSeconds,
+            PrepSeconds = prepSeconds,
+            ReadyToDoctorSeconds = readyToDoctorSeconds,
+            FinalWaitState = RoomStates.ReadyForDoctor,
+            AgingThresholdReached = urgency is ReadyUrgency.Aging or ReadyUrgency.Stale,
+            StaleThresholdReached = urgency == ReadyUrgency.Stale,
+            OriginalDefaultExpectedUnits = snapshot.OriginalDefaultExpectedUnits,
+            ExpectedAllocationUnits = snapshot.ExpectedAllocationUnits,
+            ExpectedAllocationMinutes = snapshot.ExpectedAllocationMinutes,
+            AllocationAdjustedFromDefault = snapshot.AllocationAdjustedFromDefault,
+            IsAddOn = snapshot.IsAddOn
         };
         var committed = _repository.AcceptReadyHandoffAndSaveCycle(
             snapshot,
@@ -974,10 +970,6 @@ public sealed class DemoBoardStore
             _doctors,
             _procedures);
         ApplyCommittedRoom(room, committed.Room);
-        if (committed.CompletedCycle is not null)
-        {
-            _completedCycles.Add(committed.CompletedCycle);
-        }
         AddEvent(new RoomEvent(room.RoomId, "DoctorArrived", now, room.AssignedDoctor, room.ProcedureCode, TimeSpan.FromSeconds(seatedToDoctorSeconds)));
         return ToRoomStatus(room, now);
     }
@@ -1042,14 +1034,16 @@ public sealed class DemoBoardStore
             }
 
             var now = Now;
-            var cycleIndex = _completedCycles.FindIndex(cycle => cycle.RoomId == room.RoomId && cycle.SeatedAt == room.SeatedAt);
-            if (cycleIndex < 0 && !CanCreateLegacyCompletionCycle(room))
+            var existingCycle = room.SeatedAt.HasValue
+                ? _repository.LoadCompletedCycleByRoomAndSeatedAt(room.RoomId, room.SeatedAt.Value)
+                : null;
+            if (existingCycle == null && !CanCreateLegacyCompletionCycle(room))
             {
                 return null;
             }
             var candidateRoom = CopyRoomState(room);
-            var candidateCycle = cycleIndex >= 0
-                ? CopyCompletedCycle(_completedCycles[cycleIndex])
+            var candidateCycle = existingCycle != null
+                ? CopyCompletedCycle(existingCycle)
                 : CreateLegacyCompletionCycle(room);
             candidateRoom.DoctorCompleteAt = now;
             candidateRoom.State = RoomStates.Turnover;
@@ -1057,14 +1051,6 @@ public sealed class DemoBoardStore
             candidateCycle.DoctorInRoomSeconds = SecondsBetween(room.DoctorArrivedAt.Value, now);
             var committed = _repository.SaveCompletedCycleAndRoom(candidateCycle, candidateRoom, _doctors, _procedures);
             ApplyCommittedRoom(room, committed.Room);
-            if (cycleIndex >= 0)
-            {
-                _completedCycles[cycleIndex] = committed.CompletedCycle!;
-            }
-            else
-            {
-                _completedCycles.Add(committed.CompletedCycle!);
-            }
             AddEvent(new RoomEvent(room.RoomId, "DoctorComplete", now, room.AssignedDoctor, room.ProcedureCode));
             return ToRoomStatus(room, now);
         }
@@ -1085,15 +1071,14 @@ public sealed class DemoBoardStore
             }
 
             var now = Now;
-            var cycleIndex = _completedCycles.FindIndex(cycle =>
-                cycle.RoomId == room.RoomId && cycle.SeatedAt == room.SeatedAt.Value);
-            if (cycleIndex < 0)
+            var existingCycle = _repository.LoadCompletedCycleByRoomAndSeatedAt(room.RoomId, room.SeatedAt.Value);
+            if (existingCycle == null)
             {
                 throw new InvalidOperationException(
                     $"Cannot mark room {room.RoomId} available: turnover room has no completed-cycle record.");
             }
 
-            var cycle = CopyCompletedCycle(_completedCycles[cycleIndex]);
+            var cycle = CopyCompletedCycle(existingCycle);
             cycle.RoomAvailableAt = now;
             cycle.TurnoverSeconds = SecondsBetween(room.DoctorCompleteAt.Value, now);
             cycle.TotalRoomCycleSeconds = SecondsBetween(room.SeatedAt.Value, now);
@@ -1101,7 +1086,6 @@ public sealed class DemoBoardStore
 
             var committed = _repository.SaveCompletedCycleAndRoom(cycle, resetRoom, _doctors, _procedures);
 
-            _completedCycles[cycleIndex] = committed.CompletedCycle!;
             ApplyCommittedRoom(room, committed.Room);
             AddEvent(new RoomEvent(room.RoomId, "RoomAvailable", now, cycle.AssignedDoctor, cycle.ProcedureCode));
 
@@ -1124,9 +1108,16 @@ public sealed class DemoBoardStore
     {
         lock (_syncRoot)
         {
-            var completedCycles = _completedCycles.ToArray();
-            var abortedAssignments = _repository.LoadAbortedAssignments().ToArray();
-            return _reportsSnapshotBuilder.Build(completedCycles, abortedAssignments, query);
+            var completedCycles = _repository.LoadCompletedCycles(query.Window);
+            var reviewCompletedCycles = _repository.LoadCompletedReviewCycles(query.Window);
+            var abortedAssignments = _repository.LoadAbortedAssignments(query.Window);
+            var totalCompletedAllTime = _repository.CountCompletedCycles(ReportDateRange.AllTime, query);
+            return _reportsSnapshotBuilder.Build(
+                completedCycles,
+                reviewCompletedCycles,
+                abortedAssignments,
+                query,
+                totalCompletedAllTime);
         }
     }
 
@@ -1138,10 +1129,137 @@ public sealed class DemoBoardStore
     {
         lock (_syncRoot)
         {
-            return _reportsSnapshotBuilder.BuildAudit(
-                _completedCycles.ToArray(),
-                _repository.LoadAbortedAssignments().ToArray(),
-                request);
+            var isPendingReview = string.Equals(
+                request.ContributorKind,
+                ReportAuditContributorKinds.PendingReview,
+                StringComparison.OrdinalIgnoreCase);
+            var isReviewedHistory = string.Equals(
+                request.ContributorKind,
+                ReportAuditContributorKinds.ReviewedExceptionHistory,
+                StringComparison.OrdinalIgnoreCase);
+            if (isPendingReview || isReviewedHistory)
+            {
+                var window = ReportDateRange.FromDateStrings(request.From, request.To);
+                var offset = Math.Max(0, request.Offset);
+                var limit = request.Limit <= 0 ? 50 : Math.Min(request.Limit, 100);
+                var sort = ReportAuditSorts.Review.Contains(request.Sort, StringComparer.OrdinalIgnoreCase)
+                    ? ReportAuditSorts.Review.First(item =>
+                        string.Equals(item, request.Sort, StringComparison.OrdinalIgnoreCase))
+                    : ReportAuditSorts.MostRecent;
+                var persistedPage = _repository.LoadReviewEncounterKeysPage(
+                    window,
+                    isPendingReview,
+                    sort,
+                    offset,
+                    limit);
+                var encounters = _repository.LoadHistoricalEncounters(persistedPage.Rows);
+                var completed = encounters
+                    .Where(record => record.CompletedCycle != null)
+                    .Select(record => record.CompletedCycle!)
+                    .ToList();
+                var aborted = encounters
+                    .Where(record => record.AbortedAssignment != null)
+                    .Select(record => record.AbortedAssignment!)
+                    .ToList();
+                var page = _reportsSnapshotBuilder.BuildAudit(
+                    completed,
+                    aborted,
+                    request with { Offset = 0, Limit = limit, Sort = sort });
+                return page with
+                {
+                    ReturnedCount = page.ReviewRows.Count,
+                    TotalMatchingCount = persistedPage.TotalMatchingCount,
+                    Offset = offset,
+                    Limit = limit,
+                    HasMore = persistedPage.HasMore
+                };
+            }
+
+            var query = ReportQuery.FromStrings(
+                request.From,
+                request.To,
+                request.Scope,
+                request.DoctorId,
+                request.Sedation,
+                request.ProcedureGrouping);
+            if (string.Equals(
+                request.ContributorKind,
+                ReportAuditContributorKinds.CalibrationEvidence,
+                StringComparison.OrdinalIgnoreCase))
+            {
+                return _reportsSnapshotBuilder.BuildAudit(
+                    _repository.LoadCompletedCycles(query.Window),
+                    [],
+                    request);
+            }
+
+            var requestedOffset = Math.Max(0, request.Offset);
+            var requestedLimit = request.Limit <= 0 ? 50 : Math.Min(request.Limit, 100);
+            var activeSort = ReportAuditSorts.All.Contains(request.Sort, StringComparer.OrdinalIgnoreCase)
+                ? ReportAuditSorts.All.First(item =>
+                    string.Equals(item, request.Sort, StringComparison.OrdinalIgnoreCase))
+                : ReportAuditSorts.MostRecent;
+            const int persistenceBatchSize = 100;
+            var rawOffset = 0;
+            var matchingCount = 0;
+            var retainedLimit = requestedOffset > int.MaxValue - requestedLimit
+                ? int.MaxValue
+                : requestedOffset + requestedLimit;
+            var retainedRows = new List<ReportAuditRow>(Math.Min(retainedLimit, persistenceBatchSize));
+            ReportAuditPage? template = null;
+
+            while (true)
+            {
+                var candidates = _repository.LoadCompletedAuditCandidatesPage(
+                    query,
+                    activeSort,
+                    rawOffset,
+                    persistenceBatchSize);
+                if (candidates.Rows.Count == 0)
+                {
+                    break;
+                }
+
+                var candidatePage = _reportsSnapshotBuilder.BuildAudit(
+                    candidates.Rows,
+                    [],
+                    request with { Offset = 0, Limit = persistenceBatchSize, Sort = activeSort });
+                template ??= candidatePage;
+                matchingCount += candidatePage.Rows.Count;
+                retainedRows.AddRange(candidatePage.Rows);
+                if (retainedRows.Count > retainedLimit)
+                {
+                    retainedRows = ReportsSnapshotBuilder.OrderProjectedAuditRows(retainedRows, activeSort)
+                        .Take(retainedLimit)
+                        .ToList();
+                }
+
+                rawOffset += candidates.Rows.Count;
+                if (!candidates.HasMore)
+                {
+                    break;
+                }
+            }
+
+            template ??= _reportsSnapshotBuilder.BuildAudit(
+                [],
+                [],
+                request with { Offset = 0, Limit = requestedLimit, Sort = activeSort });
+            var rows = ReportsSnapshotBuilder.OrderProjectedAuditRows(retainedRows, activeSort)
+                .Skip(requestedOffset)
+                .Take(requestedLimit)
+                .ToList();
+            return template with
+            {
+                Rows = rows,
+                ReviewRows = [],
+                ReturnedCount = rows.Count,
+                TotalMatchingCount = matchingCount,
+                Offset = requestedOffset,
+                Limit = requestedLimit,
+                HasMore = requestedOffset + rows.Count < matchingCount,
+                ActiveSort = activeSort
+            };
         }
     }
 
@@ -1188,7 +1306,6 @@ public sealed class DemoBoardStore
     private int ClearCompletedAndResetRoomsLocked()
     {
         var clearedCompleted = _repository.ResetMaintenanceState(_roomCount);
-        _completedCycles.Clear();
         foreach (var room in _rooms)
         {
             ResetRoom(room);
@@ -1296,8 +1413,7 @@ public sealed class DemoBoardStore
         var completeAt = arrivedAt.AddMinutes(doctorMin);
         var availableAt = completeAt.AddMinutes(turnoverMin);
 
-        var cycle = _completedCycles.FirstOrDefault(item => item.RoomId == roomId && item.SeatedAt == seatedAt);
-        var isNew = cycle is null;
+        var cycle = _repository.LoadCompletedCycleByRoomAndSeatedAt(roomId, seatedAt);
         cycle ??= new CompletedRoomCycle();
 
         cycle.RoomId = roomId;
@@ -1329,11 +1445,6 @@ public sealed class DemoBoardStore
         cycle.SuggestedAction = null;
         cycle.ReviewedAt = null;
         cycle.ReviewedBy = null;
-
-        if (isNew)
-        {
-            _completedCycles.Add(cycle);
-        }
 
         PersistCycle(cycle);
     }
@@ -1403,7 +1514,8 @@ public sealed class DemoBoardStore
             // Re-derive reporting-exception metadata over a detached reporting snapshot. Harmless
             // for profiles that seed no history: annotating an empty or in-progress-only cycle set
             // simply yields no reasons/candidates.
-            var reportingCycles = _reportsSnapshotBuilder.CreateAnnotatedCompletedCycleSnapshot(_completedCycles);
+            var reportingCycles = _reportsSnapshotBuilder.CreateAnnotatedCompletedCycleSnapshot(
+                _repository.LoadCompletedCycles());
 
             // Room state counts include AVAILABLE, so live-board-stress/full-stress can report their
             // intentionally unassigned no-coin room. Doctor counts stay assigned-only.
@@ -1547,31 +1659,31 @@ public sealed class DemoBoardStore
                 break;
 
             case RoomStates.ReadyForDoctor:
-            {
-                room.State = RoomStates.ReadyForDoctor;
-                var readyElapsed = EarlySeatedSample(thresholds);
-                room.ReadyForDoctorAt = now - readyElapsed;
-                room.SeatedAt = now - (readyElapsed + StressLiveSeatToReadyPad);
-                break;
-            }
+                {
+                    room.State = RoomStates.ReadyForDoctor;
+                    var readyElapsed = EarlySeatedSample(thresholds);
+                    room.ReadyForDoctorAt = now - readyElapsed;
+                    room.SeatedAt = now - (readyElapsed + StressLiveSeatToReadyPad);
+                    break;
+                }
 
             case RoomStates.Aging:
-            {
-                room.State = RoomStates.ReadyForDoctor;
-                var readyElapsed = AgingSample(thresholds);
-                room.ReadyForDoctorAt = now - readyElapsed;
-                room.SeatedAt = now - (readyElapsed + StressLiveSeatToReadyPad);
-                break;
-            }
+                {
+                    room.State = RoomStates.ReadyForDoctor;
+                    var readyElapsed = AgingSample(thresholds);
+                    room.ReadyForDoctorAt = now - readyElapsed;
+                    room.SeatedAt = now - (readyElapsed + StressLiveSeatToReadyPad);
+                    break;
+                }
 
             case RoomStates.Stale:
-            {
-                room.State = RoomStates.ReadyForDoctor;
-                var readyElapsed = StaleSample(thresholds);
-                room.ReadyForDoctorAt = now - readyElapsed;
-                room.SeatedAt = now - (readyElapsed + StressLiveSeatToReadyPad);
-                break;
-            }
+                {
+                    room.State = RoomStates.ReadyForDoctor;
+                    var readyElapsed = StaleSample(thresholds);
+                    room.ReadyForDoctorAt = now - readyElapsed;
+                    room.SeatedAt = now - (readyElapsed + StressLiveSeatToReadyPad);
+                    break;
+                }
 
             case RoomStates.DoctorInRoom:
                 room.SeatedAt = now - StressLiveDoctorInRoomSeatedElapsed;
@@ -1708,8 +1820,7 @@ public sealed class DemoBoardStore
     // the manual-audit candidate) can chain a follow-up mutation against the same persisted object.
     private CompletedRoomCycle UpsertExplicitCompletedCycle(CompletedRoomCycle template)
     {
-        var cycle = _completedCycles.FirstOrDefault(item => item.RoomId == template.RoomId && item.SeatedAt == template.SeatedAt);
-        var isNew = cycle is null;
+        var cycle = _repository.LoadCompletedCycleByRoomAndSeatedAt(template.RoomId, template.SeatedAt);
         cycle ??= new CompletedRoomCycle();
 
         cycle.RoomId = template.RoomId;
@@ -1740,11 +1851,6 @@ public sealed class DemoBoardStore
         cycle.SuggestedAction = template.SuggestedAction;
         cycle.ReviewedAt = template.ReviewedAt;
         cycle.ReviewedBy = template.ReviewedBy;
-
-        if (isNew)
-        {
-            _completedCycles.Add(cycle);
-        }
 
         PersistCycle(cycle);
         return cycle;
@@ -1898,7 +2004,7 @@ public sealed class DemoBoardStore
     {
         lock (_syncRoot)
         {
-            var cycle = _completedCycles.FirstOrDefault(item => item.RoomId == roomId && item.SeatedAt == seatedAt);
+            var cycle = _repository.LoadCompletedCycleByRoomAndSeatedAt(roomId, seatedAt);
             return MarkCycleAsException(cycle, reason, suggestedAction);
         }
     }
@@ -1918,7 +2024,7 @@ public sealed class DemoBoardStore
                 return false;
             }
 
-            var cycle = _completedCycles.FirstOrDefault(item => item.CompletedCycleId == completedCycleId);
+            var cycle = _repository.LoadCompletedCycleById(completedCycleId);
             return MarkCycleAsException(cycle, reason, suggestedAction);
         }
     }
@@ -1964,7 +2070,7 @@ public sealed class DemoBoardStore
                 return new ReviewExceptionResult(ReviewExceptionOutcome.NotFound, 0);
             }
 
-            var cycle = _completedCycles.FirstOrDefault(item => item.CompletedCycleId == completedCycleId);
+            var cycle = _repository.LoadCompletedCycleById(completedCycleId);
             if (cycle is null)
             {
                 return new ReviewExceptionResult(ReviewExceptionOutcome.NotFound, 0);
@@ -1994,8 +2100,7 @@ public sealed class DemoBoardStore
                 return new ReviewExceptionResult(ReviewExceptionOutcome.NotFound, 0);
             }
 
-            var record = _repository.LoadAbortedAssignments()
-                .FirstOrDefault(item => item.AbortedAssignmentId == abortedAssignmentId);
+            var record = _repository.LoadAbortedAssignmentById(abortedAssignmentId);
             if (record == null)
             {
                 return new ReviewExceptionResult(ReviewExceptionOutcome.NotFound, 0);
@@ -2206,9 +2311,9 @@ public sealed class DemoBoardStore
         // The cycle created at Doctor Arrived is keyed by (RoomId, SeatedAt). Reuse it so truthful
         // timestamps and the accepted-handoff snapshot are preserved; only fall back to reconstructing
         // one for a legacy arrived room that has no persisted cycle.
-        var cycleIndex = _completedCycles.FindIndex(c => c.RoomId == snapshot.RoomId && c.SeatedAt == seatedAt);
-        var cycle = cycleIndex >= 0
-            ? CopyCompletedCycle(_completedCycles[cycleIndex])
+        var existingCycle = _repository.LoadCompletedCycleByRoomAndSeatedAt(snapshot.RoomId, seatedAt);
+        var cycle = existingCycle != null
+            ? CopyCompletedCycle(existingCycle)
             : new CompletedRoomCycle
             {
                 EpisodeId = snapshot.EpisodeId,
@@ -2248,15 +2353,6 @@ public sealed class DemoBoardStore
 
         // Persist durably before mutating live state.
         _repository.SaveCompletedCycleAndRoom(cycle, new RoomState(room.RoomId), _doctors, _procedures);
-
-        if (cycleIndex >= 0)
-        {
-            _completedCycles[cycleIndex] = cycle;
-        }
-        else
-        {
-            _completedCycles.Add(cycle);
-        }
 
         ResetRoom(room);
         AddEvent(new RoomEvent(room.RoomId, "ForceExpired", now, snapshot.AssignedDoctor, snapshot.ProcedureCode));
@@ -2538,9 +2634,7 @@ public sealed class DemoBoardStore
         }
 
         var cycle = room.SeatedAt.HasValue
-            ? _completedCycles.SingleOrDefault(existing =>
-                existing.RoomId == room.RoomId
-                && existing.SeatedAt == room.SeatedAt.Value)
+            ? _repository.LoadCompletedCycleByRoomAndSeatedAt(room.RoomId, room.SeatedAt.Value)
             : null;
         if (cycle is null || !CompletedCycleMatchesAcceptedTruth(cycle, room, handoff))
         {

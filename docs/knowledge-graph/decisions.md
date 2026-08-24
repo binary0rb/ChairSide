@@ -168,6 +168,12 @@ This file records decisions that should survive across tasks, PRs, and debugging
 
 **Decision:** Normal audit preserves `DoctorCompleteAt` window anchoring. Completed exception review instead uses the latest truthful lifecycle timestamp and aborted review uses `TerminatedAt`. Administrative action dates do not change the encounter's reporting period. Data Quality review uses the active analytical scope by default, while exhaustive raw history may broaden deliberately.
 
+## Bounded historical persistence access
+
+**Decision:** Startup and ordinary room operation keep no lifetime completed-cycle cache. Reporting loads only its selected completed and review windows and obtains all-time scoped totals with a database count. Audit and review retrieval scan fixed-size SQLite pages while retaining only a request-bounded ordered working set and exact match count. A historical source record is addressed by source type plus durable source record ID; no synthetic historical encounter table is introduced by this query foundation.
+
+**Rationale:** Indefinite retention must not make startup, live-room integrity, or paged evidence reads proportional in memory to lifetime history. Storage anchoring remains distinct: normal reporting uses `DoctorCompleteAt`, completed review uses `DoctorCompleteAt ?? DoctorArrivedAt ?? SeatedAt ?? PrestageStartedAt`, and aborted review uses `TerminatedAt`.
+
 **Decision:** Practice Completed Cases remains normal included plus reporting-excluded completed history. Doctor Completed Cases uses the scoped standard included completed population and its matching sample context.
 
 **Rationale:** The reporting redesign must explain observed operational flow and scheduling-model fit without converting incomplete observation into judgments about doctors or staff. Precise shared semantics prevent later report slices from inventing incompatible denominators, time intervals, or interpretation language.
