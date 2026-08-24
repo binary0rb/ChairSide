@@ -6,7 +6,13 @@ last_verified_commit: fe60949
 
 # Report audit and metric evidence
 
-## Three separate populations
+## Status boundary
+
+**Current implementation:** The `active` tag and `last_verified_commit` apply to the current read-only audit/query behavior and existing pending versus reviewed exception projections described below.
+
+**Approved target under #234:** The separately labeled target section is an approved design gate, not behavior implemented by PR #235 or verified by the current source/test anchors.
+
+## Evidence modes and populations
 
 ChairSide uses one shared presentation but does not merge the underlying evidence populations.
 
@@ -19,7 +25,7 @@ Manual exceptions and aborted assignments never appear in completed-case audit o
 
 ## Query and scope transfer
 
-The admin-protected read-only `POST /api/reports/audit/query` accepts the normalized parent window, Practice or Doctor scope, doctor ID, Sedation scope, Procedure Grouping, contributor kind, optional segment doctor and procedure identity, analytical standing, Calibration evidence identities, sort, offset, and limit. Default page size is 50 and the server caps it at 100.
+The current admin-protected read-only `POST /api/reports/audit/query` accepts the normalized parent window, Practice or Doctor scope, doctor ID, Sedation scope, Procedure Grouping, contributor kind, optional segment doctor and procedure identity, analytical standing, Calibration evidence identities, sort, offset, and limit. Default page size is 50 and the server caps it at 100. Issue #234 is a design gate for later administrative mutation contracts; it does not change this endpoint by itself.
 
 The response returns normalized selection, evidence mode, projected rows, counts, page state, active sort, and supported sorts. JavaScript uses this contract without changing the parent report query or reloading the main report. Practice plus `segmentDoctorId` stays Practice base scope.
 
@@ -27,7 +33,13 @@ The response returns normalized selection, evidence mode, projected rows, counts
 
 Normal audit retains the completed report's `DoctorCompleteAt` window. Review selection is separate: completed exceptions use the latest truthful lifecycle anchor and aborted assignments use `TerminatedAt`.
 
-Audit rows expose exact ordered seconds. Missing or reversed intervals are null, never zero-clamped. Stable completed-cycle and optional accepted Ready-handoff identities support Mark Exception and Calibration evidence reconciliation without PHI.
+Audit rows expose exact ordered seconds. Missing or reversed intervals are null, never zero-clamped. Stable completed-cycle and optional accepted Ready-handoff identities support the current Mark Exception action and Calibration evidence reconciliation without PHI.
+
+## Approved target under #234
+
+Issue #234 keeps lifecycle and accepted Ready evidence immutable while adding current-effective metadata overlays and one append-only encounter ledger. The canonical manual action becomes Mark for Review; resolved review may be reopened; Needs Review and Confirmed Exception stay outside normal evidence; and Cleared may return to ordinary eligibility while retaining anomaly history.
+
+Data Quality and its default review drill-down inherit the active report's applicable date, Doctor, Sedation, procedure/drill-down, and approved analytical filters. Exhaustive raw history may deliberately broaden scope. Needs Review is elevated; Cleared, Confirmed Exception, Historical Correction, and Reviewed counts are not blindly additive because disposition, reporting eligibility, and provenance are separate concepts.
 
 ## Compatibility
 

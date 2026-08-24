@@ -55,20 +55,38 @@ flowchart LR
 
     PreArrivalTermination["DomainConcept: Pre-arrival cancellation / expiration"] --> Aborts
     AfterHoursSweep["DomainConcept: Nightly after-hours safety sweep"] --> Aborts
-    AfterHoursSweep --> ReviewException
-    PostArrivalExpiration["DomainConcept: Post-arrival expiration"] --> ReviewException["ReportMetric: Review-required exception"]
-    ReviewException --> Cycles
-    Aborts --> UnifiedReview["UiSurface: Unified exception review queue"]
-    ReviewException --> UnifiedReview
+    AfterHoursSweep --> SystemFinding["LifecycleEvent: Objective system finding"]
+    PostArrivalExpiration["DomainConcept: Post-arrival expiration"] --> SystemFinding
+    PostArrivalExpiration --> Cycles
+    HistoricalEncounter["DomainConcept: Durable historical encounter"] --> ReviewLedger["DomainConcept: Append-only administrative ledger"]
+    Aborts --> HistoricalEncounter
+    Cycles --> HistoricalEncounter
+    ManualReview["LifecycleEvent: Local Admin Mark for Review"] --> ReviewLedger
+    SystemFinding --> ReviewLedger
+    ReviewLedger --> NeedsReview["ReportPopulation: Needs Review"]
+    ReviewLedger --> CorrectionOverlay["DomainConcept: Historical effective-value correction"]
+    ReviewLedger --> Cleared["ReportPopulation: Cleared for Reporting"]
+    ReviewLedger --> ConfirmedException["ReportPopulation: Confirmed Exception"]
+    ReviewLedger --> ReopenReview["LifecycleEvent: Reopen Review"]
+    ReopenReview --> NeedsReview
+    NeedsReview --> AdministrativeExclusion["DesignDecision: Administrative exclusion gate"]
+    ConfirmedException --> AdministrativeExclusion
 
     Reports["UiSurface: Reports"] --> SummaryCards["UiSurface: Summary cards"]
     ReportsBuilder["StoreOrService: Report snapshot builder"] --> Reports
     AcceptedHandoff --> StandardPopulation["ReportMetric: Standard completed population"]
+    AcceptedHandoff --> ImmutableEvidence["DesignDecision: Immutable lifecycle evidence"]
+    CorrectionOverlay --> EffectiveReportingValues["DomainConcept: Current effective reporting values"]
+    EffectiveReportingValues --> ReportsBuilder
+    Cleared --> OrdinaryEligibility["DesignDecision: Ordinary reporting eligibility re-evaluated"]
+    OrdinaryEligibility --> ReportsBuilder
     StandardPopulation --> ReportsBuilder
     WithdrawnHandoff --> AuditOnly["DesignDecision: Not accepted attribution"]
     Aborts --> OutsideThroughput["DesignDecision: Outside throughput"]
 
     Reports --> ReportingDesign["DesignDecision: Canonical reporting design"]
+    Reports --> ExceptionHandlingDesign["DesignDecision: Canonical exception handling design"]
+    ExceptionHandlingDesign --> ReviewLedger
     AcceptedHandoff --> ReadyWait["ReportMetric: Accepted Ready Wait"]
     ReportingDesign --> SeatedDoctor["ReportMetric: Seated to Doctor"]
     ReportingDesign --> MedianFirst["DesignDecision: Median-first prominent timing"]
@@ -94,10 +112,12 @@ flowchart LR
     ScheduleFit --> CalibrationInsights["UiSurface: Calibration Insights"]
     CurrentDefaultCalibration --> CalibrationInsights
     Reports --> DataQualityAudit["UiSurface: Data Quality and case audit"]
+    ReportScope --> DataQualityAudit
+    ReviewLedger --> DataQualityAudit
     DataQualityAudit --> AuditQuery["Contract: Protected read-only paged audit query"]
     AuditQuery --> CompletedAudit["ReportPopulation: Normal completed history"]
     AuditQuery --> MetricEvidence["ReportPopulation: Exact metric contributors"]
-    AuditQuery --> ExceptionEvidence["ReportPopulation: Pending and reviewed exception history"]
+    AuditQuery --> ExceptionEvidence["ReportPopulation: Anomaly and ledger history"]
     CalibrationEvidence --> AuditQuery
     ReportScope --> AuditQuery
 
@@ -141,7 +161,7 @@ flowchart LR
 - `ReadyForDoctor` is the primary state. Aging and Stale are urgency projections from the owned Active handoff's `ReadyAt`.
 - Master and Doctor room cards consume the canonical assignment read model when present; partial values use neutral pending language, and Doctor View membership begins only after a doctor assignment is durably saved.
 - Withdrawal returns to Seated and starts no new urgency until a different handoff is issued. Doctor Arrived accepts the current handoff.
-- Pre-arrival cancellation and max-duration expiration are aborted history outside throughput. Pre-arrival after-hours terminations remain aborted history but also enter the unified review queue. Post-arrival expiration is review-required exception history without a fabricated completion timestamp.
+- Pre-arrival cancellation and max-duration expiration are aborted history outside throughput. Pre-arrival after-hours terminations remain aborted history and append an objective system finding that enters Needs Review. Post-arrival expiration is review-required history without a fabricated completion timestamp.
 - The after-hours sweep is independently retryable per room: successful rooms remain committed, failed and later active rooms retry, and the clinic day is marked complete only after a successful full pass.
 - Canonical lifecycle writes are compare-and-swap guarded against the complete originally loaded room, assignment, handoff, and timestamp expectation. Stale writes do not retry or mutate live state.
 - Add-on is optional scheduling-context metadata, defaults to false for every new episode, remains independent of procedure and sedation, stays correctable through Ready, locks after Doctor Arrived, survives active and historical persistence, and remains in ordinary reporting by default. Ready still locks doctor/procedure/sedation/allocation dispatch facts.
@@ -150,6 +170,8 @@ flowchart LR
 - Doctor Arrived serializes durable cross-room doctor ownership and commits the room, Accepted handoff, and reporting cycle together.
 - Live state changes only after durable persistence succeeds; SQLite failures roll back transaction-local writes.
 - Legacy persisted Aging/Stale rows remain readable; recovery never fabricates or rewrites invalid handoffs.
+- Historical anomaly review uses one append-only ledger per encounter. Needs Review provisionally excludes immediately, Confirmed Exception excludes the whole encounter, Cleared removes only the administrative gate, and Reopen Review never reopens the live lifecycle.
+- Historical metadata correction is an effective-value overlay that may change current reporting attribution without rewriting the accepted Ready handoff or any lifecycle timestamp.
 - Generated knowledge artifacts are development aids and never runtime dependencies.
 
 ## Fixture and seed invariants
@@ -171,8 +193,8 @@ flowchart LR
 
 ## Reporting semantics
 
-- `docs/design/reporting-design.md` is the canonical reporting-semantics design authority; lifecycle and accepted Ready-handoff truth remain owned by the lifecycle design and issue #111.
-- Accepted Ready handoff is finalized assignment attribution. Withdrawn handoffs are audit history and never accepted attribution.
+- `docs/design/reporting-design.md` is the canonical reporting-semantics design authority; `docs/design/exception-handling-design.md` owns historical administrative interpretation, while lifecycle and accepted Ready-handoff truth remain owned by the lifecycle design and issue #111.
+- Accepted Ready handoff is immutable lifecycle evidence and initial assignment attribution. A later explicit historical correction may supply current effective reporting metadata without rewriting it. Withdrawn handoffs are audit history and never accepted attribution.
 - Whole UTC days, Monday-start UTC weeks, and `DoctorCompleteAt` completed-window anchoring remain unchanged.
 - Standard completed metrics exclude incomplete cycles and exception populations while truthful phase-complete metrics retain their metric-specific eligibility.
 - Ready Wait is accepted Ready -> Doctor Arrived; Seated -> Doctor remains a distinct total seated interval.
@@ -185,11 +207,12 @@ flowchart LR
 - Procedure Mix exists at Practice and Doctor scope with counts, percentages, and the current scoped included population as denominator.
 - Report queries separate whole-day UTC Window, Practice or historical/current Doctor plus Sedation Scope, and Procedure Family or Detailed Variant grouping. Grouping changes aggregation, not population membership.
 - General descriptive samples are Empty at `N = 0`, Limited at `N = 1-4`, and Sufficient at `N >= 5`; zero contributors within a nonempty population are Unavailable, and comparisons require all populations to be Sufficient.
-- The action-required Review Queue remains global within its selected date window, while analytical Case Audit inherits Doctor and Sedation scope. Valid reversed ranges normalize; malformed dates remain graceful.
+- Data Quality and its default anomaly-review drill-down derive from the active report scope, while exhaustive raw history may deliberately broaden investigation. Valid reversed ranges normalize; malformed dates remain graceful.
 - Historical assigned Schedule Fit uses finalized expected allocation and truthful exact Seated -> Doctor Complete seconds over the scoped standard included completed population. It keeps exact case-level slack and debt separate, exposes coverage and signed net, and evaluates the scheduling model rather than the doctor. Practice totals ignore Procedure Grouping, while the legacy integer-minute Overall remains a Workshop compatibility contract.
 - Current-default Calibration separately uses the current active base-procedure roster default. It never substitutes historical assigned or captured defaults. Version one requires N >= 10 pairs, at least 80 percent raw-sign direction over all pairs, and an agreeing all-pair median strictly beyond +/-600 seconds; -600 through +600 seconds inclusive remains AtExpected. Evaluation is selected-population-only and is not statistical significance.
 - Only a server Qualified decision creates a neutral Calibration Insight. Qualified non-PHI evidence reconciles to the decision counts and median population. Insights never save history or mutate expected allocation automatically, and browser code does not reconstruct policy thresholds.
 - Healthy Data Quality stays quiet; exclusions and review exceptions remain visible through progressive disclosure and audit evidence.
+- Needs Review, Cleared, Confirmed Exception, correction, and Reviewed provenance use separate semantics and are not blindly additive reconciliation buckets.
 - Provider ranking, efficiency scoring, attendance inference, idle-time reporting, and punitive metrics are prohibited.
 - Ready urgency threshold flags are captured without newly persisting Aging/Stale primary states.
 

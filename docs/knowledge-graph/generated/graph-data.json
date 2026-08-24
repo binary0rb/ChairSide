@@ -33,6 +33,12 @@
                       "path":  "CLAUDE.md"
                   },
                   {
+                      "id":  "file:docs/design/exception-handling-design.md",
+                      "label":  "docs/design/exception-handling-design.md",
+                      "type":  "File",
+                      "path":  "docs/design/exception-handling-design.md"
+                  },
+                  {
                       "id":  "file:docs/design/prestage-assignment-lifecycle.md",
                       "label":  "docs/design/prestage-assignment-lifecycle.md",
                       "type":  "File",
@@ -4724,6 +4730,11 @@
                   {
                       "from":  "repo:chairside",
                       "to":  "file:CLAUDE.md",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:docs/design/exception-handling-design.md",
                       "label":  "contains"
                   },
                   {

@@ -48,7 +48,7 @@ This file records decisions that should survive across tasks, PRs, and debugging
 
 ## Cancellation, expiration, and recovery
 
-**Decision:** Pre-arrival cancellation and max-duration expiration create aborted assignment history outside throughput. Pre-arrival after-hours termination remains truthful aborted history but carries review metadata and appears in the unified exception queue. Post-arrival expiration creates a review-required exception without fabricating `DoctorCompleteAt`. Faulted pre-arrival Ready remains visible and safely cancellable without rewriting invalid or unrelated handoffs.
+**Decision:** Pre-arrival cancellation and max-duration expiration create aborted assignment history outside throughput. Pre-arrival after-hours termination remains truthful aborted history and appends an objective system finding that enters Needs Review. Post-arrival expiration creates review-required history without fabricating `DoctorCompleteAt`. Faulted pre-arrival Ready remains visible and safely cancellable without rewriting invalid or unrelated handoffs.
 
 **Rationale:** Recovery must preserve observed facts and reporting populations rather than manufacturing a plausible happy path.
 
@@ -118,9 +118,21 @@ This file records decisions that should survive across tasks, PRs, and debugging
 
 ## Reporting population semantics
 
-**Decision:** The accepted Ready handoff supplies finalized assignment attribution. Withdrawn handoffs are audit-only, pre-arrival aborts stay outside throughput, and post-arrival expiration appears only in review-required exception populations. Aging/Stale threshold flags derive from the accepted Ready interval.
+**Decision:** The accepted Ready handoff supplies immutable lifecycle evidence and the initial assignment attribution for an uncorrected encounter. A later explicit historical metadata correction may become the current effective reporting value without rewriting the handoff. Withdrawn handoffs are audit-only, pre-arrival aborts stay outside throughput, and post-arrival expiration appears only in review-required exception populations. Aging/Stale threshold flags derive from the accepted Ready interval.
 
 **Rationale:** Metrics become misleading if draft assignment, withdrawn intent, incomplete cycles, exception cycles, and completed populations are mixed.
+
+## Historical exception and anomaly handling
+
+**Decision:** `docs/design/exception-handling-design.md` is the canonical design authority for historical anomaly review, correction overlays, dispositions, append-only administrative history, Data Quality reconciliation, retention, and administrative concurrency. The encounter is the atomic administrative and analytical container. Lifecycle truth and accepted Ready evidence remain immutable; missing facts are omitted rather than reconstructed.
+
+**Decision:** Only an explicit deterministic system rule or Local Admin Mark for Review action creates an anomaly. Each encounter has one continuous chronological ledger. Needs Review provisionally excludes immediately, Confirmed Exception excludes the whole encounter, and Cleared removes only the administrative gate. Resolved review may be reopened without reopening the live lifecycle. Historical correction is available only inside anomaly review, changes current effective metadata through an overlay, and never edits lifecycle timestamps.
+
+**Decision:** Data Quality derives from the active report population and inherits applicable date, Doctor, Sedation, procedure/drill-down, and other approved analytical filters. Its default review drill-down keeps that scope; exhaustive raw history may broaden deliberately. Disposition, ordinary reporting eligibility, and Reviewed/correction provenance remain separate concepts, so their counts are not blindly additive.
+
+**Decision:** Administrative state and its ledger event commit atomically. Stale administrative writes are rejected. Ledger events are append-only, non-deletable through normal UI, bounded and non-PHI, retained indefinitely by default, and loaded through bounded/paged historical access rather than complete in-memory history.
+
+**Rationale:** Normal reports need the best current effective interpretation, while the ledger must explain every change without fabricating lifecycle facts, partially including Confirmed Exceptions, losing prior decisions, or hiding review work outside the active analytical scope.
 
 ## Canonical reporting semantics
 
@@ -142,7 +154,7 @@ This file records decisions that should survive across tasks, PRs, and debugging
 
 **Decision:** Typical Doctor Time Range is the Type 7 Q25-to-Q75 interval over truthful Doctor Arrived -> Doctor Complete observations in one scoped standard included completed procedure population. It is calculated from underlying cases after scope, Sedation, and Procedure Grouping. Numeric endpoints publish only when the shared Doctor Time sample is Sufficient; Limited samples retain their median and Limited context without range endpoints. The range is descriptive, is not min/max, and is not expected allocation, a target, or Schedule Fit.
 
-**Decision:** The action-required Review Queue remains global within the selected reporting date window, while analytical Case Audit inherits Doctor and Sedation scope. Reversed valid date ranges normalize and return normalized metadata; malformed date input retains graceful legacy behavior without a new HTTP 400 response.
+**Decision:** Data Quality and its default anomaly-review drill-down inherit the active report's applicable scope. The exhaustive raw-history surface may deliberately broaden investigation afterward. Reversed valid date ranges normalize and return normalized metadata; malformed date input retains graceful legacy behavior without a new HTTP 400 response.
 
 **Decision:** Historical assigned Schedule Fit evaluates the scheduling model with positive finalized `ExpectedAllocationMinutes` and truthful exact Seated -> Doctor Complete seconds from the scoped standard included completed population. Reversed intervals do not contribute. Exact case-level slack and debt remain separate, signed net is observed minus expected and debt minus slack, and population coverage is visible. Practice totals ignore Procedure Grouping. The legacy integer-minute `ScheduleFitReport.Overall` remains a Workshop compatibility contract.
 
@@ -152,9 +164,9 @@ This file records decisions that should survive across tasks, PRs, and debugging
 
 **Decision:** Healthy Data Quality remains quiet; exclusions, limited samples, and pending review use progressive disclosure while audit remains the evidence layer behind calculations and insights. Provider ranking, efficiency scoring, attendance inference, idle-time reporting, grades, quotas, and punitive staff metrics are prohibited.
 
-**Decision:** Issue #220 separates completed-case audit, exact Metric evidence, pending exception review, and read-only reviewed exception history. The admin-protected audit query owns contributor membership, exact seconds, stable sorting, and paging; browser code inherits normalized report scope and never treats `RecentCompletedCycles` as historical authority.
+**Decision:** Issue #220 separates completed-case audit, exact Metric evidence, and anomaly-review evidence. Issue #234 supersedes the permanently read-only reviewed-history model: resolved history retains append-only provenance and may be reopened or receive later corrections/findings. The admin-protected audit query remains the current contributor, exact-second, stable-sort, and paging authority; later administrative mutation contracts must preserve the same encounter identity and never treat `RecentCompletedCycles` as historical authority.
 
-**Decision:** Normal audit preserves `DoctorCompleteAt` window anchoring. Completed exception review instead uses the latest truthful lifecycle timestamp and aborted review uses `TerminatedAt`; review remains global within the selected window and is not narrowed by analytical Doctor or Sedation filters.
+**Decision:** Normal audit preserves `DoctorCompleteAt` window anchoring. Completed exception review instead uses the latest truthful lifecycle timestamp and aborted review uses `TerminatedAt`. Administrative action dates do not change the encounter's reporting period. Data Quality review uses the active analytical scope by default, while exhaustive raw history may broaden deliberately.
 
 **Decision:** Practice Completed Cases remains normal included plus reporting-excluded completed history. Doctor Completed Cases uses the scoped standard included completed population and its matching sample context.
 

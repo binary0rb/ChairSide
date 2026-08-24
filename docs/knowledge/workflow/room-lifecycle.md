@@ -6,6 +6,12 @@ last_verified_commit: b516481
 
 # Room lifecycle
 
+## Status boundary
+
+**Current implementation:** The `active` tag and `last_verified_commit` apply to the lifecycle, persistence, and existing exception-projection behavior described below.
+
+**Approved target under #234:** The separately labeled target section describes only the later administrative interpretation layer. PR #235 does not implement it or change live-room lifecycle behavior.
+
 ## Canonical sequence
 
 ChairSide tracks room episodes, not patients. The canonical lifecycle is:
@@ -39,6 +45,10 @@ The after-hours sweep processes each active room in its existing per-room transa
 Restart recovery restores durable truth and projects urgency and integrity without mutating the database. Live room state changes only after the repository transaction succeeds.
 
 Canonical `DoctorInRoom` and `Turnover` progression revalidates the room assignment and in-progress reporting-cycle attribution against the immutable Accepted handoff. Contradictory recovered state projects or returns `integrity-fault` and blocks Doctor Complete or Room Available without mutating room, handoff, cycle, timestamps, reports, events, or live state. Legitimate legacy arrived rooms without handoff metadata retain their compatibility completion path.
+
+## Approved target under #234
+
+The future administrative layer records objective system findings and Local Admin review in one append-only encounter ledger, with correction overlays, dispositions, and reopen history. It does not rewrite the accepted Ready handoff, the lifecycle event stream, or any lifecycle timestamp described in this note.
 
 ## Capability and integrity authority
 

@@ -73,7 +73,7 @@ Domain-concept tags say which ChairSide concept a note is about, independent of 
 - `sedation` - sedation as a modifier of a primary procedure, never a standalone timed component.
 - `reporting-metrics` - the calculated report values themselves (averages, medians, counts, durations).
 - `reporting-population` - which cycles are included, excluded, or flagged before a metric is calculated.
-- `exception-handling` - manual-review exceptions and reporting-exception (excluded) cycles.
+- `exception-handling` - historical anomalies, administrative correction overlays, review dispositions, ledger provenance, and reporting-exception populations.
 - `schedule-fit` - expected-versus-measured case flow, schedule debt, and raw slack.
 - `allocation-balance` - expected allocation versus measured case flow, by doctor and by procedure.
 - `doctor-flow` - the selected-doctor detail panel: overview, trends, procedures, flow, and audit tabs.

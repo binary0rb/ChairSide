@@ -10,6 +10,7 @@ Lifecycle truth remains owned by the canonical room lifecycle and accepted Ready
 
 - `docs/design/prestage-assignment-lifecycle.md` defines room lifecycle and Ready handoff behavior.
 - Issue #111 defines accepted reporting handoff and legacy compatibility rules.
+- `docs/design/exception-handling-design.md` defines the later historical administrative interpretation layer, including effective-value corrections, dispositions, ledger history, and Data Quality reconciliation.
 - This document consumes those facts for reporting and must not redefine them inconsistently.
 
 When current reporting code differs from this document, treat the difference as an implementation gap owned by the applicable child issue under #211. Do not silently change lifecycle or persistence semantics to make reporting easier.
@@ -28,6 +29,7 @@ When current reporting code differs from this document, treat the difference as 
 - Every narrowed analytical population retains visible sample-size context.
 - Healthy Data Quality stays quiet. Exceptions and exclusions become prominent only when context or action is needed.
 - Audit detail remains available as the evidence layer behind summary metrics and insights.
+- Historical administrative review preserves lifecycle truth, uses append-only provenance, and may change only the current effective interpretation used by reporting.
 - No provider ranking, efficiency score, attendance inference, idle-time report, leaderboard, grade, quota, or punitive staff metric is introduced.
 
 ## Approved information hierarchy
@@ -102,14 +104,14 @@ The reusable report window offers exactly six user-facing choices: Today, Last 7
 
 ### Accepted Ready handoff
 
-For a canonical completed case, finalized reporting attribution comes from the accepted Ready handoff defined by issue #111:
+For an uncorrected canonical completed case, reporting attribution comes from the accepted Ready handoff defined by issue #111:
 
 - it is the latest successful Ready-for-Doctor handoff that was not withdrawn and subsequently led to Doctor Arrived;
 - Doctor Arrived accepts that handoff and does not create a new assignment snapshot;
 - withdrawn handoffs remain auditable but do not classify the completed case;
 - a reissued Ready creates a different reporting candidate and a new Ready-wait interval.
 
-The accepted Ready snapshot supplies canonical completed-case attribution for:
+The accepted Ready snapshot supplies immutable lifecycle evidence and the initial completed-case attribution for:
 
 - doctor;
 - procedure;
@@ -118,13 +120,15 @@ The accepted Ready snapshot supplies canonical completed-case attribution for:
 
 Add-on remains separate scheduling-context metadata and does not change this dispatch attribution boundary.
 
+A later explicit historical metadata correction under `docs/design/exception-handling-design.md` may become the current effective reporting value for the corrected field. Reports use that effective value without rewriting or replacing the accepted Ready handoff. Original and superseded values remain in audit/history. Ready and other lifecycle timestamps are never corrected or fabricated through this layer.
+
 ### Legacy completed cases
 
 Legacy completed cycles may lack a truthful durable Ready handoff or Ready timestamp.
 
 For those cases:
 
-- keep using the existing finalized historical assignment stored for the completed cycle;
+- use the existing finalized historical assignment stored for the completed cycle as the initial effective value unless an explicit historical correction overlay supersedes a correctable field;
 - do not fabricate or infer a Ready timestamp;
 - allow the case to remain in otherwise valid completed-case populations;
 - exclude it from metrics whose definition requires a truthful accepted Ready timestamp.
@@ -140,7 +144,9 @@ Conceptually distinguish:
 - normal completed history that remains visible in normal reporting;
 - the standard included completed population used by analytical aggregates;
 - reporting-excluded completed records that remain visible but do not enter standard aggregates;
-- manual-review exceptions that remain outside normal reporting;
+- Needs Review encounters that are provisionally excluded from normal analytics;
+- Confirmed Exceptions that remain wholly excluded from normal analytics;
+- Cleared encounters whose administrative gate is removed and whose ordinary population and metric eligibility is evaluated normally;
 - aborted or incomplete episodes that remain outside completed-case throughput;
 - metric-specific contributing subsets that require additional truthful timestamps or allocation data.
 
@@ -150,7 +156,8 @@ The Practice Overview `Completed Cases` headline preserves the existing normal c
 
 That means:
 
-- manual-review exceptions remain outside the normal count;
+- Needs Review and Confirmed Exception encounters remain outside the normal count;
+- Cleared completed encounters return to the truthful historical report period and ordinary count eligibility;
 - reporting-excluded completed records still count as truthfully completed cases;
 - Data Quality explains that some of those completed cases were excluded from analytical aggregates.
 
@@ -437,9 +444,9 @@ It evaluates the scheduling model, not provider performance.
 
 Historical assigned Schedule Fit and current-default Calibration answer different questions and must remain visibly and structurally separate.
 
-For historical assigned Schedule Fit, expected allocation is the finalized `CompletedRoomCycle.ExpectedAllocationMinutes`. For canonical cases, that value comes from the confirmed allocation captured by the accepted Ready handoff.
+For historical assigned Schedule Fit, expected allocation is the current effective positive historical allocation. For an uncorrected canonical case, that value comes from the confirmed allocation captured by the accepted Ready handoff. An explicit historical allocation correction may replace the current effective reporting value without rewriting that handoff.
 
-For legacy completed cases without a canonical accepted Ready snapshot, preserve existing finalized historical allocation attribution when otherwise valid. Do not invent a Ready timestamp to support it.
+For legacy completed cases without a canonical accepted Ready snapshot, preserve existing finalized historical allocation attribution as the initial effective value when otherwise valid. An explicit allocation correction may overlay that value; no Ready timestamp is invented to support either value.
 
 For current-default Calibration, the baseline is the current active base-procedure roster `DefaultExpectedUnits * 10` minutes. Do not use historical `ExpectedAllocationMinutes` or `OriginalDefaultExpectedUnits` as this baseline. `OriginalDefaultExpectedUnits` remains historical audit and disclosure context only. If no positive current active roster default resolves, historical assigned Schedule Fit may remain visible but Calibration is `CurrentDefaultUnavailable` and produces no insight.
 
@@ -571,14 +578,16 @@ Calibration Insight eligibility is independently N >= 10. A population may there
 
 ### Action-required state
 
-- elevate pending manual-review exceptions or other conditions requiring human action;
+- elevate Needs Review anomalies or other conditions requiring human action;
 - keep reason and review path available without polluting unrelated healthy surfaces.
 
 ### Audit evidence
 
-Case audit is the evidence layer behind summary metrics and insights.
+Case audit is the evidence layer behind summary metrics and insights. Data Quality is derivative of the active report population and inherits its applicable date, Doctor, Sedation, procedure/drill-down identity, and other approved analytical filters. Procedure Family versus Detailed Variant changes grouping or presentation, not population membership.
 
-The action-required Review Queue remains global within the selected reporting date window. Doctor and Sedation analytical scope do not hide unresolved review items. The analytical Case Audit does inherit the selected Practice or Doctor and Sedation scope.
+The default Data Quality review drill-down preserves that producing scope. The exhaustive raw-history surface may deliberately broaden the investigation afterward. This supersedes the older global Review Queue rule that ignored Doctor and Sedation analytical scope. A non-normal encounter appears in a filtered Data Quality population only when its current effective recorded facts satisfy the filter; missing membership is never inferred.
+
+Needs Review is the strongest action-required state. Cleared Anomalies, Confirmed Exceptions, Historical Corrections, and Reviewed provenance may be disclosed without treating them as additive reconciliation buckets. Cleared encounters may already be back in the ordinary eligible population.
 
 Drill-down must preserve the scope that produced a metric or insight so the user can inspect contributing cases without silently changing date, doctor, procedure, sedation, or inclusion context.
 
@@ -619,21 +628,21 @@ At publication of #212:
 - current observed-load reporting does not yet expose Unstructured Time under this definition;
 - current Procedure Mix is doctor-scoped; Practice Procedure Mix is future work under #215;
 - #219 adds the exact-second Reports Schedule Fit authority and server-owned current-default Calibration while preserving the legacy integer-minute Workshop compatibility contract;
-- #220 adds progressive Data Quality reconciliation, a paged server-owned audit/evidence query, and separate pending and reviewed exception disclosures.
+- #220 added progressive Data Quality reconciliation, a paged server-owned audit/evidence query, and separate pending and reviewed exception disclosures. Issue #234 supersedes its global Review Queue and permanently read-only reviewed-history assumptions at the canonical design level; later implementation work must reconcile the production behavior.
 
 These are implementation gaps, not permission to reinterpret the canonical definitions in this document.
 
 ## Audit and evidence authority
 
-Reports keeps three evidence populations distinct:
+Reports keeps three evidence modes distinct even when a Cleared encounter is represented in ordinary evidence as well as anomaly history:
 
-1. Completed-case audit is normal, non-manual-exception history with `RoomAvailableAt`. Practice includes both standard-included and reporting-excluded facts; Doctor and segmented completed drill-downs use the standard included population. Reporting-excluded rows remain visible with neutral reasons.
+1. Completed-case audit is ordinary completed history with `RoomAvailableAt` that is not currently Needs Review or Confirmed Exception. Practice includes both standard-included and reporting-excluded facts; Doctor and segmented completed drill-downs use the standard included population. Reporting-excluded rows remain visible with neutral reasons.
 2. Metric evidence is the exact scoped standard contributor population for the selected metric. It may contain truthful phase evidence from a historical cycle object that has not reached Room Available, and it must not be labeled completed throughput.
-3. Exception review contains pending completed exceptions, pending aborted assignments, and a separate read-only reviewed history. It never joins the normal audit population.
+3. Anomaly review contains Needs Review, Confirmed Exception, Cleared, correction, and reviewed provenance for completed and aborted/incomplete historical encounters. It uses one continuous append-only ledger per encounter. Resolved reviews may be reopened, and a Cleared encounter may also belong to the ordinary audit or analytical population because clearing removes only the administrative gate.
 
 `POST /api/reports/audit/query` owns contributor selection, exact-second projection, deterministic sorting, and offset paging. Audit requests inherit the normalized parent `report.query`; a Practice doctor segment is an additional `segmentDoctorId`, not a rewritten Doctor base scope. Sort, page, and audit-local standing changes never mutate or reload the parent report.
 
-Normal completed audit retains `DoctorCompleteAt` as its report-window anchor. Review selection is built separately: completed exceptions use `DoctorCompleteAt ?? DoctorArrivedAt ?? SeatedAt ?? PrestageStartedAt`, while aborted assignments use `TerminatedAt`. These review anchors do not redefine completed reporting dates.
+Normal completed audit retains `DoctorCompleteAt` as its report-window anchor. Review selection uses the encounter's truthful lifecycle date: completed exceptions use `DoctorCompleteAt ?? DoctorArrivedAt ?? SeatedAt ?? PrestageStartedAt`, while aborted assignments use `TerminatedAt`. Administrative action dates do not move encounters into a different report period. These review anchors do not redefine completed reporting dates.
 
 The compatibility `RecentCompletedCycles` projection remains bounded recent context and is not historical audit authority. Calibration replaces its independent inline case list with the unified audit query and passes the exact server-qualified completed-cycle and accepted-handoff identities for reconciliation.
 
@@ -666,11 +675,14 @@ Later implementation issues should derive these guards directly from this design
 - Schedule Fit tests must preserve compatible timing, separate slack/debt, signed net variance, and population coverage.
 - Calibration Insight tests must suppress weak evidence and prove no schedule mutation occurs.
 - Data Quality/audit tests must prove exclusions change calculations without erasing durable visibility and that drill-down preserves producing scope.
+- anomaly-review tests must prove whole-encounter Confirmed Exception exclusion, Cleared return to ordinary eligibility, append-only reopen history, immutable lifecycle evidence, effective-value correction overlays, scoped Data Quality membership, and stale administrative-write rejection.
 - presentation tests must reject provider ranking, attendance inference, idle-time wording, and punitive framing where those strings or structures are under application control.
 
 ## Delivery relationship
 
 This document is the hard design gate for #211.
+
+Issue #234 later extends this design only for historical anomaly administration and Data Quality reconciliation through `docs/design/exception-handling-design.md`. That extension does not redefine ordinary metric calculations or lifecycle truth.
 
 Dependency order remains:
 

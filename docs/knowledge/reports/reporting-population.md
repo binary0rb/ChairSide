@@ -6,6 +6,12 @@ last_verified_commit: fe60949
 
 # Reporting population
 
+## Status boundary
+
+**Current implementation:** The `active` tag and `last_verified_commit` apply to the current source/test behavior described below. Production still uses the existing exception flag, global Review Queue scope, accepted-handoff attribution, and pending/read-only-reviewed exception projections.
+
+**Approved target under #234:** The separately labeled target section records the approved design gate. It is not implemented by PR #235 and is not covered by `last_verified_commit`.
+
 ## Population funnel
 
 `GetReports` narrows persisted cycles in tiers:
@@ -24,7 +30,7 @@ last_verified_commit: fe60949
 - Practice or historical/current Doctor plus Sedation scope selects the analytical population.
 - Procedure Family or Detailed Variant selects aggregation without filtering population membership.
 
-Doctor scopes accept historical doctor IDs independently of the active assignment roster. Audit requests inherit the normalized parent query. A doctor segment under Practice remains Practice scope plus `segmentDoctorId`; it is not rewritten as a Doctor query. The action-required Review Queue ignores analytical Doctor and Sedation scope and remains global within the selected date window.
+Doctor scopes accept historical doctor IDs independently of the active assignment roster. Audit requests inherit the normalized parent query. A doctor segment under Practice remains Practice scope plus `segmentDoctorId`; it is not rewritten as a Doctor query. The action-required Review Queue currently ignores analytical Doctor and Sedation scope and remains global within the selected date window.
 
 ## Evidence population boundaries
 
@@ -40,7 +46,7 @@ The paged audit endpoint owns population membership, exact-second projection, so
 
 ## Assignment and handoff attribution
 
-The accepted Ready handoff is the finalized reporting assignment. Doctor Arrived accepts the current Active handoff; its immutable assignment supplies doctor, procedure, sedation, and confirmed expected allocation attribution. A withdrawn handoff remains auditable but never becomes accepted attribution and does not contribute its Ready interval to accepted Ready-to-arrival metrics.
+The accepted Ready handoff is the current finalized reporting assignment. Doctor Arrived accepts the current Active handoff; its immutable assignment supplies doctor, procedure, sedation, and confirmed expected allocation attribution. A withdrawn handoff remains auditable but never becomes accepted attribution and does not contribute its Ready interval to accepted Ready-to-arrival metrics.
 
 Legacy completed cycles continue to use their existing finalized assignment data. ChairSide does not manufacture a Ready handoff or Ready timestamp for legacy history.
 
@@ -51,6 +57,12 @@ Legacy completed cycles continue to use their existing finalized assignment data
 - Post-arrival expiration creates only a review-required exception population. It preserves the last active state and does not fabricate `DoctorCompleteAt`.
 - Excluded and exception records remain visible for audit/review; exclusion changes calculations, not durable visibility.
 - Aging and stale threshold flags are captured for completed cycles from the accepted handoff interval without persisting new `Aging` or `Stale` primary room states.
+
+## Approved target under #234
+
+Issue #234 keeps accepted Ready and lifecycle facts immutable while allowing an explicit historical correction overlay to become the current effective reporting value. It replaces the current split pending/read-only-reviewed projection with one append-only encounter ledger whose resolved review may be reopened. Needs Review provisionally excludes immediately, Confirmed Exception excludes the whole encounter, and Cleared removes only the administrative gate without manufacturing completion or metric facts.
+
+Under that approved target, Data Quality and its default review drill-down derive from the active report population and inherit applicable date, Doctor, Sedation, procedure/drill-down, and approved analytical filters. Exhaustive raw history may broaden deliberately. Filter membership uses current effective recorded facts and never infers missing doctor, procedure, or sedation values.
 
 ## Source and test anchors
 
