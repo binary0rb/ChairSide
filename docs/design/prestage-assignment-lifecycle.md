@@ -91,7 +91,7 @@ The general `SaveRoom`/`SaveRooms` UPSERT path remains available for unrelated i
 
 ## Reporting
 
-The handoff accepted by Doctor Arrived supplies finalized doctor, procedure, sedation, allocation, and Add-on attribution. Withdrawn handoffs remain auditable but are excluded from accepted attribution and their Ready intervals do not become accepted Ready-to-arrival time. Pre-arrival aborts remain outside throughput. Post-arrival expiration belongs only to review-required exception populations. Add-on cases remain in ordinary reporting and are not classified as exceptions solely because of the modifier.
+The handoff accepted by Doctor Arrived supplies the immutable lifecycle evidence and initial doctor, procedure, sedation, allocation, and Add-on reporting attribution. Withdrawn handoffs remain auditable but are excluded from accepted attribution and their Ready intervals do not become accepted Ready-to-arrival time. A later explicit historical metadata correction may supply the current effective reporting value for a corrected field under `docs/design/exception-handling-design.md`; that administrative overlay never rewrites the accepted handoff or any lifecycle timestamp. Pre-arrival aborts remain outside throughput. Post-arrival expiration belongs only to review-required exception populations. Add-on cases remain in ordinary reporting and are not classified as exceptions solely because of the modifier.
 
 Completed-cycle Aging/Stale threshold flags are calculated from the accepted Ready interval without requiring newly persisted Aging/Stale primary room states. Legacy completed cycles retain their existing assignment and timing representation; no Ready timestamp or handoff is fabricated for them.
 

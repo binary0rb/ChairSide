@@ -1,6 +1,6 @@
 ---
 title: Room lifecycle
-tags: [room, board, room-lifecycle, data-persistence, permissions, device-binding, domain-rule, active, last-verified]
+tags: [room, board, room-lifecycle, data-persistence, permissions, device-binding, exception-handling, domain-rule, active, last-verified]
 last_verified_commit: b516481
 ---
 
@@ -32,7 +32,7 @@ A valid legacy `Aging` or `Stale` row with a matching owned Active handoff may w
 
 ## Cancellation, expiration, and recovery
 
-Pre-arrival cancellation and max-duration expiration create aborted-assignment history, not throughput. The nightly after-hours sweep also preserves pre-arrival truth in aborted-assignment history, but marks those records as `AfterHoursSweep` exceptions and projects them into the same administrative review queue as post-arrival exceptions. Faulted pre-arrival Ready rows remain visible and safely cancellable; unrelated or invalid handoff records are not rewritten. Post-arrival expiration creates a review-required exception cycle without inventing `DoctorCompleteAt` or other lifecycle timestamps.
+Pre-arrival cancellation and max-duration expiration create aborted-assignment history, not throughput. The nightly after-hours sweep also preserves pre-arrival truth in aborted-assignment history and appends an objective `AfterHoursSweep` system finding to the encounter's continuous administrative ledger, entering Needs Review. Faulted pre-arrival Ready rows remain visible and safely cancellable; unrelated or invalid handoff records are not rewritten. Post-arrival expiration creates review-required history without inventing `DoctorCompleteAt` or other lifecycle timestamps. Later administrative correction or disposition follows `docs/design/exception-handling-design.md` and never rewrites this lifecycle evidence.
 
 The after-hours sweep processes each active room in its existing per-room transaction. A committed room remains Available if a later room fails. The failed and later active rooms remain retryable because the clinic day is marked complete only after the entire pass succeeds; restart recovery likewise skips durably Available rooms and processes only active rooms.
 

@@ -244,6 +244,8 @@ Room lifecycle mutation should occur from the room-local tablet/panel only. When
 
 `docs/design/reporting-design.md` is the canonical design authority for approved reporting semantics. It consumes the lifecycle and accepted Ready-handoff facts defined by `docs/design/prestage-assignment-lifecycle.md` and issue #111; reporting work must not redefine those lifecycle facts independently.
 
+`docs/design/exception-handling-design.md` is the canonical authority for historical anomaly review, administrative correction overlays, dispositions, ledger history, and Data Quality reconciliation.
+
 Core reporting rules:
 
 - ChairSide reports only what its room events actually observe. Do not infer attendance, productivity, availability, scheduled hours, or unobserved activity.

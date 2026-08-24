@@ -24,13 +24,15 @@ last_verified_commit: fe60949
 - Practice or historical/current Doctor plus Sedation scope selects the analytical population.
 - Procedure Family or Detailed Variant selects aggregation without filtering population membership.
 
-Doctor scopes accept historical doctor IDs independently of the active assignment roster. Audit requests inherit the normalized parent query. A doctor segment under Practice remains Practice scope plus `segmentDoctorId`; it is not rewritten as a Doctor query. The action-required Review Queue ignores analytical Doctor and Sedation scope and remains global within the selected date window.
+Doctor scopes accept historical doctor IDs independently of the active assignment roster. Audit requests inherit the normalized parent query. A doctor segment under Practice remains Practice scope plus `segmentDoctorId`; it is not rewritten as a Doctor query.
+
+Issue #234 supersedes the global Review Queue rule for the canonical target design. Data Quality and its default review drill-down derive from the active report population and inherit applicable date, Doctor, Sedation, procedure/drill-down, and approved analytical filters. The exhaustive raw-history surface may broaden the investigation deliberately. Filter membership uses current effective recorded facts and never infers missing doctor, procedure, or sedation values.
 
 ## Evidence population boundaries
 
 - Completed-case audit includes normal history with Room Available. Practice audit includes reporting-excluded facts with neutral standing and reasons; included or segmented audit uses the standard included population.
 - Metric evidence selects the exact standard contributor population for Ready Wait, Seated -> Doctor, Doctor Time, Turnover, Procedure Mix, or Schedule Fit. Truthful phase evidence may be shown before Room Available and is labeled Metric evidence rather than completed throughput.
-- Exception review is separate from both populations. Pending records remain actionable; reviewed records remain in a quiet read-only history.
+- Anomaly review carries Needs Review, Confirmed Exception, Cleared, correction, and reviewed provenance in one append-only encounter ledger. Resolved reviews may be reopened. Cleared encounters may return to ordinary audit and reporting eligibility because clearing removes only the administrative gate.
 
 Normal audit and analytical evidence preserve `DoctorCompleteAt` window authority. Review is selected independently: completed exceptions use the latest truthful anchor in `DoctorCompleteAt`, `DoctorArrivedAt`, `SeatedAt`, then `PrestageStartedAt`; aborted assignments use `TerminatedAt`. Review counts therefore do not disappear merely because an exception lacks Doctor Complete.
 
@@ -40,15 +42,16 @@ The paged audit endpoint owns population membership, exact-second projection, so
 
 ## Assignment and handoff attribution
 
-The accepted Ready handoff is the finalized reporting assignment. Doctor Arrived accepts the current Active handoff; its immutable assignment supplies doctor, procedure, sedation, and confirmed expected allocation attribution. A withdrawn handoff remains auditable but never becomes accepted attribution and does not contribute its Ready interval to accepted Ready-to-arrival metrics.
+The accepted Ready handoff is immutable lifecycle evidence and supplies the initial reporting assignment. Doctor Arrived accepts the current Active handoff; its immutable assignment supplies doctor, procedure, sedation, and confirmed expected allocation attribution for an uncorrected encounter. A later explicit historical metadata correction may supply the current effective reporting value without rewriting the handoff. Original and superseded values remain in audit/history. A withdrawn handoff remains auditable but never becomes accepted attribution and does not contribute its Ready interval to accepted Ready-to-arrival metrics.
 
-Legacy completed cycles continue to use their existing finalized assignment data. ChairSide does not manufacture a Ready handoff or Ready timestamp for legacy history.
+Legacy completed cycles use their existing finalized assignment data as the initial effective value unless an explicit historical correction overlays a correctable field. ChairSide does not manufacture a Ready handoff or Ready timestamp for legacy history.
 
 ## Termination populations
 
 - Pre-arrival cancellation and max-duration expiration create aborted assignment history and stay outside throughput.
-- Pre-arrival after-hours terminations remain truthful aborted assignment history outside throughput, while a unified review projection surfaces them as pending `AfterHoursSweep` exceptions without manufacturing a completed clinical cycle.
+- Pre-arrival after-hours terminations remain truthful aborted assignment history outside throughput, while an objective `AfterHoursSweep` system finding enters Needs Review in the encounter's continuous ledger without manufacturing a completed clinical cycle.
 - Post-arrival expiration creates only a review-required exception population. It preserves the last active state and does not fabricate `DoctorCompleteAt`.
+- Needs Review is provisionally excluded immediately. Confirmed Exception is whole-encounter exclusion; it is never partially included in normal analytics. Cleared removes only the administrative gate and does not manufacture completion or missing metric facts.
 - Excluded and exception records remain visible for audit/review; exclusion changes calculations, not durable visibility.
 - Aging and stale threshold flags are captured for completed cycles from the accepted handoff interval without persisting new `Aging` or `Stale` primary room states.
 

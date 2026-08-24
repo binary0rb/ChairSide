@@ -6,20 +6,20 @@ last_verified_commit: fe60949
 
 # Report audit and metric evidence
 
-## Three separate populations
+## Evidence modes and populations
 
-ChairSide uses one shared presentation but does not merge the underlying evidence populations.
+ChairSide uses one shared presentation but does not treat the evidence modes as interchangeable. A Cleared encounter may appear in ordinary evidence and retain anomaly history at the same time.
 
 - Completed-case audit is normal completed history with Room Available. Practice includes reporting-excluded facts with explicit neutral standing; standard included audit omits them.
 - Metric evidence is the exact contributor population for a selected server metric. Phase contributors may lack Room Available and are never described as completed throughput.
 - Procedure Intelligence timing evidence begins with its standard included completed row population and then applies the selected metric's truthful interval requirement. Its Ready Wait and Doctor Time drill-down therefore do not reuse the broader generic phase populations, and its Seated to Doctor Complete evidence does not require a positive scheduling allocation.
-- Exception review contains pending completed and aborted exceptions. Reviewed exception history is a separate read-only disclosure with no actions.
+- Anomaly review contains Needs Review, Confirmed Exception, Cleared, correction, and reviewed provenance for completed and aborted/incomplete historical encounters. One continuous append-only ledger owns each encounter's history. Resolved reviews may be reopened, and later correction or system-finding events append rather than replace prior decisions.
 
-Manual exceptions and aborted assignments never appear in completed-case audit or metric evidence.
+Needs Review and Confirmed Exception encounters never appear in completed-case audit or metric evidence. A Cleared encounter may return to ordinary eligibility under its truthful lifecycle facts; clearing an aborted/incomplete encounter never promotes it to completed throughput.
 
 ## Query and scope transfer
 
-The admin-protected read-only `POST /api/reports/audit/query` accepts the normalized parent window, Practice or Doctor scope, doctor ID, Sedation scope, Procedure Grouping, contributor kind, optional segment doctor and procedure identity, analytical standing, Calibration evidence identities, sort, offset, and limit. Default page size is 50 and the server caps it at 100.
+The current admin-protected read-only `POST /api/reports/audit/query` accepts the normalized parent window, Practice or Doctor scope, doctor ID, Sedation scope, Procedure Grouping, contributor kind, optional segment doctor and procedure identity, analytical standing, Calibration evidence identities, sort, offset, and limit. Default page size is 50 and the server caps it at 100. Issue #234 is a design gate for later administrative mutation contracts; it does not change this endpoint by itself.
 
 The response returns normalized selection, evidence mode, projected rows, counts, page state, active sort, and supported sorts. JavaScript uses this contract without changing the parent report query or reloading the main report. Practice plus `segmentDoctorId` stays Practice base scope.
 
@@ -27,7 +27,9 @@ The response returns normalized selection, evidence mode, projected rows, counts
 
 Normal audit retains the completed report's `DoctorCompleteAt` window. Review selection is separate: completed exceptions use the latest truthful lifecycle anchor and aborted assignments use `TerminatedAt`.
 
-Audit rows expose exact ordered seconds. Missing or reversed intervals are null, never zero-clamped. Stable completed-cycle and optional accepted Ready-handoff identities support Mark Exception and Calibration evidence reconciliation without PHI.
+Audit rows expose exact ordered seconds. Missing or reversed intervals are null, never zero-clamped. Stable encounter, completed-cycle, and optional accepted Ready-handoff identities let every entry point reach the same durable review workflow without PHI. The canonical manual action is Mark for Review. Historical correction changes current effective metadata through an overlay while the accepted Ready handoff and lifecycle evidence remain immutable.
+
+Data Quality and its default review drill-down inherit the active report's applicable date, Doctor, Sedation, procedure/drill-down, and approved analytical filters. The exhaustive raw-history surface may deliberately broaden scope. Needs Review is elevated; Cleared, Confirmed Exception, Historical Correction, and Reviewed counts are not blindly additive because disposition, reporting eligibility, and provenance are separate concepts.
 
 ## Compatibility
 

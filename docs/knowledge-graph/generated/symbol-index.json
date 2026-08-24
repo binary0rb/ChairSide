@@ -1,7 +1,7 @@
 ﻿{
     "generatedStamp":  "deterministic",
     "root":  ".",
-    "fileCount":  182,
+    "fileCount":  183,
     "files":  [
                   {
                       "path":  ".github/pull_request_template.md",
@@ -60,7 +60,7 @@
                   {
                       "path":  "AGENTS.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  21070,
+                      "sizeBytes":  21270,
                       "typeSymbols":  [
 
                                       ],
@@ -159,9 +159,58 @@
                                    ]
                   },
                   {
+                      "path":  "docs/design/exception-handling-design.md",
+                      "kind":  "Markdown",
+                      "sizeBytes":  15684,
+                      "typeSymbols":  [
+
+                                      ],
+                      "methodSymbols":  [
+
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+                                       "ChairSide Canonical Exception and Anomaly Handling Design",
+                                       "Status and authority",
+                                       "Core model",
+                                       "Canonical vocabulary",
+                                       "Anomaly creation",
+                                       "Manual Mark for Review",
+                                       "One continuous ledger per encounter",
+                                       "Historical metadata correction",
+                                       "Accepted Ready evidence and effective attribution",
+                                       "Pending review and dispositions",
+                                       "Needs Review",
+                                       "Confirmed Exception",
+                                       "Cleared for Reporting",
+                                       "Reopen Review",
+                                       "Notes, actors, and minimum ledger fields",
+                                       "Atomicity and concurrency",
+                                       "Reporting period and effective truth",
+                                       "Data Quality scope and reconciliation",
+                                       "Temporal navigation",
+                                       "Audit and raw-history experience",
+                                       "Visibility, deletion, retention, and scale",
+                                       "Migration",
+                                       "Passive diagnostic value",
+                                       "Implementation boundaries"
+                                   ]
+                  },
+                  {
                       "path":  "docs/design/prestage-assignment-lifecycle.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  13792,
+                      "sizeBytes":  14097,
                       "typeSymbols":  [
 
                                       ],
@@ -200,7 +249,7 @@
                   {
                       "path":  "docs/design/reporting-design.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  36386,
+                      "sizeBytes":  39834,
                       "typeSymbols":  [
 
                                       ],
@@ -304,7 +353,7 @@
                   {
                       "path":  "docs/knowledge/_meta/tag-dictionary.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  13825,
+                      "sizeBytes":  13891,
                       "typeSymbols":  [
 
                                       ],
@@ -405,7 +454,7 @@
                   {
                       "path":  "docs/knowledge/reports/audit-evidence.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  3170,
+                      "sizeBytes":  4424,
                       "typeSymbols":  [
 
                                       ],
@@ -426,7 +475,7 @@
                                           ],
                       "headings":  [
                                        "Report audit and metric evidence",
-                                       "Three separate populations",
+                                       "Evidence modes and populations",
                                        "Query and scope transfer",
                                        "Time and identity authority",
                                        "Compatibility",
@@ -536,7 +585,7 @@
                   {
                       "path":  "docs/knowledge/reports/reporting-population.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  6221,
+                      "sizeBytes":  7346,
                       "typeSymbols":  [
 
                                       ],
@@ -696,7 +745,7 @@
                   {
                       "path":  "docs/knowledge/workflow/room-lifecycle.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  9520,
+                      "sizeBytes":  9659,
                       "typeSymbols":  [
 
                                       ],
@@ -759,7 +808,7 @@
                   {
                       "path":  "docs/knowledge-graph/chairside.graph.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  19987,
+                      "sizeBytes":  22204,
                       "typeSymbols":  [
 
                                       ],
@@ -790,7 +839,7 @@
                   {
                       "path":  "docs/knowledge-graph/decisions.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  23857,
+                      "sizeBytes":  26413,
                       "typeSymbols":  [
 
                                       ],
@@ -827,6 +876,7 @@
                                        "Maintenance reset",
                                        "Environment and maintenance preflight",
                                        "Reporting population semantics",
+                                       "Historical exception and anomaly handling",
                                        "Canonical reporting semantics",
                                        "Reporting UI philosophy",
                                        "Completed follow-up work"
