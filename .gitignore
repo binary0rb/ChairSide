@@ -16,4 +16,5 @@ Backups/
 
 publish/
 .claude/
+.playwright-mcp/
 node_modules/

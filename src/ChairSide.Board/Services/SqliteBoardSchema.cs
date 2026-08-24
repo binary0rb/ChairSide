@@ -329,6 +329,7 @@ internal static class SqliteBoardSchema
         }
 
         CreateReadyHandoffIndexes(connection, transaction);
+        CreateHistoricalQueryIndexes(connection, transaction);
     }
 
     private static void InitializeSchemaAndMigrations(SqliteConnection connection)
@@ -407,6 +408,7 @@ internal static class SqliteBoardSchema
         MigrateNullableDoctorArrivedAt(connection);
         MigrateAbortedAssignmentCanonicalSchema(connection);
         CreateReadyHandoffIndexes(connection);
+        CreateHistoricalQueryIndexes(connection);
     }
 
     // Canonical CREATE for completed_room_cycles (current schema: explicit id primary key,
@@ -851,6 +853,47 @@ internal static class SqliteBoardSchema
         command.ExecuteNonQuery();
     }
 
+    private static void CreateHistoricalQueryIndexes(
+        SqliteConnection connection,
+        SqliteTransaction? transaction = null)
+    {
+        var completedColumns = GetColumnNames(connection, "completed_room_cycles");
+        if (completedColumns.Contains("id"))
+        {
+            ExecuteOptional(connection, transaction, """
+                CREATE INDEX IF NOT EXISTS ix_completed_cycles_report_window
+                    ON completed_room_cycles(doctor_complete_at DESC, id DESC);
+                """);
+        }
+
+        if (completedColumns.Contains("id")
+            && completedColumns.Contains("is_exception")
+            && completedColumns.Contains("requires_review")
+            && completedColumns.Contains("prestage_started_at"))
+        {
+            ExecuteOptional(connection, transaction, """
+                CREATE INDEX IF NOT EXISTS ix_completed_cycles_review_window
+                    ON completed_room_cycles(
+                        COALESCE(doctor_complete_at, doctor_arrived_at, seated_at, prestage_started_at) DESC,
+                        requires_review,
+                        id DESC)
+                    WHERE is_exception = 1;
+                """);
+        }
+
+        var abortedColumns = GetColumnNames(connection, "aborted_room_assignments");
+        if (abortedColumns.Contains("id")
+            && abortedColumns.Contains("is_exception")
+            && abortedColumns.Contains("requires_review"))
+        {
+            ExecuteOptional(connection, transaction, """
+                CREATE INDEX IF NOT EXISTS ix_aborted_assignments_review_window
+                    ON aborted_room_assignments(terminated_at DESC, requires_review, id DESC)
+                    WHERE is_exception = 1;
+                """);
+        }
+    }
+
     private static void EnableWal(
         SqliteConnection connection,
         DeploymentEnvironment deploymentEnvironment,
@@ -949,6 +992,21 @@ internal static class SqliteBoardSchema
         using var cmd = connection.CreateCommand();
         cmd.CommandText = sql;
         cmd.ExecuteNonQuery();
+    }
+
+    private static void ExecuteOptional(
+        SqliteConnection connection,
+        SqliteTransaction? transaction,
+        string sql)
+    {
+        if (transaction is null)
+        {
+            Execute(connection, sql);
+        }
+        else
+        {
+            Execute(connection, transaction, sql);
+        }
     }
 
     internal static void TryAddColumn(SqliteConnection connection, string alterTableSql)

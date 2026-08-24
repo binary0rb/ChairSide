@@ -351,6 +351,12 @@
                       "path":  "src/ChairSide.Board/Services/AdminAccessTokenValidator.cs"
                   },
                   {
+                      "id":  "file:src/ChairSide.Board/Services/BoundedReportCollections.cs",
+                      "label":  "src/ChairSide.Board/Services/BoundedReportCollections.cs",
+                      "type":  "File",
+                      "path":  "src/ChairSide.Board/Services/BoundedReportCollections.cs"
+                  },
+                  {
                       "id":  "file:src/ChairSide.Board/Services/CalibrationInsightReport.cs",
                       "label":  "src/ChairSide.Board/Services/CalibrationInsightReport.cs",
                       "type":  "File",
@@ -421,6 +427,12 @@
                       "label":  "src/ChairSide.Board/Services/ExceptionReviewRecords.cs",
                       "type":  "File",
                       "path":  "src/ChairSide.Board/Services/ExceptionReviewRecords.cs"
+                  },
+                  {
+                      "id":  "file:src/ChairSide.Board/Services/HistoricalEncounterQuery.cs",
+                      "label":  "src/ChairSide.Board/Services/HistoricalEncounterQuery.cs",
+                      "type":  "File",
+                      "path":  "src/ChairSide.Board/Services/HistoricalEncounterQuery.cs"
                   },
                   {
                       "id":  "file:src/ChairSide.Board/Services/IReparsePointInspector.cs",
@@ -847,6 +859,12 @@
                       "label":  "tests/ChairSide.Board.Tests/FaultedReadyCancellationTests.cs",
                       "type":  "File",
                       "path":  "tests/ChairSide.Board.Tests/FaultedReadyCancellationTests.cs"
+                  },
+                  {
+                      "id":  "file:tests/ChairSide.Board.Tests/HistoricalQueryPersistenceTests.cs",
+                      "label":  "tests/ChairSide.Board.Tests/HistoricalQueryPersistenceTests.cs",
+                      "type":  "File",
+                      "path":  "tests/ChairSide.Board.Tests/HistoricalQueryPersistenceTests.cs"
                   },
                   {
                       "id":  "file:tests/ChairSide.Board.Tests/LifecycleFixtureCorrectionTests.cs",
@@ -1389,6 +1407,18 @@
                       "path":  "src/ChairSide.Board/Options/BoardUiOptions.cs"
                   },
                   {
+                      "id":  "symbol:type:BoundedGroupingSet",
+                      "label":  "BoundedGroupingSet",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/BoundedReportCollections.cs"
+                  },
+                  {
+                      "id":  "symbol:type:BoundedReportCollections",
+                      "label":  "BoundedReportCollections",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/BoundedReportCollections.cs"
+                  },
+                  {
                       "id":  "symbol:type:Bucket",
                       "label":  "Bucket",
                       "type":  "CodeType",
@@ -1719,6 +1749,18 @@
                       "path":  "src/ChairSide.Board/Options/DiagnosticOptions.cs"
                   },
                   {
+                      "id":  "symbol:type:DiskBackedReadOnlyList",
+                      "label":  "DiskBackedReadOnlyList",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/BoundedReportCollections.cs"
+                  },
+                  {
+                      "id":  "symbol:type:DiskGrouping",
+                      "label":  "DiskGrouping",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/BoundedReportCollections.cs"
+                  },
+                  {
                       "id":  "symbol:type:Doctor",
                       "label":  "Doctor",
                       "type":  "CodeType",
@@ -2031,10 +2073,34 @@
                       "path":  "tests/ChairSide.Board.Tests/PrestagingLifecycleEndpointTests.cs"
                   },
                   {
+                      "id":  "symbol:type:HistoricalEncounterRecord",
+                      "label":  "HistoricalEncounterRecord",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/HistoricalEncounterQuery.cs"
+                  },
+                  {
+                      "id":  "symbol:type:HistoricalEncounterSourceTypes",
+                      "label":  "HistoricalEncounterSourceTypes",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/HistoricalEncounterQuery.cs"
+                  },
+                  {
                       "id":  "symbol:type:HistoricalPair",
                       "label":  "HistoricalPair",
                       "type":  "CodeType",
                       "path":  "src/ChairSide.Board/Services/CalibrationInsightReport.cs"
+                  },
+                  {
+                      "id":  "symbol:type:HistoricalQueryPage",
+                      "label":  "HistoricalQueryPage",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/HistoricalEncounterQuery.cs"
+                  },
+                  {
+                      "id":  "symbol:type:HistoricalQueryPersistenceTests",
+                      "label":  "HistoricalQueryPersistenceTests",
+                      "type":  "CodeType",
+                      "path":  "tests/ChairSide.Board.Tests/HistoricalQueryPersistenceTests.cs"
                   },
                   {
                       "id":  "symbol:type:IReparsePointInspector",
@@ -2149,6 +2215,12 @@
                       "label":  "NormalizedDatabaseIsolationLayout",
                       "type":  "CodeType",
                       "path":  "src/ChairSide.Board/Services/DatabaseIsolationPolicy.cs"
+                  },
+                  {
+                      "id":  "symbol:type:NumericOrderStatistics",
+                      "label":  "NumericOrderStatistics",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/BoundedReportCollections.cs"
                   },
                   {
                       "id":  "symbol:type:ObservedDoctorDay",
@@ -2605,6 +2677,12 @@
                       "label":  "ReportSedationSegments",
                       "type":  "CodeType",
                       "path":  "src/ChairSide.Board/Services/ReportQuery.cs"
+                  },
+                  {
+                      "id":  "symbol:type:ReportSpoolScope",
+                      "label":  "ReportSpoolScope",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/BoundedReportCollections.cs"
                   },
                   {
                       "id":  "symbol:type:ReportsSnapshot",
@@ -3318,6 +3396,36 @@
                       "label":  "declares"
                   },
                   {
+                      "from":  "file:src/ChairSide.Board/Services/BoundedReportCollections.cs",
+                      "to":  "symbol:type:BoundedGroupingSet",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/BoundedReportCollections.cs",
+                      "to":  "symbol:type:BoundedReportCollections",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/BoundedReportCollections.cs",
+                      "to":  "symbol:type:DiskBackedReadOnlyList",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/BoundedReportCollections.cs",
+                      "to":  "symbol:type:DiskGrouping",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/BoundedReportCollections.cs",
+                      "to":  "symbol:type:NumericOrderStatistics",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/BoundedReportCollections.cs",
+                      "to":  "symbol:type:ReportSpoolScope",
+                      "label":  "declares"
+                  },
+                  {
                       "from":  "file:src/ChairSide.Board/Services/CalibrationInsightReport.cs",
                       "to":  "symbol:type:CalibrationBaselineSources",
                       "label":  "declares"
@@ -3775,6 +3883,26 @@
                   {
                       "from":  "file:src/ChairSide.Board/Services/ExceptionReviewRecords.cs",
                       "to":  "symbol:type:ExceptionReviewSources",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/HistoricalEncounterQuery.cs",
+                      "to":  "symbol:type:HistoricalEncounterRecord",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/HistoricalEncounterQuery.cs",
+                      "to":  "symbol:type:HistoricalEncounterSourceTypes",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/HistoricalEncounterQuery.cs",
+                      "to":  "symbol:type:HistoricalQueryPage",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/HistoricalEncounterQuery.cs",
+                      "to":  "symbol:type:struct",
                       "label":  "declares"
                   },
                   {
@@ -4513,6 +4641,11 @@
                       "label":  "declares"
                   },
                   {
+                      "from":  "file:tests/ChairSide.Board.Tests/HistoricalQueryPersistenceTests.cs",
+                      "to":  "symbol:type:HistoricalQueryPersistenceTests",
+                      "label":  "declares"
+                  },
+                  {
                       "from":  "file:tests/ChairSide.Board.Tests/LifecycleFixtureCorrectionTests.cs",
                       "to":  "symbol:type:AbortedSnapshot",
                       "label":  "declares"
@@ -4999,6 +5132,11 @@
                   },
                   {
                       "from":  "repo:chairside",
+                      "to":  "file:src/ChairSide.Board/Services/BoundedReportCollections.cs",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
                       "to":  "file:src/ChairSide.Board/Services/CalibrationInsightReport.cs",
                       "label":  "contains"
                   },
@@ -5055,6 +5193,11 @@
                   {
                       "from":  "repo:chairside",
                       "to":  "file:src/ChairSide.Board/Services/ExceptionReviewRecords.cs",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:src/ChairSide.Board/Services/HistoricalEncounterQuery.cs",
                       "label":  "contains"
                   },
                   {
@@ -5410,6 +5553,11 @@
                   {
                       "from":  "repo:chairside",
                       "to":  "file:tests/ChairSide.Board.Tests/FaultedReadyCancellationTests.cs",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:tests/ChairSide.Board.Tests/HistoricalQueryPersistenceTests.cs",
                       "label":  "contains"
                   },
                   {

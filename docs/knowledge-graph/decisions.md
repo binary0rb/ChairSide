@@ -168,6 +168,12 @@ This file records decisions that should survive across tasks, PRs, and debugging
 
 **Decision:** Normal audit preserves `DoctorCompleteAt` window anchoring. Completed exception review instead uses the latest truthful lifecycle timestamp and aborted review uses `TerminatedAt`. Administrative action dates do not change the encounter's reporting period. Data Quality review uses the active analytical scope by default, while exhaustive raw history may broaden deliberately.
 
+## Bounded historical persistence access
+
+**Decision:** Startup and ordinary room operation keep no lifetime completed-cycle cache. Reporting enumerates selected completed, review-completed, and aborted sources in fixed SQLite pages, obtains all-time scoped totals with a database count, and spills replayable populations plus exact ordered statistics to private temporary SQLite storage above a small in-memory threshold. Audit and review retrieval retain only a request-bounded ordered working set and exact match count; label-based review sorts globally merge builder-projected labels across persistence pages. Calibration Evidence replays the complete selected candidate population through the same bounded path before reconciling explicit evidence identities. A historical source record is addressed by source type plus durable source record ID; no synthetic historical encounter table is introduced by this query foundation.
+
+**Rationale:** Indefinite retention must not make startup, live-room integrity, All Time calculation, or paged evidence reads proportional in managed memory to lifetime encounter history. Exact medians, Type 7 ranges, trends, overlap/concurrency, Schedule Fit, and Calibration may replay disk-backed observations; they must not use caps or approximations. Storage anchoring remains distinct: normal reporting uses `DoctorCompleteAt`, completed review uses `DoctorCompleteAt ?? DoctorArrivedAt ?? SeatedAt ?? PrestageStartedAt`, and aborted review uses `TerminatedAt`.
+
 **Decision:** Practice Completed Cases remains normal included plus reporting-excluded completed history. Doctor Completed Cases uses the scoped standard included completed population and its matching sample context.
 
 **Rationale:** The reporting redesign must explain observed operational flow and scheduling-model fit without converting incomplete observation into judgments about doctors or staff. Precise shared semantics prevent later report slices from inventing incompatible denominators, time intervals, or interpretation language.

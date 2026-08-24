@@ -10,6 +10,7 @@ internal sealed partial class ReportsSnapshotBuilder
         IReadOnlyList<AbortedRoomAssignment> abortedAssignments,
         ReportAuditRequest request)
     {
+        using var spoolScope = ReportSpoolScope.Begin();
         ArgumentNullException.ThrowIfNull(completedCycles);
         ArgumentNullException.ThrowIfNull(abortedAssignments);
         ArgumentNullException.ThrowIfNull(request);
@@ -58,36 +59,53 @@ internal sealed partial class ReportsSnapshotBuilder
                 limit);
         }
 
-        var selected = CreateAnnotatedCompletedCycleSnapshot(completedCycles)
+        var selected = BoundedReportCollections.Materialize(CreateAnnotatedCompletedCycleSnapshot(completedCycles)
             .Where(cycle => query.Window.Includes(cycle.DoctorCompleteAt))
             .Where(cycle => !cycle.IsException)
             .Where(query.IncludesAnalyticalCycle)
-            .Where(cycle => MatchesSegmentDoctor(cycle, selection.SegmentDoctorId))
-            .ToList();
-        var standard = selected.Where(cycle => !cycle.IsExcludedFromStandardMetrics).ToList();
+            .Where(cycle => MatchesSegmentDoctor(cycle, selection.SegmentDoctorId)));
+        var standard = BoundedReportCollections.Materialize(
+            selected.Where(cycle => !cycle.IsExcludedFromStandardMetrics));
         var population = SelectContributorPopulation(selected, standard, selection);
         var mode = contributorKind is ReportAuditContributorKinds.PracticeCompletedCases
             or ReportAuditContributorKinds.IncludedCompletedCases
             ? ReportAuditModes.CompletedCaseAudit
             : ReportAuditModes.MetricEvidence;
 
-        IReadOnlyDictionary<long, CalibrationEvidenceCase> calibrationEvidence =
-            new Dictionary<long, CalibrationEvidenceCase>();
+        IReadOnlyList<CalibrationEvidenceCase> calibrationEvidence = [];
         if (contributorKind == ReportAuditContributorKinds.CalibrationEvidence)
         {
             calibrationEvidence = ResolveCalibrationEvidence(population, selection);
-            population = population
-                .Where(cycle => calibrationEvidence.ContainsKey(cycle.CompletedCycleId))
-                .ToList();
+            population = SelectCalibrationEvidencePopulation(population, calibrationEvidence);
         }
 
-        population = ApplyStanding(population, standing).ToList();
-        var rows = population
-            .Select(cycle => ToAuditRow(
+        population = BoundedReportCollections.Materialize(ApplyStanding(population, standing));
+        var retainedLimit = offset > int.MaxValue - limit ? int.MaxValue : offset + limit;
+        var rows = new List<ReportAuditRow>(Math.Min(retainedLimit, MaximumAuditLimit));
+        var totalMatchingCount = 0;
+        using var calibrationEnumerator = calibrationEvidence.GetEnumerator();
+        var hasCalibrationEvidence = calibrationEnumerator.MoveNext();
+        foreach (var cycle in population)
+        {
+            while (hasCalibrationEvidence
+                && calibrationEnumerator.Current.CompletedCycleId < cycle.CompletedCycleId)
+            {
+                hasCalibrationEvidence = calibrationEnumerator.MoveNext();
+            }
+            var matchingCalibrationEvidence = hasCalibrationEvidence
+                && calibrationEnumerator.Current.CompletedCycleId == cycle.CompletedCycleId
+                    ? calibrationEnumerator.Current
+                    : null;
+            totalMatchingCount++;
+            rows.Add(ToAuditRow(
                 cycle,
                 mode,
-                calibrationEvidence.GetValueOrDefault(cycle.CompletedCycleId)))
-            .ToList();
+                matchingCalibrationEvidence));
+            if (rows.Count > retainedLimit)
+            {
+                rows = OrderAuditRows(rows, sort).Take(retainedLimit).ToList();
+            }
+        }
         var ordered = OrderAuditRows(rows, sort).ToList();
         var pageRows = ordered.Skip(offset).Take(limit).ToList();
 
@@ -97,10 +115,10 @@ internal sealed partial class ReportsSnapshotBuilder
             pageRows,
             [],
             pageRows.Count,
-            ordered.Count,
+            totalMatchingCount,
             offset,
             limit,
-            offset + pageRows.Count < ordered.Count,
+            offset + pageRows.Count < totalMatchingCount,
             sort,
             supportedSorts);
     }
@@ -119,12 +137,7 @@ internal sealed partial class ReportsSnapshotBuilder
             normalCompletedCycles.Count - standardCompletedCycles.Count,
             reviewRows.Count(row => row.RequiresReview),
             reviewRows.Count(row => !row.RequiresReview),
-            normalCompletedCycles
-                .SelectMany(cycle => cycle.ReportingExceptionReasons)
-                .GroupBy(reason => reason, StringComparer.Ordinal)
-                .OrderBy(group => group.Key, StringComparer.Ordinal)
-                .Select(group => new ReportDataQualityReasonCount(group.Key, group.Count()))
-                .ToList(),
+            BuildDataQualityReasonCounts(normalCompletedCycles),
             query.Scope == ReportScopeKinds.Doctor
                 ? $"Doctor {query.DoctorId ?? "not selected"}; {query.Sedation}"
                 : $"Practice; {query.Sedation}",
@@ -134,7 +147,7 @@ internal sealed partial class ReportsSnapshotBuilder
     internal static DateTimeOffset? ReviewAnchor(CompletedRoomCycle cycle) =>
         cycle.DoctorCompleteAt
         ?? cycle.DoctorArrivedAt
-        ?? cycle.SeatedAt;
+        ?? (cycle.SeatedAt == default ? cycle.PrestageStartedAt : cycle.SeatedAt);
 
     private ReportAuditPage BuildReviewAuditPage(
         IReadOnlyList<CompletedRoomCycle> completedCycles,
@@ -228,10 +241,23 @@ internal sealed partial class ReportsSnapshotBuilder
                 record.ReviewedAt,
                 record.ReviewedBy,
                 record.RequiresReview));
-        return completed.Concat(aborted).ToList();
+        return BoundedReportCollections.Materialize(completed.Concat(aborted));
     }
 
-    private List<CompletedRoomCycle> SelectContributorPopulation(
+    private static IReadOnlyList<ReportDataQualityReasonCount> BuildDataQualityReasonCounts(
+        IReadOnlyList<CompletedRoomCycle> cycles)
+    {
+        var counts = new Dictionary<string, int>(StringComparer.Ordinal);
+        foreach (var reason in cycles.SelectMany(cycle => cycle.ReportingExceptionReasons))
+        {
+            counts[reason] = counts.GetValueOrDefault(reason) + 1;
+        }
+        return counts.OrderBy(pair => pair.Key, StringComparer.Ordinal)
+            .Select(pair => new ReportDataQualityReasonCount(pair.Key, pair.Value))
+            .ToList();
+    }
+
+    private IReadOnlyList<CompletedRoomCycle> SelectContributorPopulation(
         IReadOnlyList<CompletedRoomCycle> selected,
         IReadOnlyList<CompletedRoomCycle> standard,
         ReportAuditSelection selection)
@@ -262,12 +288,11 @@ internal sealed partial class ReportsSnapshotBuilder
             _ => throw new ReportAuditQueryException($"Unsupported contributorKind '{selection.ContributorKind}'.")
         };
 
-        return population
-            .Where(cycle => MatchesProcedure(cycle, selection))
-            .ToList();
+        return BoundedReportCollections.Materialize(
+            population.Where(cycle => MatchesProcedure(cycle, selection)));
     }
 
-    private IReadOnlyDictionary<long, CalibrationEvidenceCase> ResolveCalibrationEvidence(
+    private IReadOnlyList<CalibrationEvidenceCase> ResolveCalibrationEvidence(
         IReadOnlyList<CompletedRoomCycle> population,
         ReportAuditSelection selection)
     {
@@ -295,21 +320,65 @@ internal sealed partial class ReportsSnapshotBuilder
             CalibrationRuleSet.VersionOne);
         var evidence = evaluation.Insight?.Evidence
             ?? throw new ReportAuditQueryException("The selected population no longer has a qualified Calibration insight.");
-        var expected = selection.EvidenceIds.OrderBy(item => item.CompletedCycleId).ToList();
-        var actual = evidence.OrderBy(item => item.CompletedCycleId).ToList();
-        if (expected.Count != actual.Count
-            || expected.Where((item, index) =>
-                item.CompletedCycleId != actual[index].CompletedCycleId
-                || (!string.IsNullOrWhiteSpace(item.AcceptedReadyHandoffId)
+        var expected = selection.EvidenceIds.OrderBy(item => item.CompletedCycleId);
+        using var expectedEnumerator = expected.GetEnumerator();
+        using var actualEnumerator = evidence.GetEnumerator();
+        var mismatch = false;
+        while (true)
+        {
+            var hasExpected = expectedEnumerator.MoveNext();
+            var hasActual = actualEnumerator.MoveNext();
+            if (hasExpected != hasActual)
+            {
+                mismatch = true;
+                break;
+            }
+            if (!hasExpected) break;
+            if (expectedEnumerator.Current.CompletedCycleId != actualEnumerator.Current.CompletedCycleId
+                || (!string.IsNullOrWhiteSpace(expectedEnumerator.Current.AcceptedReadyHandoffId)
                     && !string.Equals(
-                        item.AcceptedReadyHandoffId,
-                        actual[index].AcceptedReadyHandoffId,
-                        StringComparison.Ordinal))).Any())
+                        expectedEnumerator.Current.AcceptedReadyHandoffId,
+                        actualEnumerator.Current.AcceptedReadyHandoffId,
+                        StringComparison.Ordinal)))
+            {
+                mismatch = true;
+                break;
+            }
+        }
+        if (mismatch)
         {
             throw new ReportAuditQueryException("Calibration evidence no longer reconciles to the selected report population. Refresh Reports and try again.");
         }
 
-        return actual.ToDictionary(item => item.CompletedCycleId);
+        return evidence;
+    }
+
+    private static IReadOnlyList<CompletedRoomCycle> SelectCalibrationEvidencePopulation(
+        IReadOnlyList<CompletedRoomCycle> population,
+        IReadOnlyList<CalibrationEvidenceCase> evidence)
+    {
+        var orderedPopulation = BoundedReportCollections.OrderBy(
+            population,
+            cycle => cycle.CompletedCycleId.ToString("D20", System.Globalization.CultureInfo.InvariantCulture),
+            descending: false);
+        return BoundedReportCollections.Materialize(MatchEvidence(orderedPopulation, evidence));
+    }
+
+    private static IEnumerable<CompletedRoomCycle> MatchEvidence(
+        IReadOnlyList<CompletedRoomCycle> orderedPopulation,
+        IReadOnlyList<CalibrationEvidenceCase> orderedEvidence)
+    {
+        using var evidenceEnumerator = orderedEvidence.GetEnumerator();
+        var hasEvidence = evidenceEnumerator.MoveNext();
+        foreach (var cycle in orderedPopulation)
+        {
+            while (hasEvidence && evidenceEnumerator.Current.CompletedCycleId < cycle.CompletedCycleId)
+            {
+                hasEvidence = evidenceEnumerator.MoveNext();
+            }
+            if (!hasEvidence) yield break;
+            if (evidenceEnumerator.Current.CompletedCycleId == cycle.CompletedCycleId) yield return cycle;
+        }
     }
 
     private ReportAuditRow ToAuditRow(
@@ -457,6 +526,11 @@ internal sealed partial class ReportsSnapshotBuilder
             .ThenByDescending(row => row.CompletedCycleId);
     }
 
+    internal static IReadOnlyList<ReportAuditRow> OrderProjectedAuditRows(
+        IReadOnlyList<ReportAuditRow> rows,
+        string sort) =>
+        OrderAuditRows(rows, sort).ToList();
+
     private static IEnumerable<ReportReviewAuditRow> OrderReviewRows(
         IReadOnlyList<ReportReviewAuditRow> rows,
         string sort)
@@ -478,6 +552,11 @@ internal sealed partial class ReportsSnapshotBuilder
             .ThenByDescending(row => row.ReviewAnchor)
             .ThenByDescending(row => row.ReviewRecordId);
     }
+
+    internal static IReadOnlyList<ReportReviewAuditRow> OrderProjectedReviewRows(
+        IReadOnlyList<ReportReviewAuditRow> rows,
+        string sort) =>
+        OrderReviewRows(rows, sort).ToList();
 
     private static string NormalizeContributorKind(string? value)
     {

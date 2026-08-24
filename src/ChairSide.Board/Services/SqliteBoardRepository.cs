@@ -6,8 +6,88 @@ namespace ChairSide.Board.Services;
 
 public sealed class SqliteBoardRepository
 {
+    private const string CompletedCycleSelectSql = """
+        SELECT
+            id,
+            room_id,
+            assigned_doctor_id,
+            procedure_code,
+            seated_at,
+            doctor_arrived_at,
+            doctor_complete_at,
+            room_available_at,
+            seated_to_doctor_seconds,
+            doctor_in_room_seconds,
+            turnover_seconds,
+            total_room_cycle_seconds,
+            final_wait_state,
+            aging_threshold_reached,
+            stale_threshold_reached,
+            ready_for_doctor_at,
+            prep_seconds,
+            ready_to_doctor_seconds,
+            is_exception,
+            requires_review,
+            exception_reason,
+            review_status,
+            suggested_action,
+            reviewed_at,
+            reviewed_by,
+            original_default_expected_units,
+            expected_allocation_units,
+            expected_allocation_minutes,
+            allocation_adjusted_from_default,
+            prestage_started_at,
+            episode_id,
+            accepted_ready_handoff_id,
+            is_add_on
+        FROM completed_room_cycles
+        """;
+
+    private const string AbortedAssignmentSelectSql = """
+        SELECT
+            id,
+            episode_id,
+            room_id,
+            assigned_doctor_id,
+            assigned_doctor_display_name,
+            procedure_code,
+            procedure_category,
+            original_default_expected_units,
+            expected_allocation_units,
+            expected_allocation_minutes,
+            allocation_adjusted_from_default,
+            prestage_started_at,
+            seated_at,
+            ready_for_doctor_at,
+            terminated_at,
+            terminated_from_state,
+            termination_kind,
+            cancellation_reason,
+            sedation_state,
+            expected_allocation_state,
+            expected_allocation_suggested_units,
+            expected_allocation_confirmed_units,
+            terminal_ready_handoff_id,
+            is_exception,
+            requires_review,
+            exception_reason,
+            review_status,
+            suggested_action,
+            reviewed_at,
+            reviewed_by,
+            is_add_on
+        FROM aborted_room_assignments
+        """;
+
     private readonly string _connectionString;
     private readonly string _databasePath;
+    private int _unboundedHistoricalLoadCount;
+    private int _largestHistoricalPageSize;
+
+    internal int UnboundedHistoricalLoadCount => Volatile.Read(ref _unboundedHistoricalLoadCount);
+
+    internal int LargestHistoricalPageSize => Volatile.Read(ref _largestHistoricalPageSize);
 
     public SqliteBoardRepository(
         IOptions<BoardPersistenceOptions> options,
@@ -240,92 +320,211 @@ public sealed class SqliteBoardRepository
         transaction.Commit();
     }
 
-    public IReadOnlyList<CompletedRoomCycle> LoadCompletedCycles()
+    public IReadOnlyList<CompletedRoomCycle> LoadCompletedCycles() =>
+        LoadCompletedCycles(ReportDateRange.AllTime);
+
+    public IReadOnlyList<CompletedRoomCycle> LoadCompletedCycles(ReportDateRange window)
+    {
+        if (window.IsAllTime) Interlocked.Increment(ref _unboundedHistoricalLoadCount);
+        using var connection = OpenConnection();
+        using var command = connection.CreateCommand();
+        command.CommandText = CompletedCycleSelectSql
+            + BuildWindowWhereClause(command, "doctor_complete_at", window)
+            + " ORDER BY doctor_complete_at DESC, id DESC;";
+        return ReadCompletedCycles(command);
+    }
+
+    public HistoricalQueryPage<CompletedRoomCycle> LoadCompletedCyclesPage(
+        ReportDateRange window,
+        int offset,
+        int limit)
+    {
+        ValidatePage(offset, limit);
+        using var connection = OpenConnection();
+        var where = BuildWindowWhereClause(null, "doctor_complete_at", window);
+        var total = CountRows(connection, "completed_room_cycles", where, window);
+        using var command = connection.CreateCommand();
+        command.CommandText = CompletedCycleSelectSql
+            + BuildWindowWhereClause(command, "doctor_complete_at", window)
+            + " ORDER BY doctor_complete_at DESC, id DESC LIMIT $limit OFFSET $offset;";
+        command.Parameters.AddWithValue("$limit", limit);
+        command.Parameters.AddWithValue("$offset", offset);
+        var rows = ReadCompletedCycles(command);
+        ObserveHistoricalPage(rows.Count);
+        return new HistoricalQueryPage<CompletedRoomCycle>(rows, total, offset, limit);
+    }
+
+    public IEnumerable<CompletedRoomCycle> EnumerateCompletedCycles(
+        ReportDateRange window,
+        int pageSize = 100)
+    {
+        if (pageSize <= 0) throw new ArgumentOutOfRangeException(nameof(pageSize));
+        var offset = 0;
+        while (true)
+        {
+            var page = LoadCompletedCyclesPage(window, offset, pageSize);
+            foreach (var row in page.Rows) yield return row;
+            if (!page.HasMore) yield break;
+            offset += page.Rows.Count;
+        }
+    }
+
+    public HistoricalQueryPage<CompletedRoomCycle> LoadCompletedAuditCandidatesPage(
+        ReportQuery query,
+        string sort,
+        int offset,
+        int limit)
+    {
+        ValidatePage(offset, limit);
+        using var connection = OpenConnection();
+        using var countCommand = connection.CreateCommand();
+        var countPredicates = new List<string> { "is_exception = 0" };
+        AddWindowPredicates(countCommand, countPredicates, "doctor_complete_at", query.Window);
+        AddAnalyticalPredicates(countCommand, countPredicates, query);
+        countCommand.CommandText = $"SELECT COUNT(*) FROM completed_room_cycles WHERE {string.Join(" AND ", countPredicates)};";
+        var total = Convert.ToInt32(countCommand.ExecuteScalar());
+
+        using var command = connection.CreateCommand();
+        var predicates = new List<string> { "is_exception = 0" };
+        AddWindowPredicates(command, predicates, "doctor_complete_at", query.Window);
+        AddAnalyticalPredicates(command, predicates, query);
+        var readyWait = "(julianday(doctor_arrived_at) - julianday(ready_for_doctor_at)) * 86400.0";
+        var doctorTime = "(julianday(doctor_complete_at) - julianday(doctor_arrived_at)) * 86400.0";
+        var fitVariance = "((julianday(doctor_complete_at) - julianday(seated_at)) * 86400.0) - (expected_allocation_minutes * 60.0)";
+        var orderBy = sort switch
+        {
+            ReportAuditSorts.LongestReadyWait =>
+                $"CASE WHEN ready_for_doctor_at IS NULL OR doctor_arrived_at IS NULL OR ready_for_doctor_at > doctor_arrived_at THEN 1 ELSE 0 END, {readyWait} DESC",
+            ReportAuditSorts.LongestDoctorTime =>
+                $"CASE WHEN doctor_arrived_at IS NULL OR doctor_complete_at IS NULL OR doctor_arrived_at > doctor_complete_at THEN 1 ELSE 0 END, {doctorTime} DESC",
+            ReportAuditSorts.LargestPositiveScheduleFitVariance =>
+                $"CASE WHEN doctor_complete_at IS NULL THEN 2 WHEN {fitVariance} > 0 THEN 0 ELSE 1 END, {fitVariance} DESC",
+            ReportAuditSorts.LargestNegativeScheduleFitVariance =>
+                $"CASE WHEN doctor_complete_at IS NULL THEN 2 WHEN {fitVariance} < 0 THEN 0 ELSE 1 END, {fitVariance} ASC",
+            ReportAuditSorts.Doctor => "assigned_doctor_display_name COLLATE NOCASE, assigned_doctor_id COLLATE NOCASE",
+            ReportAuditSorts.Procedure => "procedure_category COLLATE NOCASE, procedure_code COLLATE NOCASE",
+            _ => "CASE WHEN doctor_complete_at IS NULL THEN 1 ELSE 0 END, doctor_complete_at DESC"
+        };
+        command.CommandText = CompletedCycleSelectSql
+            + $" WHERE {string.Join(" AND ", predicates)}"
+            + $" ORDER BY {orderBy}, CASE WHEN doctor_complete_at IS NULL THEN 1 ELSE 0 END, doctor_complete_at DESC, id DESC"
+            + " LIMIT $limit OFFSET $offset;";
+        command.Parameters.AddWithValue("$limit", limit);
+        command.Parameters.AddWithValue("$offset", offset);
+        return new HistoricalQueryPage<CompletedRoomCycle>(ReadCompletedCycles(command), total, offset, limit);
+    }
+
+    public IEnumerable<CompletedRoomCycle> EnumerateCompletedAuditCandidates(
+        ReportQuery query,
+        int pageSize = 100)
+    {
+        if (pageSize <= 0) throw new ArgumentOutOfRangeException(nameof(pageSize));
+        var offset = 0;
+        while (true)
+        {
+            var page = LoadCompletedAuditCandidatesPage(
+                query,
+                ReportAuditSorts.MostRecent,
+                offset,
+                pageSize);
+            ObserveHistoricalPage(page.Rows.Count);
+            foreach (var row in page.Rows) yield return row;
+            if (!page.HasMore) yield break;
+            offset += page.Rows.Count;
+        }
+    }
+
+    public int CountCompletedCycles(ReportDateRange window, ReportQuery? analyticalQuery = null)
     {
         using var connection = OpenConnection();
         using var command = connection.CreateCommand();
-        command.CommandText = """
-            SELECT
-                id,
-                room_id,
-                assigned_doctor_id,
-                procedure_code,
-                seated_at,
-                doctor_arrived_at,
-                doctor_complete_at,
-                room_available_at,
-                seated_to_doctor_seconds,
-                doctor_in_room_seconds,
-                turnover_seconds,
-                total_room_cycle_seconds,
-                final_wait_state,
-                aging_threshold_reached,
-                stale_threshold_reached,
-                ready_for_doctor_at,
-                prep_seconds,
-                ready_to_doctor_seconds,
-                is_exception,
-                requires_review,
-                exception_reason,
-                review_status,
-                suggested_action,
-                reviewed_at,
-                reviewed_by,
-                original_default_expected_units,
-                expected_allocation_units,
-                expected_allocation_minutes,
-                allocation_adjusted_from_default,
-                prestage_started_at,
-                episode_id,
-                accepted_ready_handoff_id,
-                is_add_on
-            FROM completed_room_cycles
-            ORDER BY doctor_arrived_at DESC;
-            """;
-
-        var cycles = new List<CompletedRoomCycle>();
-        using var reader = command.ExecuteReader();
-        while (reader.Read())
+        var predicates = new List<string> { "room_available_at IS NOT NULL" };
+        AddWindowPredicates(command, predicates, "doctor_complete_at", window);
+        if (analyticalQuery is { } query)
         {
-            cycles.Add(new CompletedRoomCycle
-            {
-                CompletedCycleId = reader.GetInt64(0),
-                RoomId = reader.GetInt32(1),
-                AssignedDoctor = reader.GetString(2),
-                ProcedureCode = reader.GetString(3),
-                SeatedAt = ReadRequiredDateTimeOffset(reader, 4),
-                DoctorArrivedAt = ReadNullableDateTimeOffset(reader, 5),
-                DoctorCompleteAt = ReadNullableDateTimeOffset(reader, 6),
-                RoomAvailableAt = ReadNullableDateTimeOffset(reader, 7),
-                SeatedToDoctorSeconds = reader.GetInt32(8),
-                DoctorInRoomSeconds = ReadNullableInt32(reader, 9),
-                TurnoverSeconds = ReadNullableInt32(reader, 10),
-                TotalRoomCycleSeconds = ReadNullableInt32(reader, 11),
-                FinalWaitState = reader.GetString(12),
-                AgingThresholdReached = reader.GetInt32(13) == 1,
-                StaleThresholdReached = reader.GetInt32(14) == 1,
-                ReadyForDoctorAt = ReadNullableDateTimeOffset(reader, 15),
-                PrepSeconds = ReadNullableInt32(reader, 16),
-                ReadyToDoctorSeconds = ReadNullableInt32(reader, 17),
-                IsException = reader.GetInt32(18) == 1,
-                RequiresReview = reader.GetInt32(19) == 1,
-                ExceptionReason = ReadNullableString(reader, 20),
-                ReviewStatus = ReadNullableString(reader, 21) ?? ReviewStatuses.PendingReview,
-                SuggestedAction = ReadNullableString(reader, 22),
-                ReviewedAt = ReadNullableDateTimeOffset(reader, 23),
-                ReviewedBy = ReadNullableString(reader, 24),
-                OriginalDefaultExpectedUnits = reader.GetInt32(25),
-                ExpectedAllocationUnits = reader.GetInt32(26),
-                ExpectedAllocationMinutes = reader.GetInt32(27),
-                AllocationAdjustedFromDefault = reader.GetInt32(28) == 1,
-                PrestageStartedAt = ReadNullableDateTimeOffset(reader, 29),
-                EpisodeId = ReadNullableString(reader, 30),
-                AcceptedReadyHandoffId = ReadNullableString(reader, 31),
-                IsAddOn = reader.GetInt32(32) == 1
-            });
+            AddAnalyticalPredicates(command, predicates, query);
         }
 
-        return cycles;
+        command.CommandText = $"SELECT COUNT(*) FROM completed_room_cycles WHERE {string.Join(" AND ", predicates)};";
+        return Convert.ToInt32(command.ExecuteScalar());
+    }
+
+    public CompletedRoomCycle? LoadCompletedCycleById(long completedCycleId)
+    {
+        if (completedCycleId <= 0) return null;
+        using var connection = OpenConnection();
+        using var command = connection.CreateCommand();
+        command.CommandText = CompletedCycleSelectSql + " WHERE id = $id;";
+        command.Parameters.AddWithValue("$id", completedCycleId);
+        return ReadCompletedCycles(command).SingleOrDefault();
+    }
+
+    public CompletedRoomCycle? LoadCompletedCycleByRoomAndSeatedAt(int roomId, DateTimeOffset seatedAt)
+    {
+        using var connection = OpenConnection();
+        using var command = connection.CreateCommand();
+        command.CommandText = CompletedCycleSelectSql + " WHERE room_id = $roomId AND seated_at = $seatedAt;";
+        command.Parameters.AddWithValue("$roomId", roomId);
+        command.Parameters.AddWithValue("$seatedAt", FormatDateTimeOffset(seatedAt));
+        return ReadCompletedCycles(command).SingleOrDefault();
+    }
+
+    public IReadOnlyList<CompletedRoomCycle> LoadCompletedReviewCycles(ReportDateRange window)
+    {
+        if (window.IsAllTime) Interlocked.Increment(ref _unboundedHistoricalLoadCount);
+        using var connection = OpenConnection();
+        using var command = connection.CreateCommand();
+        var anchor = "COALESCE(doctor_complete_at, doctor_arrived_at, seated_at, prestage_started_at)";
+        var predicates = new List<string> { "is_exception = 1" };
+        AddWindowPredicates(command, predicates, anchor, window);
+        command.CommandText = CompletedCycleSelectSql
+            + $" WHERE {string.Join(" AND ", predicates)}"
+            + $" ORDER BY {anchor} DESC, id DESC;";
+        return ReadCompletedCycles(command);
+    }
+
+    public HistoricalQueryPage<CompletedRoomCycle> LoadCompletedReviewCyclesPage(
+        ReportDateRange window,
+        int offset,
+        int limit)
+    {
+        ValidatePage(offset, limit);
+        using var connection = OpenConnection();
+        var anchor = "COALESCE(doctor_complete_at, doctor_arrived_at, seated_at, prestage_started_at)";
+        using var predicateCommand = connection.CreateCommand();
+        var predicates = new List<string> { "is_exception = 1" };
+        AddWindowPredicates(predicateCommand, predicates, anchor, window);
+        var where = $" WHERE {string.Join(" AND ", predicates)}";
+        using var command = connection.CreateCommand();
+        CopyParameters(predicateCommand, command);
+        command.CommandText = CompletedCycleSelectSql
+            + where
+            + $" ORDER BY {anchor} DESC, id DESC LIMIT $limit OFFSET $offset;";
+        command.Parameters.AddWithValue("$limit", limit);
+        command.Parameters.AddWithValue("$offset", offset);
+        var rows = ReadCompletedCycles(command);
+        ObserveHistoricalPage(rows.Count);
+
+        using var countCommand = connection.CreateCommand();
+        CopyParameters(predicateCommand, countCommand);
+        countCommand.CommandText = $"SELECT COUNT(*) FROM completed_room_cycles{where};";
+        var total = Convert.ToInt32(countCommand.ExecuteScalar());
+        return new HistoricalQueryPage<CompletedRoomCycle>(rows, total, offset, limit);
+    }
+
+    public IEnumerable<CompletedRoomCycle> EnumerateCompletedReviewCycles(
+        ReportDateRange window,
+        int pageSize = 100)
+    {
+        if (pageSize <= 0) throw new ArgumentOutOfRangeException(nameof(pageSize));
+        var offset = 0;
+        while (true)
+        {
+            var page = LoadCompletedReviewCyclesPage(window, offset, pageSize);
+            foreach (var row in page.Rows) yield return row;
+            if (!page.HasMore) yield break;
+            offset += page.Rows.Count;
+        }
     }
 
     public void SaveCompletedCycle(CompletedRoomCycle cycle, IReadOnlyList<Doctor> doctors, IReadOnlyList<ProcedureCategory> procedures)
@@ -1298,88 +1497,182 @@ public sealed class SqliteBoardRepository
         transaction.Commit();
     }
 
-    public IReadOnlyList<AbortedRoomAssignment> LoadAbortedAssignments()
+    public IReadOnlyList<AbortedRoomAssignment> LoadAbortedAssignments() =>
+        LoadAbortedAssignments(ReportDateRange.AllTime);
+
+    public IReadOnlyList<AbortedRoomAssignment> LoadAbortedAssignments(ReportDateRange window)
     {
+        if (window.IsAllTime) Interlocked.Increment(ref _unboundedHistoricalLoadCount);
         using var connection = OpenConnection();
         using var command = connection.CreateCommand();
-        command.CommandText = """
-            SELECT
-                id,
-                episode_id,
-                room_id,
-                assigned_doctor_id,
-                assigned_doctor_display_name,
-                procedure_code,
-                procedure_category,
-                original_default_expected_units,
-                expected_allocation_units,
-                expected_allocation_minutes,
-                allocation_adjusted_from_default,
-                prestage_started_at,
-                seated_at,
-                ready_for_doctor_at,
-                terminated_at,
-                terminated_from_state,
-                termination_kind,
-                cancellation_reason,
-                sedation_state,
-                expected_allocation_state,
-                expected_allocation_suggested_units,
-                expected_allocation_confirmed_units,
-                terminal_ready_handoff_id,
-                is_exception,
-                requires_review,
-                exception_reason,
-                review_status,
-                suggested_action,
-                reviewed_at,
-                reviewed_by,
-                is_add_on
-            FROM aborted_room_assignments
-            ORDER BY terminated_at DESC;
-            """;
+        command.CommandText = AbortedAssignmentSelectSql
+            + BuildWindowWhereClause(command, "terminated_at", window)
+            + " ORDER BY terminated_at DESC, id DESC;";
+        return ReadAbortedAssignments(command);
+    }
 
-        var records = new List<AbortedRoomAssignment>();
+    public HistoricalQueryPage<AbortedRoomAssignment> LoadAbortedAssignmentsPage(
+        ReportDateRange window,
+        int offset,
+        int limit)
+    {
+        ValidatePage(offset, limit);
+        using var connection = OpenConnection();
+        var where = BuildWindowWhereClause(null, "terminated_at", window);
+        var total = CountRows(connection, "aborted_room_assignments", where, window);
+        using var command = connection.CreateCommand();
+        command.CommandText = AbortedAssignmentSelectSql
+            + BuildWindowWhereClause(command, "terminated_at", window)
+            + " ORDER BY terminated_at DESC, id DESC LIMIT $limit OFFSET $offset;";
+        command.Parameters.AddWithValue("$limit", limit);
+        command.Parameters.AddWithValue("$offset", offset);
+        var rows = ReadAbortedAssignments(command);
+        ObserveHistoricalPage(rows.Count);
+        return new HistoricalQueryPage<AbortedRoomAssignment>(rows, total, offset, limit);
+    }
+
+    public IEnumerable<AbortedRoomAssignment> EnumerateAbortedAssignments(
+        ReportDateRange window,
+        int pageSize = 100)
+    {
+        if (pageSize <= 0) throw new ArgumentOutOfRangeException(nameof(pageSize));
+        var offset = 0;
+        while (true)
+        {
+            var page = LoadAbortedAssignmentsPage(window, offset, pageSize);
+            foreach (var row in page.Rows) yield return row;
+            if (!page.HasMore) yield break;
+            offset += page.Rows.Count;
+        }
+    }
+
+
+    public AbortedRoomAssignment? LoadAbortedAssignmentById(long abortedAssignmentId)
+    {
+        if (abortedAssignmentId <= 0) return null;
+        using var connection = OpenConnection();
+        using var command = connection.CreateCommand();
+        command.CommandText = AbortedAssignmentSelectSql + " WHERE id = $id;";
+        command.Parameters.AddWithValue("$id", abortedAssignmentId);
+        return ReadAbortedAssignments(command).SingleOrDefault();
+    }
+
+    public HistoricalEncounterRecord? LoadHistoricalEncounter(HistoricalEncounterKey key)
+    {
+        if (!key.IsValid) return null;
+        if (key.SourceType == HistoricalEncounterSourceTypes.CompletedCycle)
+        {
+            var completed = LoadCompletedCycleById(key.SourceRecordId);
+            return completed is null ? null : new HistoricalEncounterRecord(key, completed, null);
+        }
+
+        var aborted = LoadAbortedAssignmentById(key.SourceRecordId);
+        return aborted is null ? null : new HistoricalEncounterRecord(key, null, aborted);
+    }
+
+    public IReadOnlyList<HistoricalEncounterRecord> LoadHistoricalEncounters(
+        IReadOnlyList<HistoricalEncounterKey> keys)
+    {
+        ArgumentNullException.ThrowIfNull(keys);
+        if (keys.Count == 0) return [];
+        if (keys.Any(key => !key.IsValid))
+        {
+            throw new ArgumentException("Every historical encounter key must be valid.", nameof(keys));
+        }
+
+        using var connection = OpenConnection();
+        var completed = LoadCompletedCyclesByIds(
+            connection,
+            keys.Where(key => key.SourceType == HistoricalEncounterSourceTypes.CompletedCycle)
+                .Select(key => key.SourceRecordId)
+                .Distinct()
+                .ToList())
+            .ToDictionary(cycle => cycle.CompletedCycleId);
+        var aborted = LoadAbortedAssignmentsByIds(
+            connection,
+            keys.Where(key => key.SourceType == HistoricalEncounterSourceTypes.AbortedAssignment)
+                .Select(key => key.SourceRecordId)
+                .Distinct()
+                .ToList())
+            .ToDictionary(record => record.AbortedAssignmentId);
+
+        return keys.Select(key => key.SourceType == HistoricalEncounterSourceTypes.CompletedCycle
+                ? completed.TryGetValue(key.SourceRecordId, out var cycle)
+                    ? new HistoricalEncounterRecord(key, cycle, null)
+                    : null
+                : aborted.TryGetValue(key.SourceRecordId, out var record)
+                    ? new HistoricalEncounterRecord(key, null, record)
+                    : null)
+            .Where(record => record != null)
+            .Cast<HistoricalEncounterRecord>()
+            .ToList();
+    }
+
+    public HistoricalQueryPage<HistoricalEncounterKey> LoadReviewEncounterKeysPage(
+        ReportDateRange window,
+        bool requiresReview,
+        string sort,
+        int offset,
+        int limit)
+    {
+        ValidatePage(offset, limit);
+        using var connection = OpenConnection();
+        using var command = connection.CreateCommand();
+        var completedAnchor = "COALESCE(doctor_complete_at, doctor_arrived_at, seated_at, prestage_started_at)";
+        var completedPredicates = new List<string> { "is_exception = 1", "requires_review = $requiresReview" };
+        var abortedPredicates = new List<string> { "is_exception = 1", "requires_review = $requiresReview" };
+        AddWindowPredicates(command, completedPredicates, completedAnchor, window);
+        AddWindowPredicatesWithSuffix(command, abortedPredicates, "terminated_at", window, "Abort");
+        var union = $"""
+            SELECT source_type, source_id, source_rank, review_anchor, doctor_sort, procedure_sort
+            FROM (
+                SELECT
+                    '{HistoricalEncounterSourceTypes.CompletedCycle}' AS source_type,
+                    id AS source_id,
+                    0 AS source_rank,
+                    {completedAnchor} AS review_anchor,
+                    assigned_doctor_display_name AS doctor_sort,
+                    procedure_category AS procedure_sort
+                FROM completed_room_cycles
+                WHERE {string.Join(" AND ", completedPredicates)}
+                UNION ALL
+                SELECT
+                    '{HistoricalEncounterSourceTypes.AbortedAssignment}' AS source_type,
+                    id AS source_id,
+                    1 AS source_rank,
+                    terminated_at AS review_anchor,
+                    COALESCE(assigned_doctor_display_name, assigned_doctor_id, '') AS doctor_sort,
+                    COALESCE(procedure_category, procedure_code, '') AS procedure_sort
+                FROM aborted_room_assignments
+                WHERE {string.Join(" AND ", abortedPredicates)}
+            ) review_rows
+            """;
+        command.Parameters.AddWithValue("$requiresReview", requiresReview ? 1 : 0);
+
+        using var countCommand = connection.CreateCommand();
+        countCommand.CommandText = $"SELECT COUNT(*) FROM ({union});";
+        CopyParameters(command, countCommand);
+        var total = Convert.ToInt32(countCommand.ExecuteScalar());
+
+        var orderBy = sort switch
+        {
+            ReportAuditSorts.Doctor =>
+                " ORDER BY doctor_sort COLLATE NOCASE, review_anchor DESC, source_id DESC, source_rank",
+            ReportAuditSorts.Procedure =>
+                " ORDER BY procedure_sort COLLATE NOCASE, review_anchor DESC, source_id DESC, source_rank",
+            _ => " ORDER BY review_anchor DESC, source_id DESC, source_rank"
+        };
+        command.CommandText = union + orderBy + " LIMIT $limit OFFSET $offset;";
+        command.Parameters.AddWithValue("$limit", limit);
+        command.Parameters.AddWithValue("$offset", offset);
+
+        var keys = new List<HistoricalEncounterKey>();
         using var reader = command.ExecuteReader();
         while (reader.Read())
         {
-            records.Add(new AbortedRoomAssignment
-            {
-                AbortedAssignmentId = reader.GetInt64(0),
-                EpisodeId = reader.GetString(1),
-                RoomId = reader.GetInt32(2),
-                AssignedDoctor = ReadNullableString(reader, 3),
-                AssignedDoctorDisplayName = ReadNullableString(reader, 4),
-                ProcedureCode = ReadNullableString(reader, 5),
-                ProcedureCategory = ReadNullableString(reader, 6),
-                OriginalDefaultExpectedUnits = reader.GetInt32(7),
-                ExpectedAllocationUnits = reader.GetInt32(8),
-                ExpectedAllocationMinutes = reader.GetInt32(9),
-                AllocationAdjustedFromDefault = reader.GetInt32(10) == 1,
-                PrestageStartedAt = ReadNullableDateTimeOffset(reader, 11),
-                SeatedAt = ReadNullableDateTimeOffset(reader, 12),
-                ReadyForDoctorAt = ReadNullableDateTimeOffset(reader, 13),
-                TerminatedAt = ReadRequiredDateTimeOffset(reader, 14),
-                TerminatedFromState = reader.GetString(15),
-                TerminationKind = reader.GetString(16),
-                CancellationReason = ReadNullableString(reader, 17),
-                SedationState = ReadNullableEnum<SedationState>(reader, 18),
-                ExpectedAllocationState = ReadNullableEnum<ExpectedAllocationState>(reader, 19),
-                ExpectedAllocationSuggestedUnits = ReadNullableInt32(reader, 20),
-                ExpectedAllocationConfirmedUnits = ReadNullableInt32(reader, 21),
-                TerminalReadyHandoffId = ReadNullableString(reader, 22),
-                IsException = reader.GetInt32(23) == 1,
-                RequiresReview = reader.GetInt32(24) == 1,
-                ExceptionReason = ReadNullableString(reader, 25),
-                ReviewStatus = ReadNullableString(reader, 26) ?? ReviewStatuses.PendingReview,
-                SuggestedAction = ReadNullableString(reader, 27),
-                ReviewedAt = ReadNullableDateTimeOffset(reader, 28),
-                ReviewedBy = ReadNullableString(reader, 29),
-                IsAddOn = reader.GetInt32(30) == 1
-            });
+            keys.Add(new HistoricalEncounterKey(reader.GetString(0), reader.GetInt64(1)));
         }
-
-        return records;
+        return new HistoricalQueryPage<HistoricalEncounterKey>(keys, total, offset, limit);
     }
 
     public void ReviewAbortedAssignment(long abortedAssignmentId, DateTimeOffset reviewedAt, string reviewedBy)
@@ -2425,6 +2718,253 @@ public sealed class SqliteBoardRepository
         {
             throw new ArgumentException("A non-empty identifier is required.", parameterName);
         }
+    }
+
+    private static IReadOnlyList<CompletedRoomCycle> LoadCompletedCyclesByIds(
+        SqliteConnection connection,
+        IReadOnlyList<long> ids)
+    {
+        if (ids.Count == 0) return [];
+        using var command = connection.CreateCommand();
+        var parameters = AddIdParameters(command, ids);
+        command.CommandText = CompletedCycleSelectSql + $" WHERE id IN ({string.Join(", ", parameters)});";
+        return ReadCompletedCycles(command);
+    }
+
+    private static IReadOnlyList<AbortedRoomAssignment> LoadAbortedAssignmentsByIds(
+        SqliteConnection connection,
+        IReadOnlyList<long> ids)
+    {
+        if (ids.Count == 0) return [];
+        using var command = connection.CreateCommand();
+        var parameters = AddIdParameters(command, ids);
+        command.CommandText = AbortedAssignmentSelectSql + $" WHERE id IN ({string.Join(", ", parameters)});";
+        return ReadAbortedAssignments(command);
+    }
+
+    private static IReadOnlyList<string> AddIdParameters(SqliteCommand command, IReadOnlyList<long> ids)
+    {
+        var names = new List<string>(ids.Count);
+        for (var index = 0; index < ids.Count; index++)
+        {
+            var name = $"$id{index}";
+            names.Add(name);
+            command.Parameters.AddWithValue(name, ids[index]);
+        }
+        return names;
+    }
+
+    private static IReadOnlyList<CompletedRoomCycle> ReadCompletedCycles(SqliteCommand command)
+    {
+        var cycles = new List<CompletedRoomCycle>();
+        using var reader = command.ExecuteReader();
+        while (reader.Read())
+        {
+            cycles.Add(new CompletedRoomCycle
+            {
+                CompletedCycleId = reader.GetInt64(0),
+                RoomId = reader.GetInt32(1),
+                AssignedDoctor = reader.GetString(2),
+                ProcedureCode = reader.GetString(3),
+                SeatedAt = ReadRequiredDateTimeOffset(reader, 4),
+                DoctorArrivedAt = ReadNullableDateTimeOffset(reader, 5),
+                DoctorCompleteAt = ReadNullableDateTimeOffset(reader, 6),
+                RoomAvailableAt = ReadNullableDateTimeOffset(reader, 7),
+                SeatedToDoctorSeconds = reader.GetInt32(8),
+                DoctorInRoomSeconds = ReadNullableInt32(reader, 9),
+                TurnoverSeconds = ReadNullableInt32(reader, 10),
+                TotalRoomCycleSeconds = ReadNullableInt32(reader, 11),
+                FinalWaitState = reader.GetString(12),
+                AgingThresholdReached = reader.GetInt32(13) == 1,
+                StaleThresholdReached = reader.GetInt32(14) == 1,
+                ReadyForDoctorAt = ReadNullableDateTimeOffset(reader, 15),
+                PrepSeconds = ReadNullableInt32(reader, 16),
+                ReadyToDoctorSeconds = ReadNullableInt32(reader, 17),
+                IsException = reader.GetInt32(18) == 1,
+                RequiresReview = reader.GetInt32(19) == 1,
+                ExceptionReason = ReadNullableString(reader, 20),
+                ReviewStatus = ReadNullableString(reader, 21) ?? ReviewStatuses.PendingReview,
+                SuggestedAction = ReadNullableString(reader, 22),
+                ReviewedAt = ReadNullableDateTimeOffset(reader, 23),
+                ReviewedBy = ReadNullableString(reader, 24),
+                OriginalDefaultExpectedUnits = reader.GetInt32(25),
+                ExpectedAllocationUnits = reader.GetInt32(26),
+                ExpectedAllocationMinutes = reader.GetInt32(27),
+                AllocationAdjustedFromDefault = reader.GetInt32(28) == 1,
+                PrestageStartedAt = ReadNullableDateTimeOffset(reader, 29),
+                EpisodeId = ReadNullableString(reader, 30),
+                AcceptedReadyHandoffId = ReadNullableString(reader, 31),
+                IsAddOn = reader.GetInt32(32) == 1
+            });
+        }
+
+        return cycles;
+    }
+
+    private static IReadOnlyList<AbortedRoomAssignment> ReadAbortedAssignments(SqliteCommand command)
+    {
+        var records = new List<AbortedRoomAssignment>();
+        using var reader = command.ExecuteReader();
+        while (reader.Read())
+        {
+            records.Add(new AbortedRoomAssignment
+            {
+                AbortedAssignmentId = reader.GetInt64(0),
+                EpisodeId = reader.GetString(1),
+                RoomId = reader.GetInt32(2),
+                AssignedDoctor = ReadNullableString(reader, 3),
+                AssignedDoctorDisplayName = ReadNullableString(reader, 4),
+                ProcedureCode = ReadNullableString(reader, 5),
+                ProcedureCategory = ReadNullableString(reader, 6),
+                OriginalDefaultExpectedUnits = reader.GetInt32(7),
+                ExpectedAllocationUnits = reader.GetInt32(8),
+                ExpectedAllocationMinutes = reader.GetInt32(9),
+                AllocationAdjustedFromDefault = reader.GetInt32(10) == 1,
+                PrestageStartedAt = ReadNullableDateTimeOffset(reader, 11),
+                SeatedAt = ReadNullableDateTimeOffset(reader, 12),
+                ReadyForDoctorAt = ReadNullableDateTimeOffset(reader, 13),
+                TerminatedAt = ReadRequiredDateTimeOffset(reader, 14),
+                TerminatedFromState = reader.GetString(15),
+                TerminationKind = reader.GetString(16),
+                CancellationReason = ReadNullableString(reader, 17),
+                SedationState = ReadNullableEnum<SedationState>(reader, 18),
+                ExpectedAllocationState = ReadNullableEnum<ExpectedAllocationState>(reader, 19),
+                ExpectedAllocationSuggestedUnits = ReadNullableInt32(reader, 20),
+                ExpectedAllocationConfirmedUnits = ReadNullableInt32(reader, 21),
+                TerminalReadyHandoffId = ReadNullableString(reader, 22),
+                IsException = reader.GetInt32(23) == 1,
+                RequiresReview = reader.GetInt32(24) == 1,
+                ExceptionReason = ReadNullableString(reader, 25),
+                ReviewStatus = ReadNullableString(reader, 26) ?? ReviewStatuses.PendingReview,
+                SuggestedAction = ReadNullableString(reader, 27),
+                ReviewedAt = ReadNullableDateTimeOffset(reader, 28),
+                ReviewedBy = ReadNullableString(reader, 29),
+                IsAddOn = reader.GetInt32(30) == 1
+            });
+        }
+
+        return records;
+    }
+
+    private static void ValidatePage(int offset, int limit)
+    {
+        if (offset < 0) throw new ArgumentOutOfRangeException(nameof(offset));
+        if (limit <= 0) throw new ArgumentOutOfRangeException(nameof(limit));
+    }
+
+    private void ObserveHistoricalPage(int rowCount)
+    {
+        var observed = Volatile.Read(ref _largestHistoricalPageSize);
+        while (rowCount > observed)
+        {
+            var prior = Interlocked.CompareExchange(ref _largestHistoricalPageSize, rowCount, observed);
+            if (prior == observed) return;
+            observed = prior;
+        }
+    }
+
+    private static string BuildWindowWhereClause(
+        SqliteCommand? command,
+        string anchorExpression,
+        ReportDateRange window)
+    {
+        var predicates = new List<string>();
+        AddWindowPredicates(command, predicates, anchorExpression, window);
+        return predicates.Count == 0 ? string.Empty : $" WHERE {string.Join(" AND ", predicates)}";
+    }
+
+    private static void AddWindowPredicates(
+        SqliteCommand? command,
+        ICollection<string> predicates,
+        string anchorExpression,
+        ReportDateRange window)
+    {
+        if (window.FromInclusive is { } from)
+        {
+            predicates.Add($"{anchorExpression} >= $fromInclusive");
+            command?.Parameters.AddWithValue("$fromInclusive", FormatDateTimeOffset(from));
+        }
+        if (window.ToExclusive is { } to)
+        {
+            predicates.Add($"{anchorExpression} < $toExclusive");
+            command?.Parameters.AddWithValue("$toExclusive", FormatDateTimeOffset(to));
+        }
+    }
+
+    private static void AddWindowPredicatesWithSuffix(
+        SqliteCommand command,
+        ICollection<string> predicates,
+        string anchorExpression,
+        ReportDateRange window,
+        string suffix)
+    {
+        if (window.FromInclusive is { } from)
+        {
+            var name = $"$fromInclusive{suffix}";
+            predicates.Add($"{anchorExpression} >= {name}");
+            command.Parameters.AddWithValue(name, FormatDateTimeOffset(from));
+        }
+        if (window.ToExclusive is { } to)
+        {
+            var name = $"$toExclusive{suffix}";
+            predicates.Add($"{anchorExpression} < {name}");
+            command.Parameters.AddWithValue(name, FormatDateTimeOffset(to));
+        }
+    }
+
+    private static void CopyParameters(SqliteCommand source, SqliteCommand destination)
+    {
+        foreach (SqliteParameter parameter in source.Parameters)
+        {
+            destination.Parameters.AddWithValue(parameter.ParameterName, parameter.Value);
+        }
+    }
+
+    private static void AddAnalyticalPredicates(
+        SqliteCommand command,
+        ICollection<string> predicates,
+        ReportQuery query)
+    {
+        if (query.Scope == ReportScopeKinds.Doctor)
+        {
+            if (query.DoctorId is null)
+            {
+                predicates.Add("0 = 1");
+            }
+            else
+            {
+                predicates.Add("assigned_doctor_id = $doctorId COLLATE NOCASE");
+                command.Parameters.AddWithValue("$doctorId", query.DoctorId);
+            }
+        }
+
+        if (query.Sedation == ReportSedationSegments.Sedation)
+        {
+            predicates.Add("(upper(procedure_code) LIKE '%+SED' OR upper(procedure_code) = 'SED')");
+        }
+        else if (query.Sedation == ReportSedationSegments.NonSedation)
+        {
+            predicates.Add("NOT (upper(procedure_code) LIKE '%+SED' OR upper(procedure_code) = 'SED')");
+        }
+    }
+
+    private static int CountRows(
+        SqliteConnection connection,
+        string table,
+        string whereClause,
+        ReportDateRange window)
+    {
+        using var command = connection.CreateCommand();
+        command.CommandText = $"SELECT COUNT(*) FROM {table}{whereClause};";
+        if (window.FromInclusive is { } from)
+        {
+            command.Parameters.AddWithValue("$fromInclusive", FormatDateTimeOffset(from));
+        }
+        if (window.ToExclusive is { } to)
+        {
+            command.Parameters.AddWithValue("$toExclusive", FormatDateTimeOffset(to));
+        }
+        return Convert.ToInt32(command.ExecuteScalar());
     }
 
     private SqliteConnection OpenConnection()

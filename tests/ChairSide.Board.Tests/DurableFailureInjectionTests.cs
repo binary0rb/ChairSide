@@ -194,7 +194,6 @@ public sealed class DurableFailureInjectionTests
 
         var liveBefore = RoomSnapshot.From(GetLiveRoom(context.Store));
         var durableBefore = RoomSnapshot.From(LoadRoom(context));
-        var liveCycleBefore = CycleSnapshot.From(Assert.Single(GetLiveCycles(context.Store)));
         var durableCycleBefore = CycleSnapshot.From(Assert.Single(context.Repository.LoadCompletedCycles()));
         var eventCountBefore = context.Store.GetSnapshot().RecentEvents.Count;
         Assert.Equal(RoomStates.DoctorInRoom, durableBefore.State);
@@ -220,7 +219,6 @@ public sealed class DurableFailureInjectionTests
         AssertInjectedAbort(exception, "injected active_rooms reset failure");
         Assert.Equal(liveBefore, RoomSnapshot.From(GetLiveRoom(context.Store)));
         Assert.Equal(durableBefore, RoomSnapshot.From(LoadRoom(context)));
-        Assert.Equal(liveCycleBefore, CycleSnapshot.From(Assert.Single(GetLiveCycles(context.Store))));
         Assert.Equal(durableCycleBefore, CycleSnapshot.From(Assert.Single(context.Repository.LoadCompletedCycles())));
         Assert.Equal(eventCountBefore, context.Store.GetSnapshot().RecentEvents.Count);
         Assert.Empty(context.Repository.LoadAbortedAssignments());
@@ -473,13 +471,6 @@ public sealed class DurableFailureInjectionTests
         Assert.NotNull(field);
         var rooms = Assert.IsType<List<RoomState>>(field.GetValue(store));
         return rooms.Single(room => room.RoomId == 1);
-    }
-
-    private static IReadOnlyList<CompletedRoomCycle> GetLiveCycles(DemoBoardStore store)
-    {
-        var field = typeof(DemoBoardStore).GetField("_completedCycles", BindingFlags.Instance | BindingFlags.NonPublic);
-        Assert.NotNull(field);
-        return Assert.IsType<List<CompletedRoomCycle>>(field.GetValue(store));
     }
 
     private static void InstallResetFailureTrigger(string databasePath) =>

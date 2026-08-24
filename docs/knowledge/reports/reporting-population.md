@@ -22,6 +22,8 @@ last_verified_commit: fe60949
 
 `standardCompletedCycles` remains the shared denominator for standard throughput, procedure, sedation, allocation, schedule-fit, trend, observed-day, and doctor procedure-mix calculations. Phase-complete timing surfaces retain their existing deliberately broader rules.
 
+Ordinary startup and live-board operation do not retain lifetime completed history. Report reads enumerate completed, review-completed, and aborted sources in fixed SQLite pages. Small calculation populations remain in memory; larger replayable populations and exact ordered statistics spill to private temporary SQLite files that are released after composition or HTTP response serialization. This keeps All Time exact without a row/date cap while preserving medians, Type 7 ranges, overlap/concurrency, trends, Schedule Fit, Calibration, and compatibility review projections. Operational lifecycle updates and integrity checks retrieve only the single durable completed cycle belonging to the active room episode.
+
 ## Reusable report query and sample state
 
 `ReportQuery` keeps three responsibilities distinct:

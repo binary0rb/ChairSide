@@ -78,8 +78,7 @@ internal static class ProcedureIntelligenceStatistics
                 nameof(orderedOrUnorderedValues));
         }
 
-        var ordered = orderedOrUnorderedValues.Order().ToArray();
-        return (Type7Quantile(ordered, 0.25d), Type7Quantile(ordered, 0.75d));
+        return BoundedReportCollections.Type7Quartiles(orderedOrUnorderedValues);
     }
 
     internal static double Type7Quantile(IReadOnlyList<double> orderedValues, double probability)
@@ -115,11 +114,7 @@ internal static class ProcedureIntelligenceStatistics
             return null;
         }
 
-        var ordered = values.Order().ToArray();
-        var middle = ordered.Length / 2;
-        return ordered.Length % 2 == 1
-            ? ordered[middle]
-            : (ordered[middle - 1] + ordered[middle]) / 2d;
+        return BoundedReportCollections.Median(values);
     }
 
     internal static double? Average(IReadOnlyList<double> values)

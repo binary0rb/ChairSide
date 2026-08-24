@@ -43,7 +43,7 @@ public static class ScheduleFitReportBuilder
 
         // Materialize once so a lazy source is not enumerated twice (count + calculate). Drop null
         // defensive entries here so IncludedCycleCount reflects real supplied cycles only.
-        var population = cycles.Where(cycle => cycle is not null).ToList();
+        var population = BoundedReportCollections.Materialize(cycles.Where(cycle => cycle is not null));
 
         var overall = ScheduleFitCalculator.Calculate(population, blockMinutes);
 
