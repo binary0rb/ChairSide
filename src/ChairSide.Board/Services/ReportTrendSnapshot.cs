@@ -46,40 +46,27 @@ public static class ReportTrendSnapshotBuilder
     {
         ArgumentNullException.ThrowIfNull(cycles);
 
-        var eligible = new List<CompletedRoomCycle>();
-        foreach (var cycle in cycles)
-        {
-            if (cycle is null || cycle.DoctorCompleteAt is null)
-            {
-                continue;
-            }
+        var eligible = BoundedReportCollections.Materialize(
+            cycles.Where(cycle => cycle is not null && cycle.DoctorCompleteAt is not null));
+        using var grouping = BoundedGroupingSet<CompletedRoomCycle, DateOnly>.Create(
+            eligible,
+            cycle => WeekStart(DateOnly.FromDateTime(cycle.DoctorCompleteAt!.Value.UtcDateTime)));
 
-            eligible.Add(cycle);
-        }
-
-        var buckets = eligible
-            .GroupBy(cycle => WeekStart(DateOnly.FromDateTime(cycle.DoctorCompleteAt!.Value.UtcDateTime)))
-            .OrderBy(group => group.Key)
+        var buckets = grouping.Groups.OrderBy(group => group.Key)
             .Select(group =>
             {
-                var population = group.ToList();
-                var seatedToDoctorValues = population
+                var population = BoundedReportCollections.Materialize(group);
+                var seatedToDoctorValues = BoundedReportCollections.Materialize(population
                     .Where(cycle => cycle.DoctorArrivedAt.HasValue && cycle.SeatedToDoctorSeconds >= 0)
-                    .Select(cycle => cycle.SeatedToDoctorSeconds)
-                    .Order()
-                    .ToList();
-                var readyWaitValues = population
+                    .Select(cycle => cycle.SeatedToDoctorSeconds));
+                var readyWaitValues = BoundedReportCollections.Materialize(population
                     .Select(cycle => cycle.ReadyToDoctorSeconds)
                     .Where(value => value is >= 0)
-                    .Select(value => value!.Value)
-                    .Order()
-                    .ToList();
-                var turnoverValues = group
+                    .Select(value => value!.Value));
+                var turnoverValues = BoundedReportCollections.Materialize(population
                     .Select(cycle => cycle.TurnoverSeconds)
                     .Where(value => value is >= 0)
-                    .Select(value => value!.Value)
-                    .Order()
-                    .ToList();
+                    .Select(value => value!.Value));
                 return new ReportTrendBucket(
                     FormatDate(group.Key),
                     FormatDate(group.Key.AddDays(7)),
@@ -113,19 +100,9 @@ public static class ReportTrendSnapshotBuilder
     private static double Average(IReadOnlyList<int> orderedValues) =>
         orderedValues.Count == 0 ? 0 : orderedValues.Average();
 
-    private static double Median(IReadOnlyList<int> orderedValues)
-    {
-        if (orderedValues.Count == 0)
-        {
-            return 0;
-        }
+    private static double Median(IReadOnlyList<int> values) =>
+        BoundedReportCollections.Median(values) ?? 0d;
 
-        var middle = orderedValues.Count / 2;
-        return orderedValues.Count % 2 == 1
-            ? orderedValues[middle]
-            : (orderedValues[middle - 1] + orderedValues[middle]) / 2.0;
-    }
-
-    private static double? MedianOrNull(IReadOnlyList<int> orderedValues) =>
-        orderedValues.Count == 0 ? null : Median(orderedValues);
+    private static double? MedianOrNull(IReadOnlyList<int> values) =>
+        BoundedReportCollections.Median(values);
 }

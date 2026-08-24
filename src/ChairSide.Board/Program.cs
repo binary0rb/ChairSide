@@ -186,6 +186,7 @@ app.MapGet("/api/board", (DemoBoardStore store) => store.GetSnapshot());
 // sedation narrow analytical populations; procedureGrouping changes aggregation only. Invalid dates
 // retain graceful all-time behavior and reversed valid bounds normalize in the returned query metadata.
 app.MapGet("/api/reports", (
+    HttpContext httpContext,
     DemoBoardStore store,
     string? from,
     string? to,
@@ -193,13 +194,21 @@ app.MapGet("/api/reports", (
     string? doctorId,
     string? sedation,
     string? procedureGrouping) =>
-    store.GetReports(ReportQuery.FromStrings(
+{
+    var snapshot = store.GetReports(ReportQuery.FromStrings(
         from,
         to,
         scope,
         doctorId,
         sedation,
-        procedureGrouping)));
+        procedureGrouping));
+    httpContext.Response.OnCompleted(() =>
+    {
+        snapshot.Dispose();
+        return Task.CompletedTask;
+    });
+    return snapshot;
+});
 
 // Read-only, server-owned evidence projection. POST keeps the selection contract typed and avoids
 // placing potentially long calibration evidence identities in a query string.

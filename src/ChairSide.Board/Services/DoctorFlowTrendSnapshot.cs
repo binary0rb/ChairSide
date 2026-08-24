@@ -91,18 +91,12 @@ internal static class DoctorFlowTrendSnapshotBuilder
                 []);
         }
 
-        var doctorPhaseCycles = scopedStandardPhaseCycles
-            .Where(cycle => IsDoctor(cycle.AssignedDoctor, doctor.DoctorId)
-                && cycle.DoctorCompleteAt.HasValue)
-            .ToList();
-        var doctorCompletedCycles = scopedStandardCompletedCycles
-            .Where(cycle => IsDoctor(cycle.AssignedDoctor, doctor.DoctorId)
-                && cycle.DoctorCompleteAt.HasValue)
-            .ToList();
         var doctorDays = observedDoctorFlowDays
             .Where(day => IsDoctor(day.DoctorId, doctor.DoctorId))
             .Select(day => new ParsedObservedDoctorFlowDay(day, ParseDate(day.ReportDate)))
-            .Where(item => item.ReportDate.HasValue)
+            .Where(item => item.ReportDate.HasValue
+                && item.ReportDate.Value >= window.EffectiveStart
+                && item.ReportDate.Value < window.EffectiveEndExclusive)
             .ToList();
 
         var buckets = new List<DoctorFlowTrendBucket>();
@@ -111,25 +105,25 @@ internal static class DoctorFlowTrendSnapshotBuilder
             var end = start.AddDays(7);
             var effectiveStart = start < window.EffectiveStart ? window.EffectiveStart : start;
             var effectiveEnd = end > window.EffectiveEndExclusive ? window.EffectiveEndExclusive : end;
-            var phasePopulation = doctorPhaseCycles
-                .Where(cycle => IsInBucket(cycle.DoctorCompleteAt!.Value, effectiveStart, effectiveEnd))
-                .ToList();
-            var completedPopulation = doctorCompletedCycles
-                .Where(cycle => IsInBucket(cycle.DoctorCompleteAt!.Value, effectiveStart, effectiveEnd))
-                .ToList();
+            var phasePopulation = BoundedReportCollections.Materialize(scopedStandardPhaseCycles
+                .Where(cycle => IsDoctor(cycle.AssignedDoctor, doctor.DoctorId)
+                    && cycle.DoctorCompleteAt.HasValue
+                    && IsInBucket(cycle.DoctorCompleteAt.Value, effectiveStart, effectiveEnd)));
+            var completedPopulation = BoundedReportCollections.Materialize(scopedStandardCompletedCycles
+                .Where(cycle => IsDoctor(cycle.AssignedDoctor, doctor.DoctorId)
+                    && cycle.DoctorCompleteAt.HasValue
+                    && IsInBucket(cycle.DoctorCompleteAt.Value, effectiveStart, effectiveEnd)));
             var canonicalDays = doctorDays
                 .Where(item => item.ReportDate!.Value >= effectiveStart
                     && item.ReportDate.Value < effectiveEnd)
                 .Select(item => item.Day)
                 .ToList();
-            var readyWaitValues = phasePopulation
+            var readyWaitValues = BoundedReportCollections.Materialize(phasePopulation
                 .Select(ReportsSnapshotBuilder.TruthfulReadyWaitSeconds)
-                .Where(value => value.HasValue)
-                .ToList();
-            var doctorTimeValues = phasePopulation
+                .Where(value => value.HasValue));
+            var doctorTimeValues = BoundedReportCollections.Materialize(phasePopulation
                 .Select(ReportsSnapshotBuilder.TruthfulDoctorTimeSeconds)
-                .Where(value => value.HasValue)
-                .ToList();
+                .Where(value => value.HasValue));
             var representedCompletedDates = completedPopulation
                 .Select(cycle => DateOnly.FromDateTime(cycle.DoctorCompleteAt!.Value.UtcDateTime))
                 .Distinct()
@@ -169,12 +163,14 @@ internal static class DoctorFlowTrendSnapshotBuilder
         ReportDateRange selectedRange)
     {
         var hasExplicitEnd = selectedRange.EndDate.HasValue;
-        var latestDateableObservation = scopedStandardPhaseCycles
-            .Where(cycle => cycle.DoctorCompleteAt.HasValue)
-            .Select(cycle => DateOnly.FromDateTime(cycle.DoctorCompleteAt!.Value.UtcDateTime))
-            .OrderDescending()
-            .FirstOrDefault();
-        var hasDateableObservation = scopedStandardPhaseCycles.Any(cycle => cycle.DoctorCompleteAt.HasValue);
+        var latestDateableObservation = default(DateOnly);
+        var hasDateableObservation = false;
+        foreach (var cycle in scopedStandardPhaseCycles.Where(cycle => cycle.DoctorCompleteAt.HasValue))
+        {
+            var date = DateOnly.FromDateTime(cycle.DoctorCompleteAt!.Value.UtcDateTime);
+            if (!hasDateableObservation || date > latestDateableObservation) latestDateableObservation = date;
+            hasDateableObservation = true;
+        }
 
         DateOnly endInclusive;
         if (hasExplicitEnd)

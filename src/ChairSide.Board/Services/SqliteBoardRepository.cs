@@ -82,6 +82,12 @@ public sealed class SqliteBoardRepository
 
     private readonly string _connectionString;
     private readonly string _databasePath;
+    private int _unboundedHistoricalLoadCount;
+    private int _largestHistoricalPageSize;
+
+    internal int UnboundedHistoricalLoadCount => Volatile.Read(ref _unboundedHistoricalLoadCount);
+
+    internal int LargestHistoricalPageSize => Volatile.Read(ref _largestHistoricalPageSize);
 
     public SqliteBoardRepository(
         IOptions<BoardPersistenceOptions> options,
@@ -319,6 +325,7 @@ public sealed class SqliteBoardRepository
 
     public IReadOnlyList<CompletedRoomCycle> LoadCompletedCycles(ReportDateRange window)
     {
+        if (window.IsAllTime) Interlocked.Increment(ref _unboundedHistoricalLoadCount);
         using var connection = OpenConnection();
         using var command = connection.CreateCommand();
         command.CommandText = CompletedCycleSelectSql
@@ -342,7 +349,24 @@ public sealed class SqliteBoardRepository
             + " ORDER BY doctor_complete_at DESC, id DESC LIMIT $limit OFFSET $offset;";
         command.Parameters.AddWithValue("$limit", limit);
         command.Parameters.AddWithValue("$offset", offset);
-        return new HistoricalQueryPage<CompletedRoomCycle>(ReadCompletedCycles(command), total, offset, limit);
+        var rows = ReadCompletedCycles(command);
+        ObserveHistoricalPage(rows.Count);
+        return new HistoricalQueryPage<CompletedRoomCycle>(rows, total, offset, limit);
+    }
+
+    public IEnumerable<CompletedRoomCycle> EnumerateCompletedCycles(
+        ReportDateRange window,
+        int pageSize = 100)
+    {
+        if (pageSize <= 0) throw new ArgumentOutOfRangeException(nameof(pageSize));
+        var offset = 0;
+        while (true)
+        {
+            var page = LoadCompletedCyclesPage(window, offset, pageSize);
+            foreach (var row in page.Rows) yield return row;
+            if (!page.HasMore) yield break;
+            offset += page.Rows.Count;
+        }
     }
 
     public HistoricalQueryPage<CompletedRoomCycle> LoadCompletedAuditCandidatesPage(
@@ -390,6 +414,26 @@ public sealed class SqliteBoardRepository
         return new HistoricalQueryPage<CompletedRoomCycle>(ReadCompletedCycles(command), total, offset, limit);
     }
 
+    public IEnumerable<CompletedRoomCycle> EnumerateCompletedAuditCandidates(
+        ReportQuery query,
+        int pageSize = 100)
+    {
+        if (pageSize <= 0) throw new ArgumentOutOfRangeException(nameof(pageSize));
+        var offset = 0;
+        while (true)
+        {
+            var page = LoadCompletedAuditCandidatesPage(
+                query,
+                ReportAuditSorts.MostRecent,
+                offset,
+                pageSize);
+            ObserveHistoricalPage(page.Rows.Count);
+            foreach (var row in page.Rows) yield return row;
+            if (!page.HasMore) yield break;
+            offset += page.Rows.Count;
+        }
+    }
+
     public int CountCompletedCycles(ReportDateRange window, ReportQuery? analyticalQuery = null)
     {
         using var connection = OpenConnection();
@@ -427,6 +471,7 @@ public sealed class SqliteBoardRepository
 
     public IReadOnlyList<CompletedRoomCycle> LoadCompletedReviewCycles(ReportDateRange window)
     {
+        if (window.IsAllTime) Interlocked.Increment(ref _unboundedHistoricalLoadCount);
         using var connection = OpenConnection();
         using var command = connection.CreateCommand();
         var anchor = "COALESCE(doctor_complete_at, doctor_arrived_at, seated_at, prestage_started_at)";
@@ -436,6 +481,50 @@ public sealed class SqliteBoardRepository
             + $" WHERE {string.Join(" AND ", predicates)}"
             + $" ORDER BY {anchor} DESC, id DESC;";
         return ReadCompletedCycles(command);
+    }
+
+    public HistoricalQueryPage<CompletedRoomCycle> LoadCompletedReviewCyclesPage(
+        ReportDateRange window,
+        int offset,
+        int limit)
+    {
+        ValidatePage(offset, limit);
+        using var connection = OpenConnection();
+        var anchor = "COALESCE(doctor_complete_at, doctor_arrived_at, seated_at, prestage_started_at)";
+        using var predicateCommand = connection.CreateCommand();
+        var predicates = new List<string> { "is_exception = 1" };
+        AddWindowPredicates(predicateCommand, predicates, anchor, window);
+        var where = $" WHERE {string.Join(" AND ", predicates)}";
+        using var command = connection.CreateCommand();
+        CopyParameters(predicateCommand, command);
+        command.CommandText = CompletedCycleSelectSql
+            + where
+            + $" ORDER BY {anchor} DESC, id DESC LIMIT $limit OFFSET $offset;";
+        command.Parameters.AddWithValue("$limit", limit);
+        command.Parameters.AddWithValue("$offset", offset);
+        var rows = ReadCompletedCycles(command);
+        ObserveHistoricalPage(rows.Count);
+
+        using var countCommand = connection.CreateCommand();
+        CopyParameters(predicateCommand, countCommand);
+        countCommand.CommandText = $"SELECT COUNT(*) FROM completed_room_cycles{where};";
+        var total = Convert.ToInt32(countCommand.ExecuteScalar());
+        return new HistoricalQueryPage<CompletedRoomCycle>(rows, total, offset, limit);
+    }
+
+    public IEnumerable<CompletedRoomCycle> EnumerateCompletedReviewCycles(
+        ReportDateRange window,
+        int pageSize = 100)
+    {
+        if (pageSize <= 0) throw new ArgumentOutOfRangeException(nameof(pageSize));
+        var offset = 0;
+        while (true)
+        {
+            var page = LoadCompletedReviewCyclesPage(window, offset, pageSize);
+            foreach (var row in page.Rows) yield return row;
+            if (!page.HasMore) yield break;
+            offset += page.Rows.Count;
+        }
     }
 
     public void SaveCompletedCycle(CompletedRoomCycle cycle, IReadOnlyList<Doctor> doctors, IReadOnlyList<ProcedureCategory> procedures)
@@ -1413,6 +1502,7 @@ public sealed class SqliteBoardRepository
 
     public IReadOnlyList<AbortedRoomAssignment> LoadAbortedAssignments(ReportDateRange window)
     {
+        if (window.IsAllTime) Interlocked.Increment(ref _unboundedHistoricalLoadCount);
         using var connection = OpenConnection();
         using var command = connection.CreateCommand();
         command.CommandText = AbortedAssignmentSelectSql
@@ -1436,8 +1526,26 @@ public sealed class SqliteBoardRepository
             + " ORDER BY terminated_at DESC, id DESC LIMIT $limit OFFSET $offset;";
         command.Parameters.AddWithValue("$limit", limit);
         command.Parameters.AddWithValue("$offset", offset);
-        return new HistoricalQueryPage<AbortedRoomAssignment>(ReadAbortedAssignments(command), total, offset, limit);
+        var rows = ReadAbortedAssignments(command);
+        ObserveHistoricalPage(rows.Count);
+        return new HistoricalQueryPage<AbortedRoomAssignment>(rows, total, offset, limit);
     }
+
+    public IEnumerable<AbortedRoomAssignment> EnumerateAbortedAssignments(
+        ReportDateRange window,
+        int pageSize = 100)
+    {
+        if (pageSize <= 0) throw new ArgumentOutOfRangeException(nameof(pageSize));
+        var offset = 0;
+        while (true)
+        {
+            var page = LoadAbortedAssignmentsPage(window, offset, pageSize);
+            foreach (var row in page.Rows) yield return row;
+            if (!page.HasMore) yield break;
+            offset += page.Rows.Count;
+        }
+    }
+
 
     public AbortedRoomAssignment? LoadAbortedAssignmentById(long abortedAssignmentId)
     {
@@ -2740,6 +2848,17 @@ public sealed class SqliteBoardRepository
     {
         if (offset < 0) throw new ArgumentOutOfRangeException(nameof(offset));
         if (limit <= 0) throw new ArgumentOutOfRangeException(nameof(limit));
+    }
+
+    private void ObserveHistoricalPage(int rowCount)
+    {
+        var observed = Volatile.Read(ref _largestHistoricalPageSize);
+        while (rowCount > observed)
+        {
+            var prior = Interlocked.CompareExchange(ref _largestHistoricalPageSize, rowCount, observed);
+            if (prior == observed) return;
+            observed = prior;
+        }
     }
 
     private static string BuildWindowWhereClause(

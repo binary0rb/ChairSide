@@ -351,6 +351,12 @@
                       "path":  "src/ChairSide.Board/Services/AdminAccessTokenValidator.cs"
                   },
                   {
+                      "id":  "file:src/ChairSide.Board/Services/BoundedReportCollections.cs",
+                      "label":  "src/ChairSide.Board/Services/BoundedReportCollections.cs",
+                      "type":  "File",
+                      "path":  "src/ChairSide.Board/Services/BoundedReportCollections.cs"
+                  },
+                  {
                       "id":  "file:src/ChairSide.Board/Services/CalibrationInsightReport.cs",
                       "label":  "src/ChairSide.Board/Services/CalibrationInsightReport.cs",
                       "type":  "File",
@@ -1401,6 +1407,18 @@
                       "path":  "src/ChairSide.Board/Options/BoardUiOptions.cs"
                   },
                   {
+                      "id":  "symbol:type:BoundedGroupingSet",
+                      "label":  "BoundedGroupingSet",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/BoundedReportCollections.cs"
+                  },
+                  {
+                      "id":  "symbol:type:BoundedReportCollections",
+                      "label":  "BoundedReportCollections",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/BoundedReportCollections.cs"
+                  },
+                  {
                       "id":  "symbol:type:Bucket",
                       "label":  "Bucket",
                       "type":  "CodeType",
@@ -1729,6 +1747,18 @@
                       "label":  "DiagnosticOptions",
                       "type":  "CodeType",
                       "path":  "src/ChairSide.Board/Options/DiagnosticOptions.cs"
+                  },
+                  {
+                      "id":  "symbol:type:DiskBackedReadOnlyList",
+                      "label":  "DiskBackedReadOnlyList",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/BoundedReportCollections.cs"
+                  },
+                  {
+                      "id":  "symbol:type:DiskGrouping",
+                      "label":  "DiskGrouping",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/BoundedReportCollections.cs"
                   },
                   {
                       "id":  "symbol:type:Doctor",
@@ -2187,6 +2217,12 @@
                       "path":  "src/ChairSide.Board/Services/DatabaseIsolationPolicy.cs"
                   },
                   {
+                      "id":  "symbol:type:NumericOrderStatistics",
+                      "label":  "NumericOrderStatistics",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/BoundedReportCollections.cs"
+                  },
+                  {
                       "id":  "symbol:type:ObservedDoctorDay",
                       "label":  "ObservedDoctorDay",
                       "type":  "CodeType",
@@ -2641,6 +2677,12 @@
                       "label":  "ReportSedationSegments",
                       "type":  "CodeType",
                       "path":  "src/ChairSide.Board/Services/ReportQuery.cs"
+                  },
+                  {
+                      "id":  "symbol:type:ReportSpoolScope",
+                      "label":  "ReportSpoolScope",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/BoundedReportCollections.cs"
                   },
                   {
                       "id":  "symbol:type:ReportsSnapshot",
@@ -3351,6 +3393,36 @@
                   {
                       "from":  "file:src/ChairSide.Board/Services/AdminAccessTokenValidator.cs",
                       "to":  "symbol:type:AdminAccessTokenValidator",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/BoundedReportCollections.cs",
+                      "to":  "symbol:type:BoundedGroupingSet",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/BoundedReportCollections.cs",
+                      "to":  "symbol:type:BoundedReportCollections",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/BoundedReportCollections.cs",
+                      "to":  "symbol:type:DiskBackedReadOnlyList",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/BoundedReportCollections.cs",
+                      "to":  "symbol:type:DiskGrouping",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/BoundedReportCollections.cs",
+                      "to":  "symbol:type:NumericOrderStatistics",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/BoundedReportCollections.cs",
+                      "to":  "symbol:type:ReportSpoolScope",
                       "label":  "declares"
                   },
                   {
@@ -5056,6 +5128,11 @@
                   {
                       "from":  "repo:chairside",
                       "to":  "file:src/ChairSide.Board/Services/AdminAccessTokenValidator.cs",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:src/ChairSide.Board/Services/BoundedReportCollections.cs",
                       "label":  "contains"
                   },
                   {

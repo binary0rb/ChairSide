@@ -1108,16 +1108,28 @@ public sealed class DemoBoardStore
     {
         lock (_syncRoot)
         {
-            var completedCycles = _repository.LoadCompletedCycles(query.Window);
-            var reviewCompletedCycles = _repository.LoadCompletedReviewCycles(query.Window);
-            var abortedAssignments = _repository.LoadAbortedAssignments(query.Window);
-            var totalCompletedAllTime = _repository.CountCompletedCycles(ReportDateRange.AllTime, query);
-            return _reportsSnapshotBuilder.Build(
-                completedCycles,
-                reviewCompletedCycles,
-                abortedAssignments,
-                query,
-                totalCompletedAllTime);
+            var completedCycles = BoundedReportCollections.Materialize(
+                _repository.EnumerateCompletedCycles(query.Window));
+            var reviewCompletedCycles = BoundedReportCollections.Materialize(
+                _repository.EnumerateCompletedReviewCycles(query.Window));
+            var abortedAssignments = BoundedReportCollections.Materialize(
+                _repository.EnumerateAbortedAssignments(query.Window));
+            try
+            {
+                var totalCompletedAllTime = _repository.CountCompletedCycles(ReportDateRange.AllTime, query);
+                return _reportsSnapshotBuilder.Build(
+                    completedCycles,
+                    reviewCompletedCycles,
+                    abortedAssignments,
+                    query,
+                    totalCompletedAllTime);
+            }
+            finally
+            {
+                (completedCycles as IDisposable)?.Dispose();
+                (reviewCompletedCycles as IDisposable)?.Dispose();
+                (abortedAssignments as IDisposable)?.Dispose();
+            }
         }
     }
 
@@ -1146,6 +1158,16 @@ public sealed class DemoBoardStore
                     ? ReportAuditSorts.Review.First(item =>
                         string.Equals(item, request.Sort, StringComparison.OrdinalIgnoreCase))
                     : ReportAuditSorts.MostRecent;
+                if (sort is ReportAuditSorts.Doctor or ReportAuditSorts.Procedure)
+                {
+                    return QueryProjectedReviewAudit(
+                        request,
+                        window,
+                        isPendingReview,
+                        sort,
+                        offset,
+                        limit);
+                }
                 var persistedPage = _repository.LoadReviewEncounterKeysPage(
                     window,
                     isPendingReview,
@@ -1187,10 +1209,16 @@ public sealed class DemoBoardStore
                 ReportAuditContributorKinds.CalibrationEvidence,
                 StringComparison.OrdinalIgnoreCase))
             {
-                return _reportsSnapshotBuilder.BuildAudit(
-                    _repository.LoadCompletedCycles(query.Window),
-                    [],
-                    request);
+                var candidates = BoundedReportCollections.Materialize(
+                    _repository.EnumerateCompletedAuditCandidates(query));
+                try
+                {
+                    return _reportsSnapshotBuilder.BuildAudit(candidates, [], request);
+                }
+                finally
+                {
+                    (candidates as IDisposable)?.Dispose();
+                }
             }
 
             var requestedOffset = Math.Max(0, request.Offset);
@@ -1261,6 +1289,77 @@ public sealed class DemoBoardStore
                 ActiveSort = activeSort
             };
         }
+    }
+
+    private ReportAuditPage QueryProjectedReviewAudit(
+        ReportAuditRequest request,
+        ReportDateRange window,
+        bool requiresReview,
+        string sort,
+        int requestedOffset,
+        int requestedLimit)
+    {
+        const int persistenceBatchSize = 100;
+        var rawOffset = 0;
+        var totalMatchingCount = 0;
+        var retainedLimit = requestedOffset > int.MaxValue - requestedLimit
+            ? int.MaxValue
+            : requestedOffset + requestedLimit;
+        var retainedRows = new List<ReportReviewAuditRow>(Math.Min(retainedLimit, persistenceBatchSize));
+        ReportAuditPage? template = null;
+
+        while (true)
+        {
+            var persistedPage = _repository.LoadReviewEncounterKeysPage(
+                window,
+                requiresReview,
+                ReportAuditSorts.MostRecent,
+                rawOffset,
+                persistenceBatchSize);
+            totalMatchingCount = persistedPage.TotalMatchingCount;
+            if (persistedPage.Rows.Count == 0) break;
+
+            var encounters = _repository.LoadHistoricalEncounters(persistedPage.Rows);
+            var candidate = _reportsSnapshotBuilder.BuildAudit(
+                encounters.Where(record => record.CompletedCycle != null)
+                    .Select(record => record.CompletedCycle!)
+                    .ToList(),
+                encounters.Where(record => record.AbortedAssignment != null)
+                    .Select(record => record.AbortedAssignment!)
+                    .ToList(),
+                request with { Offset = 0, Limit = persistenceBatchSize, Sort = sort });
+            template ??= candidate;
+            retainedRows.AddRange(candidate.ReviewRows);
+            if (retainedRows.Count > retainedLimit)
+            {
+                retainedRows = ReportsSnapshotBuilder.OrderProjectedReviewRows(retainedRows, sort)
+                    .Take(retainedLimit)
+                    .ToList();
+            }
+
+            rawOffset += persistedPage.Rows.Count;
+            if (!persistedPage.HasMore) break;
+        }
+
+        template ??= _reportsSnapshotBuilder.BuildAudit(
+            [],
+            [],
+            request with { Offset = 0, Limit = requestedLimit, Sort = sort });
+        var rows = ReportsSnapshotBuilder.OrderProjectedReviewRows(retainedRows, sort)
+            .Skip(requestedOffset)
+            .Take(requestedLimit)
+            .ToList();
+        return template with
+        {
+            Rows = [],
+            ReviewRows = rows,
+            ReturnedCount = rows.Count,
+            TotalMatchingCount = totalMatchingCount,
+            Offset = requestedOffset,
+            Limit = requestedLimit,
+            HasMore = requestedOffset + rows.Count < totalMatchingCount,
+            ActiveSort = sort
+        };
     }
 
     /// <summary>
@@ -3407,7 +3506,25 @@ public sealed record ReportsSnapshot(
     IReadOnlyList<ProcedureIntelligenceRow>? ProcedureIntelligenceRows = null,
     // Compact reconciliation for the selected analytical population and separate review window.
     // Healthy state stays presentation-quiet; exclusions and review work retain source-backed counts.
-    ReportDataQualitySummary? DataQuality = null);
+    ReportDataQualitySummary? DataQuality = null) : IDisposable
+{
+    public void Dispose()
+    {
+        (ExceptionCycles as IDisposable)?.Dispose();
+        (ExceptionReviewRecords as IDisposable)?.Dispose();
+        foreach (var segment in ScheduleFit?.ProcedureSegments ?? [])
+        {
+            (segment.CurrentDefaultCalibration.Insight?.Evidence as IDisposable)?.Dispose();
+            foreach (var doctor in segment.DoctorBreakdown)
+            {
+                (doctor.CurrentDefaultCalibration.Insight?.Evidence as IDisposable)?.Dispose();
+            }
+        }
+        GC.SuppressFinalize(this);
+    }
+
+    ~ReportsSnapshot() => Dispose();
+}
 
 public sealed record DoctorProcedureMixRow(
     string DoctorId,

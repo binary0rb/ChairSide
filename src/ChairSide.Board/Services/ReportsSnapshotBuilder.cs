@@ -93,6 +93,7 @@ internal sealed partial class ReportsSnapshotBuilder
         ReportQuery query,
         int? totalCompletedAllTimeOverride)
     {
+        using var spoolScope = ReportSpoolScope.Begin();
         ArgumentNullException.ThrowIfNull(completedCycles);
         ArgumentNullException.ThrowIfNull(reviewCompletedCycles);
         ArgumentNullException.ThrowIfNull(abortedAssignments);
@@ -104,58 +105,56 @@ internal sealed partial class ReportsSnapshotBuilder
         // Apply the completion window before copying or deriving report-time annotations. This
         // preserves the established DoctorCompleteAt boundary and leaves out-of-window history
         // completely uninspected by downstream reporting calculations.
-        var selectedCycles = completedCycles
-            .Where(cycle => query.Window.Includes(cycle.DoctorCompleteAt))
-            .ToList();
+        var selectedCycles = BoundedReportCollections.Materialize(completedCycles
+            .Where(cycle => query.Window.Includes(cycle.DoctorCompleteAt)));
 
         // Report-time annotations are applied only to detached copies. The store's durable
         // historical snapshots remain untouched by report reads.
-        var allCycles = CreateAnnotatedCompletedCycleSnapshot(selectedCycles)
-            .OrderByDescending(cycle => cycle.DoctorArrivedAt)
-            .ToList();
-        var detachedAbortedAssignments = abortedAssignments
+        var allCycles = CreateAnnotatedCompletedCycleSnapshot(selectedCycles);
+        var detachedAbortedAssignments = BoundedReportCollections.Materialize(abortedAssignments
             .Where(record => query.Window.Includes(record.TerminatedAt))
-            .Select(CopyAbortedAssignment)
-            .ToList();
+            .Select(CopyAbortedAssignment));
 
         // Manual review exceptions are excluded from normal operational metrics by default.
-        var normalCycles = allCycles.Where(cycle => !cycle.IsException).ToList();
+        var unoccupiedNormalCycles = BoundedReportCollections.Materialize(
+            allCycles.Where(cycle => !cycle.IsException));
         // Standard population additionally drops reporting-exception cycles (legacy/unmapped/
         // extreme/overnight) so doctor-facing aggregates are not skewed by sample/legacy data.
-        var standardCycles = normalCycles.Where(cycle => !cycle.IsExcludedFromStandardMetrics).ToList();
+        var blockerCycles = BoundedReportCollections.Materialize(
+            unoccupiedNormalCycles.Where(cycle => !cycle.IsExcludedFromStandardMetrics));
+
+        // Occupied/available wait is a cross-cycle annotation. Produce a new replayable snapshot so
+        // large disk-backed populations retain each derived value instead of mutating transient rows.
+        var normalCycles = CreateOccupiedWaitSnapshot(unoccupiedNormalCycles, blockerCycles);
+        var standardCycles = BoundedReportCollections.Materialize(
+            normalCycles.Where(cycle => !cycle.IsExcludedFromStandardMetrics));
 
         // Doctor and sedation are analytical population filters. Apply them once after report-time
         // annotation so derived operational context (for example occupied wait) can still observe the
         // full window. Procedure grouping is intentionally absent here because it is aggregation only.
-        var scopedNormalCycles = normalCycles.Where(query.IncludesAnalyticalCycle).ToList();
-        var scopedStandardCycles = standardCycles.Where(query.IncludesAnalyticalCycle).ToList();
+        var scopedNormalCycles = BoundedReportCollections.Materialize(
+            normalCycles.Where(query.IncludesAnalyticalCycle));
+        var scopedStandardCycles = BoundedReportCollections.Materialize(
+            standardCycles.Where(query.IncludesAnalyticalCycle));
 
         // Raw/audit completed set keeps reporting-exception cycles visible (with badges);
         // the standard completed set drives aggregates.
-        var normalCompletedCycles = scopedNormalCycles
-            .Where(cycle => cycle.RoomAvailableAt is not null)
-            .ToList();
-        var standardCompletedCycles = scopedStandardCycles
-            .Where(cycle => cycle.RoomAvailableAt is not null)
-            .ToList();
+        var normalCompletedCycles = BoundedReportCollections.Materialize(
+            scopedNormalCycles.Where(cycle => cycle.RoomAvailableAt is not null));
+        var standardCompletedCycles = BoundedReportCollections.Materialize(
+            scopedStandardCycles.Where(cycle => cycle.RoomAvailableAt is not null));
 
         // Review populations use their own truthful source anchors. In particular, post-arrival
         // exceptions without DoctorCompleteAt remain discoverable by their latest observed lifecycle
         // timestamp instead of being lost by the completed-case window.
-        var selectedReviewCompletedCycles = reviewCompletedCycles
+        var selectedReviewCompletedCycles = BoundedReportCollections.Materialize(reviewCompletedCycles
             .Where(cycle => cycle.IsException && query.Window.Includes(ReviewAnchor(cycle)))
-            .Select(CopyCompletedCycle)
-            .ToList();
-        var exceptionCycles = selectedReviewCompletedCycles
-            .Where(cycle => cycle.RequiresReview)
-            .OrderByDescending(cycle => cycle.SeatedAt)
-            .ToList();
+            .Select(CopyCompletedCycle));
+        var exceptionCycles = BoundedReportCollections.OrderBy(
+            selectedReviewCompletedCycles.Where(cycle => cycle.RequiresReview),
+            cycle => cycle.SeatedAt.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture),
+            descending: true);
         var exceptionReviewRecords = BuildExceptionReviewRecords(exceptionCycles, detachedAbortedAssignments);
-
-        // Annotate the raw display set with doctor-occupied / available wait, but use only the
-        // standard population as the blocker pool so an extreme/overnight outlier never distorts
-        // another cycle's occupied wait.
-        AnnotateOccupiedWait(normalCycles, standardCycles);
 
         var compatibilityScheduleFit = ScheduleFitReportBuilder.Build(standardCompletedCycles);
         var scopedProcedurePopulations = BuildScopedProcedurePopulations(
@@ -225,14 +224,17 @@ internal sealed partial class ReportsSnapshotBuilder
                 scheduleFit.IncludedCycleCount,
                 scheduleFit.ScheduleFitCycleCount));
 
-        return new ReportsSnapshotComposition
+        var composition = new ReportsSnapshotComposition
         {
             Query = query.ToContext(),
             Samples = samples,
             Population = new ReportPopulationSection
             {
                 CompletedRoomCyclesCount = normalCompletedCycles.Count,
-                RecentCompletedCycles = normalCompletedCycles.Take(25).ToList(),
+                RecentCompletedCycles = BoundedReportCollections.TakeTop(
+                    normalCompletedCycles,
+                    25,
+                    cycle => cycle.DoctorArrivedAt),
                 IncludedCompletedCycleCount = standardCompletedCycles.Count,
                 ExcludedCompletedCycleCount = normalCompletedCycles.Count - standardCompletedCycles.Count,
                 ExceptionCount = normalCompletedCycles.Count(cycle => cycle.HasReportingException),
@@ -317,6 +319,24 @@ internal sealed partial class ReportsSnapshotBuilder
                 ExceptionReviewRecords = exceptionReviewRecords
             }
         };
+        RetainResponseSpools(composition, spoolScope);
+        return composition;
+    }
+
+    private static void RetainResponseSpools(
+        ReportsSnapshotComposition composition,
+        ReportSpoolScope spoolScope)
+    {
+        spoolScope.Retain(composition.ReviewQueue.ExceptionCycles);
+        spoolScope.Retain(composition.ReviewQueue.ExceptionReviewRecords);
+        foreach (var segment in composition.Allocation.ScheduleFit?.ProcedureSegments ?? [])
+        {
+            spoolScope.Retain(segment.CurrentDefaultCalibration.Insight?.Evidence);
+            foreach (var doctor in segment.DoctorBreakdown)
+            {
+                spoolScope.Retain(doctor.CurrentDefaultCalibration.Insight?.Evidence);
+            }
+        }
     }
 
     internal IReadOnlyList<CompletedRoomCycle> CreateAnnotatedCompletedCycleSnapshot(
@@ -324,10 +344,13 @@ internal sealed partial class ReportsSnapshotBuilder
     {
         ArgumentNullException.ThrowIfNull(completedCycles);
 
-        var detached = completedCycles.Select(CopyCompletedCycle).ToList();
-        AnnotateReportingExceptions(detached);
-        AnnotateAllocationVariance(detached);
-        return detached;
+        return BoundedReportCollections.Materialize(completedCycles.Select(cycle =>
+        {
+            var detached = CopyCompletedCycle(cycle);
+            AnnotateReportingExceptions([detached]);
+            AnnotateAllocationVariance([detached]);
+            return detached;
+        }));
     }
 
     private static IReadOnlyList<ExceptionReviewRecord> BuildExceptionReviewRecords(
@@ -384,79 +407,43 @@ internal sealed partial class ReportsSnapshotBuilder
                 record.ReviewedAt,
                 record.ReviewedBy));
 
-        return completed
-            .Concat(aborted)
-            .OrderByDescending(record => record.SeatedAt ?? record.PrestageStartedAt)
-            .ThenBy(record => record.RoomId)
-            .ToList();
+        return BoundedReportCollections.OrderBy(
+            completed.Concat(aborted),
+            record => (record.SeatedAt ?? record.PrestageStartedAt)?.ToUniversalTime()
+                .ToString("O", CultureInfo.InvariantCulture),
+            descending: true,
+            record => record.RoomId);
     }
 
-    private static double AverageSeconds(IEnumerable<int?> values)
-    {
-        var completed = values.Where(value => value.HasValue).Select(value => value!.Value).ToList();
-        return completed.Count == 0 ? 0 : completed.Average();
-    }
+    private static double AverageSeconds(IEnumerable<int?> values) =>
+        BoundedReportCollections.Average(values);
 
     private static double MedianSeconds(IEnumerable<int?> values)
     {
-        var ordered = values
-            .Where(value => value.HasValue)
-            .Select(value => value!.Value)
-            .Order()
-            .ToList();
-        if (ordered.Count == 0)
-        {
-            return 0;
-        }
-
-        var middle = ordered.Count / 2;
-        return ordered.Count % 2 == 1
-            ? ordered[middle]
-            : (ordered[middle - 1] + ordered[middle]) / 2.0;
+        return BoundedReportCollections.Median(values) ?? 0d;
     }
 
     internal static double? MedianSecondsOrNull(IEnumerable<int?> values)
     {
-        var ordered = values
-            .Where(value => value.HasValue)
-            .Select(value => value!.Value)
-            .Order()
-            .ToList();
-        if (ordered.Count == 0)
-        {
-            return null;
-        }
-
-        var middle = ordered.Count / 2;
-        return ordered.Count % 2 == 1
-            ? ordered[middle]
-            : (ordered[middle - 1] + ordered[middle]) / 2.0;
+        return BoundedReportCollections.Median(values);
     }
 
     internal static double? MedianWholeMinutesOrNull(IEnumerable<int> values)
     {
-        var ordered = values.Order().ToList();
-        if (ordered.Count == 0)
-        {
-            return null;
-        }
-
-        var middle = ordered.Count / 2;
-        return ordered.Count % 2 == 1
-            ? ordered[middle]
-            : (ordered[middle - 1] + ordered[middle]) / 2.0;
+        return BoundedReportCollections.Median(values);
     }
 
-    private static IReadOnlyList<DoctorCycleSummary> BuildDoctorSummaries(IReadOnlyList<CompletedRoomCycle> cycles) =>
-        cycles
-            .Where(cycle => cycle.DoctorArrivedAt.HasValue)
-            .GroupBy(cycle => new
-            {
+    private static IReadOnlyList<DoctorCycleSummary> BuildDoctorSummaries(IReadOnlyList<CompletedRoomCycle> cycles)
+    {
+        var eligible = BoundedReportCollections.Materialize(cycles.Where(cycle => cycle.DoctorArrivedAt.HasValue));
+        using var grouping = BoundedGroupingSet<CompletedRoomCycle, (string Doctor, DateOnly Month)>.Create(
+            eligible,
+            cycle => (
                 cycle.AssignedDoctor,
-                Month = new DateOnly(cycle.DoctorArrivedAt!.Value.Year, cycle.DoctorArrivedAt.Value.Month, 1)
-            })
+                new DateOnly(cycle.DoctorArrivedAt!.Value.Year, cycle.DoctorArrivedAt.Value.Month, 1)));
+        return grouping.Groups
             .Select(group => new DoctorCycleSummary(
-                group.Key.AssignedDoctor,
+                group.Key.Doctor,
                 group.Key.Month,
                 group.Count(),
                 AverageSeconds(group.Select(cycle => (int?)cycle.SeatedToDoctorSeconds)),
@@ -479,14 +466,14 @@ internal sealed partial class ReportsSnapshotBuilder
             .OrderByDescending(summary => summary.Month)
             .ThenBy(summary => summary.AssignedDoctor)
             .ToList();
+    }
 
     private IReadOnlyList<ReportDoctorAllocationSampleContext> BuildDoctorAllocationSamples(
         IReadOnlyList<CompletedRoomCycle> cycles,
         ReportQuery query)
     {
-        var representedCycles = cycles
-            .Where(cycle => cycle.DoctorArrivedAt.HasValue && !string.IsNullOrWhiteSpace(cycle.AssignedDoctor))
-            .ToList();
+        var representedCycles = BoundedReportCollections.Materialize(cycles
+            .Where(cycle => cycle.DoctorArrivedAt.HasValue && !string.IsNullOrWhiteSpace(cycle.AssignedDoctor)));
         var doctorIds = query.Scope == ReportScopeKinds.Doctor
             ? new[] { query.DoctorId }.Where(id => !string.IsNullOrWhiteSpace(id)).Select(id => id!)
             : _doctors.Select(doctor => doctor.Id)
@@ -496,35 +483,49 @@ internal sealed partial class ReportsSnapshotBuilder
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .Select(doctorId =>
             {
-                var population = representedCycles
-                    .Where(cycle => string.Equals(cycle.AssignedDoctor, doctorId, StringComparison.OrdinalIgnoreCase))
-                    .ToList();
+                var populationCount = 0;
+                var contributingCount = 0;
+                foreach (var cycle in representedCycles.Where(cycle => string.Equals(
+                             cycle.AssignedDoctor,
+                             doctorId,
+                             StringComparison.OrdinalIgnoreCase)))
+                {
+                    populationCount++;
+                    if (cycle.AllocationVarianceMinutes.HasValue) contributingCount++;
+                }
                 return new ReportDoctorAllocationSampleContext(
                     doctorId,
-                    ReportSampleContext.Create(
-                        population.Count,
-                        population.Count(cycle => cycle.AllocationVarianceMinutes.HasValue)));
+                    ReportSampleContext.Create(populationCount, contributingCount));
             })
             .ToList();
     }
 
     private static IReadOnlyList<DoctorDailyAllocation> BuildDoctorDailyAllocationSeries(
-        IReadOnlyList<CompletedRoomCycle> cycles) =>
-        cycles
-            .Where(cycle => cycle.AllocationVarianceMinutes.HasValue && cycle.DoctorCompleteAt.HasValue)
-            .GroupBy(cycle => cycle.AssignedDoctor)
+        IReadOnlyList<CompletedRoomCycle> cycles)
+    {
+        var points = new Dictionary<(string Doctor, DateOnly Date), (int Count, int Variance)>();
+        foreach (var cycle in cycles.Where(cycle =>
+                     cycle.AllocationVarianceMinutes.HasValue && cycle.DoctorCompleteAt.HasValue))
+        {
+            var key = (
+                cycle.AssignedDoctor,
+                DateOnly.FromDateTime(cycle.DoctorCompleteAt!.Value.UtcDateTime));
+            var current = points.GetValueOrDefault(key);
+            points[key] = (current.Count + 1, current.Variance + cycle.AllocationVarianceMinutes!.Value);
+        }
+        return points
+            .GroupBy(pair => pair.Key.Doctor)
             .Select(doctorGroup => new DoctorDailyAllocation(
                 doctorGroup.Key,
-                doctorGroup
-                    .GroupBy(cycle => DateOnly.FromDateTime(cycle.DoctorCompleteAt!.Value.UtcDateTime))
-                    .OrderBy(dateGroup => dateGroup.Key)
-                    .Select(dateGroup => new DoctorDailyAllocationPoint(
-                        dateGroup.Key.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
-                        dateGroup.Count(),
-                        dateGroup.Sum(cycle => cycle.AllocationVarianceMinutes!.Value)))
+                doctorGroup.OrderBy(pair => pair.Key.Date)
+                    .Select(pair => new DoctorDailyAllocationPoint(
+                        pair.Key.Date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+                        pair.Value.Count,
+                        pair.Value.Variance))
                     .ToList()))
             .OrderBy(item => item.DoctorId)
             .ToList();
+    }
 
     private IReadOnlyList<DoctorFlowTrendIdentity> BuildDoctorFlowIdentities(
         IReadOnlyList<CompletedRoomCycle> scopedStandardPhaseCycles,
@@ -568,29 +569,25 @@ internal sealed partial class ReportsSnapshotBuilder
             .Select(identity =>
             {
                 var doctorId = identity.DoctorId;
-                var phasePopulation = scopedStandardPhaseCycles
+                var phasePopulation = BoundedReportCollections.Materialize(scopedStandardPhaseCycles
                     .Where(cycle => string.Equals(
                         cycle.AssignedDoctor,
                         doctorId,
-                        StringComparison.OrdinalIgnoreCase))
-                    .ToList();
-                var completedPopulation = scopedStandardCompletedCycles
+                        StringComparison.OrdinalIgnoreCase)));
+                var completedPopulation = BoundedReportCollections.Materialize(scopedStandardCompletedCycles
                     .Where(cycle => string.Equals(
                         cycle.AssignedDoctor,
                         doctorId,
-                        StringComparison.OrdinalIgnoreCase))
-                    .ToList();
+                        StringComparison.OrdinalIgnoreCase)));
                 var days = observedDoctorFlowDays
                     .Where(day => string.Equals(day.DoctorId, doctorId, StringComparison.OrdinalIgnoreCase))
                     .ToList();
-                var readyWaitValues = phasePopulation
+                var readyWaitValues = BoundedReportCollections.Materialize(phasePopulation
                     .Select(TruthfulReadyWaitSeconds)
-                    .Where(value => value.HasValue)
-                    .ToList();
-                var doctorTimeValues = phasePopulation
+                    .Where(value => value.HasValue));
+                var doctorTimeValues = BoundedReportCollections.Materialize(phasePopulation
                     .Select(TruthfulDoctorTimeSeconds)
-                    .Where(value => value.HasValue)
-                    .ToList();
+                    .Where(value => value.HasValue));
                 var representedCompletedDates = completedPopulation
                     .Where(cycle => cycle.DoctorCompleteAt.HasValue)
                     .Select(cycle => DateOnly.FromDateTime(cycle.DoctorCompleteAt!.Value.UtcDateTime))
@@ -636,17 +633,19 @@ internal sealed partial class ReportsSnapshotBuilder
         ExactScheduleFitCalculator.TruthfulObservedCaseFlowSeconds(cycle);
 
     private IReadOnlyList<ObservedDoctorFlowDay> BuildObservedDoctorFlowDays(
-        IReadOnlyList<CompletedRoomCycle> scopedStandardCompletedCycles) =>
-        scopedStandardCompletedCycles
-            .Where(IsQualifyingObservedDoctorFlowCase)
-            .GroupBy(cycle => new
-            {
-                DoctorId = cycle.AssignedDoctor ?? "",
-                ReportDate = DateOnly.FromDateTime(cycle.DoctorCompleteAt!.Value.UtcDateTime)
-            })
+        IReadOnlyList<CompletedRoomCycle> scopedStandardCompletedCycles)
+    {
+        var eligible = BoundedReportCollections.Materialize(
+            scopedStandardCompletedCycles.Where(IsQualifyingObservedDoctorFlowCase));
+        using var grouping = BoundedGroupingSet<CompletedRoomCycle, (string DoctorId, DateOnly ReportDate)>.Create(
+            eligible,
+            cycle => (
+                cycle.AssignedDoctor ?? "",
+                DateOnly.FromDateTime(cycle.DoctorCompleteAt!.Value.UtcDateTime)));
+        return grouping.Groups
             .Select(group =>
             {
-                var qualifyingCycles = group.ToList();
+                var qualifyingCycles = BoundedReportCollections.Materialize(group);
                 var firstAcceptedReadyAt = qualifyingCycles.Min(cycle => cycle.ReadyForDoctorAt!.Value);
                 var lastDoctorCompleteAt = qualifyingCycles.Max(cycle => cycle.DoctorCompleteAt!.Value);
                 var concurrency = BuildObservedDoctorWorkingConcurrency(
@@ -671,6 +670,7 @@ internal sealed partial class ReportsSnapshotBuilder
             .OrderBy(day => day.ReportDate, StringComparer.Ordinal)
             .ThenBy(day => day.DoctorId, StringComparer.OrdinalIgnoreCase)
             .ToList();
+    }
 
     private static bool IsQualifyingObservedDoctorFlowCase(CompletedRoomCycle cycle)
     {
@@ -773,17 +773,19 @@ internal sealed partial class ReportsSnapshotBuilder
 
     // Compatibility projection: preserve the established Seated-based span and concurrency fields.
     // Canonical #216 Ready-anchored flow is built separately by BuildObservedDoctorFlowDays.
-    private IReadOnlyList<ObservedDoctorDay> BuildObservedDoctorDays(IReadOnlyList<CompletedRoomCycle> cycles) =>
-        cycles
-            .Where(cycle => cycle.DoctorCompleteAt.HasValue && cycle.RoomAvailableAt.HasValue)
-            .GroupBy(cycle => new
-            {
-                DoctorId = cycle.AssignedDoctor ?? "",
-                ReportDate = DateOnly.FromDateTime(cycle.DoctorCompleteAt!.Value.UtcDateTime)
-            })
+    private IReadOnlyList<ObservedDoctorDay> BuildObservedDoctorDays(IReadOnlyList<CompletedRoomCycle> cycles)
+    {
+        var eligible = BoundedReportCollections.Materialize(
+            cycles.Where(cycle => cycle.DoctorCompleteAt.HasValue && cycle.RoomAvailableAt.HasValue));
+        using var grouping = BoundedGroupingSet<CompletedRoomCycle, (string DoctorId, DateOnly ReportDate)>.Create(
+            eligible,
+            cycle => (
+                cycle.AssignedDoctor ?? "",
+                DateOnly.FromDateTime(cycle.DoctorCompleteAt!.Value.UtcDateTime)));
+        return grouping.Groups
             .Select(group =>
             {
-                var dayCycles = group.ToList();
+                var dayCycles = BoundedReportCollections.Materialize(group);
                 var firstSeatedAt = dayCycles.Min(cycle => cycle.SeatedAt);
                 var firstDoctorArrivedAt = dayCycles
                     .Where(cycle => cycle.DoctorArrivedAt.HasValue)
@@ -813,6 +815,7 @@ internal sealed partial class ReportsSnapshotBuilder
             .OrderBy(day => day.ReportDate, StringComparer.Ordinal)
             .ThenBy(day => day.DoctorId, StringComparer.OrdinalIgnoreCase)
             .ToList();
+    }
 
     private static ObservedRoomConcurrency BuildObservedRoomConcurrency(IReadOnlyList<CompletedRoomCycle> cycles)
     {
@@ -872,10 +875,13 @@ internal sealed partial class ReportsSnapshotBuilder
     private static int ObservedLoadWholeMinutesBetween(DateTimeOffset start, DateTimeOffset end) =>
         end <= start ? 0 : Math.Max(0, (int)(end - start).TotalMinutes);
 
-    private IReadOnlyList<ProcedureCycleSummary> BuildProcedureSummaries(IReadOnlyList<CompletedRoomCycle> cycles) =>
-        cycles
-            .GroupBy(cycle => cycle.ProcedureCode ?? "", StringComparer.OrdinalIgnoreCase)
-            .Select(group => new ProcedureCycleSummary(
+    private IReadOnlyList<ProcedureCycleSummary> BuildProcedureSummaries(IReadOnlyList<CompletedRoomCycle> cycles)
+    {
+        using var grouping = BoundedGroupingSet<CompletedRoomCycle, string>.Create(
+            cycles,
+            cycle => cycle.ProcedureCode ?? "",
+            StringComparer.OrdinalIgnoreCase);
+        return grouping.Groups.Select(group => new ProcedureCycleSummary(
                 group.Key,
                 ResolveProcedureLabel(group.Key),
                 ResolveBaseProcedureCode(group.Key),
@@ -896,12 +902,16 @@ internal sealed partial class ReportsSnapshotBuilder
             .OrderByDescending(summary => summary.CompletedCycleCount)
             .ThenBy(summary => summary.ProcedureLabel, StringComparer.OrdinalIgnoreCase)
             .ToList();
+    }
 
     private IReadOnlyList<ProcedureCycleSummary> BuildBaseProcedureSummaries(
-        IReadOnlyList<CompletedRoomCycle> cycles) =>
-        cycles
-            .GroupBy(cycle => ResolveBaseProcedureCode(cycle.ProcedureCode), StringComparer.OrdinalIgnoreCase)
-            .Select(group => new ProcedureCycleSummary(
+        IReadOnlyList<CompletedRoomCycle> cycles)
+    {
+        using var grouping = BoundedGroupingSet<CompletedRoomCycle, string>.Create(
+            cycles,
+            cycle => ResolveBaseProcedureCode(cycle.ProcedureCode),
+            StringComparer.OrdinalIgnoreCase);
+        return grouping.Groups.Select(group => new ProcedureCycleSummary(
                 group.Key,
                 ResolveProcedureLabel(group.Key),
                 group.Key,
@@ -922,6 +932,7 @@ internal sealed partial class ReportsSnapshotBuilder
             .OrderByDescending(summary => summary.CompletedCycleCount)
             .ThenBy(summary => summary.ProcedureLabel, StringComparer.OrdinalIgnoreCase)
             .ToList();
+    }
 
     private IReadOnlyList<ScopedProcedurePopulation> BuildScopedProcedurePopulations(
         IReadOnlyList<CompletedRoomCycle> cycles,
@@ -937,27 +948,31 @@ internal sealed partial class ReportsSnapshotBuilder
                 ReportProcedureGroupings.DetailedVariant,
                 StringComparison.OrdinalIgnoreCase))
         {
-            return cycles
-                .GroupBy(cycle => cycle.ProcedureCode ?? "", StringComparer.OrdinalIgnoreCase)
-                .Select(group => new ScopedProcedurePopulation(
+            using var groups = BoundedGroupingSet<CompletedRoomCycle, string>.Create(
+                cycles,
+                cycle => cycle.ProcedureCode ?? "",
+                StringComparer.OrdinalIgnoreCase);
+            return groups.Groups.Select(group => new ScopedProcedurePopulation(
                     group.Key,
                     ResolveProcedureLabel(group.Key),
                     ResolveBaseProcedureCode(group.Key),
                     IsSedationProcedureCode(group.Key),
-                    group.ToList()))
+                    BoundedReportCollections.Materialize(group)))
                 .OrderByDescending(population => population.Cycles.Count)
                 .ThenBy(population => population.ProcedureLabel, StringComparer.OrdinalIgnoreCase)
                 .ToList();
         }
 
-        return cycles
-            .GroupBy(cycle => ResolveBaseProcedureCode(cycle.ProcedureCode), StringComparer.OrdinalIgnoreCase)
-            .Select(group => new ScopedProcedurePopulation(
+        using var baseGroups = BoundedGroupingSet<CompletedRoomCycle, string>.Create(
+            cycles,
+            cycle => ResolveBaseProcedureCode(cycle.ProcedureCode),
+            StringComparer.OrdinalIgnoreCase);
+        return baseGroups.Groups.Select(group => new ScopedProcedurePopulation(
                 group.Key,
                 ResolveProcedureLabel(group.Key),
                 group.Key,
                 null,
-                group.ToList()))
+                BoundedReportCollections.Materialize(group)))
             .OrderByDescending(population => population.Cycles.Count)
             .ThenBy(population => population.ProcedureLabel, StringComparer.OrdinalIgnoreCase)
             .ToList();
@@ -1039,10 +1054,7 @@ internal sealed partial class ReportsSnapshotBuilder
         int? currentDefaultMinutes,
         CalibrationRuleSet rules)
     {
-        var represented = cycles
-            .Where(cycle => !string.IsNullOrWhiteSpace(cycle.AssignedDoctor))
-            .GroupBy(cycle => cycle.AssignedDoctor, StringComparer.OrdinalIgnoreCase)
-            .ToDictionary(group => group.Key, group => group.ToList(), StringComparer.OrdinalIgnoreCase);
+        var represented = BuildDoctorPopulations(cycles);
 
         return OrderedRepresentedDoctorIds(represented.Keys)
             .Select(doctorId => new DoctorScheduleFitSegment(
@@ -1061,10 +1073,7 @@ internal sealed partial class ReportsSnapshotBuilder
         ReportQuery query,
         CalibrationRuleSet rules)
     {
-        var represented = cycles
-            .Where(cycle => !string.IsNullOrWhiteSpace(cycle.AssignedDoctor))
-            .GroupBy(cycle => cycle.AssignedDoctor, StringComparer.OrdinalIgnoreCase)
-            .ToDictionary(group => group.Key, group => group.ToList(), StringComparer.OrdinalIgnoreCase);
+        var represented = BuildDoctorPopulations(cycles);
         IEnumerable<string> doctorIds = query.Scope == ReportScopeKinds.Doctor
             ? new[] { query.DoctorId }.Where(id => !string.IsNullOrWhiteSpace(id)).Select(id => id!)
             : _activeDoctors.Select(doctor => doctor.Id).Concat(
@@ -1104,10 +1113,7 @@ internal sealed partial class ReportsSnapshotBuilder
     private IReadOnlyList<DoctorProcedureIntelligenceSegment> BuildDoctorProcedureIntelligence(
         IReadOnlyList<CompletedRoomCycle> cycles)
     {
-        var represented = cycles
-            .Where(cycle => !string.IsNullOrWhiteSpace(cycle.AssignedDoctor))
-            .GroupBy(cycle => cycle.AssignedDoctor, StringComparer.OrdinalIgnoreCase)
-            .ToDictionary(group => group.Key, group => group.ToList(), StringComparer.OrdinalIgnoreCase);
+        var represented = BuildDoctorPopulations(cycles);
         return OrderedRepresentedDoctorIds(represented.Keys)
             .Select(doctorId => new DoctorProcedureIntelligenceSegment(
                 doctorId,
@@ -1120,29 +1126,24 @@ internal sealed partial class ReportsSnapshotBuilder
         IReadOnlyList<CompletedRoomCycle> cycles)
     {
         var populationCount = cycles.Count;
-        var doctorTimeValues = cycles
+        var doctorTimeValues = BoundedReportCollections.Materialize(cycles
             .Select(TruthfulDoctorTimeSeconds)
             .Where(value => value.HasValue)
-            .Select(value => (double)value!.Value)
-            .ToList();
-        var readyWaitValues = cycles
+            .Select(value => (double)value!.Value));
+        var readyWaitValues = BoundedReportCollections.Materialize(cycles
             .Select(TruthfulReadyWaitSeconds)
             .Where(value => value.HasValue)
-            .Select(value => (double)value!.Value)
-            .ToList();
-        var seatedToDoctorCompleteValues = cycles
+            .Select(value => (double)value!.Value));
+        var seatedToDoctorCompleteValues = BoundedReportCollections.Materialize(cycles
             .Select(TruthfulSeatedToDoctorCompleteSeconds)
             .Where(value => value.HasValue)
-            .Select(value => value!.Value)
-            .ToList();
-        var historicalAssignedValues = cycles
+            .Select(value => value!.Value));
+        var historicalAssignedValues = BoundedReportCollections.Materialize(cycles
             .Where(cycle => cycle.ExpectedAllocationMinutes > 0)
-            .Select(cycle => cycle.ExpectedAllocationMinutes)
-            .ToList();
-        var historicalCapturedDefaultValues = cycles
+            .Select(cycle => cycle.ExpectedAllocationMinutes));
+        var historicalCapturedDefaultValues = BoundedReportCollections.Materialize(cycles
             .Where(cycle => cycle.OriginalDefaultExpectedUnits > 0)
-            .Select(cycle => cycle.OriginalDefaultExpectedUnits * 10)
-            .ToList();
+            .Select(cycle => cycle.OriginalDefaultExpectedUnits * 10));
 
         var doctorTimeSample = ReportSampleContext.Create(populationCount, doctorTimeValues.Count);
         var typicalRange = ProcedureIntelligenceStatistics.TypicalDoctorTimeRange(
@@ -1164,24 +1165,46 @@ internal sealed partial class ReportsSnapshotBuilder
             ProcedureIntelligenceStatistics.Median(seatedToDoctorCompleteValues),
             ProcedureIntelligenceStatistics.Average(seatedToDoctorCompleteValues),
             ReportSampleContext.Create(populationCount, seatedToDoctorCompleteValues.Count),
-            ProcedureIntelligenceStatistics.Median(historicalAssignedValues.Select(value => (double)value).ToList()),
+            ProcedureIntelligenceStatistics.Median(
+                BoundedReportCollections.Materialize(historicalAssignedValues.Select(value => (double)value))),
             ReportSampleContext.Create(populationCount, historicalAssignedValues.Count),
             BuildAllocationValueCounts(historicalAssignedValues),
             BuildAllocationValueCounts(historicalCapturedDefaultValues));
     }
 
     private static IReadOnlyList<ProcedureAllocationValueCount> BuildAllocationValueCounts(
-        IEnumerable<int> values) =>
-        values
-            .GroupBy(value => value)
-            .OrderBy(group => group.Key)
-            .Select(group => new ProcedureAllocationValueCount(group.Key, group.Count()))
+        IEnumerable<int> values)
+    {
+        var counts = new Dictionary<int, int>();
+        foreach (var value in values)
+        {
+            counts[value] = counts.GetValueOrDefault(value) + 1;
+        }
+        return counts
+            .OrderBy(pair => pair.Key)
+            .Select(pair => new ProcedureAllocationValueCount(pair.Key, pair.Value))
             .ToList();
+    }
+
+    private static IReadOnlyDictionary<string, IReadOnlyList<CompletedRoomCycle>> BuildDoctorPopulations(
+        IReadOnlyList<CompletedRoomCycle> cycles)
+    {
+        var eligible = BoundedReportCollections.Materialize(
+            cycles.Where(cycle => !string.IsNullOrWhiteSpace(cycle.AssignedDoctor)));
+        using var grouping = BoundedGroupingSet<CompletedRoomCycle, string>.Create(
+            eligible,
+            cycle => cycle.AssignedDoctor,
+            StringComparer.OrdinalIgnoreCase);
+        return grouping.Groups.ToDictionary(
+            group => group.Key,
+            group => BoundedReportCollections.Materialize(group),
+            StringComparer.OrdinalIgnoreCase);
+    }
 
     private static ReportProcedureMetricSampleContext BuildProcedureSamples(
         IEnumerable<CompletedRoomCycle> cycles)
     {
-        var population = cycles.ToList();
+        var population = BoundedReportCollections.Materialize(cycles);
         var populationCount = population.Count;
         return new ReportProcedureMetricSampleContext(
             ReportSampleContext.ForPopulation(populationCount),
@@ -1205,31 +1228,42 @@ internal sealed partial class ReportsSnapshotBuilder
                 population.Count(cycle => cycle.AllocationVarianceMinutes.HasValue)));
     }
 
-    private IReadOnlyList<DoctorProcedureMixRow> BuildDoctorProcedureMix(IReadOnlyList<CompletedRoomCycle> cycles) =>
-        cycles
-            .Where(cycle => !string.IsNullOrWhiteSpace(cycle.AssignedDoctor))
-            .GroupBy(cycle => cycle.AssignedDoctor!, StringComparer.OrdinalIgnoreCase)
-            .SelectMany(doctorGroup =>
+    private IReadOnlyList<DoctorProcedureMixRow> BuildDoctorProcedureMix(IReadOnlyList<CompletedRoomCycle> cycles)
+    {
+        var totals = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        var counts = new Dictionary<(string Doctor, string Procedure), int>();
+        foreach (var cycle in cycles.Where(cycle => !string.IsNullOrWhiteSpace(cycle.AssignedDoctor)))
+        {
+            var doctor = cycle.AssignedDoctor!;
+            var procedure = cycle.ProcedureCode ?? "";
+            totals[doctor] = totals.GetValueOrDefault(doctor) + 1;
+            var existing = counts.FirstOrDefault(pair =>
+                string.Equals(pair.Key.Doctor, doctor, StringComparison.OrdinalIgnoreCase)
+                && string.Equals(pair.Key.Procedure, procedure, StringComparison.OrdinalIgnoreCase));
+            if (!existing.Equals(default(KeyValuePair<(string Doctor, string Procedure), int>)))
             {
-                var doctorCompletedCaseCount = doctorGroup.Count();
-                return doctorGroup
-                    .GroupBy(cycle => cycle.ProcedureCode ?? "", StringComparer.OrdinalIgnoreCase)
-                    .Select(procedureGroup => new DoctorProcedureMixRow(
-                        doctorGroup.Key,
-                        procedureGroup.Key,
-                        ResolveProcedureLabel(procedureGroup.Key),
-                        ResolveBaseProcedureCode(procedureGroup.Key),
-                        IsSedationProcedureCode(procedureGroup.Key),
-                        procedureGroup.Count(),
-                        doctorCompletedCaseCount,
-                        doctorCompletedCaseCount == 0
-                            ? 0d
-                            : (double)procedureGroup.Count() / doctorCompletedCaseCount));
-            })
+                counts[existing.Key] = existing.Value + 1;
+            }
+            else
+            {
+                counts[(doctor, procedure)] = 1;
+            }
+        }
+
+        return counts.Select(pair => new DoctorProcedureMixRow(
+                pair.Key.Doctor,
+                pair.Key.Procedure,
+                ResolveProcedureLabel(pair.Key.Procedure),
+                ResolveBaseProcedureCode(pair.Key.Procedure),
+                IsSedationProcedureCode(pair.Key.Procedure),
+                pair.Value,
+                totals[pair.Key.Doctor],
+                totals[pair.Key.Doctor] == 0 ? 0d : (double)pair.Value / totals[pair.Key.Doctor]))
             .OrderBy(row => row.DoctorId, StringComparer.OrdinalIgnoreCase)
             .ThenByDescending(row => row.CaseCount)
             .ThenBy(row => row.ProcedureLabel, StringComparer.OrdinalIgnoreCase)
             .ToList();
+    }
 
     private string ResolveProcedureLabel(string procedureCode)
     {
@@ -1366,12 +1400,24 @@ internal sealed partial class ReportsSnapshotBuilder
     private static AllocationVarianceSummary BuildAllocationVarianceSummary(
         IEnumerable<CompletedRoomCycle> cycles)
     {
-        var population = cycles.ToList();
-        var contributing = population.Where(cycle => cycle.AllocationVarianceMinutes.HasValue).ToList();
-
-        var count = contributing.Count;
-        var totalExpected = contributing.Sum(cycle => cycle.ExpectedAllocationMinutes);
-        var totalMeasured = contributing.Sum(cycle => cycle.MeasuredCaseFlowMinutes ?? 0);
+        var count = 0;
+        var totalExpected = 0;
+        var totalMeasured = 0;
+        var over = 0;
+        var under = 0;
+        var atExpected = 0;
+        var adjusted = 0;
+        foreach (var cycle in cycles)
+        {
+            if (cycle.AllocationAdjustedFromDefault) adjusted++;
+            if (!cycle.AllocationVarianceMinutes.HasValue) continue;
+            count++;
+            totalExpected += cycle.ExpectedAllocationMinutes;
+            totalMeasured += cycle.MeasuredCaseFlowMinutes ?? 0;
+            if (cycle.IsOverExpectedAllocation) over++;
+            if (cycle.IsUnderExpectedAllocation) under++;
+            if (cycle.IsAtExpectedAllocation) atExpected++;
+        }
         var net = totalMeasured - totalExpected;
 
         return new AllocationVarianceSummary(
@@ -1380,51 +1426,60 @@ internal sealed partial class ReportsSnapshotBuilder
             totalMeasured,
             net,
             count == 0 ? 0 : (double)net / count,
-            contributing.Count(cycle => cycle.IsOverExpectedAllocation),
-            contributing.Count(cycle => cycle.IsUnderExpectedAllocation),
-            contributing.Count(cycle => cycle.IsAtExpectedAllocation),
-            population.Count(cycle => cycle.AllocationAdjustedFromDefault));
+            over,
+            under,
+            atExpected,
+            adjusted);
     }
 
-    private static void AnnotateOccupiedWait(
+    private static IReadOnlyList<CompletedRoomCycle> CreateOccupiedWaitSnapshot(
         IReadOnlyList<CompletedRoomCycle> cyclesToAnnotate,
         IReadOnlyList<CompletedRoomCycle> blockerPool)
     {
-        var eligibleBlockers = blockerPool
+        var eligibleBlockers = BoundedReportCollections.Materialize(blockerPool
             .Where(cycle =>
                 !cycle.IsException &&
                 cycle.DoctorArrivedAt.HasValue &&
                 cycle.DoctorCompleteAt.HasValue &&
-                cycle.DoctorCompleteAt.Value > cycle.DoctorArrivedAt.Value)
-            .ToList();
+                cycle.DoctorCompleteAt.Value > cycle.DoctorArrivedAt.Value));
 
-        foreach (var cycle in cyclesToAnnotate)
+        return BoundedReportCollections.Materialize(Annotate());
+
+        IEnumerable<CompletedRoomCycle> Annotate()
         {
-            if (!cycle.ReadyForDoctorAt.HasValue ||
-                !cycle.DoctorArrivedAt.HasValue ||
-                cycle.ReadyToDoctorSeconds is null)
+            foreach (var source in cyclesToAnnotate)
             {
-                cycle.DoctorOccupiedWaitSeconds = null;
-                cycle.DoctorAvailableWaitSeconds = null;
-                continue;
+                var cycle = CopyCompletedCycle(source);
+                if (!cycle.ReadyForDoctorAt.HasValue ||
+                    !cycle.DoctorArrivedAt.HasValue ||
+                    cycle.ReadyToDoctorSeconds is null)
+                {
+                    cycle.DoctorOccupiedWaitSeconds = null;
+                    cycle.DoctorAvailableWaitSeconds = null;
+                    yield return cycle;
+                    continue;
+                }
+
+                var sameDocOtherIntervals = eligibleBlockers
+                    .Where(other =>
+                        other.AssignedDoctor == cycle.AssignedDoctor &&
+                        other.DoctorArrivedAt!.Value < cycle.DoctorArrivedAt.Value &&
+                        other.DoctorCompleteAt!.Value > cycle.ReadyForDoctorAt.Value &&
+                        !(other.RoomId == cycle.RoomId && other.SeatedAt == cycle.SeatedAt))
+                    .Select(other => (Start: other.DoctorArrivedAt!.Value, End: other.DoctorCompleteAt!.Value))
+                    .ToList();
+
+                var occupied = ComputeOverlapSeconds(
+                    cycle.ReadyForDoctorAt.Value,
+                    cycle.DoctorArrivedAt.Value,
+                    sameDocOtherIntervals);
+
+                var readyToDoctor = cycle.ReadyToDoctorSeconds.Value;
+                var clamped = Math.Min(occupied, readyToDoctor);
+                cycle.DoctorOccupiedWaitSeconds = clamped;
+                cycle.DoctorAvailableWaitSeconds = readyToDoctor - clamped;
+                yield return cycle;
             }
-
-            var sameDocOtherIntervals = eligibleBlockers
-                .Where(other =>
-                    other.AssignedDoctor == cycle.AssignedDoctor &&
-                    !(other.RoomId == cycle.RoomId && other.SeatedAt == cycle.SeatedAt))
-                .Select(other => (Start: other.DoctorArrivedAt!.Value, End: other.DoctorCompleteAt!.Value))
-                .ToList();
-
-            var occupied = ComputeOverlapSeconds(
-                cycle.ReadyForDoctorAt.Value,
-                cycle.DoctorArrivedAt.Value,
-                sameDocOtherIntervals);
-
-            var readyToDoctor = cycle.ReadyToDoctorSeconds.Value;
-            var clamped = Math.Min(occupied, readyToDoctor);
-            cycle.DoctorOccupiedWaitSeconds = clamped;
-            cycle.DoctorAvailableWaitSeconds = readyToDoctor - clamped;
         }
     }
 

@@ -137,13 +137,13 @@ public sealed record DoctorScheduleFitSummary(
 
 internal static class ExactScheduleFitCalculator
 {
-    private sealed record HistoricalPair(
+    public sealed record HistoricalPair(
         CompletedRoomCycle Cycle,
         double ExpectedSeconds,
         double ObservedSeconds,
         double VarianceSeconds);
 
-    private sealed record CalibrationPair(
+    public sealed record CalibrationPair(
         CompletedRoomCycle Cycle,
         double ObservedSeconds,
         double VarianceSeconds,
@@ -161,7 +161,7 @@ internal static class ExactScheduleFitCalculator
     {
         ArgumentNullException.ThrowIfNull(population);
         var activeRules = rules ?? CalibrationRuleSet.VersionOne;
-        var pairs = population
+        var pairs = BoundedReportCollections.Materialize(population
             .Where(cycle => cycle.ExpectedAllocationMinutes > 0)
             .Select(cycle =>
             {
@@ -175,8 +175,7 @@ internal static class ExactScheduleFitCalculator
                 return new HistoricalPair(cycle, expected, observed.Value, observed.Value - expected);
             })
             .Where(pair => pair is not null)
-            .Select(pair => pair!)
-            .ToList();
+            .Select(pair => pair!));
 
         var totalExpected = pairs.Sum(pair => pair.ExpectedSeconds);
         var totalObserved = pairs.Sum(pair => pair.ObservedSeconds);
@@ -217,7 +216,7 @@ internal static class ExactScheduleFitCalculator
 
         var baselineSeconds = currentDefaultAllocationMinutes.Value * 60d;
         var tolerance = activeRules.AtExpectedToleranceSeconds;
-        var pairs = population
+        var pairs = BoundedReportCollections.Materialize(population
             .Select(cycle =>
             {
                 var observed = TruthfulObservedCaseFlowSeconds(cycle);
@@ -235,8 +234,7 @@ internal static class ExactScheduleFitCalculator
                     ToleranceClassification(variance, tolerance));
             })
             .Where(pair => pair is not null)
-            .Select(pair => pair!)
-            .ToList();
+            .Select(pair => pair!));
 
         var aboveCount = pairs.Count(pair => pair.VarianceSeconds > 0d);
         var belowCount = pairs.Count(pair => pair.VarianceSeconds < 0d);
@@ -273,9 +271,7 @@ internal static class ExactScheduleFitCalculator
             var oppositeCount = candidateDirection == CalibrationInsightDirections.MoreTimeThanCurrentDefault
                 ? belowCount
                 : aboveCount;
-            var evidence = pairs
-                .OrderBy(pair => pair.Cycle.CompletedCycleId)
-                .ThenBy(pair => pair.Cycle.SeatedAt)
+            var evidence = BoundedReportCollections.OrderBy(pairs
                 .Select(pair => new CalibrationEvidenceCase(
                     pair.Cycle.CompletedCycleId,
                     pair.Cycle.AcceptedReadyHandoffId,
@@ -284,8 +280,9 @@ internal static class ExactScheduleFitCalculator
                     pair.ObservedSeconds,
                     pair.VarianceSeconds,
                     pair.RawDirection,
-                    pair.ToleranceClassification))
-                .ToList();
+                    pair.ToleranceClassification)),
+                item => item.CompletedCycleId.ToString("D20", System.Globalization.CultureInfo.InvariantCulture),
+                descending: false);
 
             insight = new CalibrationInsight(
                 candidateDirection,
@@ -330,16 +327,7 @@ internal static class ExactScheduleFitCalculator
 
     internal static double? Median(IEnumerable<double> values)
     {
-        var ordered = values.Order().ToArray();
-        if (ordered.Length == 0)
-        {
-            return null;
-        }
-
-        var middle = ordered.Length / 2;
-        return ordered.Length % 2 == 1
-            ? ordered[middle]
-            : (ordered[middle - 1] + ordered[middle]) / 2d;
+        return BoundedReportCollections.Median(values);
     }
 
     private static bool IsMaterialInCandidateDirection(

@@ -1,4 +1,5 @@
 using System.Reflection;
+using System.Text.Json;
 
 using ChairSide.Board.Services;
 using Microsoft.Data.Sqlite;
@@ -213,15 +214,15 @@ public sealed class HistoricalQueryPersistenceTests
                 procedure: index % 3 == 0 ? "EXT+SED" : "CON");
         }
 
-        var all = context.Store.GetReports();
-        var doctor = context.Store.GetReports(ReportQuery.FromStrings(
+        using var all = context.Store.GetReports();
+        using var doctor = context.Store.GetReports(ReportQuery.FromStrings(
             null,
             null,
             ReportScopeKinds.Doctor,
             "otte",
             ReportSedationSegments.All,
             ReportProcedureGroupings.Family));
-        var sedation = context.Store.GetReports(ReportQuery.FromStrings(
+        using var sedation = context.Store.GetReports(ReportQuery.FromStrings(
             null,
             null,
             ReportScopeKinds.Practice,
@@ -233,6 +234,188 @@ public sealed class HistoricalQueryPersistenceTests
         Assert.Equal(240, all.CompletedRoomCyclesCount);
         Assert.Equal(120, doctor.TotalCompletedCycleCount);
         Assert.Equal(80, sedation.TotalCompletedCycleCount);
+    }
+
+    [Fact]
+    public void All_time_pages_every_source_and_preserves_exact_report_composition()
+    {
+        using var workspace = TestWorkspace.Create();
+        var context = StoreContext.Create(workspace, Environments.Production);
+        var start = new DateTimeOffset(2025, 1, 1, 8, 0, 0, TimeSpan.Zero);
+        for (var index = 0; index < 240; index++)
+        {
+            SaveCycle(
+                context,
+                index + 1,
+                start.AddDays(index / 4).AddMinutes(index % 4 * 20),
+                doctor: index % 2 == 0 ? "otte" : "pledger",
+                procedure: index % 3 == 0 ? "EXT+SED" : "CON",
+                doctorMinutes: 8 + (index % 17));
+        }
+
+        using var actual = context.Store.GetReports();
+
+        Assert.Equal(0, context.Repository.UnboundedHistoricalLoadCount);
+        Assert.InRange(context.Repository.LargestHistoricalPageSize, 1, 100);
+
+        var completePopulation = context.Repository.LoadCompletedCycles();
+        var builderField = typeof(DemoBoardStore).GetField(
+            "_reportsSnapshotBuilder",
+            BindingFlags.Instance | BindingFlags.NonPublic);
+        var builder = Assert.IsType<ReportsSnapshotBuilder>(builderField!.GetValue(context.Store));
+        using var reference = builder.Build(completePopulation, [], ReportQuery.Default);
+
+        Assert.Equal(reference.CompletedRoomCyclesCount, actual.CompletedRoomCyclesCount);
+        Assert.Equal(reference.MedianSeatedToDoctorSeconds, actual.MedianSeatedToDoctorSeconds);
+        Assert.Equal(reference.MedianDoctorInRoomSeconds, actual.MedianDoctorInRoomSeconds);
+        Assert.Equal(reference.MedianDoctorOccupiedWaitSeconds, actual.MedianDoctorOccupiedWaitSeconds);
+        Assert.Equal(JsonSerializer.Serialize(reference.Trends), JsonSerializer.Serialize(actual.Trends));
+        Assert.Equal(JsonSerializer.Serialize(reference.ObservedDoctorDays), JsonSerializer.Serialize(actual.ObservedDoctorDays));
+        Assert.Equal(JsonSerializer.Serialize(reference.ObservedDoctorFlowDays), JsonSerializer.Serialize(actual.ObservedDoctorFlowDays));
+        Assert.Equal(JsonSerializer.Serialize(reference.ScheduleFit), JsonSerializer.Serialize(actual.ScheduleFit));
+        Assert.Equal(
+            JsonSerializer.Serialize(reference.ProcedureIntelligenceRows),
+            JsonSerializer.Serialize(actual.ProcedureIntelligenceRows));
+    }
+
+    [Fact]
+    public void Calibration_evidence_reconciles_exactly_from_bounded_candidate_pages()
+    {
+        using var workspace = TestWorkspace.Create();
+        var context = StoreContext.Create(workspace, Environments.Production);
+        var start = new DateTimeOffset(2026, 1, 5, 8, 0, 0, TimeSpan.Zero);
+        for (var index = 0; index < 125; index++)
+        {
+            SaveCycle(
+                context,
+                index + 1,
+                start.AddDays(index / 10).AddMinutes((index % 10) * 45),
+                procedure: "CON",
+                doctorMinutes: 30);
+        }
+
+        using var reports = context.Store.GetReports();
+        var segment = Assert.Single(reports.ScheduleFit!.ProcedureSegments!);
+        var insight = segment.CurrentDefaultCalibration.Insight;
+        Assert.NotNull(insight);
+        Assert.Equal(125, insight.Evidence.Count);
+        Assert.IsType<DiskBackedReadOnlyList<CalibrationEvidenceCase>>(insight.Evidence);
+
+        var page = context.Store.QueryReportAudit(new ReportAuditRequest(
+            ContributorKind: ReportAuditContributorKinds.CalibrationEvidence,
+            BaseProcedureCode: "CON",
+            EvidenceIds: insight.Evidence.Select(item => new ReportAuditEvidenceIdentity(
+                item.CompletedCycleId,
+                item.AcceptedReadyHandoffId)).ToList(),
+            Offset: 0,
+            Limit: 100));
+
+        Assert.Equal(125, page.TotalMatchingCount);
+        Assert.Equal(100, page.ReturnedCount);
+        Assert.True(page.HasMore);
+        Assert.All(page.Rows, row => Assert.NotNull(row.CalibrationEvidence));
+        Assert.Equal(0, context.Repository.UnboundedHistoricalLoadCount);
+        Assert.InRange(context.Repository.LargestHistoricalPageSize, 1, 100);
+    }
+
+    [Fact]
+    public void All_time_review_completed_and_aborted_sources_are_paged_and_disk_backed()
+    {
+        using var workspace = TestWorkspace.Create();
+        var context = StoreContext.Create(workspace, Environments.Production);
+        var start = new DateTimeOffset(2026, 3, 2, 8, 0, 0, TimeSpan.Zero);
+        for (var index = 0; index < 110; index++)
+        {
+            var cycle = SaveCycle(context, index + 1, start.AddMinutes(index));
+            cycle.IsException = true;
+            cycle.RequiresReview = true;
+            cycle.ExceptionReason = ExceptionReasons.ManualReview;
+            context.Repository.SaveCompletedCycle(cycle, context.Doctors, context.Procedures);
+
+            var terminatedAt = start.AddDays(1).AddMinutes(index);
+            var aborted = new AbortedRoomAssignment
+            {
+                EpisodeId = $"bounded-abort-{index}",
+                RoomId = 500 + index,
+                PrestageStartedAt = terminatedAt.AddMinutes(-5),
+                TerminatedAt = terminatedAt,
+                TerminatedFromState = RoomStates.Prestaging,
+                TerminationKind = TerminationKinds.AfterHoursExpired,
+                IsException = true,
+                RequiresReview = true,
+                ExceptionReason = ExceptionReasons.AfterHoursSweep
+            };
+            context.Repository.TerminateIncompleteAssignment(
+                aborted,
+                new RoomState(aborted.RoomId),
+                context.Doctors,
+                context.Procedures);
+        }
+
+        using var reports = context.Store.GetReports();
+
+        Assert.Equal(110, reports.ExceptionCycles.Count);
+        Assert.Equal(220, reports.ExceptionReviewRecords!.Count);
+        Assert.IsType<DiskBackedReadOnlyList<CompletedRoomCycle>>(reports.ExceptionCycles);
+        Assert.IsType<DiskBackedReadOnlyList<ExceptionReviewRecord>>(reports.ExceptionReviewRecords);
+        Assert.Equal(0, context.Repository.UnboundedHistoricalLoadCount);
+        Assert.InRange(context.Repository.LargestHistoricalPageSize, 1, 100);
+    }
+
+    [Theory]
+    [InlineData(ReportAuditSorts.Doctor, "assigned_doctor_display_name")]
+    [InlineData(ReportAuditSorts.Procedure, "procedure_category")]
+    public void Review_doctor_and_procedure_sorts_use_projected_labels_globally_across_pages(
+        string sort,
+        string persistedColumn)
+    {
+        using var workspace = TestWorkspace.Create();
+        var context = StoreContext.Create(workspace, Environments.Production);
+        var start = new DateTimeOffset(2026, 2, 2, 8, 0, 0, TimeSpan.Zero);
+        for (var index = 0; index < 130; index++)
+        {
+            var cycle = SaveCycle(
+                context,
+                index + 1,
+                start.AddMinutes(index),
+                doctor: index % 2 == 0 ? "otte" : "pledger",
+                procedure: index % 2 == 0 ? "CON" : "SED");
+            cycle.IsException = true;
+            cycle.RequiresReview = true;
+            cycle.ExceptionReason = ExceptionReasons.ManualReview;
+            context.Repository.SaveCompletedCycle(cycle, context.Doctors, context.Procedures);
+        }
+
+        using (var connection = new SqliteConnection(new SqliteConnectionStringBuilder
+        {
+            DataSource = context.DatabasePath,
+            Mode = SqliteOpenMode.ReadWrite
+        }.ToString()))
+        {
+            connection.Open();
+            using var command = connection.CreateCommand();
+            command.CommandText = persistedColumn == "assigned_doctor_display_name"
+                ? "UPDATE completed_room_cycles SET assigned_doctor_display_name = CASE assigned_doctor_id WHEN 'otte' THEN 'Zulu' ELSE 'Alpha' END;"
+                : "UPDATE completed_room_cycles SET procedure_category = CASE procedure_code WHEN 'CON' THEN 'Zulu' ELSE 'Alpha' END;";
+            command.ExecuteNonQuery();
+        }
+
+        var page = context.Store.QueryReportAudit(new ReportAuditRequest(
+            ContributorKind: ReportAuditContributorKinds.PendingReview,
+            Sort: sort,
+            Offset: 55,
+            Limit: 30));
+
+        Assert.Equal(130, page.TotalMatchingCount);
+        Assert.Equal(30, page.ReturnedCount);
+        var projectedLabels = sort == ReportAuditSorts.Doctor
+            ? page.ReviewRows.Select(row => row.DoctorName).ToList()
+            : page.ReviewRows.Select(row => row.ProcedureLabel).ToList();
+        var firstLabel = sort == ReportAuditSorts.Doctor ? "Dr. Otte" : "Consult";
+        var secondLabel = sort == ReportAuditSorts.Doctor ? "Dr. Pledger" : "Sedation";
+        Assert.Equal(10, projectedLabels.Count(label => label == firstLabel));
+        Assert.Equal(20, projectedLabels.Count(label => label == secondLabel));
+        Assert.Equal(Enumerable.Repeat(firstLabel, 10).Concat(Enumerable.Repeat(secondLabel, 20)), projectedLabels);
     }
 
     [Fact]
@@ -279,11 +462,12 @@ public sealed class HistoricalQueryPersistenceTests
         int roomId,
         DateTimeOffset seatedAt,
         string doctor = "otte",
-        string procedure = "CON")
+        string procedure = "CON",
+        int doctorMinutes = 10)
     {
         var ready = seatedAt.AddMinutes(2);
         var arrived = ready.AddMinutes(3);
-        var complete = arrived.AddMinutes(10);
+        var complete = arrived.AddMinutes(doctorMinutes);
         var available = complete.AddMinutes(4);
         var cycle = new CompletedRoomCycle
         {
@@ -298,9 +482,9 @@ public sealed class HistoricalQueryPersistenceTests
             SeatedToDoctorSeconds = 300,
             PrepSeconds = 120,
             ReadyToDoctorSeconds = 180,
-            DoctorInRoomSeconds = 600,
+            DoctorInRoomSeconds = doctorMinutes * 60,
             TurnoverSeconds = 240,
-            TotalRoomCycleSeconds = 1140,
+            TotalRoomCycleSeconds = (int)(available - seatedAt).TotalSeconds,
             ExpectedAllocationUnits = 2,
             ExpectedAllocationMinutes = 20,
             OriginalDefaultExpectedUnits = 2,
