@@ -175,22 +175,26 @@ public sealed class HistoricalAnomalyAdministrationService
 
     public HistoricalAdministrativeOperationResult ClearForReporting(
         HistoricalEncounterKey key,
-        int expectedRevision) =>
+        int expectedRevision,
+        string? note = null) =>
         ChangeDisposition(
             key,
             expectedRevision,
             HistoricalAdministrativeDispositions.ClearedForReporting,
             HistoricalAdministrativeLedgerEventTypes.ClearedForReporting,
+            note,
             current => current.Disposition == HistoricalAdministrativeDispositions.NeedsReview);
 
     public HistoricalAdministrativeOperationResult ConfirmException(
         HistoricalEncounterKey key,
-        int expectedRevision) =>
+        int expectedRevision,
+        string? note = null) =>
         ChangeDisposition(
             key,
             expectedRevision,
             HistoricalAdministrativeDispositions.ConfirmedException,
             HistoricalAdministrativeLedgerEventTypes.ConfirmedException,
+            note,
             current => current.Disposition == HistoricalAdministrativeDispositions.NeedsReview);
 
     public HistoricalAdministrativeOperationResult ReopenReview(
@@ -201,6 +205,7 @@ public sealed class HistoricalAnomalyAdministrationService
             expectedRevision,
             HistoricalAdministrativeDispositions.NeedsReview,
             HistoricalAdministrativeLedgerEventTypes.ReviewReopened,
+            note: null,
             current => current.Disposition is HistoricalAdministrativeDispositions.ClearedForReporting
                 or HistoricalAdministrativeDispositions.ConfirmedException);
 
@@ -239,9 +244,10 @@ public sealed class HistoricalAnomalyAdministrationService
         int expectedRevision,
         string disposition,
         string eventType,
+        string? note,
         Func<HistoricalEncounterAdministrativeState, bool> transitionAllowed)
     {
-        var validation = ValidateCommon(key, expectedRevision, reason: null, note: null, requireReason: false);
+        var validation = ValidateCommon(key, expectedRevision, reason: null, note, requireReason: false);
         if (validation is not null) return validation;
 
         return Mutate(key, expectedRevision, current =>
@@ -260,7 +266,7 @@ public sealed class HistoricalAnomalyAdministrationService
                 current.CurrentReason,
                 current.Disposition,
                 disposition,
-                adminNote: null);
+                adminNote: note);
         });
     }
 

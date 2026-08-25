@@ -126,6 +126,64 @@ public sealed class HistoricalAnomalyAdministrationTests
     }
 
     [Fact]
+    public void Disposition_notes_share_the_disposition_event_and_revision()
+    {
+        using var workspace = TestWorkspace.Create();
+        var context = StoreContext.Create(workspace, Environments.Production);
+        var key = CreateCompletedSource(context, roomId: 1);
+        var service = new HistoricalAnomalyAdministrationService(context.Repository);
+        var clearNote = new string('c', 500);
+        const string confirmNote = "Confirmed after administrative review";
+
+        AssertSuccess(service.MarkForReview(key, 0, HistoricalManualReviewReasons.OtherNeedsReview), 1);
+        var cleared = AssertSuccess(service.ClearForReporting(key, 1, clearNote), 2);
+
+        Assert.Equal(HistoricalAdministrativeDispositions.ClearedForReporting, cleared.State!.Disposition);
+        var clearLedger = context.Repository.LoadHistoricalAdministrativeLedger(key, 0, 10).Rows;
+        Assert.Equal(2, clearLedger.Count);
+        Assert.Equal(HistoricalAdministrativeLedgerEventTypes.ClearedForReporting, clearLedger[1].EventType);
+        Assert.Equal(2, clearLedger[1].AdministrativeRevision);
+        Assert.Equal(clearNote, clearLedger[1].AdminNote);
+
+        AssertSuccess(service.ReopenReview(key, 2), 3);
+        var confirmed = AssertSuccess(service.ConfirmException(key, 3, confirmNote), 4);
+
+        Assert.Equal(HistoricalAdministrativeDispositions.ConfirmedException, confirmed.State!.Disposition);
+        var confirmLedger = context.Repository.LoadHistoricalAdministrativeLedger(key, 0, 10).Rows;
+        Assert.Equal(4, confirmLedger.Count);
+        Assert.Equal(HistoricalAdministrativeLedgerEventTypes.ConfirmedException, confirmLedger[3].EventType);
+        Assert.Equal(4, confirmLedger[3].AdministrativeRevision);
+        Assert.Equal(confirmNote, confirmLedger[3].AdminNote);
+        Assert.DoesNotContain(confirmLedger, row => row.EventType == HistoricalAdministrativeLedgerEventTypes.NoteAdded);
+    }
+
+    [Fact]
+    public void Oversized_disposition_notes_do_not_mutate_state_or_ledger()
+    {
+        using var workspace = TestWorkspace.Create();
+        var context = StoreContext.Create(workspace, Environments.Production);
+        var key = CreateCompletedSource(context, roomId: 1);
+        var service = new HistoricalAnomalyAdministrationService(context.Repository);
+        var oversizedNote = new string('x', 501);
+
+        AssertSuccess(service.MarkForReview(key, 0, HistoricalManualReviewReasons.OtherNeedsReview), 1);
+        var stateBefore = context.Repository.LoadHistoricalAdministrativeState(key);
+        var ledgerBefore = context.Repository.LoadHistoricalAdministrativeLedger(key, 0, 10).Rows.ToArray();
+
+        Assert.Equal(
+            HistoricalAdministrativeOperationOutcome.InvalidNote,
+            service.ClearForReporting(key, 1, oversizedNote).Outcome);
+        Assert.Equal(stateBefore, context.Repository.LoadHistoricalAdministrativeState(key));
+        Assert.Equal(ledgerBefore, context.Repository.LoadHistoricalAdministrativeLedger(key, 0, 10).Rows);
+
+        Assert.Equal(
+            HistoricalAdministrativeOperationOutcome.InvalidNote,
+            service.ConfirmException(key, 1, oversizedNote).Outcome);
+        Assert.Equal(stateBefore, context.Repository.LoadHistoricalAdministrativeState(key));
+        Assert.Equal(ledgerBefore, context.Repository.LoadHistoricalAdministrativeLedger(key, 0, 10).Rows);
+    }
+
+    [Fact]
     public async Task Concurrent_absent_projection_writers_with_expected_zero_yield_one_success_and_one_stale_write()
     {
         using var workspace = TestWorkspace.Create();

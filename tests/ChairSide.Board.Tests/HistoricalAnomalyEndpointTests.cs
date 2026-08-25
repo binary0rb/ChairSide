@@ -129,6 +129,97 @@ public sealed class HistoricalAnomalyEndpointTests
     }
 
     [Fact]
+    public async Task Disposition_routes_accept_optional_notes_and_reject_oversized_notes_without_mutation()
+    {
+        using var workspace = TestWorkspace.Create();
+        var context = StoreContext.Create(workspace, Environments.Production);
+        var key = CreateSource(context);
+        var service = new HistoricalAnomalyAdministrationService(context.Repository);
+        var clearNote = new string('c', 500);
+        const string confirmNote = "Confirmed after administrative review";
+
+        Assert.Equal(StatusCodes.Status200OK, (await Invoke(
+            request => HistoricalAnomalyEndpointHandler.MarkForReviewAsync(
+                key.SourceType, key.SourceRecordId, request, service),
+            """{"expectedRevision":0,"reason":"OtherNeedsReview"}""")).StatusCode);
+        Assert.Equal(StatusCodes.Status200OK, (await Invoke(
+            request => HistoricalAnomalyEndpointHandler.ClearForReportingAsync(
+                key.SourceType, key.SourceRecordId, request, service),
+            $"{{\"expectedRevision\":1,\"note\":\"{clearNote}\"}}")).StatusCode);
+
+        var clearLedger = context.Repository.LoadHistoricalAdministrativeLedger(key, 0, 10).Rows;
+        Assert.Equal(2, clearLedger.Count);
+        Assert.Equal(HistoricalAdministrativeLedgerEventTypes.ClearedForReporting, clearLedger[1].EventType);
+        Assert.Equal(clearNote, clearLedger[1].AdminNote);
+
+        Assert.Equal(StatusCodes.Status200OK, (await Invoke(
+            request => HistoricalAnomalyEndpointHandler.ReopenReviewAsync(
+                key.SourceType, key.SourceRecordId, request, service),
+            """{"expectedRevision":2}""")).StatusCode);
+        Assert.Equal(StatusCodes.Status200OK, (await Invoke(
+            request => HistoricalAnomalyEndpointHandler.ConfirmExceptionAsync(
+                key.SourceType, key.SourceRecordId, request, service),
+            $"{{\"expectedRevision\":3,\"note\":\"{confirmNote}\"}}")).StatusCode);
+
+        var confirmLedger = context.Repository.LoadHistoricalAdministrativeLedger(key, 0, 10).Rows;
+        Assert.Equal(4, confirmLedger.Count);
+        Assert.Equal(HistoricalAdministrativeLedgerEventTypes.ConfirmedException, confirmLedger[3].EventType);
+        Assert.Equal(confirmNote, confirmLedger[3].AdminNote);
+
+        Assert.Equal(StatusCodes.Status200OK, (await Invoke(
+            request => HistoricalAnomalyEndpointHandler.ReopenReviewAsync(
+                key.SourceType, key.SourceRecordId, request, service),
+            """{"expectedRevision":4}""")).StatusCode);
+        var stateBefore = context.Repository.LoadHistoricalAdministrativeState(key);
+        var ledgerBefore = context.Repository.LoadHistoricalAdministrativeLedger(key, 0, 10).Rows.ToArray();
+        var oversizedNote = new string('x', 501);
+
+        var clearRejected = await Invoke(
+            request => HistoricalAnomalyEndpointHandler.ClearForReportingAsync(
+                key.SourceType, key.SourceRecordId, request, service),
+            $"{{\"expectedRevision\":5,\"note\":\"{oversizedNote}\"}}");
+        Assert.Equal(StatusCodes.Status400BadRequest, clearRejected.StatusCode);
+        Assert.Equal("invalid-note", clearRejected.Body.GetProperty("code").GetString());
+        Assert.Equal(stateBefore, context.Repository.LoadHistoricalAdministrativeState(key));
+        Assert.Equal(ledgerBefore, context.Repository.LoadHistoricalAdministrativeLedger(key, 0, 10).Rows);
+
+        var confirmRejected = await Invoke(
+            request => HistoricalAnomalyEndpointHandler.ConfirmExceptionAsync(
+                key.SourceType, key.SourceRecordId, request, service),
+            $"{{\"expectedRevision\":5,\"note\":\"{oversizedNote}\"}}");
+        Assert.Equal(StatusCodes.Status400BadRequest, confirmRejected.StatusCode);
+        Assert.Equal("invalid-note", confirmRejected.Body.GetProperty("code").GetString());
+        Assert.Equal(stateBefore, context.Repository.LoadHistoricalAdministrativeState(key));
+        Assert.Equal(ledgerBefore, context.Repository.LoadHistoricalAdministrativeLedger(key, 0, 10).Rows);
+    }
+
+    [Theory]
+    [InlineData(false, "{\"expectedRevision\":0,\"note\":\"ok\",\"extra\":true}")]
+    [InlineData(false, "{\"expectedRevision\":0,\"note\":\"first\",\"Note\":\"second\"}")]
+    [InlineData(true, "{\"expectedRevision\":0,\"note\":42}")]
+    [InlineData(true, "{\"note\":\"missing revision\"}")]
+    public async Task Disposition_routes_preserve_strict_json_validation(bool confirm, string json)
+    {
+        using var workspace = TestWorkspace.Create();
+        var context = StoreContext.Create(workspace, Environments.Production);
+        var key = CreateSource(context);
+        var service = new HistoricalAnomalyAdministrationService(context.Repository);
+
+        var response = await Invoke(
+            request => confirm
+                ? HistoricalAnomalyEndpointHandler.ConfirmExceptionAsync(
+                    key.SourceType, key.SourceRecordId, request, service)
+                : HistoricalAnomalyEndpointHandler.ClearForReportingAsync(
+                    key.SourceType, key.SourceRecordId, request, service),
+            json);
+
+        Assert.Equal(StatusCodes.Status400BadRequest, response.StatusCode);
+        Assert.Equal("malformed-request", response.Body.GetProperty("code").GetString());
+        Assert.Null(context.Repository.LoadHistoricalAdministrativeState(key));
+        Assert.Empty(context.Repository.LoadHistoricalAdministrativeLedger(key, 0, 10).Rows);
+    }
+
+    [Fact]
     public void Canonical_anomaly_routes_are_admin_protected()
     {
         var validator = new AdminAccessTokenValidator(new TestOptionsMonitor<AdminAccessOptions>(new AdminAccessOptions

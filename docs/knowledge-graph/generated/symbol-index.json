@@ -489,7 +489,7 @@
                   {
                       "path":  "docs/knowledge/reports/historical-administrative-persistence.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  7147,
+                      "sizeBytes":  7306,
                       "typeSymbols":  [
 
                                       ],
@@ -2464,7 +2464,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/HistoricalAnomalyAdministrationService.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  14746,
+                      "sizeBytes":  14880,
                       "typeSymbols":  [
                                           "HistoricalManualReviewReasons",
                                           "HistoricalSystemFindingKind",
@@ -2511,7 +2511,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/HistoricalAnomalyEndpointHandler.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  9552,
+                      "sizeBytes":  9568,
                       "typeSymbols":  [
                                           "HistoricalAnomalyEndpointHandler",
                                           "struct"
@@ -5516,13 +5516,15 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/HistoricalAnomalyAdministrationTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  17312,
+                      "sizeBytes":  20708,
                       "typeSymbols":  [
                                           "HistoricalAnomalyAdministrationTests"
                                       ],
                       "methodSymbols":  [
                                             "Local_admin_flow_writes_one_event_per_revision_and_preserves_projection_evidence",
                                             "Invalid_inputs_and_transitions_do_not_mutate_state_or_ledger",
+                                            "Disposition_notes_share_the_disposition_event_and_revision",
+                                            "Oversized_disposition_notes_do_not_mutate_state_or_ledger",
                                             "Concurrent_absent_projection_writers_with_expected_zero_yield_one_success_and_one_stale_write",
                                             "Stale_and_failed_guarded_writes_leave_projection_and_ledger_unchanged",
                                             "Approved_system_finding_reopens_resolved_state_and_repeated_findings_append",
@@ -5551,7 +5553,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/HistoricalAnomalyEndpointTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  11038,
+                      "sizeBytes":  16533,
                       "typeSymbols":  [
                                           "HistoricalAnomalyEndpointTests"
                                       ],
@@ -5559,6 +5561,8 @@
                                             "Canonical_routes_expose_full_transition_flow_and_stale_revision_conflicts",
                                             "Strict_mark_request_rejects_malformed_or_disallowed_inputs",
                                             "Endpoint_maps_invalid_source_missing_source_and_note_length_without_mutation",
+                                            "Disposition_routes_accept_optional_notes_and_reject_oversized_notes_without_mutation",
+                                            "Disposition_routes_preserve_strict_json_validation",
                                             "Canonical_anomaly_routes_are_admin_protected",
                                             "Program_maps_only_local_admin_anomaly_mutations_and_no_public_system_finding_route",
                                             "CreateSource",

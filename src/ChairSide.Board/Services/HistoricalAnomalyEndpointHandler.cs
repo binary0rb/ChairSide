@@ -66,10 +66,10 @@ public static class HistoricalAnomalyEndpointHandler
             sourceType,
             sourceRecordId,
             httpContext,
-            ExpectedRevisionOnly,
+            NoteProperties,
             requireReason: false,
             requireNote: false,
-            (key, request) => service.ClearForReporting(key, request.ExpectedRevision));
+            (key, request) => service.ClearForReporting(key, request.ExpectedRevision, request.Note));
 
     public static Task<IResult> ConfirmExceptionAsync(
         string sourceType,
@@ -80,10 +80,10 @@ public static class HistoricalAnomalyEndpointHandler
             sourceType,
             sourceRecordId,
             httpContext,
-            ExpectedRevisionOnly,
+            NoteProperties,
             requireReason: false,
             requireNote: false,
-            (key, request) => service.ConfirmException(key, request.ExpectedRevision));
+            (key, request) => service.ConfirmException(key, request.ExpectedRevision, request.Note));
 
     public static Task<IResult> ReopenReviewAsync(
         string sourceType,

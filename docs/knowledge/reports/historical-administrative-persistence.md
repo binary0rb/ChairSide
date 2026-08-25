@@ -28,7 +28,7 @@ Projection mutation and ledger append share one immediate SQLite transaction. Ev
 
 The policy service owns Mark for Review, reason refinement, note addition, Clear for Reporting, Confirmed Exception, and Review Reopened transitions. The repository owns typed-source existence, the decisive revision comparison, and atomic persistence. Typed outcomes distinguish success, missing source, stale write, invalid transition, invalid reason, invalid note, and invalid source.
 
-Local Admin reasons use the closed vocabulary `IncorrectDoctor`, `IncorrectProcedure`, `IncorrectCaseDetails`, `UnexpectedLifecycle`, and `OtherNeedsReview`. Notes are stored verbatim up to 500 characters and are rejected at 501 characters. Actor provenance remains only `System` or `LocalAdmin`; no personal identity is stored.
+Local Admin reasons use the closed vocabulary `IncorrectDoctor`, `IncorrectProcedure`, `IncorrectCaseDetails`, `UnexpectedLifecycle`, and `OtherNeedsReview`. Notes are stored verbatim up to 500 characters and are rejected at 501 characters. Clear and Confirm may carry an optional note on their single disposition event and revision; standalone `NoteAdded` remains available for an independent note. Actor provenance remains only `System` or `LocalAdmin`; no personal identity is stored.
 
 The admin-protected strict-JSON API is rooted at `/api/reports/anomalies/{sourceType}/{sourceRecordId}`. Its Mark, refine, note, clear, confirm, and reopen operations require `expectedRevision`, return the resulting disposition and revision on success, and map stale or invalid transitions to conflict responses.
 
