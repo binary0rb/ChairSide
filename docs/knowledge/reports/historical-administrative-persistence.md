@@ -34,7 +34,9 @@ The admin-protected strict-JSON API is rooted at `/api/reports/anomalies/{source
 
 System findings are closed to the approved `AfterHoursSweep` and `ExceededMaxActiveDuration` producers. Their source archive, any Ready-handoff termination, live-room reset, current administrative projection, and one `SystemFinding` ledger event commit in the same transaction. A finding creates or returns the encounter to Needs Review; another finding while pending appends another event. Reporting-only `ReportingExceptionReasons`, statistical outliers, and calibration results do not create administrative state.
 
-Issue #241 makes current canonical disposition the administrative reporting gate. Needs Review and Confirmed Exception exclude the whole encounter immediately; Cleared removes only that gate and does not manufacture completion, timing, Ready, or allocation facts. Legacy exception columns remain immutable migration evidence rather than a competing reporting authority. Existing legacy review routes remain narrowly available until the #242 UI migration.
+Issue #241 makes current canonical disposition the administrative reporting gate. Needs Review and Confirmed Exception exclude the whole encounter immediately; Cleared removes only that gate and does not manufacture completion, timing, Ready, or allocation facts. Legacy exception columns remain immutable migration and source evidence rather than a competing reporting authority. Existing legacy review routes remain narrowly available until the #242 UI migration.
+
+Canonical reporting tests establish review state through `MarkForReview`, `ClearForReporting`, `ConfirmException`, `ReopenReview`, or an explicit canonical persistence projection. Legacy-column-only fixtures are reserved for migration, initialization/import compatibility, and preservation of truthful legacy evidence. Issue #241 intentionally retires globally unscoped Review Queue expectations: Data Quality and its default review drill-down inherit the current date, effective Doctor, explicit effective Sedation, and applicable procedure scope.
 
 ## Canonical corrections and effective projection
 

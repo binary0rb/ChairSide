@@ -65,10 +65,11 @@ public sealed class ReportsSnapshotBuilderTests
             completeAt: Utc(2026, 7, 20, 12, 25),
             availableAt: Utc(2026, 7, 20, 12, 35),
             expectedAllocationMinutes: 30);
-        manualException.IsException = true;
-        manualException.RequiresReview = true;
-        manualException.ExceptionReason = ExceptionReasons.ManualReview;
-        manualException.SuggestedAction = "Review";
+        manualException.ReportingProjection = Projection(
+            HistoricalAdministrativeDispositions.NeedsReview,
+            doctor: "otte",
+            procedure: "CON",
+            sedation: SedationState.UnavailableProcedureIneligible);
 
         var abortedException = new AbortedRoomAssignment
         {
@@ -82,12 +83,13 @@ public sealed class ReportsSnapshotBuilderTests
             ReadyForDoctorAt = Utc(2026, 7, 20, 12, 50),
             TerminatedAt = Utc(2026, 7, 20, 13, 0),
             TerminatedFromState = RoomStates.ReadyForDoctor,
-            TerminationKind = ExceptionReasons.AfterHoursSweep,
-            IsException = true,
-            RequiresReview = true,
-            ExceptionReason = ExceptionReasons.AfterHoursSweep,
-            SuggestedAction = "Review"
+            TerminationKind = ExceptionReasons.AfterHoursSweep
         };
+        abortedException.ReportingProjection = Projection(
+            HistoricalAdministrativeDispositions.NeedsReview,
+            doctor: "otte",
+            procedure: "EXT",
+            sedation: SedationState.EligibleNo);
 
         var composition = CreateBuilder().Compose(
             [standard, sedationVariant, incomplete, reportingException, manualException],
@@ -1123,9 +1125,7 @@ public sealed class ReportsSnapshotBuilderTests
             RoomId = 1,
             AssignedDoctor = "other-doctor",
             ProcedureCode = "CON",
-            TerminatedAt = Utc(2026, 8, 10, 12, 0),
-            IsException = true,
-            RequiresReview = true
+            TerminatedAt = Utc(2026, 8, 10, 12, 0)
         };
         inWindow.ReportingProjection = Projection(
             HistoricalAdministrativeDispositions.NeedsReview,
@@ -1139,9 +1139,7 @@ public sealed class ReportsSnapshotBuilderTests
             RoomId = 2,
             AssignedDoctor = "other-doctor",
             ProcedureCode = "CON",
-            TerminatedAt = Utc(2026, 8, 9, 12, 0),
-            IsException = true,
-            RequiresReview = true
+            TerminatedAt = Utc(2026, 8, 9, 12, 0)
         };
         outOfWindow.ReportingProjection = Projection(
             HistoricalAdministrativeDispositions.NeedsReview,

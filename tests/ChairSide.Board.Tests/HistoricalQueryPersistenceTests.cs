@@ -116,9 +116,6 @@ public sealed class HistoricalQueryPersistenceTests
         for (var index = 0; index < 125; index++)
         {
             var cycle = SaveCycle(context, index + 1, start.AddMinutes(index));
-            cycle.IsException = true;
-            cycle.RequiresReview = true;
-            cycle.ExceptionReason = ExceptionReasons.ManualReview;
             context.Repository.SaveCompletedCycle(cycle, context.Doctors, context.Procedures);
             MarkForReview(context, HistoricalEncounterSourceTypes.CompletedCycle, cycle.CompletedCycleId);
         }
@@ -132,10 +129,7 @@ public sealed class HistoricalQueryPersistenceTests
                 PrestageStartedAt = at,
                 TerminatedAt = at.AddMinutes(5),
                 TerminatedFromState = RoomStates.Prestaging,
-                TerminationKind = TerminationKinds.AfterHoursExpired,
-                IsException = true,
-                RequiresReview = true,
-                ExceptionReason = ExceptionReasons.AfterHoursSweep
+                TerminationKind = TerminationKinds.AfterHoursExpired
             };
             context.Repository.TerminateIncompleteAssignment(
                 aborted,
@@ -179,9 +173,6 @@ public sealed class HistoricalQueryPersistenceTests
         var completedIds = new List<long>();
 
         var tiedCycle = SaveCycle(context, 1, tiedAnchor.AddMinutes(-15));
-        tiedCycle.IsException = true;
-        tiedCycle.RequiresReview = true;
-        tiedCycle.ExceptionReason = ExceptionReasons.ManualReview;
         context.Repository.SaveCompletedCycle(tiedCycle, context.Doctors, context.Procedures);
         MarkForReview(context, HistoricalEncounterSourceTypes.CompletedCycle, tiedCycle.CompletedCycleId);
         completedIds.Add(tiedCycle.CompletedCycleId);
@@ -195,10 +186,7 @@ public sealed class HistoricalQueryPersistenceTests
             PrestageStartedAt = tiedAnchor.AddMinutes(-5),
             TerminatedAt = tiedAnchor,
             TerminatedFromState = RoomStates.Prestaging,
-            TerminationKind = TerminationKinds.AfterHoursExpired,
-            IsException = true,
-            RequiresReview = true,
-            ExceptionReason = ExceptionReasons.AfterHoursSweep
+            TerminationKind = TerminationKinds.AfterHoursExpired
         };
         context.Repository.TerminateIncompleteAssignment(
             tiedAbort,
@@ -212,9 +200,6 @@ public sealed class HistoricalQueryPersistenceTests
         {
             var reviewAnchor = tiedAnchor.AddMinutes(index);
             var cycle = SaveCycle(context, index + 2, reviewAnchor.AddMinutes(-15));
-            cycle.IsException = true;
-            cycle.RequiresReview = true;
-            cycle.ExceptionReason = ExceptionReasons.ManualReview;
             context.Repository.SaveCompletedCycle(cycle, context.Doctors, context.Procedures);
             MarkForReview(context, HistoricalEncounterSourceTypes.CompletedCycle, cycle.CompletedCycleId);
             completedIds.Add(cycle.CompletedCycleId);
@@ -432,9 +417,6 @@ public sealed class HistoricalQueryPersistenceTests
         for (var index = 0; index < 110; index++)
         {
             var cycle = SaveCycle(context, index + 1, start.AddMinutes(index));
-            cycle.IsException = true;
-            cycle.RequiresReview = true;
-            cycle.ExceptionReason = ExceptionReasons.ManualReview;
             context.Repository.SaveCompletedCycle(cycle, context.Doctors, context.Procedures);
             MarkForReview(context, HistoricalEncounterSourceTypes.CompletedCycle, cycle.CompletedCycleId);
 
@@ -446,10 +428,7 @@ public sealed class HistoricalQueryPersistenceTests
                 PrestageStartedAt = terminatedAt.AddMinutes(-5),
                 TerminatedAt = terminatedAt,
                 TerminatedFromState = RoomStates.Prestaging,
-                TerminationKind = TerminationKinds.AfterHoursExpired,
-                IsException = true,
-                RequiresReview = true,
-                ExceptionReason = ExceptionReasons.AfterHoursSweep
+                TerminationKind = TerminationKinds.AfterHoursExpired
             };
             context.Repository.TerminateIncompleteAssignment(
                 aborted,
@@ -491,9 +470,6 @@ public sealed class HistoricalQueryPersistenceTests
                 start.AddMinutes(index),
                 doctor: index % 2 == 0 ? "otte" : "pledger",
                 procedure: index % 2 == 0 ? "CON" : "SED");
-            cycle.IsException = true;
-            cycle.RequiresReview = true;
-            cycle.ExceptionReason = ExceptionReasons.ManualReview;
             context.Repository.SaveCompletedCycle(cycle, context.Doctors, context.Procedures);
             MarkForReview(context, HistoricalEncounterSourceTypes.CompletedCycle, cycle.CompletedCycleId);
         }

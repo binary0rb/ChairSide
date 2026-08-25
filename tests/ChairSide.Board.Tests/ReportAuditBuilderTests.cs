@@ -185,19 +185,12 @@ public sealed class ReportAuditBuilderTests
     public void Review_queries_use_source_specific_anchors_and_effective_analytical_scope()
     {
         var pendingCompleted = Cycle(1, "pledger", "EXT+SED", Utc(12, 0), ready: 5, arrived: 10, complete: null, available: null);
-        pendingCompleted.IsException = true;
-        pendingCompleted.RequiresReview = true;
-        pendingCompleted.ExceptionReason = "post-arrival-expiration";
         pendingCompleted.ReportingProjection = Projection(
             HistoricalAdministrativeDispositions.NeedsReview,
             doctor: "otte",
             procedure: "EXT",
             sedation: SedationState.EligibleNo);
         var reviewedCompleted = Cycle(2, "otte", "EXT", Utc(13, 0));
-        reviewedCompleted.IsException = true;
-        reviewedCompleted.RequiresReview = false;
-        reviewedCompleted.ReviewStatus = ReviewStatuses.Reviewed;
-        reviewedCompleted.ReviewedAt = Utc(15, 0);
         reviewedCompleted.ReportingProjection = Projection(
             HistoricalAdministrativeDispositions.ConfirmedException,
             doctor: "otte",
@@ -206,6 +199,8 @@ public sealed class ReportAuditBuilderTests
             reviewed: true);
         var pendingAborted = Aborted(10, Utc(14, 0), requiresReview: true);
         var reviewedAborted = Aborted(11, Utc(15, 0), requiresReview: false);
+        ClearLegacyReviewEvidence(pendingAborted);
+        ClearLegacyReviewEvidence(reviewedAborted);
         pendingAborted.ReportingProjection = Projection(
             HistoricalAdministrativeDispositions.NeedsReview,
             doctor: "pledger",
@@ -244,9 +239,19 @@ public sealed class ReportAuditBuilderTests
         var included = Cycle(1, "otte", "EXT", Utc(8, 0));
         var excluded = Cycle(2, "otte", "OLD", Utc(9, 0));
         var pendingOtherDoctor = Cycle(3, "pledger", "EXT+SED", Utc(10, 0));
-        pendingOtherDoctor.IsException = true;
-        pendingOtherDoctor.RequiresReview = true;
+        pendingOtherDoctor.ReportingProjection = Projection(
+            HistoricalAdministrativeDispositions.NeedsReview,
+            doctor: "pledger",
+            procedure: "EXT",
+            sedation: SedationState.EligibleYes);
         var reviewedAborted = Aborted(20, Utc(11, 0), requiresReview: false);
+        ClearLegacyReviewEvidence(reviewedAborted);
+        reviewedAborted.ReportingProjection = Projection(
+            HistoricalAdministrativeDispositions.ConfirmedException,
+            doctor: "pledger",
+            procedure: "EXT",
+            sedation: SedationState.EligibleYes,
+            reviewed: true);
         var query = ReportQuery.FromStrings(
             "2026-08-10", "2026-08-10", ReportScopeKinds.Doctor, "otte",
             ReportSedationSegments.NonSedation, ReportProcedureGroupings.Family);
@@ -484,6 +489,17 @@ public sealed class ReportAuditBuilderTests
             AdministrativeRevision: reviewed ? 2 : 1,
             HasHistoricalCorrectionProvenance: false,
             HasReviewedProvenance: reviewed);
+
+    private static void ClearLegacyReviewEvidence(AbortedRoomAssignment source)
+    {
+        source.IsException = false;
+        source.RequiresReview = false;
+        source.ReviewStatus = ReviewStatuses.PendingReview;
+        source.ReviewedAt = null;
+        source.ReviewedBy = null;
+        source.ExceptionReason = null;
+        source.SuggestedAction = null;
+    }
 
     private static int Seconds(DateTimeOffset start, DateTimeOffset end) =>
         (int)Math.Round((end - start).TotalSeconds);
