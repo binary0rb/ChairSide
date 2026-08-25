@@ -99,6 +99,7 @@ builder.Services.AddSingleton<DatabaseIsolationPolicy>();
 builder.Services.AddSingleton<DatabaseDeploymentIdentityPolicy>();
 builder.Services.AddSingleton<SqliteBoardRepository>();
 builder.Services.AddSingleton<HistoricalAnomalyAdministrationService>();
+builder.Services.AddSingleton<HistoricalMetadataCorrectionService>();
 builder.Services.AddSingleton<DemoBoardStore>();
 builder.Services.AddSingleton<RoomDeviceTokenValidator>();
 builder.Services.AddSingleton<AdminAccessTokenValidator>();
@@ -367,6 +368,27 @@ app.MapPost(
 app.MapPost(
     "/api/reports/anomalies/{sourceType}/{sourceRecordId:long}/reopen",
     HistoricalAnomalyEndpointHandler.ReopenReviewAsync);
+app.MapGet(
+    "/api/reports/anomalies/{sourceType}/{sourceRecordId:long}/effective-encounter",
+    HistoricalMetadataCorrectionEndpointHandler.GetEffectiveEncounter);
+app.MapPost(
+    "/api/reports/anomalies/{sourceType}/{sourceRecordId:long}/correct-doctor",
+    HistoricalMetadataCorrectionEndpointHandler.CorrectDoctorAsync);
+app.MapPost(
+    "/api/reports/anomalies/{sourceType}/{sourceRecordId:long}/correct-procedure",
+    HistoricalMetadataCorrectionEndpointHandler.CorrectProcedureAsync);
+app.MapPost(
+    "/api/reports/anomalies/{sourceType}/{sourceRecordId:long}/correct-procedure-and-sedation",
+    HistoricalMetadataCorrectionEndpointHandler.CorrectProcedureAndSedationAsync);
+app.MapPost(
+    "/api/reports/anomalies/{sourceType}/{sourceRecordId:long}/correct-sedation",
+    HistoricalMetadataCorrectionEndpointHandler.CorrectSedationAsync);
+app.MapPost(
+    "/api/reports/anomalies/{sourceType}/{sourceRecordId:long}/correct-add-on",
+    HistoricalMetadataCorrectionEndpointHandler.CorrectAddOnAsync);
+app.MapPost(
+    "/api/reports/anomalies/{sourceType}/{sourceRecordId:long}/correct-expected-allocation",
+    HistoricalMetadataCorrectionEndpointHandler.CorrectExpectedAllocationAsync);
 
 app.MapGet("/api/rooms/{roomNumber:int}", IResult (int roomNumber, DemoBoardStore store) =>
 {

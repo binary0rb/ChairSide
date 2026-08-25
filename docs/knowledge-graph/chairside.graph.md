@@ -72,6 +72,14 @@ flowchart LR
     SystemFinding --> ReviewLedger
     ReviewLedger --> NeedsReview["ReportPopulation: Needs Review"]
     ReviewLedger --> CorrectionOverlay["DomainConcept: Historical effective-value correction"]
+    NeedsReview --> CorrectionService["StoreOrService: Historical metadata correction service"]
+    CorrectionService --> CorrectionOverlay
+    CorrectionService --> AdminProjection
+    CorrectionService --> ReviewLedger
+    CorrectionService --> EffectiveEncounter["Contract: Historical effective encounter"]
+    ImmutableEvidence --> EffectiveEncounter
+    AdminProjection --> EffectiveEncounter
+    CorrectionService --> ProcedureSedationCorrection["DesignDecision: Bounded procedure and sedation atomic correction"]
     ReviewLedger --> Cleared["ReportPopulation: Cleared for Reporting"]
     ReviewLedger --> ConfirmedException["ReportPopulation: Confirmed Exception"]
     ReviewLedger --> ReopenReview["LifecycleEvent: Reopen Review"]
@@ -84,6 +92,7 @@ flowchart LR
     AcceptedHandoff --> StandardPopulation["ReportMetric: Standard completed population"]
     AcceptedHandoff --> ImmutableEvidence["DesignDecision: Immutable lifecycle evidence"]
     CorrectionOverlay --> EffectiveReportingValues["DomainConcept: Current effective reporting values"]
+    EffectiveEncounter --> EffectiveReportingValues
     EffectiveReportingValues --> ReportsBuilder
     Cleared --> OrdinaryEligibility["DesignDecision: Ordinary reporting eligibility re-evaluated"]
     OrdinaryEligibility --> ReportsBuilder
@@ -180,7 +189,7 @@ flowchart LR
 - Legacy persisted Aging/Stale rows remain readable; recovery never fabricates or rewrites invalid handoffs.
 - Historical anomaly review uses one append-only ledger per encounter. Needs Review provisionally excludes immediately, Confirmed Exception excludes the whole encounter, Cleared removes only the administrative gate, and Reopen Review never reopens the live lifecycle.
 - Canonical anomaly mutations use the typed historical key and expected administrative revision. An absent projection is logical revision 0; one immediate transaction compares the revision, advances it exactly once, and commits current state plus one ledger event. The approved AfterHoursSweep and ExceededMaxActiveDuration producers include that mutation in the source-archive and room-reset transaction.
-- Historical metadata correction is an effective-value overlay that may change current reporting attribution without rewriting the accepted Ready handoff or any lifecycle timestamp.
+- Historical metadata correction is an effective-value overlay that may change current reporting attribution without rewriting the accepted Ready handoff or any lifecycle timestamp. Corrections require Needs Review and one administrative CAS revision; procedure plus sedation is the only bounded atomic group because eligibility-boundary changes have no coherent one-field intermediate state.
 - Generated knowledge artifacts are development aids and never runtime dependencies.
 
 ## Fixture and seed invariants
