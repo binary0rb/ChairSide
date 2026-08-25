@@ -2627,7 +2627,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/HistoricalMetadataCorrectionService.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  33902,
+                      "sizeBytes":  33929,
                       "typeSymbols":  [
                                           "HistoricalMetadataCorrectionFields",
                                           "HistoricalMetadataEvidenceAuthority",
@@ -5742,7 +5742,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/HistoricalMetadataCorrectionTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  31965,
+                      "sizeBytes":  33673,
                       "typeSymbols":  [
                                           "HistoricalMetadataCorrectionTests"
                                       ],

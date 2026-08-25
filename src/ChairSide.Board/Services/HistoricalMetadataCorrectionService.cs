@@ -340,7 +340,7 @@ public sealed class HistoricalMetadataCorrectionService
             return Mutation(
                 state,
                 HistoricalMetadataCorrectionFields.Sedation,
-                effective.SedationState!.Value.ToString(),
+                context.Projection.EffectiveMetadata.SedationState!.Value.ToString(),
                 sedationState.ToString(),
                 note);
         });

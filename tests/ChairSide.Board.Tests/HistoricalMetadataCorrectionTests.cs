@@ -158,12 +158,21 @@ public sealed class HistoricalMetadataCorrectionTests
 
         var sedation = AssertSuccess(service.CorrectSedation(key, 1, SedationState.EligibleYes), 2);
         Assert.Equal(SedationState.EligibleYes, sedation.State!.OverrideSedationState);
+        Assert.Equal(HistoricalMetadataCorrectionFields.Sedation, sedation.LedgerEvent!.StructuredReason);
+        Assert.Equal(nameof(SedationState.EligibleNo), sedation.LedgerEvent.PreviousValue);
+        Assert.Equal(nameof(SedationState.EligibleYes), sedation.LedgerEvent.NewValue);
+
+        var restoredSedation = AssertSuccess(service.CorrectSedation(key, 2, SedationState.EligibleNo), 3);
+        Assert.Null(restoredSedation.State!.OverrideSedationState);
+        Assert.Equal(HistoricalMetadataCorrectionFields.Sedation, restoredSedation.LedgerEvent!.StructuredReason);
+        Assert.Equal(nameof(SedationState.EligibleYes), restoredSedation.LedgerEvent.PreviousValue);
+        Assert.Equal(nameof(SedationState.EligibleNo), restoredSedation.LedgerEvent.NewValue);
         Assert.Equal(
             HistoricalMetadataCorrectionOutcome.InvalidSedation,
-            service.CorrectSedation(key, 2, SedationState.EligibleUnresolved).Outcome);
+            service.CorrectSedation(key, 3, SedationState.EligibleUnresolved).Outcome);
         var stateBeforeAddOn = context.Repository.LoadHistoricalAdministrativeState(key)!;
 
-        var addOn = AssertSuccess(service.CorrectAddOn(key, 2, true), 3);
+        var addOn = AssertSuccess(service.CorrectAddOn(key, 3, true), 4);
         Assert.True(addOn.State!.OverrideIsAddOn);
         Assert.Equal(stateBeforeAddOn.OverrideDoctorId, addOn.State.OverrideDoctorId);
         Assert.Equal(stateBeforeAddOn.OverrideProcedureCode, addOn.State.OverrideProcedureCode);
@@ -172,6 +181,25 @@ public sealed class HistoricalMetadataCorrectionTests
         Assert.Equal(HistoricalMetadataCorrectionFields.AddOn, addOn.LedgerEvent!.StructuredReason);
         Assert.Equal("false", addOn.LedgerEvent.PreviousValue);
         Assert.Equal("true", addOn.LedgerEvent.NewValue);
+
+        var sedationLedger = context.Repository.LoadHistoricalAdministrativeLedger(key, 0, 10).Rows
+            .Where(row => row.EventType == HistoricalAdministrativeLedgerEventTypes.MetadataCorrected
+                && row.StructuredReason == HistoricalMetadataCorrectionFields.Sedation)
+            .ToArray();
+        Assert.Collection(
+            sedationLedger,
+            first =>
+            {
+                Assert.Equal(nameof(SedationState.EligibleNo), first.PreviousValue);
+                Assert.Equal(nameof(SedationState.EligibleYes), first.NewValue);
+                Assert.Equal(2, first.AdministrativeRevision);
+            },
+            second =>
+            {
+                Assert.Equal(nameof(SedationState.EligibleYes), second.PreviousValue);
+                Assert.Equal(nameof(SedationState.EligibleNo), second.NewValue);
+                Assert.Equal(3, second.AdministrativeRevision);
+            });
     }
 
     [Fact]
