@@ -459,6 +459,18 @@
                       "path":  "src/ChairSide.Board/Services/HistoricalEncounterQuery.cs"
                   },
                   {
+                      "id":  "file:src/ChairSide.Board/Services/HistoricalMetadataCorrectionEndpointHandler.cs",
+                      "label":  "src/ChairSide.Board/Services/HistoricalMetadataCorrectionEndpointHandler.cs",
+                      "type":  "File",
+                      "path":  "src/ChairSide.Board/Services/HistoricalMetadataCorrectionEndpointHandler.cs"
+                  },
+                  {
+                      "id":  "file:src/ChairSide.Board/Services/HistoricalMetadataCorrectionService.cs",
+                      "label":  "src/ChairSide.Board/Services/HistoricalMetadataCorrectionService.cs",
+                      "type":  "File",
+                      "path":  "src/ChairSide.Board/Services/HistoricalMetadataCorrectionService.cs"
+                  },
+                  {
                       "id":  "file:src/ChairSide.Board/Services/IReparsePointInspector.cs",
                       "label":  "src/ChairSide.Board/Services/IReparsePointInspector.cs",
                       "type":  "File",
@@ -903,6 +915,18 @@
                       "path":  "tests/ChairSide.Board.Tests/HistoricalAnomalyEndpointTests.cs"
                   },
                   {
+                      "id":  "file:tests/ChairSide.Board.Tests/HistoricalMetadataCorrectionEndpointTests.cs",
+                      "label":  "tests/ChairSide.Board.Tests/HistoricalMetadataCorrectionEndpointTests.cs",
+                      "type":  "File",
+                      "path":  "tests/ChairSide.Board.Tests/HistoricalMetadataCorrectionEndpointTests.cs"
+                  },
+                  {
+                      "id":  "file:tests/ChairSide.Board.Tests/HistoricalMetadataCorrectionTests.cs",
+                      "label":  "tests/ChairSide.Board.Tests/HistoricalMetadataCorrectionTests.cs",
+                      "type":  "File",
+                      "path":  "tests/ChairSide.Board.Tests/HistoricalMetadataCorrectionTests.cs"
+                  },
+                  {
                       "id":  "file:tests/ChairSide.Board.Tests/HistoricalQueryPersistenceTests.cs",
                       "label":  "tests/ChairSide.Board.Tests/HistoricalQueryPersistenceTests.cs",
                       "type":  "File",
@@ -1217,6 +1241,48 @@
                   {
                       "id":  "route:/api/reports/anomalies/{sourceType}/{sourceRecordId:long}/confirm",
                       "label":  "/api/reports/anomalies/{sourceType}/{sourceRecordId:long}/confirm",
+                      "type":  "Route",
+                      "path":  "src/ChairSide.Board/Program.cs"
+                  },
+                  {
+                      "id":  "route:/api/reports/anomalies/{sourceType}/{sourceRecordId:long}/correct-add-on",
+                      "label":  "/api/reports/anomalies/{sourceType}/{sourceRecordId:long}/correct-add-on",
+                      "type":  "Route",
+                      "path":  "src/ChairSide.Board/Program.cs"
+                  },
+                  {
+                      "id":  "route:/api/reports/anomalies/{sourceType}/{sourceRecordId:long}/correct-doctor",
+                      "label":  "/api/reports/anomalies/{sourceType}/{sourceRecordId:long}/correct-doctor",
+                      "type":  "Route",
+                      "path":  "src/ChairSide.Board/Program.cs"
+                  },
+                  {
+                      "id":  "route:/api/reports/anomalies/{sourceType}/{sourceRecordId:long}/correct-expected-allocation",
+                      "label":  "/api/reports/anomalies/{sourceType}/{sourceRecordId:long}/correct-expected-allocation",
+                      "type":  "Route",
+                      "path":  "src/ChairSide.Board/Program.cs"
+                  },
+                  {
+                      "id":  "route:/api/reports/anomalies/{sourceType}/{sourceRecordId:long}/correct-procedure",
+                      "label":  "/api/reports/anomalies/{sourceType}/{sourceRecordId:long}/correct-procedure",
+                      "type":  "Route",
+                      "path":  "src/ChairSide.Board/Program.cs"
+                  },
+                  {
+                      "id":  "route:/api/reports/anomalies/{sourceType}/{sourceRecordId:long}/correct-procedure-and-sedation",
+                      "label":  "/api/reports/anomalies/{sourceType}/{sourceRecordId:long}/correct-procedure-and-sedation",
+                      "type":  "Route",
+                      "path":  "src/ChairSide.Board/Program.cs"
+                  },
+                  {
+                      "id":  "route:/api/reports/anomalies/{sourceType}/{sourceRecordId:long}/correct-sedation",
+                      "label":  "/api/reports/anomalies/{sourceType}/{sourceRecordId:long}/correct-sedation",
+                      "type":  "Route",
+                      "path":  "src/ChairSide.Board/Program.cs"
+                  },
+                  {
+                      "id":  "route:/api/reports/anomalies/{sourceType}/{sourceRecordId:long}/effective-encounter",
+                      "label":  "/api/reports/anomalies/{sourceType}/{sourceRecordId:long}/effective-encounter",
                       "type":  "Route",
                       "path":  "src/ChairSide.Board/Program.cs"
                   },
@@ -1689,6 +1755,12 @@
                       "path":  "src/ChairSide.Board/Services/DemoBoardStore.cs"
                   },
                   {
+                      "id":  "symbol:type:CorrectionContext",
+                      "label":  "CorrectionContext",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/HistoricalMetadataCorrectionService.cs"
+                  },
+                  {
                       "id":  "symbol:type:CycleSnapshot",
                       "label":  "CycleSnapshot",
                       "type":  "CodeType",
@@ -2055,6 +2127,12 @@
                       "path":  "src/ChairSide.Board/Services/RoomAssignmentContracts.cs"
                   },
                   {
+                      "id":  "symbol:type:ExpectedAllocationLedgerValue",
+                      "label":  "ExpectedAllocationLedgerValue",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/HistoricalMetadataCorrectionService.cs"
+                  },
+                  {
                       "id":  "symbol:type:ExpectedAllocationState",
                       "label":  "ExpectedAllocationState",
                       "type":  "CodeType",
@@ -2241,6 +2319,12 @@
                       "path":  "tests/ChairSide.Board.Tests/HistoricalAnomalyEndpointTests.cs"
                   },
                   {
+                      "id":  "symbol:type:HistoricalEffectiveEncounter",
+                      "label":  "HistoricalEffectiveEncounter",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/HistoricalMetadataCorrectionService.cs"
+                  },
+                  {
                       "id":  "symbol:type:HistoricalEncounterAdministrativeLedgerEvent",
                       "label":  "HistoricalEncounterAdministrativeLedgerEvent",
                       "type":  "CodeType",
@@ -2251,6 +2335,18 @@
                       "label":  "HistoricalEncounterAdministrativeState",
                       "type":  "CodeType",
                       "path":  "src/ChairSide.Board/Services/HistoricalAdministrativePersistence.cs"
+                  },
+                  {
+                      "id":  "symbol:type:HistoricalEncounterMetadata",
+                      "label":  "HistoricalEncounterMetadata",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/HistoricalMetadataCorrectionService.cs"
+                  },
+                  {
+                      "id":  "symbol:type:HistoricalEncounterMetadataOverrides",
+                      "label":  "HistoricalEncounterMetadataOverrides",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/HistoricalMetadataCorrectionService.cs"
                   },
                   {
                       "id":  "symbol:type:HistoricalEncounterRecord",
@@ -2269,6 +2365,66 @@
                       "label":  "HistoricalManualReviewReasons",
                       "type":  "CodeType",
                       "path":  "src/ChairSide.Board/Services/HistoricalAnomalyAdministrationService.cs"
+                  },
+                  {
+                      "id":  "symbol:type:HistoricalMetadataCorrectionEndpointHandler",
+                      "label":  "HistoricalMetadataCorrectionEndpointHandler",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/HistoricalMetadataCorrectionEndpointHandler.cs"
+                  },
+                  {
+                      "id":  "symbol:type:HistoricalMetadataCorrectionEndpointTests",
+                      "label":  "HistoricalMetadataCorrectionEndpointTests",
+                      "type":  "CodeType",
+                      "path":  "tests/ChairSide.Board.Tests/HistoricalMetadataCorrectionEndpointTests.cs"
+                  },
+                  {
+                      "id":  "symbol:type:HistoricalMetadataCorrectionFields",
+                      "label":  "HistoricalMetadataCorrectionFields",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/HistoricalMetadataCorrectionService.cs"
+                  },
+                  {
+                      "id":  "symbol:type:HistoricalMetadataCorrectionIndicators",
+                      "label":  "HistoricalMetadataCorrectionIndicators",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/HistoricalMetadataCorrectionService.cs"
+                  },
+                  {
+                      "id":  "symbol:type:HistoricalMetadataCorrectionOutcome",
+                      "label":  "HistoricalMetadataCorrectionOutcome",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/HistoricalMetadataCorrectionService.cs"
+                  },
+                  {
+                      "id":  "symbol:type:HistoricalMetadataCorrectionResult",
+                      "label":  "HistoricalMetadataCorrectionResult",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/HistoricalMetadataCorrectionService.cs"
+                  },
+                  {
+                      "id":  "symbol:type:HistoricalMetadataCorrectionService",
+                      "label":  "HistoricalMetadataCorrectionService",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/HistoricalMetadataCorrectionService.cs"
+                  },
+                  {
+                      "id":  "symbol:type:HistoricalMetadataCorrectionSupport",
+                      "label":  "HistoricalMetadataCorrectionSupport",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/HistoricalMetadataCorrectionService.cs"
+                  },
+                  {
+                      "id":  "symbol:type:HistoricalMetadataCorrectionTests",
+                      "label":  "HistoricalMetadataCorrectionTests",
+                      "type":  "CodeType",
+                      "path":  "tests/ChairSide.Board.Tests/HistoricalMetadataCorrectionTests.cs"
+                  },
+                  {
+                      "id":  "symbol:type:HistoricalMetadataEvidenceAuthority",
+                      "label":  "HistoricalMetadataEvidenceAuthority",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/HistoricalMetadataCorrectionService.cs"
                   },
                   {
                       "id":  "symbol:type:HistoricalPair",
@@ -2445,6 +2601,12 @@
                       "path":  "src/ChairSide.Board/Services/ProjectionAssumptionChecklist.cs"
                   },
                   {
+                      "id":  "symbol:type:OriginalMetadataEvidence",
+                      "label":  "OriginalMetadataEvidence",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/HistoricalMetadataCorrectionService.cs"
+                  },
+                  {
                       "id":  "symbol:type:ParsedObservedDoctorFlowDay",
                       "label":  "ParsedObservedDoctorFlowDay",
                       "type":  "CodeType",
@@ -2611,6 +2773,12 @@
                       "label":  "ProcedureRosterOptionsValidator",
                       "type":  "CodeType",
                       "path":  "src/ChairSide.Board/Options/ProcedureRosterOptions.cs"
+                  },
+                  {
+                      "id":  "symbol:type:ProcedureSedationLedgerValue",
+                      "label":  "ProcedureSedationLedgerValue",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/HistoricalMetadataCorrectionService.cs"
                   },
                   {
                       "id":  "symbol:type:ProjectionAssumptionChecklist",
@@ -3436,6 +3604,41 @@
                   },
                   {
                       "from":  "file:src/ChairSide.Board/Program.cs",
+                      "to":  "route:/api/reports/anomalies/{sourceType}/{sourceRecordId:long}/correct-add-on",
+                      "label":  "maps"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Program.cs",
+                      "to":  "route:/api/reports/anomalies/{sourceType}/{sourceRecordId:long}/correct-doctor",
+                      "label":  "maps"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Program.cs",
+                      "to":  "route:/api/reports/anomalies/{sourceType}/{sourceRecordId:long}/correct-expected-allocation",
+                      "label":  "maps"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Program.cs",
+                      "to":  "route:/api/reports/anomalies/{sourceType}/{sourceRecordId:long}/correct-procedure",
+                      "label":  "maps"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Program.cs",
+                      "to":  "route:/api/reports/anomalies/{sourceType}/{sourceRecordId:long}/correct-procedure-and-sedation",
+                      "label":  "maps"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Program.cs",
+                      "to":  "route:/api/reports/anomalies/{sourceType}/{sourceRecordId:long}/correct-sedation",
+                      "label":  "maps"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Program.cs",
+                      "to":  "route:/api/reports/anomalies/{sourceType}/{sourceRecordId:long}/effective-encounter",
+                      "label":  "maps"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Program.cs",
                       "to":  "route:/api/reports/anomalies/{sourceType}/{sourceRecordId:long}/mark-for-review",
                       "label":  "maps"
                   },
@@ -4225,6 +4428,81 @@
                       "label":  "declares"
                   },
                   {
+                      "from":  "file:src/ChairSide.Board/Services/HistoricalMetadataCorrectionEndpointHandler.cs",
+                      "to":  "symbol:type:HistoricalMetadataCorrectionEndpointHandler",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/HistoricalMetadataCorrectionService.cs",
+                      "to":  "symbol:type:CorrectionContext",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/HistoricalMetadataCorrectionService.cs",
+                      "to":  "symbol:type:ExpectedAllocationLedgerValue",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/HistoricalMetadataCorrectionService.cs",
+                      "to":  "symbol:type:HistoricalEffectiveEncounter",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/HistoricalMetadataCorrectionService.cs",
+                      "to":  "symbol:type:HistoricalEncounterMetadata",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/HistoricalMetadataCorrectionService.cs",
+                      "to":  "symbol:type:HistoricalEncounterMetadataOverrides",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/HistoricalMetadataCorrectionService.cs",
+                      "to":  "symbol:type:HistoricalMetadataCorrectionFields",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/HistoricalMetadataCorrectionService.cs",
+                      "to":  "symbol:type:HistoricalMetadataCorrectionIndicators",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/HistoricalMetadataCorrectionService.cs",
+                      "to":  "symbol:type:HistoricalMetadataCorrectionOutcome",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/HistoricalMetadataCorrectionService.cs",
+                      "to":  "symbol:type:HistoricalMetadataCorrectionResult",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/HistoricalMetadataCorrectionService.cs",
+                      "to":  "symbol:type:HistoricalMetadataCorrectionService",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/HistoricalMetadataCorrectionService.cs",
+                      "to":  "symbol:type:HistoricalMetadataCorrectionSupport",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/HistoricalMetadataCorrectionService.cs",
+                      "to":  "symbol:type:HistoricalMetadataEvidenceAuthority",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/HistoricalMetadataCorrectionService.cs",
+                      "to":  "symbol:type:OriginalMetadataEvidence",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/HistoricalMetadataCorrectionService.cs",
+                      "to":  "symbol:type:ProcedureSedationLedgerValue",
+                      "label":  "declares"
+                  },
+                  {
                       "from":  "file:src/ChairSide.Board/Services/IReparsePointInspector.cs",
                       "to":  "symbol:type:FileSystemReparsePointInspector",
                       "label":  "declares"
@@ -4975,6 +5253,16 @@
                       "label":  "declares"
                   },
                   {
+                      "from":  "file:tests/ChairSide.Board.Tests/HistoricalMetadataCorrectionEndpointTests.cs",
+                      "to":  "symbol:type:HistoricalMetadataCorrectionEndpointTests",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:tests/ChairSide.Board.Tests/HistoricalMetadataCorrectionTests.cs",
+                      "to":  "symbol:type:HistoricalMetadataCorrectionTests",
+                      "label":  "declares"
+                  },
+                  {
                       "from":  "file:tests/ChairSide.Board.Tests/HistoricalQueryPersistenceTests.cs",
                       "to":  "symbol:type:HistoricalQueryPersistenceTests",
                       "label":  "declares"
@@ -5561,6 +5849,16 @@
                   },
                   {
                       "from":  "repo:chairside",
+                      "to":  "file:src/ChairSide.Board/Services/HistoricalMetadataCorrectionEndpointHandler.cs",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:src/ChairSide.Board/Services/HistoricalMetadataCorrectionService.cs",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
                       "to":  "file:src/ChairSide.Board/Services/IReparsePointInspector.cs",
                       "label":  "contains"
                   },
@@ -5927,6 +6225,16 @@
                   {
                       "from":  "repo:chairside",
                       "to":  "file:tests/ChairSide.Board.Tests/HistoricalAnomalyEndpointTests.cs",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:tests/ChairSide.Board.Tests/HistoricalMetadataCorrectionEndpointTests.cs",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:tests/ChairSide.Board.Tests/HistoricalMetadataCorrectionTests.cs",
                       "label":  "contains"
                   },
                   {

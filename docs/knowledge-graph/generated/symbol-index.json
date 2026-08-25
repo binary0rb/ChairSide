@@ -1,7 +1,7 @@
 ﻿{
     "generatedStamp":  "deterministic",
     "root":  ".",
-    "fileCount":  194,
+    "fileCount":  198,
     "files":  [
                   {
                       "path":  ".github/pull_request_template.md",
@@ -161,7 +161,7 @@
                   {
                       "path":  "docs/design/exception-handling-design.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  20387,
+                      "sizeBytes":  23427,
                       "typeSymbols":  [
 
                                       ],
@@ -190,6 +190,7 @@
                                        "Manual Mark for Review",
                                        "One continuous ledger per encounter",
                                        "Historical metadata correction",
+                                       "Implemented correction contract",
                                        "Accepted Ready evidence and effective attribution",
                                        "Pending review and dispositions",
                                        "Needs Review",
@@ -489,7 +490,7 @@
                   {
                       "path":  "docs/knowledge/reports/historical-administrative-persistence.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  7306,
+                      "sizeBytes":  9762,
                       "typeSymbols":  [
 
                                       ],
@@ -513,7 +514,7 @@
                                        "Durable identity and tables",
                                        "Integrity and atomicity",
                                        "Canonical anomaly operations",
-                                       "Correction override foundation",
+                                       "Canonical corrections and effective projection",
                                        "Legacy migration",
                                        "Retention and reset",
                                        "Source and test anchors"
@@ -849,7 +850,7 @@
                   {
                       "path":  "docs/knowledge-graph/chairside.graph.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  23565,
+                      "sizeBytes":  24347,
                       "typeSymbols":  [
 
                                       ],
@@ -880,7 +881,7 @@
                   {
                       "path":  "docs/knowledge-graph/decisions.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  29312,
+                      "sizeBytes":  30485,
                       "typeSymbols":  [
 
                                       ],
@@ -1773,7 +1774,7 @@
                   {
                       "path":  "src/ChairSide.Board/Program.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  74977,
+                      "sizeBytes":  76271,
                       "typeSymbols":  [
                                           "LegacyRoomOneRedirect",
                                           "BeginPrestageRequest",
@@ -1820,6 +1821,13 @@
                                      "/api/reports/anomalies/{sourceType}/{sourceRecordId:long}/clear",
                                      "/api/reports/anomalies/{sourceType}/{sourceRecordId:long}/confirm",
                                      "/api/reports/anomalies/{sourceType}/{sourceRecordId:long}/reopen",
+                                     "/api/reports/anomalies/{sourceType}/{sourceRecordId:long}/effective-encounter",
+                                     "/api/reports/anomalies/{sourceType}/{sourceRecordId:long}/correct-doctor",
+                                     "/api/reports/anomalies/{sourceType}/{sourceRecordId:long}/correct-procedure",
+                                     "/api/reports/anomalies/{sourceType}/{sourceRecordId:long}/correct-procedure-and-sedation",
+                                     "/api/reports/anomalies/{sourceType}/{sourceRecordId:long}/correct-sedation",
+                                     "/api/reports/anomalies/{sourceType}/{sourceRecordId:long}/correct-add-on",
+                                     "/api/reports/anomalies/{sourceType}/{sourceRecordId:long}/correct-expected-allocation",
                                      "/api/rooms/{roomNumber:int}",
                                      "/api/client-errors",
                                      "/api/rooms/{roomNumber:int}/prestage",
@@ -2128,7 +2136,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/DemoBoardStore.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  200518,
+                      "sizeBytes":  200554,
                       "typeSymbols":  [
                                           "ExceptionReasons",
                                           "ReportingExceptionReasons",
@@ -2464,7 +2472,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/HistoricalAnomalyAdministrationService.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  14880,
+                      "sizeBytes":  15266,
                       "typeSymbols":  [
                                           "HistoricalManualReviewReasons",
                                           "HistoricalSystemFindingKind",
@@ -2511,7 +2519,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/HistoricalAnomalyEndpointHandler.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  9568,
+                      "sizeBytes":  9762,
                       "typeSymbols":  [
                                           "HistoricalAnomalyEndpointHandler",
                                           "struct"
@@ -2555,6 +2563,119 @@
                                       ],
                       "methodSymbols":  [
 
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
+                      "path":  "src/ChairSide.Board/Services/HistoricalMetadataCorrectionEndpointHandler.cs",
+                      "kind":  "CSharp",
+                      "sizeBytes":  16735,
+                      "typeSymbols":  [
+                                          "HistoricalMetadataCorrectionEndpointHandler"
+                                      ],
+                      "methodSymbols":  [
+                                            "CorrectDoctorAsync",
+                                            "CorrectProcedureAsync",
+                                            "CorrectProcedureAndSedationAsync",
+                                            "CorrectSedationAsync",
+                                            "CorrectAddOnAsync",
+                                            "CorrectExpectedAllocationAsync",
+                                            "GetEffectiveEncounter",
+                                            "ToHttpResult",
+                                            "ToResponse",
+                                            "ToLifecycleEvidence",
+                                            "TryNonNegativeRevision",
+                                            "TryRequiredString",
+                                            "TryOptionalString",
+                                            "TryBoolean",
+                                            "TryNullableInt32",
+                                            "TryProperty",
+                                            "Properties",
+                                            "MalformedRequest",
+                                            "Error"
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
+                      "path":  "src/ChairSide.Board/Services/HistoricalMetadataCorrectionService.cs",
+                      "kind":  "CSharp",
+                      "sizeBytes":  33902,
+                      "typeSymbols":  [
+                                          "HistoricalMetadataCorrectionFields",
+                                          "HistoricalMetadataEvidenceAuthority",
+                                          "HistoricalEncounterMetadata",
+                                          "HistoricalEncounterMetadataOverrides",
+                                          "HistoricalMetadataCorrectionIndicators",
+                                          "HistoricalMetadataCorrectionSupport",
+                                          "HistoricalEffectiveEncounter",
+                                          "HistoricalMetadataCorrectionOutcome",
+                                          "HistoricalMetadataCorrectionResult",
+                                          "HistoricalMetadataCorrectionService",
+                                          "OriginalMetadataEvidence",
+                                          "CorrectionContext",
+                                          "ProcedureSedationLedgerValue",
+                                          "ExpectedAllocationLedgerValue"
+                                      ],
+                      "methodSymbols":  [
+                                            "GetEffectiveEncounter",
+                                            "CorrectDoctor",
+                                            "CorrectProcedure",
+                                            "CorrectProcedureAndSedation",
+                                            "CorrectSedation",
+                                            "CorrectAddOn",
+                                            "CorrectExpectedAllocation",
+                                            "Correct",
+                                            "ValidateInput",
+                                            "Mutation",
+                                            "BuildProjection",
+                                            "ReadOriginalMetadata",
+                                            "LoadReadyEvidence",
+                                            "FromAssignment",
+                                            "ReadOverrides",
+                                            "IsCoherent",
+                                            "IsSedationCoherent",
+                                            "IsExplicitHistoricalSedation",
+                                            "FindDoctor",
+                                            "FindProcedure",
+                                            "TryCreateConfirmedAllocation",
+                                            "TryCreateAllocation",
+                                            "TryCreateLegacyCompletedAllocation",
+                                            "AllocationEquals",
+                                            "TokenEquals",
+                                            "NormalizeProcedureCode",
+                                            "NullIfBlank",
+                                            "SerializeBoolean",
+                                            "SerializeProcedureAndSedation",
+                                            "SerializeAllocation",
+                                            "Invalid"
                                         ],
                       "routes":  [
 
@@ -3328,7 +3449,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/SqliteBoardRepository.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  182923,
+                      "sizeBytes":  183364,
                       "typeSymbols":  [
                                           "SqliteBoardRepository",
                                           "DoctorWorkingRoomRecord",
@@ -5516,7 +5637,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/HistoricalAnomalyAdministrationTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  20708,
+                      "sizeBytes":  21066,
                       "typeSymbols":  [
                                           "HistoricalAnomalyAdministrationTests"
                                       ],
@@ -5553,7 +5674,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/HistoricalAnomalyEndpointTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  16533,
+                      "sizeBytes":  16830,
                       "typeSymbols":  [
                                           "HistoricalAnomalyEndpointTests"
                                       ],
@@ -5567,6 +5688,84 @@
                                             "Program_maps_only_local_admin_anomaly_mutations_and_no_public_system_finding_route",
                                             "CreateSource",
                                             "FindRepositoryRoot"
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
+                      "path":  "tests/ChairSide.Board.Tests/HistoricalMetadataCorrectionEndpointTests.cs",
+                      "kind":  "CSharp",
+                      "sizeBytes":  13648,
+                      "typeSymbols":  [
+                                          "HistoricalMetadataCorrectionEndpointTests"
+                                      ],
+                      "methodSymbols":  [
+                                            "Strict_correction_routes_return_the_canonical_effective_projection",
+                                            "Paired_route_rejects_missing_unknown_duplicate_or_noncanonical_values",
+                                            "Endpoint_maps_roster_gate_stale_note_and_allocation_failures_without_mutation",
+                                            "Program_maps_only_closed_admin_protected_correction_operations",
+                                            "CreateService",
+                                            "CreateCompletedSource",
+                                            "MarkForReview",
+                                            "NewHttpContext",
+                                            "FindRepositoryRoot"
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
+                      "path":  "tests/ChairSide.Board.Tests/HistoricalMetadataCorrectionTests.cs",
+                      "kind":  "CSharp",
+                      "sizeBytes":  31965,
+                      "typeSymbols":  [
+                                          "HistoricalMetadataCorrectionTests"
+                                      ],
+                      "methodSymbols":  [
+                                            "Procedure_and_sedation_cross_eligibility_boundaries_atomically_in_both_directions",
+                                            "Eligibility_boundary_intermediates_are_rejected_without_mutation",
+                                            "Same_eligibility_procedure_correction_remains_one_field_and_inactive_procedure_is_governed",
+                                            "Doctor_corrections_accept_active_and_inactive_roster_entries_and_normalize_back_to_original",
+                                            "Sedation_and_add_on_corrections_are_explicit_independent_overlays",
+                                            "Expected_allocation_is_explicit_repeated_and_independent_of_current_roster_default",
+                                            "Correction_workflow_gate_requires_needs_review_and_preserves_disposition_reason_and_provenance",
+                                            "Stale_and_failed_paired_corrections_leave_projection_and_ledger_unchanged",
+                                            "Paired_correction_preserves_disposition_reason_provenance_and_every_unrelated_override",
+                                            "Corrections_never_mutate_source_ready_or_lifecycle_evidence",
+                                            "Aborted_sources_project_truthful_evidence_and_reject_fields_never_recorded",
+                                            "Terminal_ready_aborts_use_ready_evidence_and_typed_equal_ids_remain_isolated",
+                                            "Legacy_completed_projection_exposes_missing_ready_and_sedation_truth_without_fabrication",
+                                            "CreateService",
+                                            "CreateCompletedSource",
+                                            "MarkForReview",
+                                            "AssertSuccess",
+                                            "InstallMetadataLedgerFailureTrigger",
+                                            "InsertLegacyCompletedSource"
                                         ],
                       "routes":  [
 
@@ -5628,7 +5827,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/HistoricalSystemFindingProducerTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  10528,
+                      "sizeBytes":  10759,
                       "typeSymbols":  [
                                           "HistoricalSystemFindingProducerTests"
                                       ],

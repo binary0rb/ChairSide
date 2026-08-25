@@ -107,6 +107,18 @@ Corrected metadata must remain internally coherent under the historical meaning 
 
 Correction and disposition are separate actions. A correction does not automatically Clear the encounter or Confirm it as an Exception.
 
+### Implemented correction contract
+
+Issue #240 implements correction through one focused historical metadata service and the typed `CompletedCycle` or `AbortedAssignment` durable identity. Correction requires an existing `NeedsReview` projection and the caller's expected administrative revision. Cleared, Confirmed Exception, absent, and No Anomaly states reject normal correction until the encounter is explicitly Reopened where applicable. A successful correction preserves disposition, reason/source, known review evidence, and every unrelated override while advancing the revision exactly once through the #239 immediate-transaction compare-and-swap seam.
+
+Doctor and procedure targets resolve against the complete governed roster, including inactive historical entries. Arbitrary free-text identities are rejected. A source field is correctable only when durable original evidence truthfully supports it. Accepted Ready is the original metadata authority for canonical completed encounters, terminal Ready is the authority for Ready-stage aborts, and otherwise the completed or aborted source contributes only the facts it actually stores. Missing sedation, allocation, Ready, or lifecycle facts remain missing.
+
+Doctor, procedure, sedation, Add-on, and expected allocation normally use one field, one `MetadataCorrected` event, and one revision per correction. Procedure and sedation have one deliberately bounded exception: `CorrectProcedureAndSedation` requires both values explicitly when crossing a procedure sedation-eligibility boundary, because no coherent one-field intermediate state exists. It updates only those two overrides and is not a generic batch correction mechanism. Expected allocation never joins this group and is never recalculated from the new procedure or today's default.
+
+The correction ledger field vocabulary is `Doctor`, `Procedure`, `ProcedureAndSedation`, `Sedation`, `AddOn`, and `ExpectedAllocation`. Scalar values use governed IDs, canonical enum names, or lowercase booleans. Procedure/sedation pairs and complete confirmed allocations use compact deterministic JSON with fixed property names. `PreviousValue` is the prior effective value, `NewValue` is the corrected effective value, and an optional note of at most 500 characters belongs to the same event. Correcting back to immutable original metadata normalizes the matching override columns to null while ledger history remains append-only.
+
+`HistoricalEffectiveEncounter` is the canonical current projection. It exposes the immutable source, original evidence authority and metadata, effective metadata, nullable overrides, correction indicators and source support, disposition, reason/source, and administrative revision without replaying the ledger. The protected detail API and correction responses use this projection. Issue #240 does not make reporting or Data Quality consume it; that integration remains exclusively owned by #241. Browser review and correction workflow remains owned by #242.
+
 ## Accepted Ready evidence and effective attribution
 
 For an uncorrected canonical encounter, the accepted Ready handoff remains the immutable source of doctor, procedure, sedation, confirmed allocation, and applicable Add-on reporting attribution under the lifecycle design.
@@ -183,7 +195,7 @@ Issue #239 implements the server policy with the typed `CompletedCycle` or `Abor
 
 Local Admin reasons are the closed server vocabulary `IncorrectDoctor`, `IncorrectProcedure`, `IncorrectCaseDetails`, `UnexpectedLifecycle`, and `OtherNeedsReview`. Notes are accepted through 500 characters and rejected at 501 rather than truncated. The strict, admin-protected anomaly API exposes Mark, reason refinement, note, Clear, Confirm, and Reopen; it does not expose arbitrary system findings or personal actor identity.
 
-The approved system-finding allowlist is `AfterHoursSweep` and `ExceededMaxActiveDuration`. Those producers append `SystemFinding` and enter or re-enter Needs Review in the same transaction as source archival, Ready-handoff termination when applicable, and live-room reset. Reporting-only exception classifications, outlier checks, and Calibration remain non-mutating. Reporting consumption of the canonical projection remains owned by #241, historical correction remains owned by #240, and final browser review UI remains owned by #242.
+The approved system-finding allowlist is `AfterHoursSweep` and `ExceededMaxActiveDuration`. Those producers append `SystemFinding` and enter or re-enter Needs Review in the same transaction as source archival, Ready-handoff termination when applicable, and live-room reset. Reporting-only exception classifications, outlier checks, and Calibration remain non-mutating. Issue #240 adds the correction and effective-projection server seam described above. Reporting consumption of that projection remains owned by #241, and final browser review UI remains owned by #242.
 
 ## Reporting period and effective truth
 

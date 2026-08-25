@@ -36,11 +36,19 @@ System findings are closed to the approved `AfterHoursSweep` and `ExceededMaxAct
 
 Issue #239 does not make reports consume the canonical projection or correction overlays. Existing legacy exception columns remain the pre-#241 reporting compatibility source, and the existing legacy review routes remain narrowly available until the later UI migration.
 
-## Correction override foundation
+## Canonical corrections and effective projection
 
-Nullable current overrides cover doctor ID, procedure code, canonical sedation state, Add-on, and canonical confirmed expected-allocation units. Null means no override. The accepted Ready handoff, historical source assignment, and lifecycle timestamps remain unchanged. Reporting does not consume these overrides until later #236 work.
+Nullable current overrides cover doctor ID, procedure code, canonical sedation state, Add-on, and canonical confirmed expected-allocation units. Null means no override. The accepted Ready handoff, historical source assignment, and lifecycle timestamps remain unchanged. Reporting does not consume these overrides until issue #241.
 
-Historical doctor and procedure override values are not constrained to currently active roster entries. Later correction validation must use the known historical roster and must not accept free-text identities.
+Issue #240 adds `HistoricalMetadataCorrectionService` as the policy and projection owner. Corrections require Needs Review, use the caller's expected revision, and reuse the #239 immediate SQLite compare-and-swap seam. Success preserves disposition, reason/source, known review evidence, and unrelated overrides; updates only the approved override field or bounded field pair; appends one `MetadataCorrected` event; and advances the revision once. Stale or failed writes change neither projection nor ledger.
+
+Historical doctor and procedure targets resolve against all governed roster entries, including inactive entries, rather than only today's active assignment lists. Arbitrary free-text identities are rejected. Field support derives from truthful durable evidence: accepted Ready for canonical completed history, terminal Ready for Ready-stage aborted history, and otherwise only canonical facts actually present on the completed or aborted source. Missing evidence is never manufactured.
+
+One correction normally changes one field. `CorrectProcedureAndSedation` is the sole bounded atomic group because a move between sedation-eligible and sedation-ineligible procedures cannot pass through a coherent one-field intermediate state. Both values are required explicitly. The operation changes no allocation value and is not a generic batch-edit facility.
+
+Ledger `StructuredReason` identifies `Doctor`, `Procedure`, `ProcedureAndSedation`, `Sedation`, `AddOn`, or `ExpectedAllocation`. Previous and new values are prior and resulting effective values. Procedure/sedation pairs and complete confirmed allocation values use compact deterministic JSON; scalar fields use canonical IDs, enum names, or lowercase booleans. Correcting back to original evidence clears the corresponding redundant override while preserving ledger provenance.
+
+`HistoricalEffectiveEncounter` combines one typed source and its current administrative projection without ledger replay. It exposes original evidence authority and metadata, current effective metadata, explicit overrides and indicators, source-field support, disposition, current reason/source, and revision. The protected detail API and mutation responses use that contract. Reports and Data Quality remain on pre-#241 compatibility behavior; browser correction workflow remains deferred to #242.
 
 ## Legacy migration
 
@@ -65,9 +73,13 @@ Production initialization preserves administrative projection and ledger rows in
 - `src/ChairSide.Board/Services/HistoricalAdministrativePersistence.cs`
 - `src/ChairSide.Board/Services/HistoricalAnomalyAdministrationService.cs`
 - `src/ChairSide.Board/Services/HistoricalAnomalyEndpointHandler.cs`
+- `src/ChairSide.Board/Services/HistoricalMetadataCorrectionService.cs`
+- `src/ChairSide.Board/Services/HistoricalMetadataCorrectionEndpointHandler.cs`
 - `src/ChairSide.Board/Services/SqliteBoardSchema.cs`
 - `src/ChairSide.Board/Services/SqliteBoardRepository.cs`
 - `tests/ChairSide.Board.Tests/HistoricalAdministrativePersistenceTests.cs`
 - `tests/ChairSide.Board.Tests/HistoricalAnomalyAdministrationTests.cs`
 - `tests/ChairSide.Board.Tests/HistoricalAnomalyEndpointTests.cs`
 - `tests/ChairSide.Board.Tests/HistoricalSystemFindingProducerTests.cs`
+- `tests/ChairSide.Board.Tests/HistoricalMetadataCorrectionTests.cs`
+- `tests/ChairSide.Board.Tests/HistoricalMetadataCorrectionEndpointTests.cs`
