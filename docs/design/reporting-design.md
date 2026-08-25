@@ -628,7 +628,7 @@ At publication of #212:
 - current observed-load reporting does not yet expose Unstructured Time under this definition;
 - current Procedure Mix is doctor-scoped; Practice Procedure Mix is future work under #215;
 - #219 adds the exact-second Reports Schedule Fit authority and server-owned current-default Calibration while preserving the legacy integer-minute Workshop compatibility contract;
-- #220 added progressive Data Quality reconciliation, a paged server-owned audit/evidence query, and separate pending and reviewed exception disclosures. Issue #234 supersedes its global Review Queue and permanently read-only reviewed-history assumptions at the canonical design level; later implementation work must reconcile the production behavior.
+- #220 added progressive Data Quality reconciliation, a paged server-owned audit/evidence query, and separate pending and reviewed exception disclosures. Issue #234 superseded its global Review Queue and permanently read-only reviewed-history assumptions; #241 reconciles reporting and Data Quality with current canonical disposition, effective metadata, and scoped review retrieval.
 
 These are implementation gaps, not permission to reinterpret the canonical definitions in this document.
 

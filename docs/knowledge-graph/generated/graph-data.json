@@ -471,6 +471,12 @@
                       "path":  "src/ChairSide.Board/Services/HistoricalMetadataCorrectionService.cs"
                   },
                   {
+                      "id":  "file:src/ChairSide.Board/Services/HistoricalReportingProjection.cs",
+                      "label":  "src/ChairSide.Board/Services/HistoricalReportingProjection.cs",
+                      "type":  "File",
+                      "path":  "src/ChairSide.Board/Services/HistoricalReportingProjection.cs"
+                  },
+                  {
                       "id":  "file:src/ChairSide.Board/Services/IReparsePointInspector.cs",
                       "label":  "src/ChairSide.Board/Services/IReparsePointInspector.cs",
                       "type":  "File",
@@ -931,6 +937,12 @@
                       "label":  "tests/ChairSide.Board.Tests/HistoricalQueryPersistenceTests.cs",
                       "type":  "File",
                       "path":  "tests/ChairSide.Board.Tests/HistoricalQueryPersistenceTests.cs"
+                  },
+                  {
+                      "id":  "file:tests/ChairSide.Board.Tests/HistoricalReportingIntegrationTests.cs",
+                      "label":  "tests/ChairSide.Board.Tests/HistoricalReportingIntegrationTests.cs",
+                      "type":  "File",
+                      "path":  "tests/ChairSide.Board.Tests/HistoricalReportingIntegrationTests.cs"
                   },
                   {
                       "id":  "file:tests/ChairSide.Board.Tests/HistoricalSystemFindingProducerTests.cs",
@@ -2445,6 +2457,18 @@
                       "path":  "tests/ChairSide.Board.Tests/HistoricalQueryPersistenceTests.cs"
                   },
                   {
+                      "id":  "symbol:type:HistoricalReportingIntegrationTests",
+                      "label":  "HistoricalReportingIntegrationTests",
+                      "type":  "CodeType",
+                      "path":  "tests/ChairSide.Board.Tests/HistoricalReportingIntegrationTests.cs"
+                  },
+                  {
+                      "id":  "symbol:type:HistoricalReportingProjection",
+                      "label":  "HistoricalReportingProjection",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/HistoricalReportingProjection.cs"
+                  },
+                  {
                       "id":  "symbol:type:HistoricalSystemFindingKind",
                       "label":  "HistoricalSystemFindingKind",
                       "type":  "CodeType",
@@ -3049,6 +3073,12 @@
                       "label":  "ReportSedationSegments",
                       "type":  "CodeType",
                       "path":  "src/ChairSide.Board/Services/ReportQuery.cs"
+                  },
+                  {
+                      "id":  "symbol:type:ReportSpoolJson",
+                      "label":  "ReportSpoolJson",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/BoundedReportCollections.cs"
                   },
                   {
                       "id":  "symbol:type:ReportSpoolScope",
@@ -3859,6 +3889,11 @@
                   },
                   {
                       "from":  "file:src/ChairSide.Board/Services/BoundedReportCollections.cs",
+                      "to":  "symbol:type:ReportSpoolJson",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/BoundedReportCollections.cs",
                       "to":  "symbol:type:ReportSpoolScope",
                       "label":  "declares"
                   },
@@ -4500,6 +4535,11 @@
                   {
                       "from":  "file:src/ChairSide.Board/Services/HistoricalMetadataCorrectionService.cs",
                       "to":  "symbol:type:ProcedureSedationLedgerValue",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/HistoricalReportingProjection.cs",
+                      "to":  "symbol:type:HistoricalReportingProjection",
                       "label":  "declares"
                   },
                   {
@@ -5268,6 +5308,11 @@
                       "label":  "declares"
                   },
                   {
+                      "from":  "file:tests/ChairSide.Board.Tests/HistoricalReportingIntegrationTests.cs",
+                      "to":  "symbol:type:HistoricalReportingIntegrationTests",
+                      "label":  "declares"
+                  },
+                  {
                       "from":  "file:tests/ChairSide.Board.Tests/HistoricalSystemFindingProducerTests.cs",
                       "to":  "symbol:type:HistoricalSystemFindingProducerTests",
                       "label":  "declares"
@@ -5859,6 +5904,11 @@
                   },
                   {
                       "from":  "repo:chairside",
+                      "to":  "file:src/ChairSide.Board/Services/HistoricalReportingProjection.cs",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
                       "to":  "file:src/ChairSide.Board/Services/IReparsePointInspector.cs",
                       "label":  "contains"
                   },
@@ -6240,6 +6290,11 @@
                   {
                       "from":  "repo:chairside",
                       "to":  "file:tests/ChairSide.Board.Tests/HistoricalQueryPersistenceTests.cs",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:tests/ChairSide.Board.Tests/HistoricalReportingIntegrationTests.cs",
                       "label":  "contains"
                   },
                   {

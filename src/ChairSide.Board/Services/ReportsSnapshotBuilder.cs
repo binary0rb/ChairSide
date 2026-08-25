@@ -100,7 +100,10 @@ internal sealed partial class ReportsSnapshotBuilder
 
         // All-time completed total (for "X of Y" context), independent of the selected window.
         var totalCompletedAllTime = totalCompletedAllTimeOverride ?? completedCycles.Count(cycle =>
-            cycle.RoomAvailableAt is not null && query.IncludesAnalyticalCycle(cycle));
+            cycle.RoomAvailableAt is not null
+            && (cycle.ReportingProjection ?? HistoricalReportingProjection.FromSource(cycle))
+                .IsAdministrativelyExcluded == false
+            && query.IncludesAnalyticalCycle(cycle));
 
         // Apply the completion window before copying or deriving report-time annotations. This
         // preserves the established DoctorCompleteAt boundary and leaves out-of-window history
@@ -115,9 +118,10 @@ internal sealed partial class ReportsSnapshotBuilder
             .Where(record => query.Window.Includes(record.TerminatedAt))
             .Select(CopyAbortedAssignment));
 
-        // Manual review exceptions are excluded from normal operational metrics by default.
+        // Canonical Needs Review and Confirmed Exception dispositions are excluded from normal
+        // operational metrics. Cleared removes only this administrative gate.
         var unoccupiedNormalCycles = BoundedReportCollections.Materialize(
-            allCycles.Where(cycle => !cycle.IsException));
+            allCycles.Where(cycle => cycle.ReportingProjection?.IsAdministrativelyExcluded != true));
         // Standard population additionally drops reporting-exception cycles (legacy/unmapped/
         // extreme/overnight) so doctor-facing aggregates are not skewed by sample/legacy data.
         var blockerCycles = BoundedReportCollections.Materialize(
@@ -148,13 +152,22 @@ internal sealed partial class ReportsSnapshotBuilder
         // exceptions without DoctorCompleteAt remain discoverable by their latest observed lifecycle
         // timestamp instead of being lost by the completed-case window.
         var selectedReviewCompletedCycles = BoundedReportCollections.Materialize(reviewCompletedCycles
-            .Where(cycle => cycle.IsException && query.Window.Includes(ReviewAnchor(cycle)))
-            .Select(CopyCompletedCycle));
+            .Where(cycle => query.Window.Includes(ReviewAnchor(cycle)))
+            .Select(CreateEffectiveCompletedCycleCopy)
+            .Where(cycle => cycle.ReportingProjection is { IsAnomaly: true } projection
+                && query.IncludesReviewEncounter(projection)));
         var exceptionCycles = BoundedReportCollections.OrderBy(
-            selectedReviewCompletedCycles.Where(cycle => cycle.RequiresReview),
+            selectedReviewCompletedCycles.Where(cycle =>
+                cycle.ReportingProjection?.Disposition == HistoricalAdministrativeDispositions.NeedsReview),
             cycle => cycle.SeatedAt.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture),
             descending: true);
-        var exceptionReviewRecords = BuildExceptionReviewRecords(exceptionCycles, detachedAbortedAssignments);
+        var scopedPendingAbortedAssignments = BoundedReportCollections.Materialize(detachedAbortedAssignments
+            .Where(record => record.ReportingProjection is { } projection
+                && projection.Disposition == HistoricalAdministrativeDispositions.NeedsReview
+                && query.IncludesReviewEncounter(projection)));
+        var exceptionReviewRecords = BuildExceptionReviewRecords(
+            exceptionCycles,
+            scopedPendingAbortedAssignments);
 
         var compatibilityScheduleFit = ScheduleFitReportBuilder.Build(standardCompletedCycles);
         var scopedProcedurePopulations = BuildScopedProcedurePopulations(
@@ -346,11 +359,18 @@ internal sealed partial class ReportsSnapshotBuilder
 
         return BoundedReportCollections.Materialize(completedCycles.Select(cycle =>
         {
-            var detached = CopyCompletedCycle(cycle);
+            var detached = CreateEffectiveCompletedCycleCopy(cycle);
             AnnotateReportingExceptions([detached]);
             AnnotateAllocationVariance([detached]);
             return detached;
         }));
+    }
+
+    private static CompletedRoomCycle CreateEffectiveCompletedCycleCopy(CompletedRoomCycle cycle)
+    {
+        var detached = CopyCompletedCycle(cycle);
+        (cycle.ReportingProjection ?? HistoricalReportingProjection.FromSource(cycle)).ApplyTo(detached);
+        return detached;
     }
 
     private static IReadOnlyList<ExceptionReviewRecord> BuildExceptionReviewRecords(
@@ -1438,7 +1458,7 @@ internal sealed partial class ReportsSnapshotBuilder
     {
         var eligibleBlockers = BoundedReportCollections.Materialize(blockerPool
             .Where(cycle =>
-                !cycle.IsException &&
+                cycle.ReportingProjection?.IsAdministrativelyExcluded != true &&
                 cycle.DoctorArrivedAt.HasValue &&
                 cycle.DoctorCompleteAt.HasValue &&
                 cycle.DoctorCompleteAt.Value > cycle.DoctorArrivedAt.Value));
@@ -1619,7 +1639,7 @@ internal sealed partial class ReportsSnapshotBuilder
             DoctorOccupiedWaitSeconds = cycle.DoctorOccupiedWaitSeconds,
             DoctorAvailableWaitSeconds = cycle.DoctorAvailableWaitSeconds,
             HasReportingException = cycle.HasReportingException,
-            ReportingExceptionReasons = cycle.ReportingExceptionReasons.ToArray(),
+            ReportingExceptionReasons = (cycle.ReportingExceptionReasons ?? []).ToArray(),
             IsExcludedFromStandardMetrics = cycle.IsExcludedFromStandardMetrics,
             DisplayProcedureLabel = cycle.DisplayProcedureLabel,
             IsLegacyProcedure = cycle.IsLegacyProcedure,
@@ -1639,11 +1659,13 @@ internal sealed partial class ReportsSnapshotBuilder
             ReviewStatus = cycle.ReviewStatus,
             SuggestedAction = cycle.SuggestedAction,
             ReviewedAt = cycle.ReviewedAt,
-            ReviewedBy = cycle.ReviewedBy
+            ReviewedBy = cycle.ReviewedBy,
+            ReportingProjection = cycle.ReportingProjection
         };
 
-    private static AbortedRoomAssignment CopyAbortedAssignment(AbortedRoomAssignment record) =>
-        new()
+    private static AbortedRoomAssignment CopyAbortedAssignment(AbortedRoomAssignment record)
+    {
+        var detached = new AbortedRoomAssignment
         {
             AbortedAssignmentId = record.AbortedAssignmentId,
             EpisodeId = record.EpisodeId,
@@ -1675,6 +1697,10 @@ internal sealed partial class ReportsSnapshotBuilder
             ReviewStatus = record.ReviewStatus,
             SuggestedAction = record.SuggestedAction,
             ReviewedAt = record.ReviewedAt,
-            ReviewedBy = record.ReviewedBy
+            ReviewedBy = record.ReviewedBy,
+            ReportingProjection = record.ReportingProjection
         };
+        (record.ReportingProjection ?? HistoricalReportingProjection.FromSource(record)).ApplyTo(detached);
+        return detached;
+    }
 }

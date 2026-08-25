@@ -82,8 +82,8 @@ public sealed partial class BoardStoreTests
         // Cycle B is surfaced as an exception.
         var exception = Assert.Single(reports.ExceptionCycles);
         Assert.Equal(2, exception.RoomId);
-        Assert.Equal("Abnormal wait time", exception.ExceptionReason);
-        Assert.Equal("Manual review required", exception.SuggestedAction);
+        Assert.Equal(HistoricalManualReviewReasons.OtherNeedsReview, exception.ExceptionReason);
+        Assert.Null(exception.SuggestedAction);
         Assert.Equal(ReviewStatuses.PendingReview, exception.ReviewStatus);
         Assert.True(exception.IsException);
         Assert.True(exception.RequiresReview);
@@ -118,15 +118,17 @@ public sealed partial class BoardStoreTests
         // Exception cycle: Cycle B is in ExceptionCycles only.
         Assert.Single(reports.ExceptionCycles);
         Assert.Equal(2, reports.ExceptionCycles[0].RoomId);
-        Assert.Equal("Timed out", reports.ExceptionCycles[0].ExceptionReason);
+        Assert.Equal(
+            HistoricalManualReviewReasons.OtherNeedsReview,
+            reports.ExceptionCycles[0].ExceptionReason);
         Assert.DoesNotContain(reports.ExceptionCycles, cycle => cycle.RoomId == 1);
     }
 
     [Fact]
-    public void Exception_pending_review_status_survives_store_restart()
+    public void Canonical_pending_review_status_survives_store_restart()
     {
-        // ReviewStatus = PendingReview and exception fields must round-trip through
-        // SQLite and be present after a store reload.
+        // The compatibility route persists canonical administrative state and leaves the source
+        // review columns unchanged. The effective review projection must survive reload.
         using var workspace = TestWorkspace.Create();
         var databasePath = workspace.ProductionDatabasePath();
 
@@ -149,8 +151,8 @@ public sealed partial class BoardStoreTests
         Assert.Equal(1, exception.RoomId);
         Assert.True(exception.IsException);
         Assert.True(exception.RequiresReview);
-        Assert.Equal("Extended wait", exception.ExceptionReason);
-        Assert.Equal("Review with doctor", exception.SuggestedAction);
+        Assert.Equal(HistoricalManualReviewReasons.OtherNeedsReview, exception.ExceptionReason);
+        Assert.Null(exception.SuggestedAction);
         Assert.Equal(ReviewStatuses.PendingReview, exception.ReviewStatus);
         Assert.Null(exception.ReviewedAt);
         Assert.Null(exception.ReviewedBy);
@@ -443,8 +445,8 @@ public sealed partial class BoardStoreTests
 
         var exception = Assert.Single(reports.ExceptionCycles);
         Assert.Equal(1, exception.RoomId);
-        Assert.Equal(ExceptionReasons.ManualReview, exception.ExceptionReason);
-        Assert.Equal("Exclude from normal metrics", exception.SuggestedAction);
+        Assert.Equal(HistoricalManualReviewReasons.OtherNeedsReview, exception.ExceptionReason);
+        Assert.Null(exception.SuggestedAction);
         Assert.Equal(ReviewStatuses.PendingReview, exception.ReviewStatus);
     }
 

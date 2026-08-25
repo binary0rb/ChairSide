@@ -226,10 +226,15 @@ public sealed class AfterHoursSweepRetryTests
         var persistedReview = context.Repository.LoadAbortedAssignments()
             .Single(record => record.AbortedAssignmentId == prestaging.AbortedAssignmentId);
         Assert.True(persistedReview.IsException);
-        Assert.False(persistedReview.RequiresReview);
-        Assert.Equal(ReviewStatuses.Reviewed, persistedReview.ReviewStatus);
-        Assert.Equal(now.AddMinutes(5), persistedReview.ReviewedAt);
-        Assert.Equal(ExceptionReviewers.LocalAdmin, persistedReview.ReviewedBy);
+        Assert.True(persistedReview.RequiresReview);
+        Assert.Equal(ReviewStatuses.PendingReview, persistedReview.ReviewStatus);
+        Assert.Null(persistedReview.ReviewedAt);
+        Assert.Null(persistedReview.ReviewedBy);
+        var state = Assert.IsType<HistoricalEncounterAdministrativeState>(
+            context.Repository.LoadHistoricalAdministrativeState(new HistoricalEncounterKey(
+                HistoricalEncounterSourceTypes.AbortedAssignment,
+                prestaging.AbortedAssignmentId)));
+        Assert.Equal(HistoricalAdministrativeDispositions.ConfirmedException, state.Disposition);
         Assert.DoesNotContain(
             context.Store.GetReports().ExceptionReviewRecords!,
             record => record.AbortedAssignmentId == prestaging.AbortedAssignmentId);

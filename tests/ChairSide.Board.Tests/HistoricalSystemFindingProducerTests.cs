@@ -140,17 +140,24 @@ public sealed class HistoricalSystemFindingProducerTests
     {
         using var workspace = TestWorkspace.Create();
         var context = StoreContext.Create(workspace, Environments.Production);
-        ActivateArrived(context.Store, roomId: 1);
-        Assert.NotNull(context.Store.MarkDoctorComplete(1));
-        Assert.NotNull(context.Store.MarkRoomAvailable(1));
-        var cycle = Assert.Single(context.Repository.LoadCompletedCycles());
-        using (var connection = Open(context.DatabasePath))
-        using (var command = connection.CreateCommand())
+        var seatedAt = DateTimeOffset.Parse("2026-08-24T14:00:00Z");
+        var cycle = new CompletedRoomCycle
         {
-            command.CommandText = "UPDATE completed_room_cycles SET procedure_code = 'UNMAPPED' WHERE id = $id;";
-            command.Parameters.AddWithValue("$id", cycle.CompletedCycleId);
-            Assert.Equal(1, command.ExecuteNonQuery());
-        }
+            RoomId = 1,
+            AssignedDoctor = "otte",
+            ProcedureCode = "UNMAPPED",
+            SeatedAt = seatedAt,
+            ReadyForDoctorAt = seatedAt.AddMinutes(2),
+            DoctorArrivedAt = seatedAt.AddMinutes(5),
+            DoctorCompleteAt = seatedAt.AddMinutes(15),
+            RoomAvailableAt = seatedAt.AddMinutes(18),
+            ReadyToDoctorSeconds = 180,
+            DoctorInRoomSeconds = 600,
+            TurnoverSeconds = 180,
+            TotalRoomCycleSeconds = 1_080,
+            FinalWaitState = RoomStates.ReadyForDoctor
+        };
+        context.Repository.SaveCompletedCycle(cycle, context.Doctors, context.Procedures);
         var key = new HistoricalEncounterKey(HistoricalEncounterSourceTypes.CompletedCycle, cycle.CompletedCycleId);
 
         using var report = context.Store.GetReports();

@@ -104,7 +104,7 @@ public sealed class ReportsSnapshotBuilderTests
         Assert.Null(composition.Window.RangeStartDate);
         Assert.Null(composition.Window.RangeEndDate);
         Assert.Equal("All time", composition.Window.RangeLabel);
-        Assert.Equal(4, composition.Window.TotalCompletedCycleCount);
+        Assert.Equal(3, composition.Window.TotalCompletedCycleCount);
 
         Assert.Equal(1, composition.Timing.AgingEventCount);
         Assert.Equal(1, composition.Timing.StaleEventCount);
@@ -1114,7 +1114,7 @@ public sealed class ReportsSnapshotBuilderTests
     }
 
     [Fact]
-    public void Build_keeps_review_queue_global_to_analytical_scope_but_bounded_by_window()
+    public void Build_scopes_review_queue_by_effective_attribution_and_window()
     {
         var inWindow = new AbortedRoomAssignment
         {
@@ -1127,6 +1127,11 @@ public sealed class ReportsSnapshotBuilderTests
             IsException = true,
             RequiresReview = true
         };
+        inWindow.ReportingProjection = Projection(
+            HistoricalAdministrativeDispositions.NeedsReview,
+            doctor: "otte",
+            procedure: "EXT",
+            sedation: SedationState.EligibleYes);
         var outOfWindow = new AbortedRoomAssignment
         {
             AbortedAssignmentId = 2,
@@ -1138,6 +1143,11 @@ public sealed class ReportsSnapshotBuilderTests
             IsException = true,
             RequiresReview = true
         };
+        outOfWindow.ReportingProjection = Projection(
+            HistoricalAdministrativeDispositions.NeedsReview,
+            doctor: "otte",
+            procedure: "EXT",
+            sedation: SedationState.EligibleYes);
         var query = ReportQuery.FromStrings(
             "2026-08-10",
             "2026-08-10",
@@ -1446,6 +1456,30 @@ public sealed class ReportsSnapshotBuilderTests
         var active = activeDoctors ?? allDoctors;
         return new ReportsSnapshotBuilder(allDoctors, active, procedures, activeProcedures);
     }
+
+    private static HistoricalReportingProjection Projection(
+        string disposition,
+        string doctor,
+        string procedure,
+        SedationState sedation) =>
+        new(
+            disposition,
+            doctor,
+            procedure,
+            sedation,
+            HasExplicitSedationEvidence: true,
+            PreserveLegacySedationTransport: false,
+            EffectiveIsAddOn: false,
+            ExpectedAllocationState.ConfirmedSuggestedValue,
+            EffectiveExpectedAllocationSuggestedUnits: 3,
+            EffectiveExpectedAllocationConfirmedUnits: 3,
+            CurrentReason: HistoricalManualReviewReasons.OtherNeedsReview,
+            ReasonSource: HistoricalAdministrativeReasonSources.LocalAdmin,
+            KnownReviewedAt: null,
+            KnownReviewedActorClass: null,
+            AdministrativeRevision: 1,
+            HasHistoricalCorrectionProvenance: false,
+            HasReviewedProvenance: false);
 
     private static ReportsSnapshot BuildScoped(
         IReadOnlyList<CompletedRoomCycle> cycles,

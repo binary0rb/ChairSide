@@ -1,24 +1,24 @@
 ---
 title: Reporting population
 tags: [reports, reporting-population, reporting-metrics, exception-handling, domain-rule, active, last-verified]
-last_verified_commit: fe60949
+last_verified_commit: 1c6a03d
 ---
 
 # Reporting population
 
 ## Status boundary
 
-**Current implementation:** The `active` tag and `last_verified_commit` apply to the current source/test behavior described below. Production still uses the existing exception flag, global Review Queue scope, accepted-handoff attribution, and pending/read-only-reviewed exception projections.
-
-**Approved target under #234:** The separately labeled target section records the approved design gate. It is not implemented by PR #235 and is not covered by `last_verified_commit`.
+**Current implementation:** Issues #237 through #241 implement typed historical identity, canonical administrative state and ledger, canonical mutations, metadata correction, and effective reporting/Data Quality consumption. Issue #242 still owns the final browser review and correction workflow.
 
 ## Population funnel
 
 `GetReports` narrows persisted cycles in tiers:
 
-1. `normalCycles` excludes manual-review exceptions (`!IsException`).
+1. `normalCycles` excludes current Needs Review and Confirmed Exception dispositions.
 2. `standardCycles` also excludes derived reporting exceptions (`!IsExcludedFromStandardMetrics`).
 3. `normalCompletedCycles` and `standardCompletedCycles` require `RoomAvailableAt`.
+
+Cleared removes only the administrative gate. It does not create a completed case or fill missing lifecycle, Ready, timing, or allocation evidence. Legacy `is_exception`, `requires_review`, and `review_status` remain immutable source/migration evidence and do not compete with current canonical disposition.
 
 `standardCompletedCycles` remains the shared denominator for standard throughput, procedure, sedation, allocation, schedule-fit, trend, observed-day, and doctor procedure-mix calculations. Phase-complete timing surfaces retain their existing deliberately broader rules.
 
@@ -32,13 +32,13 @@ Ordinary startup and live-board operation do not retain lifetime completed histo
 - Practice or historical/current Doctor plus Sedation scope selects the analytical population.
 - Procedure Family or Detailed Variant selects aggregation without filtering population membership.
 
-Doctor scopes accept historical doctor IDs independently of the active assignment roster. Audit requests inherit the normalized parent query. A doctor segment under Practice remains Practice scope plus `segmentDoctorId`; it is not rewritten as a Doctor query. The action-required Review Queue currently ignores analytical Doctor and Sedation scope and remains global within the selected date window.
+Doctor scopes accept historical doctor IDs independently of the active assignment roster. Audit requests inherit the normalized parent query. A doctor segment under Practice remains Practice scope plus `segmentDoctorId`; it is not rewritten as a Doctor query. Data Quality and its default review drill-down inherit applicable date, effective Doctor, explicit effective Sedation, and procedure/drill-down scope. Missing anomaly sedation evidence matches neither Sedation nor NonSedation.
 
 ## Evidence population boundaries
 
 - Completed-case audit includes normal history with Room Available. Practice audit includes reporting-excluded facts with neutral standing and reasons; included or segmented audit uses the standard included population.
 - Metric evidence selects the exact standard contributor population for Ready Wait, Seated -> Doctor, Doctor Time, Turnover, Procedure Mix, or Schedule Fit. Truthful phase evidence may be shown before Room Available and is labeled Metric evidence rather than completed throughput.
-- Exception review is separate from both populations. Pending records remain actionable; reviewed records remain in a quiet read-only history.
+- Exception review is separate from both populations. Pending means current Needs Review. Reviewed/history compatibility means durable reviewed provenance, including a later reopen, rather than simply `RequiresReview == false`.
 
 Normal audit and analytical evidence preserve `DoctorCompleteAt` window authority. Review is selected independently: completed exceptions use the latest truthful anchor in `DoctorCompleteAt`, `DoctorArrivedAt`, `SeatedAt`, then `PrestageStartedAt`; aborted assignments use `TerminatedAt`. Review counts therefore do not disappear merely because an exception lacks Doctor Complete.
 
@@ -48,9 +48,11 @@ The paged audit endpoint owns population membership, exact-second projection, so
 
 ## Assignment and handoff attribution
 
-The accepted Ready handoff is the current finalized reporting assignment. Doctor Arrived accepts the current Active handoff; its immutable assignment supplies doctor, procedure, sedation, and confirmed expected allocation attribution. A withdrawn handoff remains auditable but never becomes accepted attribution and does not contribute its Ready interval to accepted Ready-to-arrival metrics.
+The accepted Ready handoff is immutable original reporting evidence. Doctor Arrived accepts the current Active handoff; its assignment initially supplies doctor, procedure, sedation, Add-on, and confirmed expected allocation attribution. A later canonical correction overlay may change the current effective analytical value without rewriting that handoff or any source lifecycle timestamp. A withdrawn handoff remains auditable but never becomes accepted attribution and does not contribute its Ready interval to accepted Ready-to-arrival metrics.
 
-Legacy completed cycles continue to use their existing finalized assignment data. ChairSide does not manufacture a Ready handoff or Ready timestamp for legacy history.
+Repository reporting pages project effective values set-wise before in-memory scope, grouping, derived reporting-exception annotation, occupied-wait attribution, audit, Schedule Fit, or Data Quality. Historical assigned Schedule Fit uses current effective explicit historical allocation. Current-default Calibration separately uses today's active base-procedure roster default.
+
+Legacy completed cycles without truthful Ready evidence continue to use their existing finalized assignment data. ChairSide does not manufacture a Ready handoff, Ready timestamp, or explicit sedation state. Their `+SED` or legacy `SED` transport code remains a narrow ordinary-report fallback only; scoped anomaly/Data Quality membership requires explicit sedation evidence.
 
 ## Termination populations
 
@@ -60,19 +62,21 @@ Legacy completed cycles continue to use their existing finalized assignment data
 - Excluded and exception records remain visible for audit/review; exclusion changes calculations, not durable visibility.
 - Aging and stale threshold flags are captured for completed cycles from the accepted handoff interval without persisting new `Aging` or `Stale` primary room states.
 
-## Approved target under #234
+## Canonical administrative integration
 
-Issue #234 keeps accepted Ready and lifecycle facts immutable while allowing an explicit historical correction overlay to become the current effective reporting value. It replaces the current split pending/read-only-reviewed projection with one append-only encounter ledger whose resolved review may be reopened. Needs Review provisionally excludes immediately, Confirmed Exception excludes the whole encounter, and Cleared removes only the administrative gate without manufacturing completion or metric facts.
+Issue #234 keeps accepted Ready and lifecycle facts immutable while allowing an explicit historical correction overlay to become the current effective reporting value. One append-only encounter ledger preserves prior decisions and correction provenance; resolved review may be reopened. Needs Review provisionally excludes immediately, Confirmed Exception excludes the whole encounter, and Cleared removes only the administrative gate without manufacturing completion or metric facts.
 
-Under that approved target, Data Quality and its default review drill-down derive from the active report population and inherit applicable date, Doctor, Sedation, procedure/drill-down, and approved analytical filters. Exhaustive raw history may broaden deliberately. Filter membership uses current effective recorded facts and never infers missing doctor, procedure, or sedation values.
+Data Quality and its default review drill-down derive from the active report population and inherit applicable date, Doctor, Sedation, procedure/drill-down, and approved analytical filters. Exhaustive raw history may broaden deliberately. Filter membership uses current effective recorded facts and never infers missing doctor, procedure, or sedation values. Needs Review, Cleared, Confirmed Exception, Historical Correction, and reviewed provenance are overlapping concepts where truthful and are not additive reconciliation buckets.
 
 ## Source and test anchors
 
 - `src/ChairSide.Board/Services/DemoBoardStore.cs` - `GetReports`, arrival acceptance, completion, expiration, and reporting builders.
+- `src/ChairSide.Board/Services/HistoricalReportingProjection.cs` - internal current effective reporting contract.
 - `src/ChairSide.Board/Services/SqliteBoardRepository.cs` - handoff, aborted-assignment, completed-cycle, and exception persistence.
 - `tests/ChairSide.Board.Tests/BoardStoreTests.cs` - reporting population and exclusion characterization.
 - `tests/ChairSide.Board.Tests/ReadyHandoffPersistenceTests.cs` - accepted/withdrawn handoff persistence and attribution.
 - `tests/ChairSide.Board.Tests/DurableFailureInjectionTests.cs` - transaction rollback at cancellation and expiration boundaries.
+- `tests/ChairSide.Board.Tests/HistoricalReportingIntegrationTests.cs` - canonical disposition, effective metadata, scoped Data Quality, and immutability integration.
 
 Reporting date filters remain whole UTC calendar days, weekly buckets remain Monday-start UTC, and completed-cycle windows remain anchored on `DoctorCompleteAt`.
 

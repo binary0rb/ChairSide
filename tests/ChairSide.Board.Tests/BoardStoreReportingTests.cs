@@ -59,7 +59,7 @@ public sealed partial class BoardStoreTests
     }
 
     [Fact]
-    public void Confirm_exclusion_sets_reviewed_metadata()
+    public void Confirm_exclusion_sets_canonical_state_without_rewriting_legacy_source_metadata()
     {
         using var workspace = TestWorkspace.Create();
         var reviewedAt = new DateTimeOffset(2026, 6, 11, 14, 30, 0, TimeSpan.Zero);
@@ -76,12 +76,22 @@ public sealed partial class BoardStoreTests
         var persisted = reloaded.Repository.LoadCompletedCycles()
             .Single(item => item.CompletedCycleId == cycle.CompletedCycleId);
 
-        Assert.True(persisted.IsException);
+        Assert.False(persisted.IsException);
         Assert.False(persisted.RequiresReview);
-        Assert.Equal(ReviewStatuses.Reviewed, persisted.ReviewStatus);
-        Assert.Equal("Exclude from normal metrics", persisted.SuggestedAction);
-        Assert.Equal(reviewedAt, persisted.ReviewedAt);
-        Assert.Equal(ExceptionReviewers.LocalAdmin, persisted.ReviewedBy);
+        Assert.Equal(ReviewStatuses.PendingReview, persisted.ReviewStatus);
+        Assert.Null(persisted.SuggestedAction);
+        Assert.Null(persisted.ReviewedAt);
+        Assert.Null(persisted.ReviewedBy);
+        var key = new HistoricalEncounterKey(
+            HistoricalEncounterSourceTypes.CompletedCycle,
+            cycle.CompletedCycleId);
+        var state = Assert.IsType<HistoricalEncounterAdministrativeState>(
+            reloaded.Repository.LoadHistoricalAdministrativeState(key));
+        Assert.Equal(HistoricalAdministrativeDispositions.ConfirmedException, state.Disposition);
+        var ledger = reloaded.Repository.LoadHistoricalAdministrativeLedger(key, 0, 10);
+        Assert.Equal(2, ledger.TotalMatchingCount);
+        Assert.Equal("Exclude from normal metrics", ledger.Rows[0].AdminNote);
+        Assert.Equal(reviewedAt, ledger.Rows[1].OccurredAt);
     }
 
     [Fact]
@@ -163,8 +173,16 @@ public sealed partial class BoardStoreTests
         var persisted = reloaded.Repository.LoadCompletedCycles()
             .Single(item => item.CompletedCycleId == cycle.CompletedCycleId);
         Assert.False(persisted.RequiresReview);
-        Assert.Equal(ReviewStatuses.Reviewed, persisted.ReviewStatus);
-        Assert.True(persisted.IsException);
+        Assert.Equal(ReviewStatuses.PendingReview, persisted.ReviewStatus);
+        Assert.False(persisted.IsException);
+        var key = new HistoricalEncounterKey(
+            HistoricalEncounterSourceTypes.CompletedCycle,
+            cycle.CompletedCycleId);
+        var state = Assert.IsType<HistoricalEncounterAdministrativeState>(
+            reloaded.Repository.LoadHistoricalAdministrativeState(key));
+        Assert.Equal(HistoricalAdministrativeDispositions.ConfirmedException, state.Disposition);
+        Assert.Equal(2, state.AdministrativeRevision);
+        Assert.Equal(2, reloaded.Repository.LoadHistoricalAdministrativeLedger(key, 0, 10).TotalMatchingCount);
     }
 
     [Fact]

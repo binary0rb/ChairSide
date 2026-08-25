@@ -53,7 +53,7 @@ internal sealed partial class ReportsSnapshotBuilder
                 completedCycles,
                 abortedAssignments,
                 selection,
-                query.Window,
+                query,
                 sort,
                 offset,
                 limit);
@@ -61,7 +61,7 @@ internal sealed partial class ReportsSnapshotBuilder
 
         var selected = BoundedReportCollections.Materialize(CreateAnnotatedCompletedCycleSnapshot(completedCycles)
             .Where(cycle => query.Window.Includes(cycle.DoctorCompleteAt))
-            .Where(cycle => !cycle.IsException)
+            .Where(cycle => cycle.ReportingProjection?.IsAdministrativelyExcluded != true)
             .Where(query.IncludesAnalyticalCycle)
             .Where(cycle => MatchesSegmentDoctor(cycle, selection.SegmentDoctorId)));
         var standard = BoundedReportCollections.Materialize(
@@ -130,18 +130,31 @@ internal sealed partial class ReportsSnapshotBuilder
         IReadOnlyList<AbortedRoomAssignment> abortedAssignments,
         ReportQuery query)
     {
-        var reviewRows = BuildReviewRows(allCompletedCycles, abortedAssignments, query.Window);
+        var reviewRows = BuildReviewRows(allCompletedCycles, abortedAssignments, query);
+        var needsReview = reviewRows.Count(row =>
+            row.Disposition == HistoricalAdministrativeDispositions.NeedsReview);
+        var cleared = reviewRows.Count(row =>
+            row.Disposition == HistoricalAdministrativeDispositions.ClearedForReporting);
+        var confirmed = reviewRows.Count(row =>
+            row.Disposition == HistoricalAdministrativeDispositions.ConfirmedException);
+        var corrected = reviewRows.Count(row => row.HasHistoricalCorrection);
+        var reviewed = reviewRows.Count(row => row.HasReviewedProvenance);
         return new ReportDataQualitySummary(
             normalCompletedCycles.Count,
             standardCompletedCycles.Count,
             normalCompletedCycles.Count - standardCompletedCycles.Count,
-            reviewRows.Count(row => row.RequiresReview),
-            reviewRows.Count(row => !row.RequiresReview),
+            needsReview,
+            reviewed,
             BuildDataQualityReasonCounts(normalCompletedCycles),
             query.Scope == ReportScopeKinds.Doctor
                 ? $"Doctor {query.DoctorId ?? "not selected"}; {query.Sedation}"
                 : $"Practice; {query.Sedation}",
-            query.Window.Label);
+            query.Window.Label,
+            needsReview,
+            cleared,
+            confirmed,
+            corrected,
+            reviewed);
     }
 
     internal static DateTimeOffset? ReviewAnchor(CompletedRoomCycle cycle) =>
@@ -153,14 +166,17 @@ internal sealed partial class ReportsSnapshotBuilder
         IReadOnlyList<CompletedRoomCycle> completedCycles,
         IReadOnlyList<AbortedRoomAssignment> abortedAssignments,
         ReportAuditSelection selection,
-        ReportDateRange window,
+        ReportQuery query,
         string sort,
         int offset,
         int limit)
     {
         var pending = selection.ContributorKind == ReportAuditContributorKinds.PendingReview;
-        var rows = BuildReviewRows(completedCycles, abortedAssignments, window)
-            .Where(row => row.RequiresReview == pending)
+        var rows = BuildReviewRows(completedCycles, abortedAssignments, query)
+            .Where(row => pending
+                ? row.Disposition == HistoricalAdministrativeDispositions.NeedsReview
+                : row.HasReviewedProvenance)
+            .Where(row => MatchesReviewProcedure(row, selection))
             .ToList();
         var ordered = OrderReviewRows(rows, sort).ToList();
         var pageRows = ordered.Skip(offset).Take(limit).ToList();
@@ -181,11 +197,16 @@ internal sealed partial class ReportsSnapshotBuilder
     private IReadOnlyList<ReportReviewAuditRow> BuildReviewRows(
         IReadOnlyList<CompletedRoomCycle> completedCycles,
         IReadOnlyList<AbortedRoomAssignment> abortedAssignments,
-        ReportDateRange window)
+        ReportQuery query)
     {
         var completed = completedCycles
-            .Where(cycle => cycle.IsException)
-            .Where(cycle => window.Includes(ReviewAnchor(cycle)))
+            .Select(CreateEffectiveCompletedCycleCopy)
+            .Where(cycle => query.Window.Includes(ReviewAnchor(cycle)))
+            .Where(cycle => cycle.ReportingProjection is { } projection
+                && (projection.IsAnomaly
+                    || projection.HasHistoricalCorrectionProvenance
+                    || projection.HasReviewedProvenance)
+                && query.IncludesReviewEncounter(projection))
             .Select(cycle => new ReportReviewAuditRow(
                 ExceptionReviewSources.CompletedCycle,
                 cycle.CompletedCycleId,
@@ -211,10 +232,19 @@ internal sealed partial class ReportsSnapshotBuilder
                 cycle.ReviewStatus,
                 cycle.ReviewedAt,
                 cycle.ReviewedBy,
-                cycle.RequiresReview));
+                cycle.RequiresReview,
+                cycle.ReportingProjection!.Disposition,
+                cycle.ReportingProjection.HasHistoricalCorrectionProvenance,
+                cycle.ReportingProjection.HasReviewedProvenance,
+                cycle.ReportingProjection.AdministrativeRevision));
         var aborted = abortedAssignments
-            .Where(record => record.IsException)
-            .Where(record => window.Includes(record.TerminatedAt))
+            .Select(CopyAbortedAssignment)
+            .Where(record => query.Window.Includes(record.TerminatedAt))
+            .Where(record => record.ReportingProjection is { } projection
+                && (projection.IsAnomaly
+                    || projection.HasHistoricalCorrectionProvenance
+                    || projection.HasReviewedProvenance)
+                && query.IncludesReviewEncounter(projection))
             .Select(record => new ReportReviewAuditRow(
                 ExceptionReviewSources.AbortedAssignment,
                 record.AbortedAssignmentId,
@@ -240,7 +270,11 @@ internal sealed partial class ReportsSnapshotBuilder
                 record.ReviewStatus,
                 record.ReviewedAt,
                 record.ReviewedBy,
-                record.RequiresReview));
+                record.RequiresReview,
+                record.ReportingProjection!.Disposition,
+                record.ReportingProjection.HasHistoricalCorrectionProvenance,
+                record.ReportingProjection.HasReviewedProvenance,
+                record.ReportingProjection.AdministrativeRevision));
         return BoundedReportCollections.Materialize(completed.Concat(aborted));
     }
 
@@ -457,6 +491,22 @@ internal sealed partial class ReportsSnapshotBuilder
         return requestedBase is null
             || string.Equals(
                 ResolveBaseProcedureCode(cycle.ProcedureCode),
+                requestedBase,
+                StringComparison.OrdinalIgnoreCase);
+    }
+
+    private bool MatchesReviewProcedure(ReportReviewAuditRow row, ReportAuditSelection selection)
+    {
+        if (selection.Query.ProcedureGrouping == ReportProcedureGroupings.DetailedVariant)
+        {
+            return selection.ProcedureCode is null
+                || string.Equals(row.ProcedureCode, selection.ProcedureCode, StringComparison.OrdinalIgnoreCase);
+        }
+
+        var requestedBase = selection.BaseProcedureCode ?? selection.ProcedureCode;
+        return requestedBase is null
+            || string.Equals(
+                ResolveBaseProcedureCode(row.ProcedureCode),
                 requestedBase,
                 StringComparison.OrdinalIgnoreCase);
     }

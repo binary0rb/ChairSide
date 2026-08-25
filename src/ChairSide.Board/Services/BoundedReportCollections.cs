@@ -1,9 +1,58 @@
 using System.Collections;
 using System.Text.Json;
+using System.Text.Json.Serialization.Metadata;
 
 using Microsoft.Data.Sqlite;
 
 namespace ChairSide.Board.Services;
+
+internal static class ReportSpoolJson
+{
+    internal static JsonSerializerOptions CreateOptions()
+    {
+        var resolver = new DefaultJsonTypeInfoResolver();
+        resolver.Modifiers.Add(typeInfo =>
+        {
+            if (typeInfo.Kind != JsonTypeInfoKind.Object)
+            {
+                return;
+            }
+
+            if (typeInfo.Type == typeof(CompletedRoomCycle))
+            {
+                AddHistoricalProjection(
+                    typeInfo,
+                    value => ((CompletedRoomCycle)value).ReportingProjection,
+                    (value, projection) => ((CompletedRoomCycle)value).ReportingProjection = projection);
+            }
+            else if (typeInfo.Type == typeof(AbortedRoomAssignment))
+            {
+                AddHistoricalProjection(
+                    typeInfo,
+                    value => ((AbortedRoomAssignment)value).ReportingProjection,
+                    (value, projection) => ((AbortedRoomAssignment)value).ReportingProjection = projection);
+            }
+        });
+
+        return new JsonSerializerOptions(JsonSerializerDefaults.General)
+        {
+            TypeInfoResolver = resolver
+        };
+    }
+
+    private static void AddHistoricalProjection(
+        JsonTypeInfo typeInfo,
+        Func<object, HistoricalReportingProjection?> get,
+        Action<object, HistoricalReportingProjection?> set)
+    {
+        var property = typeInfo.CreateJsonPropertyInfo(
+            typeof(HistoricalReportingProjection),
+            "$historicalReportingProjection");
+        property.Get = get;
+        property.Set = (value, projection) => set(value, (HistoricalReportingProjection?)projection);
+        typeInfo.Properties.Add(property);
+    }
+}
 
 /// <summary>
 /// Exact replayable collections used while composing reports from indefinite history. Small
@@ -167,7 +216,7 @@ internal sealed class ReportSpoolScope : IDisposable
 
 internal sealed class DiskBackedReadOnlyList<T> : IReadOnlyList<T>, IDisposable
 {
-    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.General);
+    private static readonly JsonSerializerOptions JsonOptions = ReportSpoolJson.CreateOptions();
     private readonly string _path;
     private readonly string _orderBy;
     private bool _disposed;
@@ -445,7 +494,7 @@ internal sealed class NumericOrderStatistics : IDisposable
 internal sealed class BoundedGroupingSet<T, TKey> : IDisposable
     where TKey : notnull
 {
-    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.General);
+    private static readonly JsonSerializerOptions JsonOptions = ReportSpoolJson.CreateOptions();
     private readonly string? _path;
 
     private BoundedGroupingSet(IReadOnlyList<IGrouping<TKey, T>> groups, string? path)

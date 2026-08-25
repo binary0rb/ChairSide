@@ -941,16 +941,15 @@ public sealed partial class BoardStoreTests
         Assert.Equal(1, result.ManualAuditCandidatesSeeded);
 
         // Date-range buckets are populated: the Today marker (plus the large-synthetic seed's own
-        // recent cycles) land in Today. TotalCompletedCycleCount (not CompletedRoomCyclesCount) is
-        // the ground-truth all-time total independent of the selected window: CompletedRoomCyclesCount
-        // deliberately excludes the manual-audit-candidate cycle (IsException = true), so it reads 875
-        // here, one less than the raw 876 - that exclusion is correct reporting behavior, not a
-        // collision or a miscount.
+        // recent cycles) land in Today. TotalCompletedCycleCount is the exact all-time analytical
+        // count independent of the selected window and uses the same canonical administrative gate.
+        // The Needs Review audit candidate is excluded, so both all-time and window counts remain
+        // consistent with their effective reporting populations rather than exposing a raw table count.
         var today = DateOnly.FromDateTime(now.UtcDateTime.Date);
         var todayCount = context.Store.GetReports(ReportDateRange.FromDates(today, today)).CompletedRoomCyclesCount;
         var allTimeTotal = context.Store.GetReports(ReportDateRange.AllTime).TotalCompletedCycleCount;
         Assert.True(todayCount > 0, "Expected at least one completed cycle in the Today window.");
-        Assert.Equal(876, allTimeTotal);
+        Assert.Equal(875, allTimeTotal);
     }
 
     [Fact]

@@ -255,7 +255,8 @@ if (deploymentEnvironment.IsDevelopment)
     });
 }
 
-// Admin-protected: mark a completed cycle as an exception, removing it from normal metrics.
+// Admin-protected legacy compatibility route. It now writes canonical Needs Review state; #242
+// owns replacement of the browser wording and request contract.
 // Protected by AdminAccessGuard via the /api/reports/* path prefix.
 app.MapPost("/api/reports/cycles/mark-exception", async Task<IResult> (
     MarkExceptionRequest request,
@@ -307,9 +308,8 @@ app.MapPost("/api/reports/cycles/mark-exception", async Task<IResult> (
     return Results.NoContent();
 });
 
-// Admin-protected: confirm the exclusion of an exception cycle, completing its review.
-// The cycle remains an exception (still excluded from normal metrics); confirming review only
-// clears it from the pending-review queue. Targeted solely by the stable completedCycleId.
+// Admin-protected legacy compatibility route. It confirms the current canonical Needs Review
+// disposition without rewriting immutable legacy source columns. Targeted by completedCycleId.
 // Protected by AdminAccessGuard via the /api/reports/* path prefix.
 app.MapPost("/api/reports/cycles/{completedCycleId:long}/confirm-exclusion", async Task<IResult> (
     long completedCycleId,
@@ -343,7 +343,7 @@ app.MapPost("/api/reports/cycles/{completedCycleId:long}/confirm-exclusion", asy
 });
 
 // Admin-protected counterpart for truthful pre-arrival after-hours history. These records remain
-// aborted assignments outside throughput; confirming review clears only the pending-review flag.
+// aborted assignments outside throughput; the compatibility action writes canonical Confirmed state.
 app.MapPost(
     "/api/reports/aborted-assignments/{abortedAssignmentId:long}/confirm-exclusion",
     ExceptionReviewEndpointHandler.ConfirmAbortedAssignmentExclusionAsync);
