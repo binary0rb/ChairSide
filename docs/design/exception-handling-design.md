@@ -177,6 +177,14 @@ The ledger is not a general clickstream and does not require giant serialized sn
 
 These rules apply independently of canonical live-room lifecycle compare-and-swap. Administrative review never mutates the live lifecycle or its immutable evidence.
 
+### Implemented server contract
+
+Issue #239 implements the server policy with the typed `CompletedCycle` or `AbortedAssignment` source identity. An absent administrative projection is logical revision 0. Each canonical mutation requires `ExpectedRevision`, compares it within the same immediate SQLite transaction as the projection and ledger writes, and increments exactly once. Stale writes return the current revision without mutation.
+
+Local Admin reasons are the closed server vocabulary `IncorrectDoctor`, `IncorrectProcedure`, `IncorrectCaseDetails`, `UnexpectedLifecycle`, and `OtherNeedsReview`. Notes are accepted through 500 characters and rejected at 501 rather than truncated. The strict, admin-protected anomaly API exposes Mark, reason refinement, note, Clear, Confirm, and Reopen; it does not expose arbitrary system findings or personal actor identity.
+
+The approved system-finding allowlist is `AfterHoursSweep` and `ExceededMaxActiveDuration`. Those producers append `SystemFinding` and enter or re-enter Needs Review in the same transaction as source archival, Ready-handoff termination when applicable, and live-room reset. Reporting-only exception classifications, outlier checks, and Calibration remain non-mutating. Reporting consumption of the canonical projection remains owned by #241, historical correction remains owned by #240, and final browser review UI remains owned by #242.
+
 ## Reporting period and effective truth
 
 - A Cleared encounter returns to the reporting period dictated by its truthful lifecycle/reporting date, not the later administrative action date.

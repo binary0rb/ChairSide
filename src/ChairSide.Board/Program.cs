@@ -98,6 +98,7 @@ builder.Services.AddSingleton<IReparsePointInspector, FileSystemReparsePointInsp
 builder.Services.AddSingleton<DatabaseIsolationPolicy>();
 builder.Services.AddSingleton<DatabaseDeploymentIdentityPolicy>();
 builder.Services.AddSingleton<SqliteBoardRepository>();
+builder.Services.AddSingleton<HistoricalAnomalyAdministrationService>();
 builder.Services.AddSingleton<DemoBoardStore>();
 builder.Services.AddSingleton<RoomDeviceTokenValidator>();
 builder.Services.AddSingleton<AdminAccessTokenValidator>();
@@ -345,6 +346,27 @@ app.MapPost("/api/reports/cycles/{completedCycleId:long}/confirm-exclusion", asy
 app.MapPost(
     "/api/reports/aborted-assignments/{abortedAssignmentId:long}/confirm-exclusion",
     ExceptionReviewEndpointHandler.ConfirmAbortedAssignmentExclusionAsync);
+
+// Canonical administrative anomaly operations. The typed historical key prevents table-local IDs
+// from colliding, and each request supplies the expected logical administrative revision.
+app.MapPost(
+    "/api/reports/anomalies/{sourceType}/{sourceRecordId:long}/mark-for-review",
+    HistoricalAnomalyEndpointHandler.MarkForReviewAsync);
+app.MapPost(
+    "/api/reports/anomalies/{sourceType}/{sourceRecordId:long}/refine-reason",
+    HistoricalAnomalyEndpointHandler.RefineReasonAsync);
+app.MapPost(
+    "/api/reports/anomalies/{sourceType}/{sourceRecordId:long}/note",
+    HistoricalAnomalyEndpointHandler.AddNoteAsync);
+app.MapPost(
+    "/api/reports/anomalies/{sourceType}/{sourceRecordId:long}/clear",
+    HistoricalAnomalyEndpointHandler.ClearForReportingAsync);
+app.MapPost(
+    "/api/reports/anomalies/{sourceType}/{sourceRecordId:long}/confirm",
+    HistoricalAnomalyEndpointHandler.ConfirmExceptionAsync);
+app.MapPost(
+    "/api/reports/anomalies/{sourceType}/{sourceRecordId:long}/reopen",
+    HistoricalAnomalyEndpointHandler.ReopenReviewAsync);
 
 app.MapGet("/api/rooms/{roomNumber:int}", IResult (int roomNumber, DemoBoardStore store) =>
 {

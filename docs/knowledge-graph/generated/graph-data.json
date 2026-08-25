@@ -441,6 +441,18 @@
                       "path":  "src/ChairSide.Board/Services/HistoricalAdministrativePersistence.cs"
                   },
                   {
+                      "id":  "file:src/ChairSide.Board/Services/HistoricalAnomalyAdministrationService.cs",
+                      "label":  "src/ChairSide.Board/Services/HistoricalAnomalyAdministrationService.cs",
+                      "type":  "File",
+                      "path":  "src/ChairSide.Board/Services/HistoricalAnomalyAdministrationService.cs"
+                  },
+                  {
+                      "id":  "file:src/ChairSide.Board/Services/HistoricalAnomalyEndpointHandler.cs",
+                      "label":  "src/ChairSide.Board/Services/HistoricalAnomalyEndpointHandler.cs",
+                      "type":  "File",
+                      "path":  "src/ChairSide.Board/Services/HistoricalAnomalyEndpointHandler.cs"
+                  },
+                  {
                       "id":  "file:src/ChairSide.Board/Services/HistoricalEncounterQuery.cs",
                       "label":  "src/ChairSide.Board/Services/HistoricalEncounterQuery.cs",
                       "type":  "File",
@@ -879,10 +891,28 @@
                       "path":  "tests/ChairSide.Board.Tests/HistoricalAdministrativePersistenceTests.cs"
                   },
                   {
+                      "id":  "file:tests/ChairSide.Board.Tests/HistoricalAnomalyAdministrationTests.cs",
+                      "label":  "tests/ChairSide.Board.Tests/HistoricalAnomalyAdministrationTests.cs",
+                      "type":  "File",
+                      "path":  "tests/ChairSide.Board.Tests/HistoricalAnomalyAdministrationTests.cs"
+                  },
+                  {
+                      "id":  "file:tests/ChairSide.Board.Tests/HistoricalAnomalyEndpointTests.cs",
+                      "label":  "tests/ChairSide.Board.Tests/HistoricalAnomalyEndpointTests.cs",
+                      "type":  "File",
+                      "path":  "tests/ChairSide.Board.Tests/HistoricalAnomalyEndpointTests.cs"
+                  },
+                  {
                       "id":  "file:tests/ChairSide.Board.Tests/HistoricalQueryPersistenceTests.cs",
                       "label":  "tests/ChairSide.Board.Tests/HistoricalQueryPersistenceTests.cs",
                       "type":  "File",
                       "path":  "tests/ChairSide.Board.Tests/HistoricalQueryPersistenceTests.cs"
+                  },
+                  {
+                      "id":  "file:tests/ChairSide.Board.Tests/HistoricalSystemFindingProducerTests.cs",
+                      "label":  "tests/ChairSide.Board.Tests/HistoricalSystemFindingProducerTests.cs",
+                      "type":  "File",
+                      "path":  "tests/ChairSide.Board.Tests/HistoricalSystemFindingProducerTests.cs"
                   },
                   {
                       "id":  "file:tests/ChairSide.Board.Tests/LifecycleFixtureCorrectionTests.cs",
@@ -1175,6 +1205,42 @@
                   {
                       "id":  "route:/api/reports/aborted-assignments/{abortedAssignmentId:long}/confirm-exclusion",
                       "label":  "/api/reports/aborted-assignments/{abortedAssignmentId:long}/confirm-exclusion",
+                      "type":  "Route",
+                      "path":  "src/ChairSide.Board/Program.cs"
+                  },
+                  {
+                      "id":  "route:/api/reports/anomalies/{sourceType}/{sourceRecordId:long}/clear",
+                      "label":  "/api/reports/anomalies/{sourceType}/{sourceRecordId:long}/clear",
+                      "type":  "Route",
+                      "path":  "src/ChairSide.Board/Program.cs"
+                  },
+                  {
+                      "id":  "route:/api/reports/anomalies/{sourceType}/{sourceRecordId:long}/confirm",
+                      "label":  "/api/reports/anomalies/{sourceType}/{sourceRecordId:long}/confirm",
+                      "type":  "Route",
+                      "path":  "src/ChairSide.Board/Program.cs"
+                  },
+                  {
+                      "id":  "route:/api/reports/anomalies/{sourceType}/{sourceRecordId:long}/mark-for-review",
+                      "label":  "/api/reports/anomalies/{sourceType}/{sourceRecordId:long}/mark-for-review",
+                      "type":  "Route",
+                      "path":  "src/ChairSide.Board/Program.cs"
+                  },
+                  {
+                      "id":  "route:/api/reports/anomalies/{sourceType}/{sourceRecordId:long}/note",
+                      "label":  "/api/reports/anomalies/{sourceType}/{sourceRecordId:long}/note",
+                      "type":  "Route",
+                      "path":  "src/ChairSide.Board/Program.cs"
+                  },
+                  {
+                      "id":  "route:/api/reports/anomalies/{sourceType}/{sourceRecordId:long}/refine-reason",
+                      "label":  "/api/reports/anomalies/{sourceType}/{sourceRecordId:long}/refine-reason",
+                      "type":  "Route",
+                      "path":  "src/ChairSide.Board/Program.cs"
+                  },
+                  {
+                      "id":  "route:/api/reports/anomalies/{sourceType}/{sourceRecordId:long}/reopen",
+                      "label":  "/api/reports/anomalies/{sourceType}/{sourceRecordId:long}/reopen",
                       "type":  "Route",
                       "path":  "src/ChairSide.Board/Program.cs"
                   },
@@ -2043,6 +2109,18 @@
                       "path":  "src/ChairSide.Board/Services/ReadyHandoffPersistenceRecords.cs"
                   },
                   {
+                      "id":  "symbol:type:GuardedHistoricalAdministrativePersistenceOutcome",
+                      "label":  "GuardedHistoricalAdministrativePersistenceOutcome",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/HistoricalAnomalyAdministrationService.cs"
+                  },
+                  {
+                      "id":  "symbol:type:GuardedHistoricalAdministrativePersistenceResult",
+                      "label":  "GuardedHistoricalAdministrativePersistenceResult",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/HistoricalAnomalyAdministrationService.cs"
+                  },
+                  {
                       "id":  "symbol:type:GuardedReadyAddOnCorrectionPersistenceOutcome",
                       "label":  "GuardedReadyAddOnCorrectionPersistenceOutcome",
                       "type":  "CodeType",
@@ -2115,6 +2193,18 @@
                       "path":  "src/ChairSide.Board/Services/HistoricalAdministrativePersistence.cs"
                   },
                   {
+                      "id":  "symbol:type:HistoricalAdministrativeOperationOutcome",
+                      "label":  "HistoricalAdministrativeOperationOutcome",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/HistoricalAnomalyAdministrationService.cs"
+                  },
+                  {
+                      "id":  "symbol:type:HistoricalAdministrativeOperationResult",
+                      "label":  "HistoricalAdministrativeOperationResult",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/HistoricalAnomalyAdministrationService.cs"
+                  },
+                  {
                       "id":  "symbol:type:HistoricalAdministrativePersistenceTests",
                       "label":  "HistoricalAdministrativePersistenceTests",
                       "type":  "CodeType",
@@ -2125,6 +2215,30 @@
                       "label":  "HistoricalAdministrativeReasonSources",
                       "type":  "CodeType",
                       "path":  "src/ChairSide.Board/Services/HistoricalAdministrativePersistence.cs"
+                  },
+                  {
+                      "id":  "symbol:type:HistoricalAnomalyAdministrationService",
+                      "label":  "HistoricalAnomalyAdministrationService",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/HistoricalAnomalyAdministrationService.cs"
+                  },
+                  {
+                      "id":  "symbol:type:HistoricalAnomalyAdministrationTests",
+                      "label":  "HistoricalAnomalyAdministrationTests",
+                      "type":  "CodeType",
+                      "path":  "tests/ChairSide.Board.Tests/HistoricalAnomalyAdministrationTests.cs"
+                  },
+                  {
+                      "id":  "symbol:type:HistoricalAnomalyEndpointHandler",
+                      "label":  "HistoricalAnomalyEndpointHandler",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/HistoricalAnomalyEndpointHandler.cs"
+                  },
+                  {
+                      "id":  "symbol:type:HistoricalAnomalyEndpointTests",
+                      "label":  "HistoricalAnomalyEndpointTests",
+                      "type":  "CodeType",
+                      "path":  "tests/ChairSide.Board.Tests/HistoricalAnomalyEndpointTests.cs"
                   },
                   {
                       "id":  "symbol:type:HistoricalEncounterAdministrativeLedgerEvent",
@@ -2151,6 +2265,12 @@
                       "path":  "src/ChairSide.Board/Services/HistoricalEncounterQuery.cs"
                   },
                   {
+                      "id":  "symbol:type:HistoricalManualReviewReasons",
+                      "label":  "HistoricalManualReviewReasons",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/HistoricalAnomalyAdministrationService.cs"
+                  },
+                  {
                       "id":  "symbol:type:HistoricalPair",
                       "label":  "HistoricalPair",
                       "type":  "CodeType",
@@ -2167,6 +2287,24 @@
                       "label":  "HistoricalQueryPersistenceTests",
                       "type":  "CodeType",
                       "path":  "tests/ChairSide.Board.Tests/HistoricalQueryPersistenceTests.cs"
+                  },
+                  {
+                      "id":  "symbol:type:HistoricalSystemFindingKind",
+                      "label":  "HistoricalSystemFindingKind",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/HistoricalAnomalyAdministrationService.cs"
+                  },
+                  {
+                      "id":  "symbol:type:HistoricalSystemFindingProducerTests",
+                      "label":  "HistoricalSystemFindingProducerTests",
+                      "type":  "CodeType",
+                      "path":  "tests/ChairSide.Board.Tests/HistoricalSystemFindingProducerTests.cs"
+                  },
+                  {
+                      "id":  "symbol:type:HistoricalSystemFindingReasons",
+                      "label":  "HistoricalSystemFindingReasons",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/HistoricalAnomalyAdministrationService.cs"
                   },
                   {
                       "id":  "symbol:type:IReparsePointInspector",
@@ -3288,6 +3426,36 @@
                   },
                   {
                       "from":  "file:src/ChairSide.Board/Program.cs",
+                      "to":  "route:/api/reports/anomalies/{sourceType}/{sourceRecordId:long}/clear",
+                      "label":  "maps"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Program.cs",
+                      "to":  "route:/api/reports/anomalies/{sourceType}/{sourceRecordId:long}/confirm",
+                      "label":  "maps"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Program.cs",
+                      "to":  "route:/api/reports/anomalies/{sourceType}/{sourceRecordId:long}/mark-for-review",
+                      "label":  "maps"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Program.cs",
+                      "to":  "route:/api/reports/anomalies/{sourceType}/{sourceRecordId:long}/note",
+                      "label":  "maps"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Program.cs",
+                      "to":  "route:/api/reports/anomalies/{sourceType}/{sourceRecordId:long}/refine-reason",
+                      "label":  "maps"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Program.cs",
+                      "to":  "route:/api/reports/anomalies/{sourceType}/{sourceRecordId:long}/reopen",
+                      "label":  "maps"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Program.cs",
                       "to":  "route:/api/reports/audit/query",
                       "label":  "maps"
                   },
@@ -3984,6 +4152,56 @@
                   {
                       "from":  "file:src/ChairSide.Board/Services/HistoricalAdministrativePersistence.cs",
                       "to":  "symbol:type:HistoricalEncounterAdministrativeState",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/HistoricalAnomalyAdministrationService.cs",
+                      "to":  "symbol:type:GuardedHistoricalAdministrativePersistenceOutcome",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/HistoricalAnomalyAdministrationService.cs",
+                      "to":  "symbol:type:GuardedHistoricalAdministrativePersistenceResult",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/HistoricalAnomalyAdministrationService.cs",
+                      "to":  "symbol:type:HistoricalAdministrativeOperationOutcome",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/HistoricalAnomalyAdministrationService.cs",
+                      "to":  "symbol:type:HistoricalAdministrativeOperationResult",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/HistoricalAnomalyAdministrationService.cs",
+                      "to":  "symbol:type:HistoricalAnomalyAdministrationService",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/HistoricalAnomalyAdministrationService.cs",
+                      "to":  "symbol:type:HistoricalManualReviewReasons",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/HistoricalAnomalyAdministrationService.cs",
+                      "to":  "symbol:type:HistoricalSystemFindingKind",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/HistoricalAnomalyAdministrationService.cs",
+                      "to":  "symbol:type:HistoricalSystemFindingReasons",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/HistoricalAnomalyEndpointHandler.cs",
+                      "to":  "symbol:type:HistoricalAnomalyEndpointHandler",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/HistoricalAnomalyEndpointHandler.cs",
+                      "to":  "symbol:type:struct",
                       "label":  "declares"
                   },
                   {
@@ -4747,8 +4965,23 @@
                       "label":  "declares"
                   },
                   {
+                      "from":  "file:tests/ChairSide.Board.Tests/HistoricalAnomalyAdministrationTests.cs",
+                      "to":  "symbol:type:HistoricalAnomalyAdministrationTests",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:tests/ChairSide.Board.Tests/HistoricalAnomalyEndpointTests.cs",
+                      "to":  "symbol:type:HistoricalAnomalyEndpointTests",
+                      "label":  "declares"
+                  },
+                  {
                       "from":  "file:tests/ChairSide.Board.Tests/HistoricalQueryPersistenceTests.cs",
                       "to":  "symbol:type:HistoricalQueryPersistenceTests",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:tests/ChairSide.Board.Tests/HistoricalSystemFindingProducerTests.cs",
+                      "to":  "symbol:type:HistoricalSystemFindingProducerTests",
                       "label":  "declares"
                   },
                   {
@@ -5313,6 +5546,16 @@
                   },
                   {
                       "from":  "repo:chairside",
+                      "to":  "file:src/ChairSide.Board/Services/HistoricalAnomalyAdministrationService.cs",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:src/ChairSide.Board/Services/HistoricalAnomalyEndpointHandler.cs",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
                       "to":  "file:src/ChairSide.Board/Services/HistoricalEncounterQuery.cs",
                       "label":  "contains"
                   },
@@ -5678,7 +5921,22 @@
                   },
                   {
                       "from":  "repo:chairside",
+                      "to":  "file:tests/ChairSide.Board.Tests/HistoricalAnomalyAdministrationTests.cs",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:tests/ChairSide.Board.Tests/HistoricalAnomalyEndpointTests.cs",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
                       "to":  "file:tests/ChairSide.Board.Tests/HistoricalQueryPersistenceTests.cs",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:tests/ChairSide.Board.Tests/HistoricalSystemFindingProducerTests.cs",
                       "label":  "contains"
                   },
                   {
