@@ -10,8 +10,11 @@ public sealed class ReportAuditBuilderTests
         var completed = Cycle(1, "otte", "EXT", Utc(8, 0), ready: 5, arrived: 15, complete: 45, available: 55);
         var phaseOnly = Cycle(2, "otte", "EXT", Utc(9, 0), ready: 5, arrived: 20, complete: 50, available: null);
         var manualException = Cycle(3, "otte", "EXT", Utc(10, 0), ready: 5, arrived: 10, complete: 35, available: 40);
-        manualException.IsException = true;
-        manualException.RequiresReview = true;
+        manualException.ReportingProjection = Projection(
+            HistoricalAdministrativeDispositions.NeedsReview,
+            doctor: "otte",
+            procedure: "EXT",
+            sedation: SedationState.EligibleNo);
 
         var builder = CreateBuilder();
         var completedPage = builder.BuildAudit(

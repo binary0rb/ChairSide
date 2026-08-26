@@ -37,6 +37,109 @@ public sealed class HistoricalReportingIntegrationTests
     }
 
     [Fact]
+    public void Legacy_review_columns_without_canonical_projection_do_not_create_runtime_administrative_state()
+    {
+        var seatedAt = DateTimeOffset.Parse("2026-08-19T14:00:00Z");
+        var completed = new CompletedRoomCycle
+        {
+            CompletedCycleId = 1,
+            RoomId = 1,
+            AssignedDoctor = "otte",
+            ProcedureCode = "EXT+SED",
+            IsAddOn = true,
+            SeatedAt = seatedAt,
+            ReadyForDoctorAt = seatedAt.AddMinutes(2),
+            DoctorArrivedAt = seatedAt.AddMinutes(5),
+            DoctorCompleteAt = seatedAt.AddMinutes(15),
+            RoomAvailableAt = seatedAt.AddMinutes(18),
+            OriginalDefaultExpectedUnits = 3,
+            ExpectedAllocationUnits = 3,
+            ExpectedAllocationMinutes = 30,
+            IsException = true,
+            RequiresReview = true,
+            ExceptionReason = ExceptionReasons.ManualReview,
+            ReviewStatus = ReviewStatuses.PendingReview
+        };
+        var reviewedAt = seatedAt.AddHours(1);
+        var aborted = new AbortedRoomAssignment
+        {
+            AbortedAssignmentId = 1,
+            EpisodeId = "legacy-reviewed-abort",
+            RoomId = 2,
+            AssignedDoctor = "pledger",
+            ProcedureCode = "EXT",
+            SedationState = SedationState.EligibleYes,
+            ExpectedAllocationState = ExpectedAllocationState.ConfirmedAdjustedValue,
+            ExpectedAllocationSuggestedUnits = 9,
+            ExpectedAllocationConfirmedUnits = 4,
+            OriginalDefaultExpectedUnits = 3,
+            ExpectedAllocationUnits = 4,
+            ExpectedAllocationMinutes = 40,
+            TerminatedAt = seatedAt,
+            IsException = true,
+            RequiresReview = false,
+            ExceptionReason = ExceptionReasons.AfterHoursSweep,
+            ReviewStatus = ReviewStatuses.Reviewed,
+            ReviewedAt = reviewedAt,
+            ReviewedBy = ExceptionReviewers.LocalAdmin
+        };
+
+        var completedFallback = HistoricalReportingProjection.FromSource(completed);
+        AssertNoRuntimeAdministrativeState(completedFallback);
+        Assert.Equal("otte", completedFallback.EffectiveDoctorId);
+        Assert.Equal("EXT+SED", completedFallback.EffectiveProcedureCode);
+        Assert.True(completedFallback.EffectiveIsAddOn);
+        Assert.True(completedFallback.IsSedationCaseForNormalReporting);
+        Assert.Equal(3, completedFallback.EffectiveExpectedAllocationConfirmedUnits);
+
+        var abortedFallback = HistoricalReportingProjection.FromSource(aborted);
+        AssertNoRuntimeAdministrativeState(abortedFallback);
+        Assert.Equal("pledger", abortedFallback.EffectiveDoctorId);
+        Assert.Equal("EXT", abortedFallback.EffectiveProcedureCode);
+        Assert.Equal(SedationState.EligibleYes, abortedFallback.EffectiveSedationState);
+        Assert.Equal(9, abortedFallback.EffectiveExpectedAllocationSuggestedUnits);
+        Assert.Equal(4, abortedFallback.EffectiveExpectedAllocationConfirmedUnits);
+
+        Doctor[] doctors =
+        [
+            new("otte", "Dr. Otte", "LDO", "#dc2626"),
+            new("pledger", "Dr. Pledger", "JWP", "#16a34a")
+        ];
+        ProcedureCategory[] procedures =
+        [
+            new("extraction", "EXT", "Extraction", "forceps", SedationEligible: true,
+                AllocationBehavior: "Variable", DefaultExpectedUnits: 3)
+        ];
+        var report = new ReportsSnapshotBuilder(doctors, doctors, procedures, procedures)
+            .Build([completed], [aborted], ReportQuery.Default);
+        Assert.Equal(1, report.CompletedRoomCyclesCount);
+        Assert.Equal(0, report.DataQuality!.NeedsReviewCount);
+        Assert.Equal(0, report.DataQuality.ConfirmedExceptionCount);
+        Assert.Empty(report.ExceptionReviewRecords!);
+        var reported = Assert.Single(report.RecentCompletedCycles);
+        Assert.False(reported.IsException);
+        Assert.False(reported.RequiresReview);
+        Assert.Equal(ReviewStatuses.PendingReview, reported.ReviewStatus);
+        Assert.Null(reported.ExceptionReason);
+        Assert.Null(reported.SuggestedAction);
+        Assert.Null(reported.ReviewedAt);
+        Assert.Null(reported.ReviewedBy);
+
+        abortedFallback.ApplyTo(aborted);
+        Assert.False(aborted.IsException);
+        Assert.False(aborted.RequiresReview);
+        Assert.Equal(ReviewStatuses.PendingReview, aborted.ReviewStatus);
+        Assert.Null(aborted.ExceptionReason);
+        Assert.Null(aborted.SuggestedAction);
+        Assert.Null(aborted.ReviewedAt);
+        Assert.Null(aborted.ReviewedBy);
+        Assert.Equal(3, aborted.OriginalDefaultExpectedUnits);
+        Assert.Equal(4, aborted.ExpectedAllocationUnits);
+        Assert.Equal(40, aborted.ExpectedAllocationMinutes);
+        Assert.True(aborted.AllocationAdjustedFromDefault);
+    }
+
+    [Fact]
     public void Canonical_gate_and_all_effective_fields_update_reports_audit_and_data_quality_immediately()
     {
         using var workspace = TestWorkspace.Create();
@@ -136,7 +239,7 @@ public sealed class HistoricalReportingIntegrationTests
             Assert.Equal("pledger", effective.AssignedDoctor);
             Assert.Equal("IMP+SED", effective.ProcedureCode);
             Assert.True(effective.IsAddOn);
-            Assert.Equal(9, effective.OriginalDefaultExpectedUnits);
+            Assert.Equal(3, effective.OriginalDefaultExpectedUnits);
             Assert.Equal(4, effective.ExpectedAllocationUnits);
             Assert.Equal(40, effective.ExpectedAllocationMinutes);
             Assert.True(effective.AllocationAdjustedFromDefault);
@@ -174,6 +277,7 @@ public sealed class HistoricalReportingIntegrationTests
         Assert.Equal("IMP+SED", auditRow.ProcedureCode);
         Assert.True(auditRow.IsSedationCase);
         Assert.True(auditRow.IsAddOn);
+        Assert.Equal(3, auditRow.OriginalDefaultExpectedUnits);
         Assert.Equal(4, auditRow.ExpectedAllocationUnits);
         Assert.Equal(40, auditRow.ExpectedAllocationMinutes);
         Assert.Equal(-1_680, auditRow.ExactScheduleFitVarianceSeconds);
@@ -182,8 +286,16 @@ public sealed class HistoricalReportingIntegrationTests
             ledgerCountBeforeReports,
             context.Repository.LoadHistoricalAdministrativeLedger(key, 0, 100).TotalMatchingCount);
         Assert.Equal(ledgerReadsBeforeReports + 2, context.Repository.HistoricalLedgerPageReadCount);
-        Assert.Equal(sourceJson, JsonSerializer.Serialize(context.Repository.LoadHistoricalEncounter(key)!.CompletedCycle));
-        Assert.Equal(handoffJson, JsonSerializer.Serialize(context.Repository.LoadReadyHandoff(sourceBefore.AcceptedReadyHandoffId!)));
+        var sourceAfter = context.Repository.LoadHistoricalEncounter(key)!.CompletedCycle!;
+        Assert.Equal(3, sourceAfter.OriginalDefaultExpectedUnits);
+        Assert.Equal(3, sourceAfter.ExpectedAllocationUnits);
+        Assert.Equal(30, sourceAfter.ExpectedAllocationMinutes);
+        Assert.Equal(sourceJson, JsonSerializer.Serialize(sourceAfter));
+        var handoffAfter = context.Repository.LoadReadyHandoff(sourceBefore.AcceptedReadyHandoffId!)!;
+        Assert.Equal(ExpectedAllocationState.ConfirmedSuggestedValue, handoffAfter.Assignment.ExpectedAllocationState);
+        Assert.Equal(3, handoffAfter.Assignment.ExpectedAllocationSuggestedUnits);
+        Assert.Equal(3, handoffAfter.Assignment.ExpectedAllocationConfirmedUnits);
+        Assert.Equal(handoffJson, JsonSerializer.Serialize(handoffAfter));
 
         AssertSuccess(administration.ReopenReview(key, 7), 8);
         using (var reopened = context.Store.GetReports(correctedScope))
@@ -480,5 +592,17 @@ public sealed class HistoricalReportingIntegrationTests
     {
         Assert.Equal(HistoricalMetadataCorrectionOutcome.Success, result.Outcome);
         Assert.Equal(expectedRevision, result.CurrentRevision);
+    }
+
+    private static void AssertNoRuntimeAdministrativeState(HistoricalReportingProjection projection)
+    {
+        Assert.Equal(HistoricalAdministrativeDispositions.NoAnomaly, projection.Disposition);
+        Assert.Null(projection.CurrentReason);
+        Assert.Null(projection.ReasonSource);
+        Assert.Null(projection.KnownReviewedAt);
+        Assert.Null(projection.KnownReviewedActorClass);
+        Assert.Equal(0, projection.AdministrativeRevision);
+        Assert.False(projection.HasHistoricalCorrectionProvenance);
+        Assert.False(projection.HasReviewedProvenance);
     }
 }

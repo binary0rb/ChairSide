@@ -84,9 +84,8 @@ internal sealed record HistoricalReportingProjection(
             EffectiveExpectedAllocationState,
             EffectiveExpectedAllocationSuggestedUnits,
             EffectiveExpectedAllocationConfirmedUnits,
-            (suggested, confirmed, adjusted) =>
+            (_, confirmed, adjusted) =>
             {
-                cycle.OriginalDefaultExpectedUnits = suggested;
                 cycle.ExpectedAllocationUnits = confirmed;
                 cycle.ExpectedAllocationMinutes = confirmed * 10;
                 cycle.AllocationAdjustedFromDefault = adjusted;
@@ -94,10 +93,9 @@ internal sealed record HistoricalReportingProjection(
         cycle.IsException = IsAnomaly;
         cycle.RequiresReview = RequiresReview;
         cycle.ExceptionReason = CurrentReason;
-        if (IsAnomaly)
-        {
-            cycle.ReviewStatus = RequiresReview ? ReviewStatuses.PendingReview : ReviewStatuses.Reviewed;
-        }
+        cycle.ReviewStatus = RequiresReview
+            ? ReviewStatuses.PendingReview
+            : IsAnomaly ? ReviewStatuses.Reviewed : ReviewStatuses.PendingReview;
         cycle.ReviewedAt = KnownReviewedAt;
         cycle.ReviewedBy = KnownReviewedActorClass;
     }
@@ -117,9 +115,8 @@ internal sealed record HistoricalReportingProjection(
             EffectiveExpectedAllocationState,
             EffectiveExpectedAllocationSuggestedUnits,
             EffectiveExpectedAllocationConfirmedUnits,
-            (suggested, confirmed, adjusted) =>
+            (_, confirmed, adjusted) =>
             {
-                record.OriginalDefaultExpectedUnits = suggested;
                 record.ExpectedAllocationUnits = confirmed;
                 record.ExpectedAllocationMinutes = confirmed * 10;
                 record.AllocationAdjustedFromDefault = adjusted;
@@ -127,10 +124,9 @@ internal sealed record HistoricalReportingProjection(
         record.IsException = IsAnomaly;
         record.RequiresReview = RequiresReview;
         record.ExceptionReason = CurrentReason;
-        if (IsAnomaly)
-        {
-            record.ReviewStatus = RequiresReview ? ReviewStatuses.PendingReview : ReviewStatuses.Reviewed;
-        }
+        record.ReviewStatus = RequiresReview
+            ? ReviewStatuses.PendingReview
+            : IsAnomaly ? ReviewStatuses.Reviewed : ReviewStatuses.PendingReview;
         record.ReviewedAt = KnownReviewedAt;
         record.ReviewedBy = KnownReviewedActorClass;
     }
@@ -139,13 +135,8 @@ internal sealed record HistoricalReportingProjection(
     {
         ArgumentNullException.ThrowIfNull(cycle);
         var allocation = LegacyCompletedAllocation(cycle);
-        var disposition = cycle.IsException
-            ? cycle.RequiresReview
-                ? HistoricalAdministrativeDispositions.NeedsReview
-                : HistoricalAdministrativeDispositions.ConfirmedException
-            : HistoricalAdministrativeDispositions.NoAnomaly;
         return new(
-            disposition,
+            HistoricalAdministrativeDispositions.NoAnomaly,
             NullIfBlank(cycle.AssignedDoctor),
             NullIfBlank(cycle.ProcedureCode),
             EffectiveSedationState: null,
@@ -155,25 +146,20 @@ internal sealed record HistoricalReportingProjection(
             allocation.State,
             allocation.Suggested,
             allocation.Confirmed,
-            cycle.ExceptionReason,
-            cycle.IsException ? HistoricalAdministrativeReasonSources.Legacy : null,
-            cycle.ReviewedAt,
-            cycle.ReviewedBy,
+            CurrentReason: null,
+            ReasonSource: null,
+            KnownReviewedAt: null,
+            KnownReviewedActorClass: null,
             AdministrativeRevision: 0,
             HasHistoricalCorrectionProvenance: false,
-            HasReviewedProvenance: cycle.ReviewedAt.HasValue || !cycle.RequiresReview && cycle.IsException);
+            HasReviewedProvenance: false);
     }
 
     public static HistoricalReportingProjection FromSource(AbortedRoomAssignment record)
     {
         ArgumentNullException.ThrowIfNull(record);
-        var disposition = record.IsException
-            ? record.RequiresReview
-                ? HistoricalAdministrativeDispositions.NeedsReview
-                : HistoricalAdministrativeDispositions.ConfirmedException
-            : HistoricalAdministrativeDispositions.NoAnomaly;
         return new(
-            disposition,
+            HistoricalAdministrativeDispositions.NoAnomaly,
             NullIfBlank(record.AssignedDoctor),
             NullIfBlank(record.ProcedureCode),
             record.SedationState,
@@ -183,13 +169,13 @@ internal sealed record HistoricalReportingProjection(
             record.ExpectedAllocationState,
             record.ExpectedAllocationSuggestedUnits,
             record.ExpectedAllocationConfirmedUnits,
-            record.ExceptionReason,
-            record.IsException ? HistoricalAdministrativeReasonSources.Legacy : null,
-            record.ReviewedAt,
-            record.ReviewedBy,
+            CurrentReason: null,
+            ReasonSource: null,
+            KnownReviewedAt: null,
+            KnownReviewedActorClass: null,
             AdministrativeRevision: 0,
             HasHistoricalCorrectionProvenance: false,
-            HasReviewedProvenance: record.ReviewedAt.HasValue || !record.RequiresReview && record.IsException);
+            HasReviewedProvenance: false);
     }
 
     private string BuildDetailedProcedureCode()

@@ -649,9 +649,11 @@ public sealed class ReportsSnapshotBuilderTests
         var blank = CompletedCycle(2, "   ");
         var unmapped = CompletedCycle(3, "MYSTERY");
         var manualReview = CompletedCycle(4, "CON");
-        manualReview.IsException = true;
-        manualReview.RequiresReview = true;
-        manualReview.ExceptionReason = ExceptionReasons.ManualReview;
+        manualReview.ReportingProjection = Projection(
+            HistoricalAdministrativeDispositions.NeedsReview,
+            doctor: "otte",
+            procedure: "CON",
+            sedation: SedationState.UnavailableProcedureIneligible);
 
         var snapshot = CreateBuilder().Build(
             [included, blank, unmapped, manualReview],

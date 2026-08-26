@@ -2699,7 +2699,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/HistoricalReportingProjection.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  10744,
+                      "sizeBytes":  9930,
                       "typeSymbols":  [
                                           "HistoricalReportingProjection"
                                       ],
@@ -5864,12 +5864,13 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/HistoricalReportingIntegrationTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  23390,
+                      "sizeBytes":  29458,
                       "typeSymbols":  [
                                           "HistoricalReportingIntegrationTests"
                                       ],
                       "methodSymbols":  [
                                             "Explicit_sedation_state_normalizes_contradictory_transport_suffixes",
+                                            "Legacy_review_columns_without_canonical_projection_do_not_create_runtime_administrative_state",
                                             "Canonical_gate_and_all_effective_fields_update_reports_audit_and_data_quality_immediately",
                                             "Effective_procedure_reannotations_remain_separate_and_correction_provenance_survives_restore",
                                             "Legacy_sedation_transport_is_normal_only_and_unknown_sedation_matches_no_scoped_review_segment",
@@ -5879,7 +5880,8 @@
                                             "CreateCorrectionService",
                                             "Projection",
                                             "AssertSuccess",
-                                            "AssertCorrectionSuccess"
+                                            "AssertCorrectionSuccess",
+                                            "AssertNoRuntimeAdministrativeState"
                                         ],
                       "routes":  [
 
@@ -6379,7 +6381,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/ReportAuditBuilderTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  25049,
+                      "sizeBytes":  25180,
                       "typeSymbols":  [
                                           "ReportAuditBuilderTests"
                                       ],
@@ -6450,7 +6452,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/ReportsSnapshotBuilderTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  78182,
+                      "sizeBytes":  78265,
                       "typeSymbols":  [
                                           "ReportsSnapshotBuilderTests"
                                       ],
