@@ -3278,7 +3278,7 @@ export function createReports({
 }
 
 // Wires report-query controls. Every analytical-scope or grouping change reloads the server-owned
-// report population; the Review Queue remains window-global in that response.
+// report population; Data Quality and its default review drill-down retain the producing scope.
   function wireReportFilters() {
   const bar = document.getElementById("reportFilterBar");
   if (!bar) {

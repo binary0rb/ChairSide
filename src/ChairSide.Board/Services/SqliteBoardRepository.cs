@@ -80,14 +80,160 @@ public sealed class SqliteBoardRepository
         FROM aborted_room_assignments
         """;
 
+    private static readonly string CompletedReportingSelectSql = $"""
+        SELECT
+            source.*,
+            COALESCE(admin.disposition, '{HistoricalAdministrativeDispositions.NoAnomaly}') AS reporting_disposition,
+            COALESCE(admin.override_doctor_id, ready.doctor_id, NULLIF(trim(source.assigned_doctor_id), '')) AS reporting_doctor_id,
+            COALESCE(admin.override_procedure_code, ready.procedure_code, NULLIF(trim(source.procedure_code), '')) AS reporting_procedure_code,
+            COALESCE(admin.override_sedation_state, ready.sedation_state) AS reporting_sedation_state,
+            CASE WHEN COALESCE(admin.override_sedation_state, ready.sedation_state) IS NULL THEN 0 ELSE 1 END AS reporting_has_explicit_sedation,
+            CASE WHEN ready.handoff_id IS NULL AND admin.override_sedation_state IS NULL THEN 1 ELSE 0 END AS reporting_preserve_legacy_sedation,
+            CASE
+                WHEN admin.override_is_add_on IS NOT NULL THEN admin.override_is_add_on
+                WHEN ready.handoff_id IS NOT NULL THEN ready.is_add_on
+                ELSE source.is_add_on
+            END AS reporting_is_add_on,
+            COALESCE(
+                admin.override_expected_allocation_state,
+                ready.expected_allocation_state,
+                CASE
+                    WHEN source.expected_allocation_units <= 0 THEN NULL
+                    WHEN source.original_default_expected_units = source.expected_allocation_units
+                        THEN 'ConfirmedSuggestedValue'
+                    ELSE 'ConfirmedAdjustedValue'
+                END) AS reporting_allocation_state,
+            CASE
+                WHEN admin.override_expected_allocation_state IS NOT NULL
+                    THEN admin.override_expected_allocation_suggested_units
+                WHEN ready.handoff_id IS NOT NULL
+                    THEN ready.expected_allocation_suggested_units
+                WHEN source.original_default_expected_units > 0
+                    THEN source.original_default_expected_units
+                ELSE NULL
+            END AS reporting_allocation_suggested_units,
+            CASE
+                WHEN admin.override_expected_allocation_state IS NOT NULL
+                    THEN admin.override_expected_allocation_confirmed_units
+                WHEN ready.handoff_id IS NOT NULL
+                    THEN ready.expected_allocation_confirmed_units
+                WHEN source.expected_allocation_units > 0
+                    THEN source.expected_allocation_units
+                ELSE NULL
+            END AS reporting_allocation_confirmed_units,
+            admin.current_reason AS reporting_current_reason,
+            admin.reason_source AS reporting_reason_source,
+            admin.known_reviewed_at AS reporting_known_reviewed_at,
+            admin.known_reviewed_actor_class AS reporting_known_reviewed_actor_class,
+            COALESCE(admin.administrative_revision, 0) AS reporting_administrative_revision,
+            EXISTS (
+                SELECT 1
+                FROM historical_encounter_ledger correction
+                WHERE correction.source_type = '{HistoricalEncounterSourceTypes.CompletedCycle}'
+                  AND correction.source_record_id = source.id
+                  AND correction.event_type = '{HistoricalAdministrativeLedgerEventTypes.MetadataCorrected}'
+            ) AS reporting_has_correction,
+            (admin.known_reviewed_at IS NOT NULL OR EXISTS (
+                SELECT 1
+                FROM historical_encounter_ledger review
+                WHERE review.source_type = '{HistoricalEncounterSourceTypes.CompletedCycle}'
+                  AND review.source_record_id = source.id
+                  AND review.event_type IN (
+                      '{HistoricalAdministrativeLedgerEventTypes.ClearedForReporting}',
+                      '{HistoricalAdministrativeLedgerEventTypes.ConfirmedException}',
+                      '{HistoricalAdministrativeLedgerEventTypes.ReviewReopened}')
+            )) AS reporting_has_reviewed_provenance
+        FROM ({CompletedCycleSelectSql}) source
+        LEFT JOIN ready_handoffs ready
+          ON ready.handoff_id = source.accepted_ready_handoff_id
+         AND ready.episode_id = source.episode_id
+         AND ready.room_id = source.room_id
+         AND ready.accepted_at IS NOT NULL
+         AND ready.withdrawn_at IS NULL
+         AND ready.terminated_at IS NULL
+        LEFT JOIN historical_encounter_admin_state admin
+          ON admin.source_type = '{HistoricalEncounterSourceTypes.CompletedCycle}'
+         AND admin.source_record_id = source.id
+        """;
+
+    private static readonly string AbortedReportingSelectSql = $"""
+        SELECT
+            source.*,
+            COALESCE(admin.disposition, '{HistoricalAdministrativeDispositions.NoAnomaly}') AS reporting_disposition,
+            COALESCE(admin.override_doctor_id, ready.doctor_id, NULLIF(trim(source.assigned_doctor_id), '')) AS reporting_doctor_id,
+            COALESCE(admin.override_procedure_code, ready.procedure_code, NULLIF(trim(source.procedure_code), '')) AS reporting_procedure_code,
+            COALESCE(admin.override_sedation_state, ready.sedation_state, source.sedation_state) AS reporting_sedation_state,
+            CASE WHEN COALESCE(admin.override_sedation_state, ready.sedation_state, source.sedation_state) IS NULL THEN 0 ELSE 1 END AS reporting_has_explicit_sedation,
+            0 AS reporting_preserve_legacy_sedation,
+            CASE
+                WHEN admin.override_is_add_on IS NOT NULL THEN admin.override_is_add_on
+                WHEN ready.handoff_id IS NOT NULL THEN ready.is_add_on
+                ELSE source.is_add_on
+            END AS reporting_is_add_on,
+            COALESCE(admin.override_expected_allocation_state, ready.expected_allocation_state, source.expected_allocation_state) AS reporting_allocation_state,
+            CASE
+                WHEN admin.override_expected_allocation_state IS NOT NULL
+                    THEN admin.override_expected_allocation_suggested_units
+                WHEN ready.handoff_id IS NOT NULL
+                    THEN ready.expected_allocation_suggested_units
+                ELSE source.expected_allocation_suggested_units
+            END AS reporting_allocation_suggested_units,
+            CASE
+                WHEN admin.override_expected_allocation_state IS NOT NULL
+                    THEN admin.override_expected_allocation_confirmed_units
+                WHEN ready.handoff_id IS NOT NULL
+                    THEN ready.expected_allocation_confirmed_units
+                ELSE source.expected_allocation_confirmed_units
+            END AS reporting_allocation_confirmed_units,
+            admin.current_reason AS reporting_current_reason,
+            admin.reason_source AS reporting_reason_source,
+            admin.known_reviewed_at AS reporting_known_reviewed_at,
+            admin.known_reviewed_actor_class AS reporting_known_reviewed_actor_class,
+            COALESCE(admin.administrative_revision, 0) AS reporting_administrative_revision,
+            EXISTS (
+                SELECT 1
+                FROM historical_encounter_ledger correction
+                WHERE correction.source_type = '{HistoricalEncounterSourceTypes.AbortedAssignment}'
+                  AND correction.source_record_id = source.id
+                  AND correction.event_type = '{HistoricalAdministrativeLedgerEventTypes.MetadataCorrected}'
+            ) AS reporting_has_correction,
+            (admin.known_reviewed_at IS NOT NULL OR EXISTS (
+                SELECT 1
+                FROM historical_encounter_ledger review
+                WHERE review.source_type = '{HistoricalEncounterSourceTypes.AbortedAssignment}'
+                  AND review.source_record_id = source.id
+                  AND review.event_type IN (
+                      '{HistoricalAdministrativeLedgerEventTypes.ClearedForReporting}',
+                      '{HistoricalAdministrativeLedgerEventTypes.ConfirmedException}',
+                      '{HistoricalAdministrativeLedgerEventTypes.ReviewReopened}')
+            )) AS reporting_has_reviewed_provenance
+        FROM ({AbortedAssignmentSelectSql}) source
+        LEFT JOIN ready_handoffs ready
+          ON ready.handoff_id = source.terminal_ready_handoff_id
+         AND ready.episode_id = source.episode_id
+         AND ready.room_id = source.room_id
+         AND ready.terminated_at IS NOT NULL
+         AND ready.accepted_at IS NULL
+         AND ready.withdrawn_at IS NULL
+        LEFT JOIN historical_encounter_admin_state admin
+          ON admin.source_type = '{HistoricalEncounterSourceTypes.AbortedAssignment}'
+         AND admin.source_record_id = source.id
+        """;
+
     private readonly string _connectionString;
     private readonly string _databasePath;
     private int _unboundedHistoricalLoadCount;
     private int _largestHistoricalPageSize;
+    private int _historicalEncounterPointReadCount;
+    private int _historicalLedgerPageReadCount;
 
     internal int UnboundedHistoricalLoadCount => Volatile.Read(ref _unboundedHistoricalLoadCount);
 
     internal int LargestHistoricalPageSize => Volatile.Read(ref _largestHistoricalPageSize);
+
+    internal int HistoricalEncounterPointReadCount => Volatile.Read(ref _historicalEncounterPointReadCount);
+
+    internal int HistoricalLedgerPageReadCount => Volatile.Read(ref _historicalLedgerPageReadCount);
 
     public SqliteBoardRepository(
         IOptions<BoardPersistenceOptions> options,
@@ -347,11 +493,18 @@ public sealed class SqliteBoardRepository
     {
         ValidatePage(offset, limit);
         using var connection = OpenConnection();
-        var where = BuildWindowWhereClause(null, "doctor_complete_at", window);
-        var total = CountRows(connection, "completed_room_cycles", where, window);
+        using var predicateCommand = connection.CreateCommand();
+        var predicates = new List<string>();
+        AddWindowPredicates(predicateCommand, predicates, "doctor_complete_at", window);
+        var where = predicates.Count == 0 ? "" : $" WHERE {string.Join(" AND ", predicates)}";
+        using var countCommand = connection.CreateCommand();
+        CopyParameters(predicateCommand, countCommand);
+        countCommand.CommandText = $"SELECT COUNT(*) FROM ({CompletedReportingSelectSql}) reporting{where};";
+        var total = Convert.ToInt32(countCommand.ExecuteScalar());
         using var command = connection.CreateCommand();
-        command.CommandText = CompletedCycleSelectSql
-            + BuildWindowWhereClause(command, "doctor_complete_at", window)
+        CopyParameters(predicateCommand, command);
+        command.CommandText = $"SELECT * FROM ({CompletedReportingSelectSql}) reporting"
+            + where
             + " ORDER BY doctor_complete_at DESC, id DESC LIMIT $limit OFFSET $offset;";
         command.Parameters.AddWithValue("$limit", limit);
         command.Parameters.AddWithValue("$offset", offset);
@@ -384,19 +537,25 @@ public sealed class SqliteBoardRepository
         ValidatePage(offset, limit);
         using var connection = OpenConnection();
         using var countCommand = connection.CreateCommand();
-        var countPredicates = new List<string> { "is_exception = 0" };
+        var countPredicates = new List<string>
+        {
+            $"reporting_disposition NOT IN ('{HistoricalAdministrativeDispositions.NeedsReview}', '{HistoricalAdministrativeDispositions.ConfirmedException}')"
+        };
         AddWindowPredicates(countCommand, countPredicates, "doctor_complete_at", query.Window);
         AddAnalyticalPredicates(countCommand, countPredicates, query);
-        countCommand.CommandText = $"SELECT COUNT(*) FROM completed_room_cycles WHERE {string.Join(" AND ", countPredicates)};";
+        countCommand.CommandText = $"SELECT COUNT(*) FROM ({CompletedReportingSelectSql}) reporting WHERE {string.Join(" AND ", countPredicates)};";
         var total = Convert.ToInt32(countCommand.ExecuteScalar());
 
         using var command = connection.CreateCommand();
-        var predicates = new List<string> { "is_exception = 0" };
+        var predicates = new List<string>
+        {
+            $"reporting_disposition NOT IN ('{HistoricalAdministrativeDispositions.NeedsReview}', '{HistoricalAdministrativeDispositions.ConfirmedException}')"
+        };
         AddWindowPredicates(command, predicates, "doctor_complete_at", query.Window);
         AddAnalyticalPredicates(command, predicates, query);
         var readyWait = "(julianday(doctor_arrived_at) - julianday(ready_for_doctor_at)) * 86400.0";
         var doctorTime = "(julianday(doctor_complete_at) - julianday(doctor_arrived_at)) * 86400.0";
-        var fitVariance = "((julianday(doctor_complete_at) - julianday(seated_at)) * 86400.0) - (expected_allocation_minutes * 60.0)";
+        var fitVariance = "((julianday(doctor_complete_at) - julianday(seated_at)) * 86400.0) - (reporting_allocation_confirmed_units * 600.0)";
         var orderBy = sort switch
         {
             ReportAuditSorts.LongestReadyWait =>
@@ -407,11 +566,11 @@ public sealed class SqliteBoardRepository
                 $"CASE WHEN doctor_complete_at IS NULL THEN 2 WHEN {fitVariance} > 0 THEN 0 ELSE 1 END, {fitVariance} DESC",
             ReportAuditSorts.LargestNegativeScheduleFitVariance =>
                 $"CASE WHEN doctor_complete_at IS NULL THEN 2 WHEN {fitVariance} < 0 THEN 0 ELSE 1 END, {fitVariance} ASC",
-            ReportAuditSorts.Doctor => "assigned_doctor_display_name COLLATE NOCASE, assigned_doctor_id COLLATE NOCASE",
-            ReportAuditSorts.Procedure => "procedure_category COLLATE NOCASE, procedure_code COLLATE NOCASE",
+            ReportAuditSorts.Doctor => "reporting_doctor_id COLLATE NOCASE",
+            ReportAuditSorts.Procedure => "reporting_procedure_code COLLATE NOCASE",
             _ => "CASE WHEN doctor_complete_at IS NULL THEN 1 ELSE 0 END, doctor_complete_at DESC"
         };
-        command.CommandText = CompletedCycleSelectSql
+        command.CommandText = $"SELECT * FROM ({CompletedReportingSelectSql}) reporting"
             + $" WHERE {string.Join(" AND ", predicates)}"
             + $" ORDER BY {orderBy}, CASE WHEN doctor_complete_at IS NULL THEN 1 ELSE 0 END, doctor_complete_at DESC, id DESC"
             + " LIMIT $limit OFFSET $offset;";
@@ -444,14 +603,18 @@ public sealed class SqliteBoardRepository
     {
         using var connection = OpenConnection();
         using var command = connection.CreateCommand();
-        var predicates = new List<string> { "room_available_at IS NOT NULL" };
+        var predicates = new List<string>
+        {
+            "room_available_at IS NOT NULL",
+            $"reporting_disposition NOT IN ('{HistoricalAdministrativeDispositions.NeedsReview}', '{HistoricalAdministrativeDispositions.ConfirmedException}')"
+        };
         AddWindowPredicates(command, predicates, "doctor_complete_at", window);
         if (analyticalQuery is { } query)
         {
             AddAnalyticalPredicates(command, predicates, query);
         }
 
-        command.CommandText = $"SELECT COUNT(*) FROM completed_room_cycles WHERE {string.Join(" AND ", predicates)};";
+        command.CommandText = $"SELECT COUNT(*) FROM ({CompletedReportingSelectSql}) reporting WHERE {string.Join(" AND ", predicates)};";
         return Convert.ToInt32(command.ExecuteScalar());
     }
 
@@ -481,9 +644,12 @@ public sealed class SqliteBoardRepository
         using var connection = OpenConnection();
         using var command = connection.CreateCommand();
         var anchor = "COALESCE(doctor_complete_at, doctor_arrived_at, seated_at, prestage_started_at)";
-        var predicates = new List<string> { "is_exception = 1" };
+        var predicates = new List<string>
+        {
+            $"(reporting_disposition <> '{HistoricalAdministrativeDispositions.NoAnomaly}' OR reporting_has_correction = 1 OR reporting_has_reviewed_provenance = 1)"
+        };
         AddWindowPredicates(command, predicates, anchor, window);
-        command.CommandText = CompletedCycleSelectSql
+        command.CommandText = $"SELECT * FROM ({CompletedReportingSelectSql}) reporting"
             + $" WHERE {string.Join(" AND ", predicates)}"
             + $" ORDER BY {anchor} DESC, id DESC;";
         return ReadCompletedCycles(command);
@@ -498,12 +664,15 @@ public sealed class SqliteBoardRepository
         using var connection = OpenConnection();
         var anchor = "COALESCE(doctor_complete_at, doctor_arrived_at, seated_at, prestage_started_at)";
         using var predicateCommand = connection.CreateCommand();
-        var predicates = new List<string> { "is_exception = 1" };
+        var predicates = new List<string>
+        {
+            $"(reporting_disposition <> '{HistoricalAdministrativeDispositions.NoAnomaly}' OR reporting_has_correction = 1 OR reporting_has_reviewed_provenance = 1)"
+        };
         AddWindowPredicates(predicateCommand, predicates, anchor, window);
         var where = $" WHERE {string.Join(" AND ", predicates)}";
         using var command = connection.CreateCommand();
         CopyParameters(predicateCommand, command);
-        command.CommandText = CompletedCycleSelectSql
+        command.CommandText = $"SELECT * FROM ({CompletedReportingSelectSql}) reporting"
             + where
             + $" ORDER BY {anchor} DESC, id DESC LIMIT $limit OFFSET $offset;";
         command.Parameters.AddWithValue("$limit", limit);
@@ -513,7 +682,7 @@ public sealed class SqliteBoardRepository
 
         using var countCommand = connection.CreateCommand();
         CopyParameters(predicateCommand, countCommand);
-        countCommand.CommandText = $"SELECT COUNT(*) FROM completed_room_cycles{where};";
+        countCommand.CommandText = $"SELECT COUNT(*) FROM ({CompletedReportingSelectSql}) reporting{where};";
         var total = Convert.ToInt32(countCommand.ExecuteScalar());
         return new HistoricalQueryPage<CompletedRoomCycle>(rows, total, offset, limit);
     }
@@ -1557,11 +1726,18 @@ public sealed class SqliteBoardRepository
     {
         ValidatePage(offset, limit);
         using var connection = OpenConnection();
-        var where = BuildWindowWhereClause(null, "terminated_at", window);
-        var total = CountRows(connection, "aborted_room_assignments", where, window);
+        using var predicateCommand = connection.CreateCommand();
+        var predicates = new List<string>();
+        AddWindowPredicates(predicateCommand, predicates, "terminated_at", window);
+        var where = predicates.Count == 0 ? "" : $" WHERE {string.Join(" AND ", predicates)}";
+        using var countCommand = connection.CreateCommand();
+        CopyParameters(predicateCommand, countCommand);
+        countCommand.CommandText = $"SELECT COUNT(*) FROM ({AbortedReportingSelectSql}) reporting{where};";
+        var total = Convert.ToInt32(countCommand.ExecuteScalar());
         using var command = connection.CreateCommand();
-        command.CommandText = AbortedAssignmentSelectSql
-            + BuildWindowWhereClause(command, "terminated_at", window)
+        CopyParameters(predicateCommand, command);
+        command.CommandText = $"SELECT * FROM ({AbortedReportingSelectSql}) reporting"
+            + where
             + " ORDER BY terminated_at DESC, id DESC LIMIT $limit OFFSET $offset;";
         command.Parameters.AddWithValue("$limit", limit);
         command.Parameters.AddWithValue("$offset", offset);
@@ -1599,6 +1775,7 @@ public sealed class SqliteBoardRepository
     public HistoricalEncounterRecord? LoadHistoricalEncounter(HistoricalEncounterKey key)
     {
         if (!key.IsValid) return null;
+        Interlocked.Increment(ref _historicalEncounterPointReadCount);
         if (key.SourceType == HistoricalEncounterSourceTypes.CompletedCycle)
         {
             var completed = LoadCompletedCycleById(key.SourceRecordId);
@@ -1651,6 +1828,7 @@ public sealed class SqliteBoardRepository
         HistoricalEncounterKey key)
     {
         if (!key.IsValid) return null;
+        Interlocked.Increment(ref _historicalEncounterPointReadCount);
 
         using var connection = OpenConnection();
         using var command = connection.CreateCommand();
@@ -1689,6 +1867,7 @@ public sealed class SqliteBoardRepository
             throw new ArgumentException("Historical encounter key must use a supported source type and positive record ID.", nameof(key));
         }
         ValidatePage(offset, limit);
+        Interlocked.Increment(ref _historicalLedgerPageReadCount);
 
         using var connection = OpenConnection();
         using var countCommand = connection.CreateCommand();
@@ -2042,16 +2221,38 @@ public sealed class SqliteBoardRepository
         bool requiresReview,
         string sort,
         int offset,
+        int limit) =>
+        LoadReviewEncounterKeysPage(
+            ReportQuery.Default with { Window = window },
+            requiresReview,
+            procedureCode: null,
+            baseProcedureCode: null,
+            sort,
+            offset,
+            limit);
+
+    public HistoricalQueryPage<HistoricalEncounterKey> LoadReviewEncounterKeysPage(
+        ReportQuery query,
+        bool requiresReview,
+        string? procedureCode,
+        string? baseProcedureCode,
+        string sort,
+        int offset,
         int limit)
     {
         ValidatePage(offset, limit);
         using var connection = OpenConnection();
         using var command = connection.CreateCommand();
         var completedAnchor = "COALESCE(doctor_complete_at, doctor_arrived_at, seated_at, prestage_started_at)";
-        var completedPredicates = new List<string> { "is_exception = 1", "requires_review = $requiresReview" };
-        var abortedPredicates = new List<string> { "is_exception = 1", "requires_review = $requiresReview" };
-        AddWindowPredicates(command, completedPredicates, completedAnchor, window);
-        AddWindowPredicatesWithSuffix(command, abortedPredicates, "terminated_at", window, "Abort");
+        var statusPredicate = requiresReview
+            ? $"reporting_disposition = '{HistoricalAdministrativeDispositions.NeedsReview}'"
+            : "reporting_has_reviewed_provenance = 1";
+        var completedPredicates = new List<string> { statusPredicate };
+        var abortedPredicates = new List<string> { statusPredicate };
+        AddWindowPredicates(command, completedPredicates, completedAnchor, query.Window);
+        AddWindowPredicatesWithSuffix(command, abortedPredicates, "terminated_at", query.Window, "Abort");
+        AddReviewAnalyticalPredicates(command, completedPredicates, query, procedureCode, baseProcedureCode, "Completed");
+        AddReviewAnalyticalPredicates(command, abortedPredicates, query, procedureCode, baseProcedureCode, "Aborted");
         var union = $"""
             SELECT source_type, source_id, source_rank, review_anchor, doctor_sort, procedure_sort
             FROM (
@@ -2060,9 +2261,9 @@ public sealed class SqliteBoardRepository
                     id AS source_id,
                     0 AS source_rank,
                     {completedAnchor} AS review_anchor,
-                    assigned_doctor_display_name AS doctor_sort,
-                    procedure_category AS procedure_sort
-                FROM completed_room_cycles
+                    COALESCE(reporting_doctor_id, '') AS doctor_sort,
+                    COALESCE(reporting_procedure_code, '') AS procedure_sort
+                FROM ({CompletedReportingSelectSql}) completed_reporting
                 WHERE {string.Join(" AND ", completedPredicates)}
                 UNION ALL
                 SELECT
@@ -2070,14 +2271,12 @@ public sealed class SqliteBoardRepository
                     id AS source_id,
                     1 AS source_rank,
                     terminated_at AS review_anchor,
-                    COALESCE(assigned_doctor_display_name, assigned_doctor_id, '') AS doctor_sort,
-                    COALESCE(procedure_category, procedure_code, '') AS procedure_sort
-                FROM aborted_room_assignments
+                    COALESCE(reporting_doctor_id, '') AS doctor_sort,
+                    COALESCE(reporting_procedure_code, '') AS procedure_sort
+                FROM ({AbortedReportingSelectSql}) aborted_reporting
                 WHERE {string.Join(" AND ", abortedPredicates)}
             ) review_rows
             """;
-        command.Parameters.AddWithValue("$requiresReview", requiresReview ? 1 : 0);
-
         using var countCommand = connection.CreateCommand();
         countCommand.CommandText = $"SELECT COUNT(*) FROM ({union});";
         CopyParameters(command, countCommand);
@@ -3156,7 +3355,7 @@ public sealed class SqliteBoardRepository
         if (ids.Count == 0) return [];
         using var command = connection.CreateCommand();
         var parameters = AddIdParameters(command, ids);
-        command.CommandText = CompletedCycleSelectSql + $" WHERE id IN ({string.Join(", ", parameters)});";
+        command.CommandText = $"SELECT * FROM ({CompletedReportingSelectSql}) reporting WHERE id IN ({string.Join(", ", parameters)});";
         return ReadCompletedCycles(command);
     }
 
@@ -3167,7 +3366,7 @@ public sealed class SqliteBoardRepository
         if (ids.Count == 0) return [];
         using var command = connection.CreateCommand();
         var parameters = AddIdParameters(command, ids);
-        command.CommandText = AbortedAssignmentSelectSql + $" WHERE id IN ({string.Join(", ", parameters)});";
+        command.CommandText = $"SELECT * FROM ({AbortedReportingSelectSql}) reporting WHERE id IN ({string.Join(", ", parameters)});";
         return ReadAbortedAssignments(command);
     }
 
@@ -3189,7 +3388,7 @@ public sealed class SqliteBoardRepository
         using var reader = command.ExecuteReader();
         while (reader.Read())
         {
-            cycles.Add(new CompletedRoomCycle
+            var cycle = new CompletedRoomCycle
             {
                 CompletedCycleId = reader.GetInt64(0),
                 RoomId = reader.GetInt32(1),
@@ -3224,7 +3423,12 @@ public sealed class SqliteBoardRepository
                 EpisodeId = ReadNullableString(reader, 30),
                 AcceptedReadyHandoffId = ReadNullableString(reader, 31),
                 IsAddOn = reader.GetInt32(32) == 1
-            });
+            };
+            if (reader.FieldCount >= 50)
+            {
+                cycle.ReportingProjection = ReadHistoricalReportingProjection(reader, 33);
+            }
+            cycles.Add(cycle);
         }
 
         return cycles;
@@ -3236,7 +3440,7 @@ public sealed class SqliteBoardRepository
         using var reader = command.ExecuteReader();
         while (reader.Read())
         {
-            records.Add(new AbortedRoomAssignment
+            var record = new AbortedRoomAssignment
             {
                 AbortedAssignmentId = reader.GetInt64(0),
                 EpisodeId = reader.GetString(1),
@@ -3269,11 +3473,38 @@ public sealed class SqliteBoardRepository
                 ReviewedAt = ReadNullableDateTimeOffset(reader, 28),
                 ReviewedBy = ReadNullableString(reader, 29),
                 IsAddOn = reader.GetInt32(30) == 1
-            });
+            };
+            if (reader.FieldCount >= 48)
+            {
+                record.ReportingProjection = ReadHistoricalReportingProjection(reader, 31);
+            }
+            records.Add(record);
         }
 
         return records;
     }
+
+    private static HistoricalReportingProjection ReadHistoricalReportingProjection(
+        SqliteDataReader reader,
+        int offset) =>
+        new(
+            reader.GetString(offset),
+            ReadNullableString(reader, offset + 1),
+            ReadNullableString(reader, offset + 2),
+            ReadNullableEnum<SedationState>(reader, offset + 3),
+            reader.GetInt32(offset + 4) == 1,
+            reader.GetInt32(offset + 5) == 1,
+            reader.GetInt32(offset + 6) == 1,
+            ReadNullableEnum<ExpectedAllocationState>(reader, offset + 7),
+            ReadNullableInt32(reader, offset + 8),
+            ReadNullableInt32(reader, offset + 9),
+            ReadNullableString(reader, offset + 10),
+            ReadNullableString(reader, offset + 11),
+            ReadNullableDateTimeOffset(reader, offset + 12),
+            ReadNullableString(reader, offset + 13),
+            reader.GetInt32(offset + 14),
+            reader.GetInt32(offset + 15) == 1,
+            reader.GetInt32(offset + 16) == 1);
 
     private static void ValidatePage(int offset, int limit)
     {
@@ -3362,20 +3593,92 @@ public sealed class SqliteBoardRepository
             }
             else
             {
-                predicates.Add("assigned_doctor_id = $doctorId COLLATE NOCASE");
+                predicates.Add("reporting_doctor_id = $doctorId COLLATE NOCASE");
                 command.Parameters.AddWithValue("$doctorId", query.DoctorId);
             }
         }
 
         if (query.Sedation == ReportSedationSegments.Sedation)
         {
-            predicates.Add("(upper(procedure_code) LIKE '%+SED' OR upper(procedure_code) = 'SED')");
+            predicates.Add("((reporting_has_explicit_sedation = 1 AND reporting_sedation_state = 'EligibleYes')"
+                + " OR (reporting_has_explicit_sedation = 0 AND reporting_preserve_legacy_sedation = 1"
+                + " AND (upper(reporting_procedure_code) LIKE '%+SED' OR upper(reporting_procedure_code) = 'SED')))");
         }
         else if (query.Sedation == ReportSedationSegments.NonSedation)
         {
-            predicates.Add("NOT (upper(procedure_code) LIKE '%+SED' OR upper(procedure_code) = 'SED')");
+            predicates.Add("((reporting_has_explicit_sedation = 1"
+                + " AND reporting_sedation_state IN ('EligibleNo', 'UnavailableProcedureIneligible'))"
+                + " OR (reporting_has_explicit_sedation = 0 AND reporting_preserve_legacy_sedation = 1"
+                + " AND NOT (upper(reporting_procedure_code) LIKE '%+SED' OR upper(reporting_procedure_code) = 'SED')))");
         }
     }
+
+    private static void AddReviewAnalyticalPredicates(
+        SqliteCommand command,
+        ICollection<string> predicates,
+        ReportQuery query,
+        string? procedureCode,
+        string? baseProcedureCode,
+        string suffix)
+    {
+        if (query.Scope == ReportScopeKinds.Doctor)
+        {
+            if (query.DoctorId is null)
+            {
+                predicates.Add("0 = 1");
+            }
+            else
+            {
+                var name = $"$reviewDoctor{suffix}";
+                predicates.Add($"reporting_doctor_id = {name} COLLATE NOCASE");
+                command.Parameters.AddWithValue(name, query.DoctorId);
+            }
+        }
+
+        if (query.Sedation == ReportSedationSegments.Sedation)
+        {
+            predicates.Add("reporting_has_explicit_sedation = 1 AND reporting_sedation_state = 'EligibleYes'");
+        }
+        else if (query.Sedation == ReportSedationSegments.NonSedation)
+        {
+            predicates.Add("reporting_has_explicit_sedation = 1"
+                + " AND reporting_sedation_state IN ('EligibleNo', 'UnavailableProcedureIneligible')");
+        }
+
+        var requestedProcedure = query.ProcedureGrouping == ReportProcedureGroupings.DetailedVariant
+            ? NullIfWhiteSpace(procedureCode)
+            : NullIfWhiteSpace(baseProcedureCode) ?? NullIfWhiteSpace(procedureCode);
+        if (requestedProcedure is null)
+        {
+            return;
+        }
+
+        var parameterName = $"$reviewProcedure{suffix}";
+        if (query.ProcedureGrouping == ReportProcedureGroupings.DetailedVariant)
+        {
+            var baseExpression = "CASE WHEN upper(reporting_procedure_code) LIKE '%+SED'"
+                + " THEN substr(reporting_procedure_code, 1, length(reporting_procedure_code) - 4)"
+                + " ELSE reporting_procedure_code END";
+            var detailedExpression = "CASE"
+                + " WHEN reporting_has_explicit_sedation = 0 THEN reporting_procedure_code"
+                + " WHEN reporting_sedation_state = 'EligibleYes'"
+                + $" AND upper({baseExpression}) <> 'SED'"
+                + $" THEN ({baseExpression}) || '+SED'"
+                + $" ELSE {baseExpression} END";
+            predicates.Add($"{detailedExpression} = {parameterName} COLLATE NOCASE");
+        }
+        else
+        {
+            var familyExpression = "CASE WHEN upper(reporting_procedure_code) LIKE '%+SED'"
+                + " THEN substr(reporting_procedure_code, 1, length(reporting_procedure_code) - 4)"
+                + " ELSE reporting_procedure_code END";
+            predicates.Add($"{familyExpression} = {parameterName} COLLATE NOCASE");
+        }
+        command.Parameters.AddWithValue(parameterName, requestedProcedure);
+    }
+
+    private static string? NullIfWhiteSpace(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
     private static int CountRows(
         SqliteConnection connection,

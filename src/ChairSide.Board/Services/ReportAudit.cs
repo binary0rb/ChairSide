@@ -150,7 +150,11 @@ public sealed record ReportReviewAuditRow(
     string ReviewStatus,
     DateTimeOffset? ReviewedAt,
     string? ReviewedBy,
-    bool RequiresReview);
+    bool RequiresReview,
+    string Disposition = HistoricalAdministrativeDispositions.NoAnomaly,
+    bool HasHistoricalCorrection = false,
+    bool HasReviewedProvenance = false,
+    int AdministrativeRevision = 0);
 
 public sealed record ReportAuditPage(
     ReportAuditSelection NormalizedSelection,
@@ -175,6 +179,11 @@ public sealed record ReportDataQualitySummary(
     int ReviewedExceptionCount,
     IReadOnlyList<ReportDataQualityReasonCount> ExclusionReasonCounts,
     string AnalyticalScopeDescription,
-    string ReviewWindowDescription);
+    string ReviewWindowDescription,
+    int NeedsReviewCount = 0,
+    int ClearedAnomalyCount = 0,
+    int ConfirmedExceptionCount = 0,
+    int HistoricalCorrectionCount = 0,
+    int ReviewedProvenanceCount = 0);
 
 public sealed class ReportAuditQueryException(string message) : Exception(message);

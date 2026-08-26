@@ -1100,9 +1100,9 @@ public sealed class DemoBoardStore
 
     /// <summary>
     /// Builds the report snapshot for the normalized window and analytical scope in
-    /// <paramref name="query"/>. Doctor and sedation narrow analytical populations; procedure grouping
-    /// changes aggregation only. The action-required review projection stays global within the query
-    /// window. Completed-cycle windows retain the established DoctorCompleteAt anchor.
+    /// <paramref name="query"/>. Doctor and sedation narrow analytical and Data Quality populations;
+    /// procedure grouping changes aggregation only. Completed-cycle windows retain the established
+    /// DoctorCompleteAt anchor.
     /// </summary>
     public ReportsSnapshot GetReports(ReportQuery query)
     {
@@ -1141,6 +1141,13 @@ public sealed class DemoBoardStore
     {
         lock (_syncRoot)
         {
+            var query = ReportQuery.FromStrings(
+                request.From,
+                request.To,
+                request.Scope,
+                request.DoctorId,
+                request.Sedation,
+                request.ProcedureGrouping);
             var isPendingReview = string.Equals(
                 request.ContributorKind,
                 ReportAuditContributorKinds.PendingReview,
@@ -1151,7 +1158,6 @@ public sealed class DemoBoardStore
                 StringComparison.OrdinalIgnoreCase);
             if (isPendingReview || isReviewedHistory)
             {
-                var window = ReportDateRange.FromDateStrings(request.From, request.To);
                 var offset = Math.Max(0, request.Offset);
                 var limit = request.Limit <= 0 ? 50 : Math.Min(request.Limit, 100);
                 var sort = ReportAuditSorts.Review.Contains(request.Sort, StringComparer.OrdinalIgnoreCase)
@@ -1162,15 +1168,17 @@ public sealed class DemoBoardStore
                 {
                     return QueryProjectedReviewAudit(
                         request,
-                        window,
+                        query,
                         isPendingReview,
                         sort,
                         offset,
                         limit);
                 }
                 var persistedPage = _repository.LoadReviewEncounterKeysPage(
-                    window,
+                    query,
                     isPendingReview,
+                    request.ProcedureCode,
+                    request.BaseProcedureCode,
                     sort,
                     offset,
                     limit);
@@ -1197,13 +1205,6 @@ public sealed class DemoBoardStore
                 };
             }
 
-            var query = ReportQuery.FromStrings(
-                request.From,
-                request.To,
-                request.Scope,
-                request.DoctorId,
-                request.Sedation,
-                request.ProcedureGrouping);
             if (string.Equals(
                 request.ContributorKind,
                 ReportAuditContributorKinds.CalibrationEvidence,
@@ -1293,7 +1294,7 @@ public sealed class DemoBoardStore
 
     private ReportAuditPage QueryProjectedReviewAudit(
         ReportAuditRequest request,
-        ReportDateRange window,
+        ReportQuery query,
         bool requiresReview,
         string sort,
         int requestedOffset,
@@ -1311,8 +1312,10 @@ public sealed class DemoBoardStore
         while (true)
         {
             var persistedPage = _repository.LoadReviewEncounterKeysPage(
-                window,
+                query,
                 requiresReview,
+                request.ProcedureCode,
+                request.BaseProcedureCode,
                 ReportAuditSorts.MostRecent,
                 rawOffset,
                 persistenceBatchSize);
@@ -1613,8 +1616,11 @@ public sealed class DemoBoardStore
             // Re-derive reporting-exception metadata over a detached reporting snapshot. Harmless
             // for profiles that seed no history: annotating an empty or in-progress-only cycle set
             // simply yields no reasons/candidates.
+            using var reportSpoolScope = ReportSpoolScope.Begin();
+            var persistedReportingCycles = BoundedReportCollections.Materialize(
+                _repository.EnumerateCompletedCycles(ReportDateRange.AllTime));
             var reportingCycles = _reportsSnapshotBuilder.CreateAnnotatedCompletedCycleSnapshot(
-                _repository.LoadCompletedCycles());
+                persistedReportingCycles);
 
             // Room state counts include AVAILABLE, so live-board-stress/full-stress can report their
             // intentionally unassigned no-coin room. Doctor counts stay assigned-only.
@@ -1661,7 +1667,8 @@ public sealed class DemoBoardStore
                 .GroupBy(reason => reason, StringComparer.Ordinal)
                 .ToDictionary(group => group.Key, group => group.Count(), StringComparer.Ordinal);
 
-            var manualAuditCandidates = completedHistoryCycles.Count(cycle => cycle.IsException && cycle.RequiresReview);
+            var manualAuditCandidates = completedHistoryCycles.Count(cycle =>
+                cycle.ReportingProjection?.Disposition == HistoricalAdministrativeDispositions.NeedsReview);
 
             DateTimeOffset? earliestSeatedAt = completedHistoryCycles.Count == 0 ? null : completedHistoryCycles.Min(cycle => cycle.SeatedAt);
             DateTimeOffset? latestSeatedAt = completedHistoryCycles.Count == 0 ? null : completedHistoryCycles.Max(cycle => cycle.SeatedAt);
@@ -2094,8 +2101,8 @@ public sealed class DemoBoardStore
     }
 
     /// <summary>
-    /// Marks an existing completed cycle as an exception, removing it from normal
-    /// reporting metrics and surfacing it in the Exceptions Requiring Review section.
+    /// Compatibility wrapper for the pre-#242 Mark Exception route. It targets the canonical
+    /// administrative projection and leaves legacy completed-cycle review columns immutable.
     /// Returns false if no matching cycle is found.
     /// No PHI is stored - reason and suggested action are operational notes only.
     /// </summary>
@@ -2128,7 +2135,7 @@ public sealed class DemoBoardStore
         }
     }
 
-    // Shared mutation for both the id-based and legacy (roomId, seatedAt) targeting paths.
+    // Shared compatibility mutation for both id-based and legacy targeting paths.
     // Must be called inside _syncRoot.
     private bool MarkCycleAsException(CompletedRoomCycle? cycle, string reason, string suggestedAction)
     {
@@ -2137,28 +2144,29 @@ public sealed class DemoBoardStore
             return false;
         }
 
-        cycle.IsException = true;
-        cycle.RequiresReview = true;
-        cycle.ExceptionReason = reason;
-        cycle.SuggestedAction = suggestedAction;
-        cycle.ReviewStatus = ReviewStatuses.PendingReview;
-        PersistCycle(cycle);
-        return true;
+        var key = new HistoricalEncounterKey(
+            HistoricalEncounterSourceTypes.CompletedCycle,
+            cycle.CompletedCycleId);
+        var current = _repository.LoadHistoricalAdministrativeState(key);
+        var result = new HistoricalAnomalyAdministrationService(_repository, _timeProvider).MarkForReview(
+            key,
+            current?.AdministrativeRevision ?? 0,
+            HistoricalManualReviewReasons.OtherNeedsReview,
+            suggestedAction);
+        return result.Outcome == HistoricalAdministrativeOperationOutcome.Success;
     }
 
     /// <summary>
-    /// Confirms the exclusion of an exception cycle by its stable CompletedCycleId, completing the
-    /// review workflow. The cycle stays an exception and therefore stays excluded from normal
-    /// metrics; confirming review only clears it from the pending-review queue.
+    /// Compatibility wrapper for the pre-#242 Confirm Exclusion route. It confirms the current
+    /// canonical Needs Review disposition and leaves legacy completed-cycle columns immutable.
     ///
     /// Outcomes:
     /// - NotFound when no cycle matches the id (including non-positive ids).
     /// - NotAnException when the cycle exists but was never flagged as an exception.
     /// - Reviewed on success. Idempotent: confirming an already-reviewed exception succeeds again.
     ///
-    /// On success RequiresReview becomes false, ReviewStatus becomes Reviewed, ReviewedAt is set to
-    /// the current time, and ReviewedBy is set to a safe non-PHI reviewer label. SuggestedAction and
-    /// IsException are left unchanged so the cycle remains excluded from normal metrics.
+    /// On success canonical disposition becomes Confirmed Exception and one ledger event records the
+    /// action. The immutable source review fields remain unchanged.
     /// </summary>
     public ReviewExceptionResult ReviewExceptionCycleById(long completedCycleId)
     {
@@ -2175,18 +2183,29 @@ public sealed class DemoBoardStore
                 return new ReviewExceptionResult(ReviewExceptionOutcome.NotFound, 0);
             }
 
-            if (!cycle.IsException)
+            var key = new HistoricalEncounterKey(
+                HistoricalEncounterSourceTypes.CompletedCycle,
+                completedCycleId);
+            var state = _repository.LoadHistoricalAdministrativeState(key);
+            if (state is null
+                || state.Disposition is HistoricalAdministrativeDispositions.NoAnomaly
+                    or HistoricalAdministrativeDispositions.ClearedForReporting)
             {
                 return new ReviewExceptionResult(ReviewExceptionOutcome.NotAnException, cycle.RoomId);
             }
 
-            // Idempotent: re-applying these on an already-reviewed exception has no net effect.
-            cycle.RequiresReview = false;
-            cycle.ReviewStatus = ReviewStatuses.Reviewed;
-            cycle.ReviewedAt = Now;
-            cycle.ReviewedBy = ExceptionReviewers.LocalAdmin;
-            PersistCycle(cycle);
-            return new ReviewExceptionResult(ReviewExceptionOutcome.Reviewed, cycle.RoomId);
+            if (state.Disposition == HistoricalAdministrativeDispositions.ConfirmedException)
+            {
+                return new ReviewExceptionResult(ReviewExceptionOutcome.Reviewed, cycle.RoomId);
+            }
+
+            var result = new HistoricalAnomalyAdministrationService(_repository, _timeProvider)
+                .ConfirmException(key, state.AdministrativeRevision);
+            return new ReviewExceptionResult(
+                result.Outcome == HistoricalAdministrativeOperationOutcome.Success
+                    ? ReviewExceptionOutcome.Reviewed
+                    : ReviewExceptionOutcome.NotAnException,
+                cycle.RoomId);
         }
     }
 
@@ -2205,13 +2224,29 @@ public sealed class DemoBoardStore
                 return new ReviewExceptionResult(ReviewExceptionOutcome.NotFound, 0);
             }
 
-            if (!record.IsException)
+            var key = new HistoricalEncounterKey(
+                HistoricalEncounterSourceTypes.AbortedAssignment,
+                abortedAssignmentId);
+            var state = _repository.LoadHistoricalAdministrativeState(key);
+            if (state is null
+                || state.Disposition is HistoricalAdministrativeDispositions.NoAnomaly
+                    or HistoricalAdministrativeDispositions.ClearedForReporting)
             {
                 return new ReviewExceptionResult(ReviewExceptionOutcome.NotAnException, record.RoomId);
             }
 
-            _repository.ReviewAbortedAssignment(abortedAssignmentId, Now, ExceptionReviewers.LocalAdmin);
-            return new ReviewExceptionResult(ReviewExceptionOutcome.Reviewed, record.RoomId);
+            if (state.Disposition == HistoricalAdministrativeDispositions.ConfirmedException)
+            {
+                return new ReviewExceptionResult(ReviewExceptionOutcome.Reviewed, record.RoomId);
+            }
+
+            var result = new HistoricalAnomalyAdministrationService(_repository, _timeProvider)
+                .ConfirmException(key, state.AdministrativeRevision);
+            return new ReviewExceptionResult(
+                result.Outcome == HistoricalAdministrativeOperationOutcome.Success
+                    ? ReviewExceptionOutcome.Reviewed
+                    : ReviewExceptionOutcome.NotAnException,
+                record.RoomId);
         }
     }
 
@@ -3473,7 +3508,8 @@ public sealed record ReportsSnapshot(
     AllocationVarianceSummary? AllocationVariance = null,
     // Active report window metadata. Dates are ISO yyyy-MM-dd (null = unbounded). RangeLabel is a
     // plain-English summary ("All time" or "Jun 17 – Jun 24"). TotalCompletedCycleCount is the
-    // all-time completed total for "X of Y" context, independent of the selected window.
+    // all-time effective scoped completed total for "X of Y" context, independent of the selected
+    // window and subject to the same canonical administrative gate.
     string? RangeStartDate = null,
     string? RangeEndDate = null,
     string RangeLabel = "All time",
@@ -3505,9 +3541,9 @@ public sealed record ReportsSnapshot(
     // pre-arrival after-hours exceptions retain aborted-assignment identity and nullable lifecycle
     // timestamps instead of being forced into the completed-cycle reporting model.
     IReadOnlyList<ExceptionReviewRecord>? ExceptionReviewRecords = null,
-    // Normalized analytical query metadata. ReviewQueue remains window-global; doctor and sedation
-    // scope apply to analytical populations and Case Audit only. ProcedureGrouping chooses an
-    // aggregation lens and never changes population membership.
+    // Normalized analytical query metadata. Data Quality and its default review drill-down inherit
+    // applicable date, doctor, sedation, and procedure selection. ProcedureGrouping chooses an
+    // aggregation lens and never changes the main report population membership.
     ReportQueryContext? Query = null,
     // Reusable population/contributor context. Existing numeric aggregate fields remain additive-
     // compatible; consumers use these states to avoid rendering missing observations as zero.
@@ -3731,6 +3767,8 @@ public readonly record struct ReportDateRange(
 
 public sealed class CompletedRoomCycle
 {
+    internal HistoricalReportingProjection? ReportingProjection { get; set; }
+
     // Stable unique identity for this completed cycle, assigned by SQLite and mapped from
     // the completed_room_cycles.id column. Zero until the cycle has been persisted at least
     // once. Reporting and exception actions can target a single cycle by this value without
@@ -4042,6 +4080,8 @@ public static class CancellationReasons
 /// </summary>
 public sealed class AbortedRoomAssignment
 {
+    internal HistoricalReportingProjection? ReportingProjection { get; set; }
+
     // Stable per-row identity assigned by SQLite (aborted_room_assignments.id). Zero until persisted.
     public long AbortedAssignmentId { get; set; }
 

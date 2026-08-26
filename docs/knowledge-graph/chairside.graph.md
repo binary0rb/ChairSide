@@ -93,6 +93,13 @@ flowchart LR
     AcceptedHandoff --> ImmutableEvidence["DesignDecision: Immutable lifecycle evidence"]
     CorrectionOverlay --> EffectiveReportingValues["DomainConcept: Current effective reporting values"]
     EffectiveEncounter --> EffectiveReportingValues
+    AdminProjection --> HistoricalReportingProjection["Contract: Set-based historical reporting projection"]
+    AcceptedHandoff --> HistoricalReportingProjection
+    Cycles --> HistoricalReportingProjection
+    Aborts --> HistoricalReportingProjection
+    LedgerPersistence --> ReportingProvenance["DomainConcept: Correction and reviewed provenance EXISTS"]
+    ReportingProvenance --> HistoricalReportingProjection
+    HistoricalReportingProjection --> EffectiveReportingValues
     EffectiveReportingValues --> ReportsBuilder
     Cleared --> OrdinaryEligibility["DesignDecision: Ordinary reporting eligibility re-evaluated"]
     OrdinaryEligibility --> ReportsBuilder
@@ -185,11 +192,12 @@ flowchart LR
 - `DemoBoardStore.DeriveIntegrityFaults` is the repository-aware production integrity authority. Faulted rooms remain visible, unsafe progression is blocked without rewriting persisted facts, and supported cancellation and legacy recovery remain available.
 - Doctor Arrived serializes durable cross-room doctor ownership and commits the room, Accepted handoff, and reporting cycle together.
 - Live state changes only after durable persistence succeeds; SQLite failures roll back transaction-local writes.
-- Startup and live-board operation do not load lifetime completed history. Reporting enumerates fixed-size persistence pages, spills large replayable calculation populations and exact ordered statistics to private temporary SQLite storage, and releases them after composition/response serialization. Audit retains request-bounded rows, label sorts globally merge projected values, review pages unite typed completed or aborted durable identities, and active lifecycle operations retrieve only their single durable cycle.
+- Startup and live-board operation do not load lifetime completed history. Reporting enumerates fixed-size persistence pages with set-based current administrative state, valid Ready evidence, and indexed correction/review provenance, then spills large replayable calculation populations and exact ordered statistics to private temporary SQLite storage. Audit retains request-bounded rows, label sorts globally merge projected effective values, review pages unite typed completed or aborted durable identities, and reporting performs no per-encounter effective-projection or ledger replay.
 - Legacy persisted Aging/Stale rows remain readable; recovery never fabricates or rewrites invalid handoffs.
 - Historical anomaly review uses one append-only ledger per encounter. Needs Review provisionally excludes immediately, Confirmed Exception excludes the whole encounter, Cleared removes only the administrative gate, and Reopen Review never reopens the live lifecycle.
 - Canonical anomaly mutations use the typed historical key and expected administrative revision. An absent projection is logical revision 0; one immediate transaction compares the revision, advances it exactly once, and commits current state plus one ledger event. The approved AfterHoursSweep and ExceededMaxActiveDuration producers include that mutation in the source-archive and room-reset transaction.
 - Historical metadata correction is an effective-value overlay that may change current reporting attribution without rewriting the accepted Ready handoff or any lifecycle timestamp. Corrections require Needs Review and one administrative CAS revision; procedure plus sedation is the only bounded atomic group because eligibility-boundary changes have no coherent one-field intermediate state.
+- Current disposition gates normal reporting: Needs Review and Confirmed Exception exclude the whole encounter, while Cleared removes only that gate. Effective doctor, procedure, explicit sedation, Add-on, and confirmed allocation apply before scope and derived reporting annotations. Legacy sedation suffix transport remains an ordinary-report fallback only when truthful Ready or explicit sedation evidence is absent; scoped anomaly/Data Quality membership requires explicit sedation.
 - Generated knowledge artifacts are development aids and never runtime dependencies.
 
 ## Fixture and seed invariants

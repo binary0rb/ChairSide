@@ -38,9 +38,6 @@ public readonly record struct ReportQuery(
     string Sedation,
     string ProcedureGrouping)
 {
-    private const string SedationModifierSuffix = "+SED";
-    private const string LegacySedationCode = "SED";
-
     public static ReportQuery Default => new(
         ReportDateRange.AllTime,
         ReportScopeKinds.Practice,
@@ -72,21 +69,14 @@ public readonly record struct ReportQuery(
     public bool IncludesAnalyticalCycle(CompletedRoomCycle cycle)
     {
         ArgumentNullException.ThrowIfNull(cycle);
+        return (cycle.ReportingProjection ?? HistoricalReportingProjection.FromSource(cycle))
+            .MatchesAnalyticalScope(this, requireExplicitSedation: false);
+    }
 
-        if (Scope == ReportScopeKinds.Doctor
-            && (DoctorId is null
-                || !string.Equals(cycle.AssignedDoctor, DoctorId, StringComparison.OrdinalIgnoreCase)))
-        {
-            return false;
-        }
-
-        var isSedationCase = IsSedationProcedureCode(cycle.ProcedureCode);
-        return Sedation switch
-        {
-            ReportSedationSegments.Sedation => isSedationCase,
-            ReportSedationSegments.NonSedation => !isSedationCase,
-            _ => true
-        };
+    internal bool IncludesReviewEncounter(HistoricalReportingProjection projection)
+    {
+        ArgumentNullException.ThrowIfNull(projection);
+        return projection.MatchesAnalyticalScope(this, requireExplicitSedation: true);
     }
 
     public ReportQueryContext ToContext() => new(
@@ -119,10 +109,6 @@ public readonly record struct ReportQuery(
     private static string? NormalizeDoctorId(string? doctorId) =>
         string.IsNullOrWhiteSpace(doctorId) ? null : doctorId.Trim();
 
-    private static bool IsSedationProcedureCode(string? procedureCode) =>
-        !string.IsNullOrWhiteSpace(procedureCode)
-        && (procedureCode.EndsWith(SedationModifierSuffix, StringComparison.OrdinalIgnoreCase)
-            || string.Equals(procedureCode, LegacySedationCode, StringComparison.OrdinalIgnoreCase));
 }
 
 public sealed record ReportQueryContext(

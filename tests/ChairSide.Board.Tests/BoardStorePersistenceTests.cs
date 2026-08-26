@@ -470,7 +470,7 @@ public sealed partial class BoardStoreTests
         var exception = Assert.Single(reports.ExceptionCycles);
         Assert.Equal(cycleId, exception.CompletedCycleId);
         Assert.True(exception.IsException);
-        Assert.Equal(ExceptionReasons.ManualReview, exception.ExceptionReason);
+        Assert.Equal(HistoricalManualReviewReasons.OtherNeedsReview, exception.ExceptionReason);
 
         // Targeting a non-existent id returns false.
         Assert.False(context.Store.MarkCycleAsExceptionById(999999, ExceptionReasons.ManualReview, "noop"));

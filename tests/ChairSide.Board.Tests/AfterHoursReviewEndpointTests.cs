@@ -71,10 +71,19 @@ public sealed class AfterHoursReviewEndpointTests
         var durable = context.Repository.LoadAbortedAssignments()
             .Single(record => record.AbortedAssignmentId == aborted.AbortedAssignmentId);
         Assert.True(durable.IsException);
-        Assert.False(durable.RequiresReview);
-        Assert.Equal(ReviewStatuses.Reviewed, durable.ReviewStatus);
-        Assert.Equal(now, durable.ReviewedAt);
-        Assert.Equal(ExceptionReviewers.LocalAdmin, durable.ReviewedBy);
+        Assert.True(durable.RequiresReview);
+        Assert.Equal(ReviewStatuses.PendingReview, durable.ReviewStatus);
+        Assert.Null(durable.ReviewedAt);
+        Assert.Null(durable.ReviewedBy);
+        var key = new HistoricalEncounterKey(
+            HistoricalEncounterSourceTypes.AbortedAssignment,
+            aborted.AbortedAssignmentId);
+        var canonical = Assert.IsType<HistoricalEncounterAdministrativeState>(
+            context.Repository.LoadHistoricalAdministrativeState(key));
+        Assert.Equal(HistoricalAdministrativeDispositions.ConfirmedException, canonical.Disposition);
+        var ledgerBeforeRepeated = context.Repository.LoadHistoricalAdministrativeLedger(key, 0, 10);
+        Assert.Equal(HistoricalAdministrativeLedgerEventTypes.ConfirmedException, ledgerBeforeRepeated.Rows[^1].EventType);
+        Assert.Equal(now, ledgerBeforeRepeated.Rows[^1].OccurredAt);
 
         var afterReview = context.Store.GetReports().ExceptionReviewRecords!;
         Assert.DoesNotContain(afterReview, record =>
@@ -93,8 +102,11 @@ public sealed class AfterHoursReviewEndpointTests
         Assert.Equal(StatusCodes.Status204NoContent, StatusCode(repeated));
         var repeatedDurable = context.Repository.LoadAbortedAssignments()
             .Single(record => record.AbortedAssignmentId == aborted.AbortedAssignmentId);
-        Assert.Equal(now.AddMinutes(1), repeatedDurable.ReviewedAt);
-        Assert.False(repeatedDurable.RequiresReview);
+        Assert.Null(repeatedDurable.ReviewedAt);
+        Assert.True(repeatedDurable.RequiresReview);
+        Assert.Equal(
+            ledgerBeforeRepeated.TotalMatchingCount,
+            context.Repository.LoadHistoricalAdministrativeLedger(key, 0, 10).TotalMatchingCount);
 
         Assert.NotNull(context.Store.BeginPrestage(3, "gibson", "CON"));
         Assert.NotNull(context.Store.CancelPrestage(3));

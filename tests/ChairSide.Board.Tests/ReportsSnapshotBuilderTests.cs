@@ -65,10 +65,11 @@ public sealed class ReportsSnapshotBuilderTests
             completeAt: Utc(2026, 7, 20, 12, 25),
             availableAt: Utc(2026, 7, 20, 12, 35),
             expectedAllocationMinutes: 30);
-        manualException.IsException = true;
-        manualException.RequiresReview = true;
-        manualException.ExceptionReason = ExceptionReasons.ManualReview;
-        manualException.SuggestedAction = "Review";
+        manualException.ReportingProjection = Projection(
+            HistoricalAdministrativeDispositions.NeedsReview,
+            doctor: "otte",
+            procedure: "CON",
+            sedation: SedationState.UnavailableProcedureIneligible);
 
         var abortedException = new AbortedRoomAssignment
         {
@@ -82,12 +83,13 @@ public sealed class ReportsSnapshotBuilderTests
             ReadyForDoctorAt = Utc(2026, 7, 20, 12, 50),
             TerminatedAt = Utc(2026, 7, 20, 13, 0),
             TerminatedFromState = RoomStates.ReadyForDoctor,
-            TerminationKind = ExceptionReasons.AfterHoursSweep,
-            IsException = true,
-            RequiresReview = true,
-            ExceptionReason = ExceptionReasons.AfterHoursSweep,
-            SuggestedAction = "Review"
+            TerminationKind = ExceptionReasons.AfterHoursSweep
         };
+        abortedException.ReportingProjection = Projection(
+            HistoricalAdministrativeDispositions.NeedsReview,
+            doctor: "otte",
+            procedure: "EXT",
+            sedation: SedationState.EligibleNo);
 
         var composition = CreateBuilder().Compose(
             [standard, sedationVariant, incomplete, reportingException, manualException],
@@ -104,7 +106,7 @@ public sealed class ReportsSnapshotBuilderTests
         Assert.Null(composition.Window.RangeStartDate);
         Assert.Null(composition.Window.RangeEndDate);
         Assert.Equal("All time", composition.Window.RangeLabel);
-        Assert.Equal(4, composition.Window.TotalCompletedCycleCount);
+        Assert.Equal(3, composition.Window.TotalCompletedCycleCount);
 
         Assert.Equal(1, composition.Timing.AgingEventCount);
         Assert.Equal(1, composition.Timing.StaleEventCount);
@@ -647,9 +649,11 @@ public sealed class ReportsSnapshotBuilderTests
         var blank = CompletedCycle(2, "   ");
         var unmapped = CompletedCycle(3, "MYSTERY");
         var manualReview = CompletedCycle(4, "CON");
-        manualReview.IsException = true;
-        manualReview.RequiresReview = true;
-        manualReview.ExceptionReason = ExceptionReasons.ManualReview;
+        manualReview.ReportingProjection = Projection(
+            HistoricalAdministrativeDispositions.NeedsReview,
+            doctor: "otte",
+            procedure: "CON",
+            sedation: SedationState.UnavailableProcedureIneligible);
 
         var snapshot = CreateBuilder().Build(
             [included, blank, unmapped, manualReview],
@@ -1114,7 +1118,7 @@ public sealed class ReportsSnapshotBuilderTests
     }
 
     [Fact]
-    public void Build_keeps_review_queue_global_to_analytical_scope_but_bounded_by_window()
+    public void Build_scopes_review_queue_by_effective_attribution_and_window()
     {
         var inWindow = new AbortedRoomAssignment
         {
@@ -1123,10 +1127,13 @@ public sealed class ReportsSnapshotBuilderTests
             RoomId = 1,
             AssignedDoctor = "other-doctor",
             ProcedureCode = "CON",
-            TerminatedAt = Utc(2026, 8, 10, 12, 0),
-            IsException = true,
-            RequiresReview = true
+            TerminatedAt = Utc(2026, 8, 10, 12, 0)
         };
+        inWindow.ReportingProjection = Projection(
+            HistoricalAdministrativeDispositions.NeedsReview,
+            doctor: "otte",
+            procedure: "EXT",
+            sedation: SedationState.EligibleYes);
         var outOfWindow = new AbortedRoomAssignment
         {
             AbortedAssignmentId = 2,
@@ -1134,10 +1141,13 @@ public sealed class ReportsSnapshotBuilderTests
             RoomId = 2,
             AssignedDoctor = "other-doctor",
             ProcedureCode = "CON",
-            TerminatedAt = Utc(2026, 8, 9, 12, 0),
-            IsException = true,
-            RequiresReview = true
+            TerminatedAt = Utc(2026, 8, 9, 12, 0)
         };
+        outOfWindow.ReportingProjection = Projection(
+            HistoricalAdministrativeDispositions.NeedsReview,
+            doctor: "otte",
+            procedure: "EXT",
+            sedation: SedationState.EligibleYes);
         var query = ReportQuery.FromStrings(
             "2026-08-10",
             "2026-08-10",
@@ -1446,6 +1456,30 @@ public sealed class ReportsSnapshotBuilderTests
         var active = activeDoctors ?? allDoctors;
         return new ReportsSnapshotBuilder(allDoctors, active, procedures, activeProcedures);
     }
+
+    private static HistoricalReportingProjection Projection(
+        string disposition,
+        string doctor,
+        string procedure,
+        SedationState sedation) =>
+        new(
+            disposition,
+            doctor,
+            procedure,
+            sedation,
+            HasExplicitSedationEvidence: true,
+            PreserveLegacySedationTransport: false,
+            EffectiveIsAddOn: false,
+            ExpectedAllocationState.ConfirmedSuggestedValue,
+            EffectiveExpectedAllocationSuggestedUnits: 3,
+            EffectiveExpectedAllocationConfirmedUnits: 3,
+            CurrentReason: HistoricalManualReviewReasons.OtherNeedsReview,
+            ReasonSource: HistoricalAdministrativeReasonSources.LocalAdmin,
+            KnownReviewedAt: null,
+            KnownReviewedActorClass: null,
+            AdministrativeRevision: 1,
+            HasHistoricalCorrectionProvenance: false,
+            HasReviewedProvenance: false);
 
     private static ReportsSnapshot BuildScoped(
         IReadOnlyList<CompletedRoomCycle> cycles,

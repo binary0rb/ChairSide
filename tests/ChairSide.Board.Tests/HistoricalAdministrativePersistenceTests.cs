@@ -249,6 +249,22 @@ public sealed class HistoricalAdministrativePersistenceTests
                 reviewedBy: ExceptionReviewers.LocalAdmin);
 
             SqliteBoardSchema.MigrateLegacyAdministrativeState(connection, importedAt);
+
+            var completedEvidence = ReadLegacyReviewEvidence(connection, "completed_room_cycles", confirmedId);
+            Assert.True(completedEvidence.IsException);
+            Assert.False(completedEvidence.RequiresReview);
+            Assert.Equal(ExceptionReasons.ManualReview, completedEvidence.ExceptionReason);
+            Assert.Equal(ReviewStatuses.Reviewed, completedEvidence.ReviewStatus);
+            Assert.Equal(reviewedAt.ToString("O"), completedEvidence.ReviewedAt);
+            Assert.Equal(ExceptionReviewers.LocalAdmin, completedEvidence.ReviewedBy);
+
+            var abortedEvidence = ReadLegacyReviewEvidence(connection, "aborted_room_assignments", abortedConfirmedId);
+            Assert.True(abortedEvidence.IsException);
+            Assert.False(abortedEvidence.RequiresReview);
+            Assert.Equal(ExceptionReasons.AfterHoursSweep, abortedEvidence.ExceptionReason);
+            Assert.Equal(ReviewStatuses.Reviewed, abortedEvidence.ReviewStatus);
+            Assert.Equal(reviewedAt.ToString("O"), abortedEvidence.ReviewedAt);
+            Assert.Equal(ExceptionReviewers.LocalAdmin, abortedEvidence.ReviewedBy);
         }
 
         Assert.Null(context.Repository.LoadHistoricalAdministrativeState(
@@ -652,6 +668,35 @@ public sealed class HistoricalAdministrativePersistenceTests
         using var reader = command.ExecuteReader();
         while (reader.Read()) names.Add(reader.GetString(0));
         return names;
+    }
+
+    private static (
+        bool IsException,
+        bool RequiresReview,
+        string? ExceptionReason,
+        string ReviewStatus,
+        string? ReviewedAt,
+        string? ReviewedBy) ReadLegacyReviewEvidence(
+            SqliteConnection connection,
+            string tableName,
+            long sourceRecordId)
+    {
+        using var command = connection.CreateCommand();
+        command.CommandText = $"""
+            SELECT is_exception, requires_review, exception_reason, review_status, reviewed_at, reviewed_by
+            FROM {tableName}
+            WHERE id = $sourceRecordId;
+            """;
+        command.Parameters.AddWithValue("$sourceRecordId", sourceRecordId);
+        using var reader = command.ExecuteReader();
+        Assert.True(reader.Read());
+        return (
+            reader.GetInt64(0) != 0,
+            reader.GetInt64(1) != 0,
+            reader.IsDBNull(2) ? null : reader.GetString(2),
+            reader.GetString(3),
+            reader.IsDBNull(4) ? null : reader.GetString(4),
+            reader.IsDBNull(5) ? null : reader.GetString(5));
     }
 
     private static HashSet<string> ReadColumns(SqliteConnection connection, string tableName)
