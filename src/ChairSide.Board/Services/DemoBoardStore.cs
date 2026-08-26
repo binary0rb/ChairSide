@@ -1156,7 +1156,16 @@ public sealed class DemoBoardStore
                 request.ContributorKind,
                 ReportAuditContributorKinds.ReviewedExceptionHistory,
                 StringComparison.OrdinalIgnoreCase);
-            if (isPendingReview || isReviewedHistory)
+            var isAnomalyReview = string.Equals(
+                request.ContributorKind,
+                ReportAuditContributorKinds.AnomalyReview,
+                StringComparison.OrdinalIgnoreCase);
+            var anomalyStatus = isAnomalyReview
+                ? ReportsSnapshotBuilder.NormalizeAnomalyStatus(request.AnomalyStatus)
+                : isPendingReview
+                    ? ReportAnomalyStatuses.NeedsReview
+                    : null;
+            if (isPendingReview || isReviewedHistory || isAnomalyReview)
             {
                 var offset = Math.Max(0, request.Offset);
                 var limit = request.Limit <= 0 ? 50 : Math.Min(request.Limit, 100);
@@ -1169,19 +1178,29 @@ public sealed class DemoBoardStore
                     return QueryProjectedReviewAudit(
                         request,
                         query,
-                        isPendingReview,
+                        anomalyStatus,
+                        isReviewedHistory,
                         sort,
                         offset,
                         limit);
                 }
-                var persistedPage = _repository.LoadReviewEncounterKeysPage(
-                    query,
-                    isPendingReview,
-                    request.ProcedureCode,
-                    request.BaseProcedureCode,
-                    sort,
-                    offset,
-                    limit);
+                var persistedPage = isReviewedHistory
+                    ? _repository.LoadReviewEncounterKeysPage(
+                        query,
+                        requiresReview: false,
+                        request.ProcedureCode,
+                        request.BaseProcedureCode,
+                        sort,
+                        offset,
+                        limit)
+                    : _repository.LoadReviewEncounterKeysPage(
+                        query,
+                        anomalyStatus!,
+                        request.ProcedureCode,
+                        request.BaseProcedureCode,
+                        sort,
+                        offset,
+                        limit);
                 var encounters = _repository.LoadHistoricalEncounters(persistedPage.Rows);
                 var completed = encounters
                     .Where(record => record.CompletedCycle != null)
@@ -1292,10 +1311,35 @@ public sealed class DemoBoardStore
         }
     }
 
+    public IReadOnlyList<string> GetHistoricalReportingExclusionReasons(HistoricalEncounterRecord source)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+        lock (_syncRoot)
+        {
+            if (source.CompletedCycle is not { } completed)
+            {
+                return [];
+            }
+
+            var annotated = _reportsSnapshotBuilder.CreateAnnotatedCompletedCycleSnapshot([completed]);
+            try
+            {
+                return annotated.Count == 0
+                    ? []
+                    : annotated[0].ReportingExceptionReasons.ToArray();
+            }
+            finally
+            {
+                (annotated as IDisposable)?.Dispose();
+            }
+        }
+    }
+
     private ReportAuditPage QueryProjectedReviewAudit(
         ReportAuditRequest request,
         ReportQuery query,
-        bool requiresReview,
+        string? anomalyStatus,
+        bool reviewedProvenance,
         string sort,
         int requestedOffset,
         int requestedLimit)
@@ -1311,14 +1355,23 @@ public sealed class DemoBoardStore
 
         while (true)
         {
-            var persistedPage = _repository.LoadReviewEncounterKeysPage(
-                query,
-                requiresReview,
-                request.ProcedureCode,
-                request.BaseProcedureCode,
-                ReportAuditSorts.MostRecent,
-                rawOffset,
-                persistenceBatchSize);
+            var persistedPage = reviewedProvenance
+                ? _repository.LoadReviewEncounterKeysPage(
+                    query,
+                    requiresReview: false,
+                    request.ProcedureCode,
+                    request.BaseProcedureCode,
+                    ReportAuditSorts.MostRecent,
+                    rawOffset,
+                    persistenceBatchSize)
+                : _repository.LoadReviewEncounterKeysPage(
+                    query,
+                    anomalyStatus!,
+                    request.ProcedureCode,
+                    request.BaseProcedureCode,
+                    ReportAuditSorts.MostRecent,
+                    rawOffset,
+                    persistenceBatchSize);
             totalMatchingCount = persistedPage.TotalMatchingCount;
             if (persistedPage.Rows.Count == 0) break;
 

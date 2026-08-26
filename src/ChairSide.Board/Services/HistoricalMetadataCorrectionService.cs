@@ -135,7 +135,7 @@ public sealed class HistoricalMetadataCorrectionService
     public HistoricalEffectiveEncounter? GetEffectiveEncounter(HistoricalEncounterKey key)
     {
         if (!key.IsValid) return null;
-        var source = _repository.LoadHistoricalEncounter(key);
+        var source = _repository.LoadHistoricalEncounterForReporting(key);
         if (source is null) return null;
         return BuildProjection(source, _repository.LoadHistoricalAdministrativeState(key));
     }

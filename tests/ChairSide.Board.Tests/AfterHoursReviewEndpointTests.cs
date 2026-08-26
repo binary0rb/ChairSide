@@ -138,11 +138,20 @@ public sealed class AfterHoursReviewEndpointTests
             "ChairSide.Board",
             "wwwroot",
             "reports.js"));
+        var anomalyJs = File.ReadAllText(Path.Combine(
+            FindRepositoryRoot(),
+            "src",
+            "ChairSide.Board",
+            "wwwroot",
+            "anomaly-review.js"));
 
         Assert.Contains("data-review-source", reportsJs, StringComparison.Ordinal);
-        Assert.Contains("sourceType === \"AbortedAssignment\"", reportsJs, StringComparison.Ordinal);
-        Assert.Contains("aborted-assignments/${reviewRecordId}", reportsJs, StringComparison.Ordinal);
-        Assert.Contains("cycles/${reviewRecordId}", reportsJs, StringComparison.Ordinal);
+        Assert.Contains("sourceType, sourceRecordId", anomalyJs, StringComparison.Ordinal);
+        Assert.Contains("encodeURIComponent(sourceType)", anomalyJs, StringComparison.Ordinal);
+        Assert.Contains("/${sourceRecordId}/detail", anomalyJs, StringComparison.Ordinal);
+        Assert.Contains("/${sourceRecordId}/ledger", anomalyJs, StringComparison.Ordinal);
+        Assert.DoesNotContain("aborted-assignments/${reviewRecordId}", reportsJs, StringComparison.Ordinal);
+        Assert.DoesNotContain("cycles/${reviewRecordId}", reportsJs, StringComparison.Ordinal);
     }
 
     private static RoomExpirationOptions SweepOptions() =>

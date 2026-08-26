@@ -34,7 +34,7 @@ The admin-protected strict-JSON API is rooted at `/api/reports/anomalies/{source
 
 System findings are closed to the approved `AfterHoursSweep` and `ExceededMaxActiveDuration` producers. Their source archive, any Ready-handoff termination, live-room reset, current administrative projection, and one `SystemFinding` ledger event commit in the same transaction. A finding creates or returns the encounter to Needs Review; another finding while pending appends another event. Reporting-only `ReportingExceptionReasons`, statistical outliers, and calibration results do not create administrative state.
 
-Issue #241 makes current canonical disposition the administrative reporting gate. Needs Review and Confirmed Exception exclude the whole encounter immediately; Cleared removes only that gate and does not manufacture completion, timing, Ready, or allocation facts. Legacy exception columns remain immutable migration and source evidence rather than a competing reporting authority. Existing legacy review routes remain narrowly available until the #242 UI migration.
+Issue #241 makes current canonical disposition the administrative reporting gate. Needs Review and Confirmed Exception exclude the whole encounter immediately; Cleared removes only that gate and does not manufacture completion, timing, Ready, or allocation facts. Legacy exception columns remain immutable migration and source evidence rather than a competing reporting authority. Issue #242 moves the checked-in browser to canonical anomaly routes; retained older server routes are compatibility-only.
 
 Canonical reporting tests establish review state through `MarkForReview`, `ClearForReporting`, `ConfirmException`, `ReopenReview`, or an explicit canonical persistence projection. Legacy-column-only fixtures are reserved for migration, initialization/import compatibility, and preservation of truthful legacy evidence. Issue #241 intentionally retires globally unscoped Review Queue expectations: Data Quality and its default review drill-down inherit the current date, effective Doctor, explicit effective Sedation, and applicable procedure scope.
 
@@ -56,7 +56,15 @@ Issue #241 adds an internal `HistoricalReportingProjection` at the persistence/r
 
 Canonical Ready-backed or corrected sedation uses explicit effective `SedationState`. A procedure suffix never overrides that state. Only a legacy completed source without truthful Ready or explicit correction evidence may retain `+SED` or legacy `SED` transport classification in ordinary normal reporting. Scoped anomaly and Data Quality membership requires explicit effective sedation; unknown sedation matches neither Sedation nor NonSedation.
 
-Historical assigned Schedule Fit uses the current effective explicit historical allocation. Current-default Calibration remains a separate comparison against today's active base-procedure roster default. Correction provenance is ledger existence, so it survives a correction back to immutable original evidence even when current override columns return to null. Browser correction workflow remains deferred to #242.
+Historical assigned Schedule Fit uses the current effective explicit historical allocation. Current-default Calibration remains a separate comparison against today's active base-procedure roster default. Correction provenance is ledger existence, so it survives a correction back to immutable original evidence even when current override columns return to null. The #242 browser exposes only explicit historical allocation values and never recalculates a correction from today's default.
+
+## Browser read and review seams
+
+Issue #242 adds one status-filtered, persistence-paged `AnomalyReview` audit population. Needs Review is the default. Confirmed Exception, Cleared for Reporting, and All Anomalies are current-disposition filters over the same typed completed and aborted identities. All Anomalies retains report scope; a separate deliberate control broadens to All Time, Practice, unrestricted Doctor, All Sedation, and no procedure restriction.
+
+`GET /api/reports/anomalies/{sourceType}/{sourceRecordId}/detail` composes the canonical effective encounter with separately derived ordinary reporting-exclusion reasons. `GET .../ledger` returns only that typed encounter's chronological ledger with a default of 50 and maximum of 100 rows. `GET /api/reports/anomalies/options` returns the complete configured active and inactive Doctor and base-procedure rosters, canonical reason choices, and the 500-character note limit. These reads do not write projection, ledger, source, Ready, or lifecycle state.
+
+The integrated Reports UI loads shared options once and detail plus ledger only for the selected encounter. It uses select controls for governed Doctor and Procedure identities, the sole paired Procedure and Sedation operation at eligibility boundaries, and current revision on every mutation. Stale writes and unknown transport outcomes block another mutation until authoritative detail and ledger reads complete; mutations are never repeated automatically.
 
 ## Legacy migration
 
@@ -74,7 +82,7 @@ Legacy import is set-based and transactional. Projection insert conflicts preser
 
 ## Retention and reset
 
-Production initialization preserves administrative projection and ledger rows indefinitely. Existing Development and Training maintenance reset deletes completed-source administration before deleting completed cycles, while administration attached to preserved aborted history remains preserved. Issue #239 adds the server API and policy operations only; final review UI migration remains deferred to #242.
+Production initialization preserves administrative projection and ledger rows indefinitely. Existing Development and Training maintenance reset deletes completed-source administration before deleting completed cycles, while administration attached to preserved aborted history remains preserved. Issue #239 adds the server API and policy operations; Issue #242 supplies the integrated review UI and bounded read seams.
 
 ## Source and test anchors
 
@@ -83,6 +91,7 @@ Production initialization preserves administrative projection and ledger rows in
 - `src/ChairSide.Board/Services/HistoricalAnomalyEndpointHandler.cs`
 - `src/ChairSide.Board/Services/HistoricalMetadataCorrectionService.cs`
 - `src/ChairSide.Board/Services/HistoricalMetadataCorrectionEndpointHandler.cs`
+- `src/ChairSide.Board/Services/HistoricalAnomalyReadEndpointHandler.cs`
 - `src/ChairSide.Board/Services/HistoricalReportingProjection.cs`
 - `src/ChairSide.Board/Services/ReportsSnapshotBuilder.cs`
 - `src/ChairSide.Board/Services/ReportsSnapshotBuilder.Audit.cs`
@@ -93,6 +102,7 @@ Production initialization preserves administrative projection and ledger rows in
 - `tests/ChairSide.Board.Tests/HistoricalAnomalyEndpointTests.cs`
 - `tests/ChairSide.Board.Tests/HistoricalSystemFindingProducerTests.cs`
 - `tests/ChairSide.Board.Tests/HistoricalMetadataCorrectionTests.cs`
+- `tests/javascript/anomaly-review.test.mjs`
 - `tests/ChairSide.Board.Tests/HistoricalMetadataCorrectionEndpointTests.cs`
 - `tests/ChairSide.Board.Tests/HistoricalReportingIntegrationTests.cs`
 - `tests/ChairSide.Board.Tests/HistoricalQueryPersistenceTests.cs`

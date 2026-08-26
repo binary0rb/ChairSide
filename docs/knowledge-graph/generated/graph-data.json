@@ -453,6 +453,12 @@
                       "path":  "src/ChairSide.Board/Services/HistoricalAnomalyEndpointHandler.cs"
                   },
                   {
+                      "id":  "file:src/ChairSide.Board/Services/HistoricalAnomalyReadEndpointHandler.cs",
+                      "label":  "src/ChairSide.Board/Services/HistoricalAnomalyReadEndpointHandler.cs",
+                      "type":  "File",
+                      "path":  "src/ChairSide.Board/Services/HistoricalAnomalyReadEndpointHandler.cs"
+                  },
+                  {
                       "id":  "file:src/ChairSide.Board/Services/HistoricalEncounterQuery.cs",
                       "label":  "src/ChairSide.Board/Services/HistoricalEncounterQuery.cs",
                       "type":  "File",
@@ -607,6 +613,12 @@
                       "label":  "src/ChairSide.Board/Services/SqliteBoardSchema.cs",
                       "type":  "File",
                       "path":  "src/ChairSide.Board/Services/SqliteBoardSchema.cs"
+                  },
+                  {
+                      "id":  "file:src/ChairSide.Board/wwwroot/anomaly-review.js",
+                      "label":  "src/ChairSide.Board/wwwroot/anomaly-review.js",
+                      "type":  "File",
+                      "path":  "src/ChairSide.Board/wwwroot/anomaly-review.js"
                   },
                   {
                       "id":  "file:src/ChairSide.Board/wwwroot/application-state.js",
@@ -1107,6 +1119,12 @@
                       "path":  "tests/ChairSide.Board.Tests/TestSupport/TestWorkspace.cs"
                   },
                   {
+                      "id":  "file:tests/javascript/anomaly-review.test.mjs",
+                      "label":  "tests/javascript/anomaly-review.test.mjs",
+                      "type":  "File",
+                      "path":  "tests/javascript/anomaly-review.test.mjs"
+                  },
+                  {
                       "id":  "file:tests/javascript/common-interactions.test.mjs",
                       "label":  "tests/javascript/common-interactions.test.mjs",
                       "type":  "File",
@@ -1293,8 +1311,20 @@
                       "path":  "src/ChairSide.Board/Program.cs"
                   },
                   {
+                      "id":  "route:/api/reports/anomalies/{sourceType}/{sourceRecordId:long}/detail",
+                      "label":  "/api/reports/anomalies/{sourceType}/{sourceRecordId:long}/detail",
+                      "type":  "Route",
+                      "path":  "src/ChairSide.Board/Program.cs"
+                  },
+                  {
                       "id":  "route:/api/reports/anomalies/{sourceType}/{sourceRecordId:long}/effective-encounter",
                       "label":  "/api/reports/anomalies/{sourceType}/{sourceRecordId:long}/effective-encounter",
+                      "type":  "Route",
+                      "path":  "src/ChairSide.Board/Program.cs"
+                  },
+                  {
+                      "id":  "route:/api/reports/anomalies/{sourceType}/{sourceRecordId:long}/ledger",
+                      "label":  "/api/reports/anomalies/{sourceType}/{sourceRecordId:long}/ledger",
                       "type":  "Route",
                       "path":  "src/ChairSide.Board/Program.cs"
                   },
@@ -1319,6 +1349,12 @@
                   {
                       "id":  "route:/api/reports/anomalies/{sourceType}/{sourceRecordId:long}/reopen",
                       "label":  "/api/reports/anomalies/{sourceType}/{sourceRecordId:long}/reopen",
+                      "type":  "Route",
+                      "path":  "src/ChairSide.Board/Program.cs"
+                  },
+                  {
+                      "id":  "route:/api/reports/anomalies/options",
+                      "label":  "/api/reports/anomalies/options",
                       "type":  "Route",
                       "path":  "src/ChairSide.Board/Program.cs"
                   },
@@ -2331,6 +2367,12 @@
                       "path":  "tests/ChairSide.Board.Tests/HistoricalAnomalyEndpointTests.cs"
                   },
                   {
+                      "id":  "symbol:type:HistoricalAnomalyReadEndpointHandler",
+                      "label":  "HistoricalAnomalyReadEndpointHandler",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/HistoricalAnomalyReadEndpointHandler.cs"
+                  },
+                  {
                       "id":  "symbol:type:HistoricalEffectiveEncounter",
                       "label":  "HistoricalEffectiveEncounter",
                       "type":  "CodeType",
@@ -2887,6 +2929,12 @@
                       "label":  "ReportAllocationSection",
                       "type":  "CodeType",
                       "path":  "src/ChairSide.Board/Services/ReportsSnapshotComposition.cs"
+                  },
+                  {
+                      "id":  "symbol:type:ReportAnomalyStatuses",
+                      "label":  "ReportAnomalyStatuses",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/ReportAudit.cs"
                   },
                   {
                       "id":  "symbol:type:ReportAuditBuilderTests",
@@ -3664,7 +3712,17 @@
                   },
                   {
                       "from":  "file:src/ChairSide.Board/Program.cs",
+                      "to":  "route:/api/reports/anomalies/{sourceType}/{sourceRecordId:long}/detail",
+                      "label":  "maps"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Program.cs",
                       "to":  "route:/api/reports/anomalies/{sourceType}/{sourceRecordId:long}/effective-encounter",
+                      "label":  "maps"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Program.cs",
+                      "to":  "route:/api/reports/anomalies/{sourceType}/{sourceRecordId:long}/ledger",
                       "label":  "maps"
                   },
                   {
@@ -3685,6 +3743,11 @@
                   {
                       "from":  "file:src/ChairSide.Board/Program.cs",
                       "to":  "route:/api/reports/anomalies/{sourceType}/{sourceRecordId:long}/reopen",
+                      "label":  "maps"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Program.cs",
+                      "to":  "route:/api/reports/anomalies/options",
                       "label":  "maps"
                   },
                   {
@@ -4443,6 +4506,11 @@
                       "label":  "declares"
                   },
                   {
+                      "from":  "file:src/ChairSide.Board/Services/HistoricalAnomalyReadEndpointHandler.cs",
+                      "to":  "symbol:type:HistoricalAnomalyReadEndpointHandler",
+                      "label":  "declares"
+                  },
+                  {
                       "from":  "file:src/ChairSide.Board/Services/HistoricalEncounterQuery.cs",
                       "to":  "symbol:type:HistoricalEncounterRecord",
                       "label":  "declares"
@@ -4785,6 +4853,11 @@
                   {
                       "from":  "file:src/ChairSide.Board/Services/ReadyHandoffPersistenceRecords.cs",
                       "to":  "symbol:type:ReadyHandoffTerminationKinds",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/ReportAudit.cs",
+                      "to":  "symbol:type:ReportAnomalyStatuses",
                       "label":  "declares"
                   },
                   {
@@ -5889,6 +5962,11 @@
                   },
                   {
                       "from":  "repo:chairside",
+                      "to":  "file:src/ChairSide.Board/Services/HistoricalAnomalyReadEndpointHandler.cs",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
                       "to":  "file:src/ChairSide.Board/Services/HistoricalEncounterQuery.cs",
                       "label":  "contains"
                   },
@@ -6015,6 +6093,11 @@
                   {
                       "from":  "repo:chairside",
                       "to":  "file:src/ChairSide.Board/Services/SqliteBoardSchema.cs",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:src/ChairSide.Board/wwwroot/anomaly-review.js",
                       "label":  "contains"
                   },
                   {
@@ -6430,6 +6513,11 @@
                   {
                       "from":  "repo:chairside",
                       "to":  "file:tests/ChairSide.Board.Tests/TestSupport/TestWorkspace.cs",
+                      "label":  "contains"
+                  },
+                  {
+                      "from":  "repo:chairside",
+                      "to":  "file:tests/javascript/anomaly-review.test.mjs",
                       "label":  "contains"
                   },
                   {

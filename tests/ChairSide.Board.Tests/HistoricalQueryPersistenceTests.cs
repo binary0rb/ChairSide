@@ -161,6 +161,73 @@ public sealed class HistoricalQueryPersistenceTests
         Assert.Equal(5, storePage.ReviewRows.Count(row => row.SourceType == ExceptionReviewSources.AbortedAssignment));
     }
 
+    [Fact]
+    public void Canonical_anomaly_status_filters_share_one_paged_population()
+    {
+        using var workspace = TestWorkspace.Create();
+        var context = StoreContext.Create(workspace, Environments.Production);
+        var administration = new HistoricalAnomalyAdministrationService(context.Repository);
+        var at = new DateTimeOffset(2026, 8, 12, 8, 0, 0, TimeSpan.Zero);
+        var keys = Enumerable.Range(0, 4)
+            .Select(index => SaveCycle(context, index + 1, at.AddMinutes(index)))
+            .Select(cycle => new HistoricalEncounterKey(
+                HistoricalEncounterSourceTypes.CompletedCycle,
+                cycle.CompletedCycleId))
+            .ToArray();
+
+        foreach (var key in keys.Take(3))
+        {
+            Assert.Equal(
+                HistoricalAdministrativeOperationOutcome.Success,
+                administration.MarkForReview(key, 0, HistoricalManualReviewReasons.OtherNeedsReview).Outcome);
+        }
+        Assert.Equal(
+            HistoricalAdministrativeOperationOutcome.Success,
+            administration.ConfirmException(keys[1], 1, null).Outcome);
+        Assert.Equal(
+            HistoricalAdministrativeOperationOutcome.Success,
+            administration.ClearForReporting(keys[2], 1, null).Outcome);
+
+        Assert.Equal([keys[0]], Query(ReportAnomalyStatuses.NeedsReview));
+        Assert.Equal([keys[1]], Query(ReportAnomalyStatuses.ConfirmedException));
+        Assert.Equal([keys[2]], Query(ReportAnomalyStatuses.ClearedForReporting));
+        Assert.Equal(3, Query(ReportAnomalyStatuses.AllAnomalies).Count);
+        Assert.DoesNotContain(keys[3], Query(ReportAnomalyStatuses.AllAnomalies));
+        foreach (var (status, expectedCount) in new[]
+        {
+            (ReportAnomalyStatuses.NeedsReview, 1),
+            (ReportAnomalyStatuses.ConfirmedException, 1),
+            (ReportAnomalyStatuses.ClearedForReporting, 1),
+            (ReportAnomalyStatuses.AllAnomalies, 3)
+        })
+        {
+            var page = context.Store.QueryReportAudit(new ReportAuditRequest(
+                ContributorKind: ReportAuditContributorKinds.AnomalyReview,
+                Offset: 0,
+                Limit: 2,
+                AnomalyStatus: status));
+            Assert.Equal(expectedCount, page.TotalMatchingCount);
+            Assert.Equal(Math.Min(expectedCount, 2), page.ReturnedCount);
+            Assert.Equal(page.Offset + page.ReturnedCount < page.TotalMatchingCount, page.HasMore);
+            Assert.All(page.ReviewRows, row => Assert.True(
+                status == ReportAnomalyStatuses.AllAnomalies
+                    ? row.Disposition is HistoricalAdministrativeDispositions.NeedsReview
+                        or HistoricalAdministrativeDispositions.ConfirmedException
+                        or HistoricalAdministrativeDispositions.ClearedForReporting
+                    : row.Disposition == status));
+        }
+
+        IReadOnlyList<HistoricalEncounterKey> Query(string status) =>
+            context.Repository.LoadReviewEncounterKeysPage(
+                ReportQuery.Default,
+                status,
+                procedureCode: null,
+                baseProcedureCode: null,
+                sort: ReportAuditSorts.MostRecent,
+                offset: 0,
+                limit: 50).Rows;
+    }
+
     [Theory]
     [InlineData(ReportAuditSorts.MostRecent)]
     [InlineData(ReportAuditSorts.Doctor)]

@@ -117,7 +117,7 @@ Doctor, procedure, sedation, Add-on, and expected allocation normally use one fi
 
 The correction ledger field vocabulary is `Doctor`, `Procedure`, `ProcedureAndSedation`, `Sedation`, `AddOn`, and `ExpectedAllocation`. Scalar values use governed IDs, canonical enum names, or lowercase booleans. Procedure/sedation pairs and complete confirmed allocations use compact deterministic JSON with fixed property names. `PreviousValue` is the prior effective value, `NewValue` is the corrected effective value, and an optional note of at most 500 characters belongs to the same event. Correcting back to immutable original metadata normalizes the matching override columns to null while ledger history remains append-only.
 
-`HistoricalEffectiveEncounter` is the canonical current administrative projection. It exposes the immutable source, original evidence authority and metadata, effective metadata, nullable overrides, correction indicators and source support, disposition, reason/source, and administrative revision without replaying the ledger. The protected detail API and correction responses use this projection. Issue #241 integrates the same current state and evidence precedence into reporting through a set-based internal `HistoricalReportingProjection`; it does not replay one ledger or load one effective encounter per row. Browser review and correction workflow remains owned by #242.
+`HistoricalEffectiveEncounter` is the canonical current administrative projection. It exposes the immutable source, original evidence authority and metadata, effective metadata, nullable overrides, correction indicators and source support, disposition, reason/source, and administrative revision without replaying the ledger. The protected detail API and correction responses use this projection. Issue #241 integrates the same current state and evidence precedence into reporting through a set-based internal `HistoricalReportingProjection`; it does not replay one ledger or load one effective encounter per row. Issue #242 presents this projection in the integrated Reports anomaly review workflow.
 
 ## Accepted Ready evidence and effective attribution
 
@@ -195,7 +195,7 @@ Issue #239 implements the server policy with the typed `CompletedCycle` or `Abor
 
 Local Admin reasons are the closed server vocabulary `IncorrectDoctor`, `IncorrectProcedure`, `IncorrectCaseDetails`, `UnexpectedLifecycle`, and `OtherNeedsReview`. Notes are accepted through 500 characters and rejected at 501 rather than truncated. The strict, admin-protected anomaly API exposes Mark, reason refinement, note, Clear, Confirm, and Reopen; it does not expose arbitrary system findings or personal actor identity.
 
-The approved system-finding allowlist is `AfterHoursSweep` and `ExceededMaxActiveDuration`. Those producers append `SystemFinding` and enter or re-enter Needs Review in the same transaction as source archival, Ready-handoff termination when applicable, and live-room reset. Reporting-only exception classifications, outlier checks, and Calibration remain non-mutating. Issue #240 adds the correction and effective-projection server seam described above. Issue #241 consumes current disposition and effective values in reporting and scoped Data Quality without mutating source, Ready, projection, or ledger state. Final browser review UI remains owned by #242.
+The approved system-finding allowlist is `AfterHoursSweep` and `ExceededMaxActiveDuration`. Those producers append `SystemFinding` and enter or re-enter Needs Review in the same transaction as source archival, Ready-handoff termination when applicable, and live-room reset. Reporting-only exception classifications, outlier checks, and Calibration remain non-mutating. Issue #240 adds the correction and effective-projection server seam described above. Issue #241 consumes current disposition and effective values in reporting and scoped Data Quality without mutating source, Ready, projection, or ledger state. Issue #242 connects those contracts to the canonical browser workflow without adding a second policy implementation.
 
 ## Reporting period and effective truth
 
@@ -283,6 +283,12 @@ Deeper transaction-level and raw evidence remains available on demand without ma
 - The initial design has no bulk Clear or Confirm action.
 - Efficient Resolve -> Next Needs Review navigation is desirable.
 
+Issue #242 implements this as one progressive-disclosure surface in Reports. Its status filters are Needs Review, Confirmed Exceptions, Cleared, and All Anomalies. All Anomalies changes disposition membership only; it retains the active report scope. A separate explicit View all anomaly history action broadens to All Time, Practice, unrestricted Doctor, All Sedation, and no procedure restriction, with a Return to report scope action.
+
+List retrieval uses the persistence-paged `AnomalyReview` audit contributor and typed completed or aborted identity. Selection loads one canonical detail and one bounded chronological ledger page on demand. The ledger read defaults to 50 rows, caps at 100, and supports Load more history. Shared correction options come from the complete configured active and inactive Doctor and base-procedure rosters; synthetic `+SED` transport variants are not selectable identities.
+
+The selected detail keeps immutable lifecycle/original Ready evidence, current effective metadata, and current administrative interpretation visibly separate. Needs Review alone exposes correction and decision controls. Cleared and Confirmed Exception remain inspectable and expose Reopen. Stale writes are never retried automatically; the browser refreshes the current revision, detail, and ledger before enabling another explicit action. A transport failure is treated as an unknown outcome and reconciled with reads before another mutation can be submitted.
+
 ## Visibility, deletion, retention, and scale
 
 - Anomaly status never hides or removes the underlying historical encounter.
@@ -329,4 +335,4 @@ This design does not require a new anomaly analytics dashboard.
 
 ## Implementation boundaries
 
-The #234 design gate itself required no production change. Issues #237 through #241 implement the durable identity, administrative persistence, canonical mutations, effective correction, and reporting/Data Quality integration described here. Remaining browser workflow work must derive behavior and tests from this document without weakening lifecycle truth, partializing Confirmed Exceptions, restoring a globally unscoped Review Queue, or making resolved history permanently read-only.
+The #234 design gate itself required no production change. Issues #237 through #242 implement the durable identity, administrative persistence, canonical mutations, effective correction, reporting/Data Quality integration, and integrated browser workflow described here. Issue #243 remains the final cross-feature acceptance pass; it must not weaken lifecycle truth, partialize Confirmed Exceptions, restore a globally unscoped Review Queue, or make resolved history permanently read-only.

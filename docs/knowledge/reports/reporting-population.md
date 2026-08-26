@@ -8,7 +8,7 @@ last_verified_commit: 1c6a03d
 
 ## Status boundary
 
-**Current implementation:** Issues #237 through #241 implement typed historical identity, canonical administrative state and ledger, canonical mutations, metadata correction, and effective reporting/Data Quality consumption. Issue #242 still owns the final browser review and correction workflow.
+**Current implementation:** Issues #237 through #242 implement typed historical identity, canonical administrative state and ledger, canonical mutations, metadata correction, effective reporting/Data Quality consumption, and the integrated browser review and correction workflow.
 
 ## Population funnel
 
@@ -43,6 +43,8 @@ Doctor scopes accept historical doctor IDs independently of the active assignmen
 Normal audit and analytical evidence preserve `DoctorCompleteAt` window authority. Review is selected independently: completed exceptions use the latest truthful anchor in `DoctorCompleteAt`, `DoctorArrivedAt`, `SeatedAt`, then `PrestageStartedAt`; aborted assignments use `TerminatedAt`. Review counts therefore do not disappear merely because an exception lacks Doctor Complete.
 
 The paged audit endpoint owns population membership, exact-second projection, sort, and local standing narrowing. `RecentCompletedCycles` remains compatibility context only and is not audit authority.
+
+The canonical `AnomalyReview` contributor filters the current disposition as Needs Review, Confirmed Exception, Cleared for Reporting, or All Anomalies. Count and page predicates are identical and use the same effective Doctor, Procedure, explicit Sedation, review anchor, and typed source identity. All Anomalies remains inside active report scope. Only the separate View all anomaly history control requests All Time, Practice, unrestricted Doctor, All Sedation, and no procedure restriction.
 
 `ReportSampleContext` carries population count, contributing count, state, threshold, and comparison eligibility. Empty is `N = 0`, Limited is `N = 1-4`, and Sufficient is `N >= 5`. A metric with a nonempty population and zero contributors is Unavailable. Comparison language requires every compared population to be Sufficient. Calibration Insights retain separate, stricter N >= 10 evidence eligibility without reclassifying the general descriptive sample state; the full server-owned rule is documented in `schedule-fit.md`.
 

@@ -1786,6 +1786,25 @@ public sealed class SqliteBoardRepository
         return aborted is null ? null : new HistoricalEncounterRecord(key, null, aborted);
     }
 
+    internal HistoricalEncounterRecord? LoadHistoricalEncounterForReporting(HistoricalEncounterKey key)
+    {
+        if (!key.IsValid) return null;
+        Interlocked.Increment(ref _historicalEncounterPointReadCount);
+        using var connection = OpenConnection();
+        using var command = connection.CreateCommand();
+        command.Parameters.AddWithValue("$id", key.SourceRecordId);
+        if (key.SourceType == HistoricalEncounterSourceTypes.CompletedCycle)
+        {
+            command.CommandText = $"SELECT * FROM ({CompletedReportingSelectSql}) reporting WHERE id = $id;";
+            var completed = ReadCompletedCycles(command).SingleOrDefault();
+            return completed is null ? null : new HistoricalEncounterRecord(key, completed, null);
+        }
+
+        command.CommandText = $"SELECT * FROM ({AbortedReportingSelectSql}) reporting WHERE id = $id;";
+        var aborted = ReadAbortedAssignments(command).SingleOrDefault();
+        return aborted is null ? null : new HistoricalEncounterRecord(key, null, aborted);
+    }
+
     public IReadOnlyList<HistoricalEncounterRecord> LoadHistoricalEncounters(
         IReadOnlyList<HistoricalEncounterKey> keys)
     {
@@ -2238,15 +2257,54 @@ public sealed class SqliteBoardRepository
         string? baseProcedureCode,
         string sort,
         int offset,
+        int limit) =>
+        LoadReviewEncounterKeysPageCore(
+            query,
+            requiresReview ? ReportAnomalyStatuses.NeedsReview : null,
+            reviewedProvenance: !requiresReview,
+            procedureCode,
+            baseProcedureCode,
+            sort,
+            offset,
+            limit);
+
+    public HistoricalQueryPage<HistoricalEncounterKey> LoadReviewEncounterKeysPage(
+        ReportQuery query,
+        string anomalyStatus,
+        string? procedureCode,
+        string? baseProcedureCode,
+        string sort,
+        int offset,
+        int limit) =>
+        LoadReviewEncounterKeysPageCore(
+            query,
+            ReportsSnapshotBuilder.NormalizeAnomalyStatus(anomalyStatus),
+            reviewedProvenance: false,
+            procedureCode,
+            baseProcedureCode,
+            sort,
+            offset,
+            limit);
+
+    private HistoricalQueryPage<HistoricalEncounterKey> LoadReviewEncounterKeysPageCore(
+        ReportQuery query,
+        string? anomalyStatus,
+        bool reviewedProvenance,
+        string? procedureCode,
+        string? baseProcedureCode,
+        string sort,
+        int offset,
         int limit)
     {
         ValidatePage(offset, limit);
         using var connection = OpenConnection();
         using var command = connection.CreateCommand();
         var completedAnchor = "COALESCE(doctor_complete_at, doctor_arrived_at, seated_at, prestage_started_at)";
-        var statusPredicate = requiresReview
-            ? $"reporting_disposition = '{HistoricalAdministrativeDispositions.NeedsReview}'"
-            : "reporting_has_reviewed_provenance = 1";
+        var statusPredicate = reviewedProvenance
+            ? "reporting_has_reviewed_provenance = 1"
+            : anomalyStatus == ReportAnomalyStatuses.AllAnomalies
+                ? $"reporting_disposition IN ('{HistoricalAdministrativeDispositions.NeedsReview}', '{HistoricalAdministrativeDispositions.ConfirmedException}', '{HistoricalAdministrativeDispositions.ClearedForReporting}')"
+                : $"reporting_disposition = '{anomalyStatus}'";
         var completedPredicates = new List<string> { statusPredicate };
         var abortedPredicates = new List<string> { statusPredicate };
         AddWindowPredicates(command, completedPredicates, completedAnchor, query.Window);

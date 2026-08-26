@@ -1672,9 +1672,279 @@ body[data-view="reports"] .insight-metrics .metric-sample {
   margin-top: 0.6rem;
 }
 
+body[data-view="reports"] .anomaly-review-shell {
+  display: grid;
+  gap: 16px;
+  padding-top: 12px;
+}
+
+body[data-view="reports"] .anomaly-review-head,
+body[data-view="reports"] .anomaly-list-heading,
+body[data-view="reports"] .anomaly-list-row-top {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: space-between;
+}
+
+body[data-view="reports"] .anomaly-review-head h3,
+body[data-view="reports"] .anomaly-review-head p,
+body[data-view="reports"] .anomaly-list-heading h4,
+body[data-view="reports"] .anomaly-detail-summary h4 {
+  margin: 0;
+}
+
+body[data-view="reports"] .anomaly-scope-notice,
+body[data-view="reports"] .anomaly-inline-feedback,
+body[data-view="reports"] .anomaly-reporting-effect {
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 8px;
+  color: #1e3a8a;
+  margin: 0;
+  padding: 10px 12px;
+}
+
+body[data-view="reports"] .anomaly-inline-feedback[hidden] {
+  display: none;
+}
+
+body[data-view="reports"] .anomaly-inline-feedback.tone-error,
+body[data-view="reports"] .anomaly-inline-feedback.tone-stale {
+  background: #fef2f2;
+  border-color: #fecaca;
+  color: #7f1d1d;
+}
+
+body[data-view="reports"] .anomaly-inline-feedback.tone-success {
+  background: #f0fdf4;
+  border-color: #86efac;
+  color: #14532d;
+}
+
+body[data-view="reports"] .anomaly-status-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+body[data-view="reports"] .anomaly-review-grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: minmax(240px, 0.8fr) minmax(0, 1.7fr);
+}
+
+body[data-view="reports"] .anomaly-list-panel,
+body[data-view="reports"] .anomaly-detail-panel,
+body[data-view="reports"] .anomaly-action-section,
+body[data-view="reports"] .anomaly-evidence-section {
+  background: var(--surface-raised, #fff);
+  border: 1px solid var(--border-subtle, #d8dee8);
+  border-radius: 10px;
+  min-width: 0;
+  padding: 12px;
+}
+
+body[data-view="reports"] .anomaly-list,
+body[data-view="reports"] .anomaly-actions,
+body[data-view="reports"] .anomaly-detail,
+body[data-view="reports"] .anomaly-correction-grid {
+  display: grid;
+  gap: 10px;
+}
+
+body[data-view="reports"] .anomaly-list-row {
+  background: #fff;
+  border: 1px solid #d8dee8;
+  border-left: 5px solid #94a3b8;
+  border-radius: 8px;
+  color: #172033;
+  cursor: pointer;
+  display: grid;
+  gap: 4px;
+  padding: 10px;
+  text-align: left;
+  width: 100%;
+}
+
+body[data-view="reports"] .anomaly-list-row.status-NeedsReview {
+  border-left-color: #d97706;
+}
+
+body[data-view="reports"] .anomaly-list-row.status-ConfirmedException {
+  border-left-color: #7f1d1d;
+}
+
+body[data-view="reports"] .anomaly-list-row.status-ClearedForReporting {
+  border-left-color: #64748b;
+}
+
+body[data-view="reports"] .anomaly-list-row.is-selected,
+body[data-view="reports"] .anomaly-list-row:focus-visible {
+  box-shadow: 0 0 0 3px #bfdbfe;
+  outline: 2px solid #2563eb;
+  outline-offset: 1px;
+}
+
+body[data-view="reports"] .anomaly-detail-summary,
+body[data-view="reports"] .anomaly-actions,
+body[data-view="reports"] .anomaly-action-section form {
+  display: grid;
+  gap: 10px;
+}
+
+body[data-view="reports"] .anomaly-detail-summary dl,
+body[data-view="reports"] .anomaly-lifecycle,
+body[data-view="reports"] .anomaly-metadata-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  margin: 0;
+}
+
+body[data-view="reports"] .anomaly-detail-summary dl div,
+body[data-view="reports"] .anomaly-lifecycle div,
+body[data-view="reports"] .anomaly-metadata-row {
+  background: #f8fafc;
+  border-radius: 8px;
+  padding: 9px;
+}
+
+body[data-view="reports"] .anomaly-detail-summary dt,
+body[data-view="reports"] .anomaly-lifecycle dt,
+body[data-view="reports"] .anomaly-metadata-row small {
+  color: #596579;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+body[data-view="reports"] .anomaly-detail-summary dd,
+body[data-view="reports"] .anomaly-lifecycle dd {
+  margin: 3px 0 0;
+}
+
+body[data-view="reports"] .anomaly-status-badge,
+body[data-view="reports"] .anomaly-metadata-row h5 span {
+  background: #e2e8f0;
+  border-radius: 999px;
+  display: inline-block;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 3px 8px;
+}
+
+body[data-view="reports"] .anomaly-status-badge.status-NeedsReview {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+body[data-view="reports"] .anomaly-status-badge.status-ConfirmedException {
+  background: #fee2e2;
+  color: #7f1d1d;
+}
+
+body[data-view="reports"] .anomaly-status-badge.status-ClearedForReporting {
+  background: #e2e8f0;
+  color: #334155;
+}
+
+body[data-view="reports"] .anomaly-metadata-row {
+  display: grid;
+  gap: 8px;
+}
+
+body[data-view="reports"] .anomaly-metadata-row h5 {
+  margin: 0;
+}
+
+body[data-view="reports"] .anomaly-metadata-row div {
+  display: grid;
+  gap: 2px;
+}
+
+body[data-view="reports"] .anomaly-metadata-row.is-corrected {
+  border: 1px solid #93c5fd;
+}
+
+body[data-view="reports"] .anomaly-correction-grid {
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+}
+
+body[data-view="reports"] .anomaly-correction-card {
+  align-content: start;
+  background: #f8fafc;
+  border: 1px solid #d8dee8;
+  border-radius: 8px;
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+}
+
+body[data-view="reports"] .anomaly-correction-card h6,
+body[data-view="reports"] .anomaly-action-section h5 {
+  margin: 0;
+}
+
+body[data-view="reports"] .anomaly-action-section label,
+body[data-view="reports"] .anomaly-correction-card label {
+  display: grid;
+  gap: 4px;
+  font-weight: 700;
+}
+
+body[data-view="reports"] .anomaly-action-section textarea {
+  min-height: 88px;
+  resize: vertical;
+}
+
+body[data-view="reports"] .anomaly-note-help,
+body[data-view="reports"] .anomaly-note-count {
+  color: #596579;
+  font-size: 12px;
+  margin: 0;
+}
+
+body[data-view="reports"] .anomaly-decisions {
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+
+body[data-view="reports"] .anomaly-ledger {
+  display: grid;
+  gap: 10px;
+  list-style-position: inside;
+  padding: 0;
+}
+
+body[data-view="reports"] .anomaly-ledger li {
+  border-left: 3px solid #94a3b8;
+  padding: 8px 10px;
+}
+
+body[data-view="reports"] .anomaly-ledger li div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: space-between;
+}
+
+body[data-view="reports"] .anomaly-ledger p {
+  margin: 4px 0 0;
+}
+
+body[data-view="reports"] .anomaly-ledger-note {
+  white-space: pre-wrap;
+}
+
 @media (max-width: 760px) {
   .report-audit-row > summary {
     grid-template-columns: 1fr 1fr;
+  }
+
+  body[data-view="reports"] .anomaly-review-grid,
+  body[data-view="reports"] .anomaly-decisions {
+    grid-template-columns: 1fr;
   }
 }
 
