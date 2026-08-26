@@ -1311,12 +1311,12 @@ public sealed class DemoBoardStore
         }
     }
 
-    public IReadOnlyList<string> GetHistoricalReportingExclusionReasons(HistoricalEncounterKey key)
+    public IReadOnlyList<string> GetHistoricalReportingExclusionReasons(HistoricalEncounterRecord source)
     {
+        ArgumentNullException.ThrowIfNull(source);
         lock (_syncRoot)
         {
-            var source = _repository.LoadHistoricalEncounter(key);
-            if (source?.CompletedCycle is not { } completed)
+            if (source.CompletedCycle is not { } completed)
             {
                 return [];
             }

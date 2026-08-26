@@ -470,7 +470,8 @@ internal sealed partial class ReportsSnapshotBuilder
             cycle.ReportingExceptionReasons.ToArray(),
             calibrationEvidence,
             cycle.CompletedCycleId > 0,
-            cycle.CompletedCycleId > 0);
+            cycle.CompletedCycleId > 0
+                && cycle.ReportingProjection?.Disposition == HistoricalAdministrativeDispositions.NoAnomaly);
     }
 
     private string ResolveDoctorName(string? doctorId) =>

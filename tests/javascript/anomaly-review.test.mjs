@@ -255,6 +255,28 @@ test("selected detail renders original, effective, lifecycle, inactive roster, a
   assert.match(html, /Incorrect Doctor/);
 });
 
+test("Cleared detail remains inspectable and exposes Reopen without an active-review decision", async () => {
+  const h = harness({
+    request: async url => {
+      if (url.endsWith("/options")) return ok(options);
+      if (url.includes("/detail")) return ok({
+        ...detail(4),
+        disposition: "ClearedForReporting",
+        reviewProvenance: { hasReviewedProvenance: true }
+      });
+      if (url.includes("/ledger")) return ok(ledger);
+      throw new Error(`Unexpected request: ${url}`);
+    }
+  });
+
+  await h.review.selectEncounter("CompletedCycle", 42);
+  const html = h.document.elements.get("reportAnomalyReviewBody").innerHTML;
+
+  assert.match(html, /Cleared for Reporting/);
+  assert.match(html, /Reopen Review/);
+  assert.doesNotMatch(html, /Clear for Reporting<\/button>|Confirm Exception<\/button>/);
+});
+
 test("a stale write is never retried and refreshes authoritative state", async () => {
   let postCount = 0;
   let currentRevision = 1;

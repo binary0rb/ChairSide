@@ -2143,7 +2143,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/DemoBoardStore.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  204782,
+                      "sizeBytes":  204771,
                       "typeSymbols":  [
                                           "ExceptionReasons",
                                           "ReportingExceptionReasons",
@@ -2561,7 +2561,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/HistoricalAnomalyReadEndpointHandler.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  5006,
+                      "sizeBytes":  5019,
                       "typeSymbols":  [
                                           "HistoricalAnomalyReadEndpointHandler"
                                       ],
@@ -2665,7 +2665,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/HistoricalMetadataCorrectionService.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  34753,
+                      "sizeBytes":  34764,
                       "typeSymbols":  [
                                           "HistoricalMetadataCorrectionFields",
                                           "HistoricalMetadataEvidenceAuthority",
@@ -3119,7 +3119,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/ReportsSnapshotBuilder.Audit.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  32254,
+                      "sizeBytes":  32362,
                       "typeSymbols":  [
                                           "ReportsSnapshotBuilder"
                                       ],
@@ -3523,7 +3523,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/SqliteBoardRepository.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  201873,
+                      "sizeBytes":  202915,
                       "typeSymbols":  [
                                           "SqliteBoardRepository",
                                           "DoctorWorkingRoomRecord",
@@ -3568,8 +3568,8 @@
                                             "EnumerateAbortedAssignments",
                                             "LoadAbortedAssignmentById",
                                             "LoadHistoricalEncounter",
-                                            "LoadHistoricalEncounters",
-                                            "LoadHistoricalAdministrativeState"
+                                            "LoadHistoricalEncounterForReporting",
+                                            "LoadHistoricalEncounters"
                                         ],
                       "routes":  [
 
@@ -5831,7 +5831,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/HistoricalAnomalyEndpointTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  23787,
+                      "sizeBytes":  33709,
                       "typeSymbols":  [
                                           "HistoricalAnomalyEndpointTests"
                                       ],
@@ -5843,9 +5843,14 @@
                                             "Disposition_routes_preserve_strict_json_validation",
                                             "Canonical_anomaly_routes_are_admin_protected",
                                             "Canonical_detail_and_bounded_ledger_are_read_only_and_typed",
+                                            "Detail_reporting_exclusions_use_effective_projection_without_rewriting_source_or_ready",
+                                            "Detail_provenance_uses_persisted_projection_after_correction_back_clear_and_reopen",
                                             "Canonical_options_include_inactive_roster_entries_without_synthetic_sedation_variants",
                                             "Program_maps_only_local_admin_anomaly_mutations_and_no_public_system_finding_route",
                                             "CreateSource",
+                                            "CompleteCycle",
+                                            "CreateCorrectionService",
+                                            "SetPersistedProcedure",
                                             "FindRepositoryRoot"
                                         ],
                       "routes":  [
@@ -6505,7 +6510,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/ReportAuditBuilderTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  25278,
+                      "sizeBytes":  26538,
                       "typeSymbols":  [
                                           "ReportAuditBuilderTests"
                                       ],
@@ -6514,6 +6519,7 @@
                                             "Procedure_intelligence_timing_uses_completed_contributors_while_generic_phase_kinds_remain_broader",
                                             "Procedure_intelligence_contributors_inherit_scope_segment_sedation_and_grouping_filters",
                                             "Broad_completed_audit_marks_reporting_exclusions_but_included_audit_omits_them",
+                                            "Mark_for_review_is_available_only_for_current_no_anomaly_disposition",
                                             "Exact_projection_keeps_truthful_zero_and_reversed_intervals_null",
                                             "Query_inherits_base_scope_and_stacks_segment_sedation_and_grouping_filters",
                                             "Review_queries_use_source_specific_anchors_and_effective_analytical_scope",
@@ -7121,7 +7127,7 @@
                   {
                       "path":  "tests/javascript/anomaly-review.test.mjs",
                       "kind":  "JavaScript",
-                      "sizeBytes":  16566,
+                      "sizeBytes":  17398,
                       "typeSymbols":  [
 
                                       ],
@@ -7347,7 +7353,7 @@
                   {
                       "path":  "tests/javascript/reports.test.mjs",
                       "kind":  "JavaScript",
-                      "sizeBytes":  90260,
+                      "sizeBytes":  106058,
                       "typeSymbols":  [
 
                                       ],

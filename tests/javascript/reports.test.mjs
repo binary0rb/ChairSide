@@ -2504,3 +2504,384 @@ test("Doctor View stays pinned to the route doctor while its selected tab surviv
     panel.innerHTML,
     /aria-selected="true" data-report-doctor-tab="audit"/);
 });
+
+test("report press state is module-local and defers guarded replacement until release", () => {
+  const harness = createHarness();
+  harness.reports.wire();
+  harness.reports.render();
+  const grid = harness.elements.get("doctorReportCards");
+  const before = grid.innerHTML;
+
+  harness.pressGuards[0].setPressActive(true);
+  harness.setPayload(reportPayload({
+    otteCases: 4,
+    pledgerCases: 0,
+    marker: "pressed-refresh"
+  }));
+  harness.reports.render();
+  assert.equal(grid.innerHTML, before);
+
+  harness.pressGuards[0].setPressActive(false);
+  harness.reports.render();
+  assert.notEqual(grid.innerHTML, before);
+});
+
+test("module and board preserve shared authority and one-way ownership boundaries", () => {
+  assert.match(
+    moduleSource,
+    /^import \{ wirePressInterruptionGuard \} from "\.\/common-interactions\.js";/);
+  assert.match(
+    moduleSource,
+    /import \{ createAnomalyReview \} from "\.\/anomaly-review\.js";/);
+  assert.match(
+    moduleSource,
+    /import \{ escapeAttribute, escapeHtml, renderHelpIcon \} from "\.\/dom-utils\.js";/);
+  assert.match(
+    moduleSource,
+    /import \{ formatDateTime, formatDuration \} from "\.\/format-utils\.js";/);
+  assert.match(
+    moduleSource,
+    /} from "\.\/request-utils\.js";/);
+  assert.doesNotMatch(
+    moduleSource,
+    /from "\.\/(board|application-state|page-context|room-card|room-workflow|workshop)\.js"/);
+  assert.doesNotMatch(moduleSource, /\bapp\./);
+  assert.doesNotMatch(
+    applicationStateSource,
+    /\b(reports|reportsInFlight|reportFilters|reportDoctorId|reportDoctorTab|dateRange|reportPressActive|reportsVersion)\b/);
+
+  assert.match(boardSource, /import \{ createReportData \} from "\.\/report-data\.js";/);
+  assert.match(boardSource, /import \{ createReports \} from "\.\/reports\.js";/);
+  assert.match(
+    boardSource,
+    /reports = pageContext\.isReports \|\| pageContext\.isDoctor\s*\? createReports\(/);
+  assert.match(
+    boardSource,
+    /const reportData = pageContext\.isReports \|\| pageContext\.isDoctor \|\| pageContext\.isWorkshop/);
+  assert.doesNotMatch(
+    boardSource,
+    /function (renderReports|renderDoctorCockpit|handleReportsActionClick|handleConfirmExclusionClick|renderReportsAccessPrompt|loadReports)\b/);
+  assert.doesNotMatch(boardSource, /\/api\/reports/);
+  assert.doesNotMatch(moduleSource, /aggregateAllocationByDoctor|doctorAllocationSummary/);
+  assert.doesNotMatch(
+    moduleSource,
+    /minimumPairedCases|atExpectedToleranceSeconds|minimumDirectionalShare|materialDeviationSeconds/);
+  assert.match(
+    stylesSource,
+    /@media \(max-width: 700px\)[\s\S]*?\.schedule-fit-kpis\s*\{[\s\S]*?grid-template-columns: 1fr;/);
+});
+
+test("shared audit builds drill-down from normalized report query without reloading Reports", async () => {
+  const payload = reportPayload({ otteCases: 2, pledgerCases: 3 });
+  payload.query = {
+    scope: "Practice",
+    doctorId: null,
+    sedation: "Sedation",
+    procedureGrouping: "DetailedVariant",
+    rangeStartDate: "2026-07-04",
+    rangeEndDate: "2026-07-29"
+  };
+  const evidencePage = {
+    mode: "MetricEvidence",
+    rows: [{
+      completedCycleId: 88,
+      acceptedReadyHandoffId: "handoff-88",
+      analyticalStanding: "Included",
+      roomId: 4,
+      doctorId: "pledger",
+      doctorName: "Dr. Pledger",
+      procedureCode: "EXT+SED",
+      procedureLabel: "Extraction + Sedation",
+      seatedAt: "2026-07-20T08:00:00Z",
+      readyForDoctorAt: "2026-07-20T08:05:00Z",
+      doctorArrivedAt: "2026-07-20T08:05:00Z",
+      doctorCompleteAt: "2026-07-20T08:25:00Z",
+      readyWaitSeconds: 0,
+      doctorTimeSeconds: 1200,
+      seatedToDoctorCompleteSeconds: 1500,
+      expectedAllocationMinutes: 30,
+      exactScheduleFitVarianceSeconds: -300,
+      reportingExclusionReasons: [],
+      canMarkException: true
+    }],
+    reviewRows: [],
+    returnedCount: 1,
+    totalMatchingCount: 1,
+    offset: 0,
+    limit: 50,
+    hasMore: false,
+    activeSort: "LongestReadyWait",
+    supportedSorts: ["MostRecent", "LongestReadyWait"]
+  };
+  const harness = createHarness({ payload, auditResponses: [undefined, evidencePage] });
+  harness.reports.wire();
+  harness.reports.render();
+  await new Promise(resolve => setImmediate(resolve));
+  const button = new FakeElement("", "button");
+  button.dataset.auditKind = "ReadyWait";
+  button.dataset.auditDoctor = "pledger";
+
+  await harness.document.dispatch("click", {
+    target: targetFor(new Map([["[data-audit-kind]", button]]))
+  });
+
+  const selection = harness.auditQueries.at(-1);
+  assert.deepEqual(selection, {
+    from: "2026-07-04",
+    to: "2026-07-29",
+    scope: "Practice",
+    doctorId: null,
+    sedation: "Sedation",
+    procedureGrouping: "DetailedVariant",
+    contributorKind: "ReadyWait",
+    segmentDoctorId: "pledger",
+    procedureCode: null,
+    baseProcedureCode: null,
+    analyticalStanding: "All",
+    evidenceIds: [],
+    sort: "MostRecent",
+    offset: 0,
+    limit: 50
+  });
+  assert.equal(harness.reloadCount, 0);
+  assert.equal(harness.elements.get("reportAuditEvidence").open, true);
+  assert.match(harness.elements.get("reportAuditBody").innerHTML, /report-audit-row/);
+  assert.match(harness.elements.get("reportAuditBody").innerHTML, /Metric|Room 4/);
+  assert.match(harness.elements.get("reportAuditBody").innerHTML, /0 sec/);
+  assert.doesNotMatch(harness.elements.get("reportAuditBody").innerHTML, /recent completed/i);
+
+  const queryCount = harness.auditQueries.length;
+  harness.reports.render();
+  await new Promise(resolve => setImmediate(resolve));
+
+  assert.equal(harness.auditQueries.length, queryCount);
+  assert.equal(harness.auditQueries.at(-1).contributorKind, "ReadyWait");
+  assert.match(harness.elements.get("reportAuditBody").innerHTML, /Metric|Room 4/);
+});
+
+test("audit sort survives a same-version Reports render without a Most Recent reset", async () => {
+  const sorted = {
+    mode: "CompletedCaseAudit",
+    rows: [{ completedCycleId: 7, roomId: 7, doctorName: "Dr. Otte", procedureLabel: "Extraction", analyticalStanding: "Included", reportingExclusionReasons: [] }],
+    reviewRows: [], returnedCount: 1, totalMatchingCount: 1, offset: 0, limit: 50, hasMore: false,
+    activeSort: "Doctor", supportedSorts: ["MostRecent", "Doctor"]
+  };
+  const harness = createHarness({ auditResponses: [undefined, sorted] });
+  harness.reports.wire();
+  harness.reports.render();
+  await new Promise(resolve => setImmediate(resolve));
+  const select = new FakeElement("", "select");
+  select.dataset.auditSort = "";
+  select.dataset.auditView = "primary";
+  select.value = "Doctor";
+
+  await harness.document.dispatch("change", {
+    target: targetFor(new Map([["[data-audit-sort], [data-audit-standing-filter]", select]]))
+  });
+
+  const queryCount = harness.auditQueries.length;
+  assert.equal(harness.auditQueries.at(-1).sort, "Doctor");
+  harness.reports.render();
+  await new Promise(resolve => setImmediate(resolve));
+
+  assert.equal(harness.auditQueries.length, queryCount);
+  assert.equal(harness.auditQueries.at(-1).sort, "Doctor");
+  assert.match(harness.elements.get("reportAuditBody").innerHTML, /value="Doctor" selected/);
+  assert.match(harness.elements.get("reportAuditBody").innerHTML, /Room 7/);
+});
+
+test("audit load more appends server pages without a main report reload", async () => {
+  const first = {
+    mode: "CompletedCaseAudit",
+    rows: [{ completedCycleId: 1, roomId: 1, doctorName: "Dr. Otte", procedureLabel: "Extraction", analyticalStanding: "Included", reportingExclusionReasons: [] }],
+    reviewRows: [], returnedCount: 1, totalMatchingCount: 2, offset: 0, limit: 1, hasMore: true,
+    activeSort: "MostRecent", supportedSorts: ["MostRecent"]
+  };
+  const second = {
+    ...first,
+    rows: [{ completedCycleId: 2, roomId: 2, doctorName: "Dr. Pledger", procedureLabel: "Consult", analyticalStanding: "ReportingExcluded", reportingExclusionReasons: ["unmapped"] }],
+    offset: 1,
+    hasMore: false
+  };
+  const harness = createHarness({ auditResponses: [first, second] });
+  harness.reports.wire();
+  harness.reports.render();
+  await new Promise(resolve => setImmediate(resolve));
+  const button = new FakeElement("", "button");
+  button.dataset.auditLoadMore = "";
+  button.dataset.auditView = "primary";
+
+  await harness.document.dispatch("click", {
+    target: targetFor(new Map([["[data-audit-load-more]", button]]))
+  });
+
+  assert.equal(harness.auditQueries.at(-1).offset, 1);
+  assert.equal(harness.reloadCount, 0);
+  const html = harness.elements.get("reportAuditBody").innerHTML;
+  assert.match(html, /Room 1/);
+  assert.match(html, /Room 2/);
+  assert.match(html, /unmapped/);
+  assert.match(html, /2 matching records; showing 2/);
+  assert.doesNotMatch(html, /showing 1/);
+
+  const queryCount = harness.auditQueries.length;
+  harness.reports.render();
+  await new Promise(resolve => setImmediate(resolve));
+
+  assert.equal(harness.auditQueries.length, queryCount);
+  assert.equal(harness.auditQueries.at(-1).offset, 1);
+  const repeatedHtml = harness.elements.get("reportAuditBody").innerHTML;
+  assert.match(repeatedHtml, /Room 1/);
+  assert.match(repeatedHtml, /Room 2/);
+  assert.match(repeatedHtml, /2 matching records; showing 2/);
+});
+
+test("Doctor Case Audit sort survives a same-version Reports render", async () => {
+  const doctorDefault = {
+    mode: "CompletedCaseAudit",
+    rows: [], reviewRows: [], returnedCount: 0, totalMatchingCount: 0, offset: 0, limit: 50, hasMore: false,
+    activeSort: "MostRecent", supportedSorts: ["MostRecent", "Doctor"]
+  };
+  const doctorSorted = {
+    ...doctorDefault,
+    rows: [{ completedCycleId: 21, roomId: 9, doctorName: "Dr. Otte", procedureLabel: "Consult", analyticalStanding: "Included", reportingExclusionReasons: [] }],
+    returnedCount: 1,
+    totalMatchingCount: 1,
+    activeSort: "Doctor"
+  };
+  const harness = createHarness({ auditResponses: [undefined, doctorDefault, doctorSorted] });
+  harness.elements.set("doctorAuditBody", new FakeElement("doctorAuditBody"));
+  harness.reports.wire();
+  harness.reports.render();
+  await new Promise(resolve => setImmediate(resolve));
+  const auditTab = new FakeElement();
+  auditTab.dataset.reportDoctorTab = "audit";
+  await harness.document.dispatch("click", {
+    target: targetFor(new Map([["[data-report-doctor-tab]", auditTab]]))
+  });
+  harness.reports.render();
+  await new Promise(resolve => setImmediate(resolve));
+  const select = new FakeElement("", "select");
+  select.dataset.auditSort = "";
+  select.dataset.auditView = "doctor";
+  select.value = "Doctor";
+
+  await harness.document.dispatch("change", {
+    target: targetFor(new Map([["[data-audit-sort], [data-audit-standing-filter]", select]]))
+  });
+
+  const queryCount = harness.auditQueries.length;
+  harness.reports.render();
+  await new Promise(resolve => setImmediate(resolve));
+
+  assert.equal(harness.auditQueries.length, queryCount);
+  assert.equal(harness.auditQueries.at(-1).contributorKind, "IncludedCompletedCases");
+  assert.equal(harness.auditQueries.at(-1).sort, "Doctor");
+  assert.match(harness.elements.get("doctorAuditBody").innerHTML, /Room 9/);
+});
+
+test("new reportData version invalidates custom audit state and initializes new parent defaults", async () => {
+  const metricPage = {
+    mode: "MetricEvidence",
+    rows: [{ completedCycleId: 31, roomId: 4, doctorName: "Dr. Pledger", procedureLabel: "Extraction", analyticalStanding: "Included", reportingExclusionReasons: [] }],
+    reviewRows: [], returnedCount: 1, totalMatchingCount: 1, offset: 0, limit: 50, hasMore: false,
+    activeSort: "MostRecent", supportedSorts: ["MostRecent"]
+  };
+  const newDefaultPage = {
+    mode: "CompletedCaseAudit",
+    rows: [{ completedCycleId: 32, roomId: 8, doctorName: "Dr. Otte", procedureLabel: "Extraction + Sedation", analyticalStanding: "Included", reportingExclusionReasons: [] }],
+    reviewRows: [], returnedCount: 1, totalMatchingCount: 1, offset: 0, limit: 50, hasMore: false,
+    activeSort: "MostRecent", supportedSorts: ["MostRecent"]
+  };
+  const harness = createHarness({
+    auditResponses: [undefined, metricPage, newDefaultPage]
+  });
+  harness.reports.wire();
+  harness.reports.render();
+  await new Promise(resolve => setImmediate(resolve));
+  const button = new FakeElement("", "button");
+  button.dataset.auditKind = "ProcedureIntelligenceReadyWait";
+  button.dataset.auditBaseProcedure = "EXT";
+  await harness.document.dispatch("click", {
+    target: targetFor(new Map([["[data-audit-kind]", button]]))
+  });
+  assert.match(harness.elements.get("reportAuditBody").innerHTML, /Metric evidence|Room 4/);
+
+  const nextPayload = reportPayload({ otteCases: 1, pledgerCases: 0 });
+  nextPayload.query = {
+    scope: "Doctor",
+    doctorId: "otte",
+    sedation: "Sedation",
+    procedureGrouping: "DetailedVariant",
+    rangeStartDate: "2026-08-01",
+    rangeEndDate: "2026-08-07"
+  };
+  harness.setPayload(nextPayload);
+  harness.reports.render();
+  await new Promise(resolve => setImmediate(resolve));
+
+  assert.equal(harness.auditQueries.length, 3);
+  assert.deepEqual(harness.auditQueries[2], {
+    from: "2026-08-01",
+    to: "2026-08-07",
+    scope: "Doctor",
+    doctorId: "otte",
+    sedation: "Sedation",
+    procedureGrouping: "DetailedVariant",
+    contributorKind: "IncludedCompletedCases",
+    segmentDoctorId: null,
+    procedureCode: null,
+    baseProcedureCode: null,
+    analyticalStanding: "All",
+    evidenceIds: [],
+    sort: "MostRecent",
+    offset: 0,
+    limit: 50
+  });
+  assert.match(harness.elements.get("reportAuditBody").innerHTML, /Completed-case audit|Room 8/);
+  assert.doesNotMatch(harness.elements.get("reportAuditBody").innerHTML, /Room 4/);
+});
+
+test("Calibration audit passes exact qualified evidence identities without browser qualification", async () => {
+  const payload = reportPayload({ otteCases: 10, pledgerCases: 0 });
+  const harness = createHarness({ payload });
+  harness.reports.wire();
+  harness.reports.render();
+  await new Promise(resolve => setImmediate(resolve));
+  const evidenceIds = [
+    { completedCycleId: 41, acceptedReadyHandoffId: "handoff-41" },
+    { completedCycleId: 42, acceptedReadyHandoffId: "handoff-42" }
+  ];
+  const button = new FakeElement("", "button");
+  button.dataset.auditKind = "CalibrationEvidence";
+  button.dataset.auditBaseProcedure = "EXT";
+  button.dataset.auditEvidence = JSON.stringify(evidenceIds);
+
+  await harness.document.dispatch("click", {
+    target: targetFor(new Map([["[data-audit-kind]", button]]))
+  });
+
+  const selection = harness.auditQueries.at(-1);
+  assert.deepEqual(selection.evidenceIds, evidenceIds);
+  assert.equal(selection.baseProcedureCode, "EXT");
+  assert.equal(harness.reloadCount, 0);
+  assert.doesNotMatch(moduleSource, /minimumPairedCases|minimumDirectionalShare|materialDeviationSeconds/);
+});
+
+test("Doctor headline uses included completed count while Practice keeps broad completed count", () => {
+  const doctorPayload = reportPayload({ otteCases: 5, pledgerCases: 0 });
+  doctorPayload.query = { scope: "Doctor", doctorId: "otte", sedation: "All", procedureGrouping: "Family" };
+  doctorPayload.completedRoomCyclesCount = 7;
+  doctorPayload.includedCompletedCycleCount = 5;
+  doctorPayload.samples.completedCases = sample(7);
+  doctorPayload.samples.includedCompletedCases = sample(5);
+  const doctor = createHarness({ payload: doctorPayload });
+  doctor.reports.render();
+  assert.match(doctor.elements.get("reportHeadline").innerHTML, />5</);
+  assert.doesNotMatch(doctor.elements.get("reportHeadline").innerHTML, />7</);
+
+  const practicePayload = { ...doctorPayload, query: { ...doctorPayload.query, scope: "Practice", doctorId: null } };
+  const practice = createHarness({ payload: practicePayload });
+  practice.reports.render();
+  assert.match(practice.elements.get("reportHeadline").innerHTML, />7</);
+});

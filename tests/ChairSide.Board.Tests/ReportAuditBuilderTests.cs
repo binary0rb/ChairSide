@@ -133,6 +133,33 @@ public sealed class ReportAuditBuilderTests
     }
 
     [Fact]
+    public void Mark_for_review_is_available_only_for_current_no_anomaly_disposition()
+    {
+        var noAnomaly = Cycle(1, "otte", "EXT", Utc(8, 0));
+        var cleared = Cycle(2, "otte", "EXT", Utc(9, 0));
+        cleared.ReportingProjection = Projection(
+            HistoricalAdministrativeDispositions.ClearedForReporting,
+            doctor: "otte",
+            procedure: "EXT",
+            sedation: SedationState.EligibleNo,
+            reviewed: true);
+        var builder = CreateBuilder();
+
+        var completed = builder.BuildAudit(
+            [noAnomaly, cleared], [],
+            new ReportAuditRequest(ContributorKind: ReportAuditContributorKinds.PracticeCompletedCases));
+        var clearedHistory = builder.BuildAudit(
+            [noAnomaly, cleared], [],
+            new ReportAuditRequest(
+                ContributorKind: ReportAuditContributorKinds.AnomalyReview,
+                AnomalyStatus: ReportAnomalyStatuses.ClearedForReporting));
+
+        Assert.True(completed.Rows.Single(row => row.CompletedCycleId == 1).CanMarkForReview);
+        Assert.False(completed.Rows.Single(row => row.CompletedCycleId == 2).CanMarkForReview);
+        Assert.Equal(2, Assert.Single(clearedHistory.ReviewRows).CompletedCycleId);
+    }
+
+    [Fact]
     public void Exact_projection_keeps_truthful_zero_and_reversed_intervals_null()
     {
         var zero = Cycle(1, "otte", "EXT", Utc(8, 0), ready: 10, arrived: 10, complete: 30, available: 30);

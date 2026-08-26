@@ -27,7 +27,7 @@ public static class HistoricalAnomalyReadEndpointHandler
             ? MissingSource()
             : Results.Ok(HistoricalMetadataCorrectionEndpointHandler.ToResponse(
                 encounter,
-                store.GetHistoricalReportingExclusionReasons(key)));
+                store.GetHistoricalReportingExclusionReasons(encounter.Source)));
     }
 
     public static IResult GetLedger(

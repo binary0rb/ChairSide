@@ -4,6 +4,7 @@ using System.Text.Json;
 using ChairSide.Board.Options;
 using ChairSide.Board.Services;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 
@@ -315,6 +316,122 @@ public sealed class HistoricalAnomalyEndpointTests
     }
 
     [Fact]
+    public async Task Detail_reporting_exclusions_use_effective_projection_without_rewriting_source_or_ready()
+    {
+        using var workspace = TestWorkspace.Create();
+        var clock = new ManualTimeProvider(DateTimeOffset.Parse("2026-08-26T14:00:00Z"));
+        var context = StoreContext.Create(workspace, Environments.Production, timeProvider: clock);
+        var key = CompleteCycle(context, clock);
+        SetPersistedProcedure(context.DatabasePath, key.SourceRecordId, "LEGACY-UNKNOWN");
+        var sourceBefore = context.Repository.LoadHistoricalEncounter(key)!.CompletedCycle!;
+        var readyBefore = context.Repository.LoadReadyHandoff(sourceBefore.AcceptedReadyHandoffId!)!;
+        var sourceJson = JsonSerializer.Serialize(sourceBefore);
+        var readyJson = JsonSerializer.Serialize(readyBefore);
+        var administration = new HistoricalAnomalyAdministrationService(context.Repository, clock);
+        var correction = CreateCorrectionService(context);
+
+        Assert.Equal(
+            HistoricalAdministrativeOperationOutcome.Success,
+            administration.MarkForReview(key, 0, HistoricalManualReviewReasons.IncorrectProcedure).Outcome);
+        var before = await GetDetail(key, correction, context);
+        Assert.Contains(
+            ReportingExceptionReasons.UnmappedProcedure,
+            before.Body.GetProperty("reportingExclusionReasons").EnumerateArray()
+                .Select(item => item.GetString()));
+
+        var corrected = correction.CorrectProcedure(key, 1, "EXT");
+        Assert.Equal(HistoricalMetadataCorrectionOutcome.Success, corrected.Outcome);
+        var after = await GetDetail(key, correction, context);
+        var exclusions = after.Body.GetProperty("reportingExclusionReasons").EnumerateArray()
+            .Select(item => item.GetString())
+            .ToArray();
+
+        Assert.DoesNotContain(ReportingExceptionReasons.UnmappedProcedure, exclusions);
+        Assert.DoesNotContain(ReportingExceptionReasons.LegacyProcedure, exclusions);
+        Assert.Equal(
+            "LEGACY-UNKNOWN",
+            after.Body.GetProperty("originalEvidence").GetProperty("metadata").GetProperty("procedureCode").GetString());
+        Assert.Equal("EXT", after.Body.GetProperty("effectiveMetadata").GetProperty("procedureCode").GetString());
+        Assert.Equal(sourceJson, JsonSerializer.Serialize(context.Repository.LoadHistoricalEncounter(key)!.CompletedCycle));
+        Assert.Equal(readyJson, JsonSerializer.Serialize(context.Repository.LoadReadyHandoff(readyBefore.HandoffId)));
+    }
+
+    [Fact]
+    public async Task Detail_provenance_uses_persisted_projection_after_correction_back_clear_and_reopen()
+    {
+        using var workspace = TestWorkspace.Create();
+        var importedReviewedAt = DateTimeOffset.Parse("2026-08-25T18:00:00Z");
+        var clock = new ManualTimeProvider(DateTimeOffset.Parse("2026-08-26T15:00:00Z"));
+        var context = StoreContext.Create(workspace, Environments.Production, timeProvider: clock);
+        var key = CompleteCycle(context, clock);
+        var rawBefore = JsonSerializer.Serialize(context.Repository.LoadHistoricalEncounter(key));
+        var administration = new HistoricalAnomalyAdministrationService(context.Repository, clock);
+        var correction = CreateCorrectionService(context);
+        context.Repository.PersistHistoricalAdministrativeStateAndLedger(
+            new HistoricalEncounterAdministrativeState(
+                key,
+                HistoricalAdministrativeDispositions.NoAnomaly,
+                CurrentReason: null,
+                ReasonSource: null,
+                KnownReviewedAt: importedReviewedAt,
+                KnownReviewedActorClass: HistoricalAdministrativeActorClasses.LocalAdmin,
+                OverrideDoctorId: null,
+                OverrideProcedureCode: null,
+                OverrideSedationState: null,
+                OverrideIsAddOn: null,
+                OverrideExpectedAllocationState: null,
+                OverrideExpectedAllocationSuggestedUnits: null,
+                OverrideExpectedAllocationConfirmedUnits: null,
+                AdministrativeRevision: 0),
+            new HistoricalEncounterAdministrativeLedgerEvent(
+                LedgerId: 0,
+                Key: key,
+                EventType: HistoricalAdministrativeLedgerEventTypes.LegacyStateImported,
+                OccurredAt: importedReviewedAt,
+                ActorClass: HistoricalAdministrativeActorClasses.System,
+                ReasonSource: HistoricalAdministrativeReasonSources.Legacy,
+                StructuredReason: null,
+                PreviousValue: null,
+                NewValue: null,
+                AdminNote: null,
+                AdministrativeRevision: 0));
+
+        var imported = await GetDetail(key, correction, context);
+        var importedProvenance = imported.Body.GetProperty("reviewProvenance");
+        Assert.Equal(importedReviewedAt, importedProvenance.GetProperty("importedReviewedAt").GetDateTimeOffset());
+        Assert.Equal(
+            HistoricalAdministrativeActorClasses.LocalAdmin,
+            importedProvenance.GetProperty("importedReviewedActorClass").GetString());
+        Assert.True(importedProvenance.GetProperty("hasReviewedProvenance").GetBoolean());
+
+        Assert.Equal(
+            HistoricalAdministrativeOperationOutcome.Success,
+            administration.MarkForReview(key, 0, HistoricalManualReviewReasons.IncorrectDoctor).Outcome);
+        Assert.Equal(HistoricalMetadataCorrectionOutcome.Success, correction.CorrectDoctor(key, 1, "pledger").Outcome);
+        Assert.Equal(HistoricalMetadataCorrectionOutcome.Success, correction.CorrectDoctor(key, 2, "otte").Outcome);
+        Assert.Equal(
+            HistoricalAdministrativeOperationOutcome.Success,
+            administration.ClearForReporting(key, 3).Outcome);
+
+        var cleared = await GetDetail(key, correction, context);
+        var clearedProvenance = cleared.Body.GetProperty("reviewProvenance");
+        Assert.True(clearedProvenance.GetProperty("hasHistoricalCorrection").GetBoolean());
+        Assert.True(clearedProvenance.GetProperty("hasReviewedProvenance").GetBoolean());
+        Assert.False(cleared.Body.GetProperty("correctionIndicators").GetProperty("doctor").GetBoolean());
+
+        Assert.Equal(
+            HistoricalAdministrativeOperationOutcome.Success,
+            administration.ReopenReview(key, 4).Outcome);
+        var reopened = await GetDetail(key, correction, context);
+        Assert.Equal(
+            HistoricalAdministrativeDispositions.NeedsReview,
+            reopened.Body.GetProperty("disposition").GetString());
+        Assert.True(reopened.Body.GetProperty("reviewProvenance").GetProperty("hasHistoricalCorrection").GetBoolean());
+        Assert.True(reopened.Body.GetProperty("reviewProvenance").GetProperty("hasReviewedProvenance").GetBoolean());
+        Assert.Equal(rawBefore, JsonSerializer.Serialize(context.Repository.LoadHistoricalEncounter(key)));
+    }
+
+    [Fact]
     public async Task Canonical_options_include_inactive_roster_entries_without_synthetic_sedation_variants()
     {
         var doctors = DoctorRosterOptions.DefaultDoctors();
@@ -390,6 +507,71 @@ public sealed class HistoricalAnomalyEndpointTests
         Assert.NotNull(context.Store.CancelPrestage(1));
         var source = Assert.Single(context.Repository.LoadAbortedAssignments());
         return new HistoricalEncounterKey(HistoricalEncounterSourceTypes.AbortedAssignment, source.AbortedAssignmentId);
+    }
+
+    private static HistoricalEncounterKey CompleteCycle(StoreContext context, ManualTimeProvider clock)
+    {
+        var started = clock.GetUtcNow();
+        Assert.NotNull(context.Store.BeginPrestage(1, "otte", "EXT", sedation: false, expectedAllocationUnits: 3));
+        clock.SetUtcNow(started.AddMinutes(1));
+        Assert.NotNull(context.Store.SeatRoomCanonical(1, null).Room);
+        clock.SetUtcNow(started.AddMinutes(2));
+        Assert.NotNull(context.Store.MarkReadyForDoctor(1));
+        clock.SetUtcNow(started.AddMinutes(3));
+        Assert.NotNull(context.Store.MarkDoctorArrived(1));
+        clock.SetUtcNow(started.AddMinutes(13));
+        Assert.NotNull(context.Store.MarkDoctorComplete(1));
+        clock.SetUtcNow(started.AddMinutes(15));
+        Assert.NotNull(context.Store.MarkRoomAvailable(1));
+        var cycle = Assert.Single(context.Repository.LoadCompletedCycles());
+        return new HistoricalEncounterKey(HistoricalEncounterSourceTypes.CompletedCycle, cycle.CompletedCycleId);
+    }
+
+    private static HistoricalMetadataCorrectionService CreateCorrectionService(StoreContext context) =>
+        new(
+            context.Repository,
+            Microsoft.Extensions.Options.Options.Create(new DoctorRosterOptions
+            {
+                Doctors = DoctorRosterOptions.DefaultDoctors()
+            }),
+            Microsoft.Extensions.Options.Options.Create(new ProcedureRosterOptions
+            {
+                Procedures = ProcedureRosterOptions.DefaultProcedures()
+            }));
+
+    private static async Task<(int? StatusCode, JsonElement Body)> GetDetail(
+        HistoricalEncounterKey key,
+        HistoricalMetadataCorrectionService correction,
+        StoreContext context) =>
+        await ExecuteResult(HistoricalAnomalyReadEndpointHandler.GetDetail(
+            key.SourceType,
+            key.SourceRecordId,
+            correction,
+            context.Store));
+
+    private static void SetPersistedProcedure(string databasePath, long sourceRecordId, string procedureCode)
+    {
+        using var connection = new SqliteConnection(new SqliteConnectionStringBuilder
+        {
+            DataSource = databasePath
+        }.ToString());
+        connection.Open();
+        using var command = connection.CreateCommand();
+        command.CommandText = """
+            UPDATE completed_room_cycles
+            SET procedure_code = $procedureCode
+            WHERE id = $sourceRecordId;
+
+            UPDATE ready_handoffs
+            SET procedure_code = $procedureCode
+            WHERE handoff_id = (
+                SELECT accepted_ready_handoff_id
+                FROM completed_room_cycles
+                WHERE id = $sourceRecordId);
+            """;
+        command.Parameters.AddWithValue("$procedureCode", procedureCode);
+        command.Parameters.AddWithValue("$sourceRecordId", sourceRecordId);
+        Assert.Equal(2, command.ExecuteNonQuery());
     }
 
     private static async Task<(int? StatusCode, JsonElement Body)> Invoke(
