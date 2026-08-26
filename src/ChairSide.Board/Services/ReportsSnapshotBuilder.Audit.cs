@@ -33,7 +33,9 @@ internal sealed partial class ReportsSnapshotBuilder
             ? DefaultAuditLimit
             : Math.Min(request.Limit, MaximumAuditLimit);
         var isReview = contributorKind is ReportAuditContributorKinds.PendingReview
-            or ReportAuditContributorKinds.ReviewedExceptionHistory;
+            or ReportAuditContributorKinds.ReviewedExceptionHistory
+            or ReportAuditContributorKinds.AnomalyReview;
+        var anomalyStatus = NormalizeAnomalyStatus(request.AnomalyStatus);
         var supportedSorts = isReview ? ReportAuditSorts.Review : ReportAuditSorts.All;
         var sort = supportedSorts.Contains(request.Sort, StringComparer.OrdinalIgnoreCase)
             ? supportedSorts.First(item => string.Equals(item, request.Sort, StringComparison.OrdinalIgnoreCase))
@@ -45,7 +47,8 @@ internal sealed partial class ReportsSnapshotBuilder
             NormalizeOptional(request.ProcedureCode),
             NormalizeOptional(request.BaseProcedureCode),
             standing,
-            evidenceIds);
+            evidenceIds,
+            anomalyStatus);
 
         if (isReview)
         {
@@ -171,11 +174,14 @@ internal sealed partial class ReportsSnapshotBuilder
         int offset,
         int limit)
     {
-        var pending = selection.ContributorKind == ReportAuditContributorKinds.PendingReview;
+        var compatibilityPending = selection.ContributorKind == ReportAuditContributorKinds.PendingReview;
+        var compatibilityReviewed = selection.ContributorKind == ReportAuditContributorKinds.ReviewedExceptionHistory;
         var rows = BuildReviewRows(completedCycles, abortedAssignments, query)
-            .Where(row => pending
+            .Where(row => compatibilityPending
                 ? row.Disposition == HistoricalAdministrativeDispositions.NeedsReview
-                : row.HasReviewedProvenance)
+                : compatibilityReviewed
+                    ? row.HasReviewedProvenance
+                    : MatchesAnomalyStatus(row.Disposition, selection.AnomalyStatus))
             .Where(row => MatchesReviewProcedure(row, selection))
             .ToList();
         var ordered = OrderReviewRows(rows, sort).ToList();
@@ -463,6 +469,7 @@ internal sealed partial class ReportsSnapshotBuilder
             cycle.StaleThresholdReached,
             cycle.ReportingExceptionReasons.ToArray(),
             calibrationEvidence,
+            cycle.CompletedCycleId > 0,
             cycle.CompletedCycleId > 0);
     }
 
@@ -624,6 +631,7 @@ internal sealed partial class ReportsSnapshotBuilder
             ReportAuditContributorKinds.ProcedureIntelligenceSeatedToDoctorComplete,
             ReportAuditContributorKinds.HistoricalScheduleFit,
             ReportAuditContributorKinds.CalibrationEvidence,
+            ReportAuditContributorKinds.AnomalyReview,
             ReportAuditContributorKinds.PendingReview,
             ReportAuditContributorKinds.ReviewedExceptionHistory
         };
@@ -635,6 +643,25 @@ internal sealed partial class ReportsSnapshotBuilder
         return supported.FirstOrDefault(item => string.Equals(item, value.Trim(), StringComparison.OrdinalIgnoreCase))
             ?? throw new ReportAuditQueryException($"Unsupported contributorKind '{value}'.");
     }
+
+    internal static string NormalizeAnomalyStatus(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return ReportAnomalyStatuses.NeedsReview;
+        }
+
+        return ReportAnomalyStatuses.All.FirstOrDefault(item =>
+                string.Equals(item, value.Trim(), StringComparison.OrdinalIgnoreCase))
+            ?? throw new ReportAuditQueryException($"Unsupported anomalyStatus '{value}'.");
+    }
+
+    internal static bool MatchesAnomalyStatus(string disposition, string anomalyStatus) =>
+        anomalyStatus == ReportAnomalyStatuses.AllAnomalies
+            ? disposition is HistoricalAdministrativeDispositions.NeedsReview
+                or HistoricalAdministrativeDispositions.ConfirmedException
+                or HistoricalAdministrativeDispositions.ClearedForReporting
+            : disposition == anomalyStatus;
 
     private static string NormalizeStanding(string? value) =>
         value?.Trim() switch

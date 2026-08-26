@@ -236,26 +236,41 @@ public static class HistoricalMetadataCorrectionEndpointHandler
                 "The source type and source record id must form a supported historical identity.")
         };
 
-    private static object ToResponse(HistoricalEffectiveEncounter encounter) => new
+    internal static object ToResponse(
+        HistoricalEffectiveEncounter encounter,
+        IReadOnlyList<string>? reportingExclusionReasons = null)
     {
-        sourceType = encounter.Key.SourceType,
-        sourceRecordId = encounter.Key.SourceRecordId,
-        originalEvidence = new
+        var reportingProjection = encounter.Source.CompletedCycle?.ReportingProjection
+            ?? encounter.Source.AbortedAssignment?.ReportingProjection;
+        return new
         {
-            authority = encounter.OriginalEvidenceAuthority,
-            readyHandoffId = encounter.OriginalReadyHandoffId,
-            metadata = encounter.OriginalMetadata,
-            lifecycle = ToLifecycleEvidence(encounter.Source)
-        },
-        effectiveMetadata = encounter.EffectiveMetadata,
-        overrides = encounter.Overrides,
-        correctionIndicators = encounter.CorrectionIndicators,
-        correctionSupport = encounter.CorrectionSupport,
-        disposition = encounter.Disposition,
-        reason = encounter.CurrentReason,
-        reasonSource = encounter.ReasonSource,
-        administrativeRevision = encounter.AdministrativeRevision
-    };
+            sourceType = encounter.Key.SourceType,
+            sourceRecordId = encounter.Key.SourceRecordId,
+            originalEvidence = new
+            {
+                authority = encounter.OriginalEvidenceAuthority,
+                readyHandoffId = encounter.OriginalReadyHandoffId,
+                metadata = encounter.OriginalMetadata,
+                lifecycle = ToLifecycleEvidence(encounter.Source)
+            },
+            effectiveMetadata = encounter.EffectiveMetadata,
+            overrides = encounter.Overrides,
+            correctionIndicators = encounter.CorrectionIndicators,
+            correctionSupport = encounter.CorrectionSupport,
+            disposition = encounter.Disposition,
+            reason = encounter.CurrentReason,
+            reasonSource = encounter.ReasonSource,
+            administrativeRevision = encounter.AdministrativeRevision,
+            reviewProvenance = new
+            {
+                importedReviewedAt = reportingProjection?.KnownReviewedAt,
+                importedReviewedActorClass = reportingProjection?.KnownReviewedActorClass,
+                hasHistoricalCorrection = reportingProjection?.HasHistoricalCorrectionProvenance ?? false,
+                hasReviewedProvenance = reportingProjection?.HasReviewedProvenance ?? false
+            },
+            reportingExclusionReasons = reportingExclusionReasons ?? []
+        };
+    }
 
     private static object ToLifecycleEvidence(HistoricalEncounterRecord source) =>
         source.CompletedCycle is { } completed

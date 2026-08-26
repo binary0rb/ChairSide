@@ -232,10 +232,136 @@ public sealed class HistoricalAnomalyEndpointTests
         context.Request.Path = path;
 
         Assert.True(AdminAccessGuard.IsProtectedPath(path));
+        Assert.True(AdminAccessGuard.IsProtectedPath("/api/reports/anomalies/options"));
+        Assert.True(AdminAccessGuard.IsProtectedPath("/api/reports/anomalies/CompletedCycle/1/ledger"));
         Assert.Equal(
             StatusCodes.Status401Unauthorized,
             Assert.IsAssignableFrom<IStatusCodeHttpResult>(
                 AdminAccessGuard.ValidateRequest(context.Request, validator)!).StatusCode);
+    }
+
+    [Fact]
+    public async Task Canonical_detail_and_bounded_ledger_are_read_only_and_typed()
+    {
+        using var workspace = TestWorkspace.Create();
+        var context = StoreContext.Create(workspace, Environments.Production);
+        var key = CreateSource(context);
+        var administration = new HistoricalAnomalyAdministrationService(context.Repository);
+        Assert.Equal(
+            HistoricalAdministrativeOperationOutcome.Success,
+            administration.MarkForReview(key, 0, HistoricalManualReviewReasons.UnexpectedLifecycle).Outcome);
+        Assert.Equal(
+            HistoricalAdministrativeOperationOutcome.Success,
+            administration.AddNote(key, 1, "Reviewed without PHI").Outcome);
+        var before = JsonSerializer.Serialize(context.Repository.LoadHistoricalEncounter(key));
+        var correctionService = new HistoricalMetadataCorrectionService(
+            context.Repository,
+            Microsoft.Extensions.Options.Options.Create(new DoctorRosterOptions
+            {
+                Doctors = DoctorRosterOptions.DefaultDoctors()
+            }),
+            Microsoft.Extensions.Options.Options.Create(new ProcedureRosterOptions
+            {
+                Procedures = ProcedureRosterOptions.DefaultProcedures()
+            }));
+
+        var detail = await ExecuteResult(HistoricalAnomalyReadEndpointHandler.GetDetail(
+            key.SourceType,
+            key.SourceRecordId,
+            correctionService,
+            context.Store));
+        Assert.Equal(StatusCodes.Status200OK, detail.StatusCode);
+        Assert.Equal(2, detail.Body.GetProperty("administrativeRevision").GetInt32());
+        Assert.Equal(
+            HistoricalAdministrativeDispositions.NeedsReview,
+            detail.Body.GetProperty("disposition").GetString());
+        Assert.True(detail.Body.TryGetProperty("originalEvidence", out _));
+        Assert.True(detail.Body.TryGetProperty("effectiveMetadata", out _));
+        Assert.True(detail.Body.TryGetProperty("reportingExclusionReasons", out _));
+
+        var ledger = await ExecuteResult(HistoricalAnomalyReadEndpointHandler.GetLedger(
+            key.SourceType,
+            key.SourceRecordId,
+            offset: 1,
+            limit: 500,
+            context.Repository));
+        Assert.Equal(StatusCodes.Status200OK, ledger.StatusCode);
+        Assert.Equal(100, ledger.Body.GetProperty("limit").GetInt32());
+        Assert.Equal(1, ledger.Body.GetProperty("returnedCount").GetInt32());
+        Assert.Equal(2, ledger.Body.GetProperty("totalMatchingCount").GetInt32());
+        Assert.Equal(
+            "Reviewed without PHI",
+            ledger.Body.GetProperty("rows")[0].GetProperty("administrativeNote").GetString());
+
+        Assert.Equal(before, JsonSerializer.Serialize(context.Repository.LoadHistoricalEncounter(key)));
+        Assert.Equal(2, context.Repository.LoadHistoricalAdministrativeLedger(key, 0, 10).Rows.Count);
+
+        var invalid = await ExecuteResult(HistoricalAnomalyReadEndpointHandler.GetLedger(
+            "completed",
+            key.SourceRecordId,
+            0,
+            50,
+            context.Repository));
+        Assert.Equal(StatusCodes.Status400BadRequest, invalid.StatusCode);
+        Assert.Equal("invalid-source", invalid.Body.GetProperty("code").GetString());
+
+        var missing = await ExecuteResult(HistoricalAnomalyReadEndpointHandler.GetLedger(
+            HistoricalEncounterSourceTypes.CompletedCycle,
+            999_999,
+            0,
+            50,
+            context.Repository));
+        Assert.Equal(StatusCodes.Status404NotFound, missing.StatusCode);
+    }
+
+    [Fact]
+    public async Task Canonical_options_include_inactive_roster_entries_without_synthetic_sedation_variants()
+    {
+        var doctors = DoctorRosterOptions.DefaultDoctors();
+        doctors.Add(new DoctorRosterItem
+        {
+            Id = "retired-doctor",
+            DisplayName = "Dr. Retired",
+            ShortName = "Retired",
+            Color = "#64748b",
+            Active = false
+        });
+        var procedures = ProcedureRosterOptions.DefaultProcedures();
+        procedures.Add(new ProcedureRosterItem
+        {
+            Code = "OLD",
+            Label = "Historical Procedure",
+            Icon = "history",
+            Active = false,
+            SedationEligible = true
+        });
+        procedures.Add(new ProcedureRosterItem
+        {
+            Code = "OLD+SED",
+            Label = "Historical Procedure + Sedation",
+            Icon = "history",
+            Active = false,
+            SedationEligible = true
+        });
+
+        var response = await ExecuteResult(HistoricalAnomalyReadEndpointHandler.GetOptions(
+            Microsoft.Extensions.Options.Options.Create(new DoctorRosterOptions { Doctors = doctors }),
+            Microsoft.Extensions.Options.Options.Create(new ProcedureRosterOptions { Procedures = procedures })));
+
+        Assert.Equal(StatusCodes.Status200OK, response.StatusCode);
+        Assert.Contains(
+            response.Body.GetProperty("doctors").EnumerateArray(),
+            item => item.GetProperty("id").GetString() == "retired-doctor"
+                && !item.GetProperty("active").GetBoolean());
+        Assert.Contains(
+            response.Body.GetProperty("procedures").EnumerateArray(),
+            item => item.GetProperty("code").GetString() == "OLD"
+                && !item.GetProperty("active").GetBoolean());
+        Assert.DoesNotContain(
+            response.Body.GetProperty("procedures").EnumerateArray(),
+            item => item.GetProperty("code").GetString()!.Contains("+SED", StringComparison.OrdinalIgnoreCase));
+        Assert.Equal(500, response.Body.GetProperty("noteMaximumLength").GetInt32());
+        Assert.Equal(5, response.Body.GetProperty("reasons").GetArrayLength());
     }
 
     [Fact]
@@ -252,6 +378,9 @@ public sealed class HistoricalAnomalyEndpointTests
         Assert.Contains("/api/reports/anomalies/{sourceType}/{sourceRecordId:long}/clear", program, StringComparison.Ordinal);
         Assert.Contains("/api/reports/anomalies/{sourceType}/{sourceRecordId:long}/confirm", program, StringComparison.Ordinal);
         Assert.Contains("/api/reports/anomalies/{sourceType}/{sourceRecordId:long}/reopen", program, StringComparison.Ordinal);
+        Assert.Contains("/api/reports/anomalies/options", program, StringComparison.Ordinal);
+        Assert.Contains("/api/reports/anomalies/{sourceType}/{sourceRecordId:long}/detail", program, StringComparison.Ordinal);
+        Assert.Contains("/api/reports/anomalies/{sourceType}/{sourceRecordId:long}/ledger", program, StringComparison.Ordinal);
         Assert.DoesNotContain("system-finding", program, StringComparison.OrdinalIgnoreCase);
     }
 
@@ -274,6 +403,18 @@ public sealed class HistoricalAnomalyEndpointTests
         using var services = new ServiceCollection().AddLogging().BuildServiceProvider();
         context.RequestServices = services;
         var result = await invoke(context);
+        var status = Assert.IsAssignableFrom<IStatusCodeHttpResult>(result).StatusCode;
+        await result.ExecuteAsync(context);
+        context.Response.Body.Position = 0;
+        using var document = await JsonDocument.ParseAsync(context.Response.Body);
+        return (status, document.RootElement.Clone());
+    }
+
+    private static async Task<(int? StatusCode, JsonElement Body)> ExecuteResult(IResult result)
+    {
+        var context = new DefaultHttpContext();
+        context.Response.Body = new MemoryStream();
+        context.RequestServices = new ServiceCollection().AddLogging().BuildServiceProvider();
         var status = Assert.IsAssignableFrom<IStatusCodeHttpResult>(result).StatusCode;
         await result.ExecuteAsync(context);
         context.Response.Body.Position = 0;

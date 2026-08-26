@@ -419,6 +419,7 @@ public sealed class BoardReadyPresentationTests
         var reportsPage = File.ReadAllText(Path.Combine(webRoot, "reports.html"));
         var doctorPage = File.ReadAllText(Path.Combine(webRoot, "doctor.html"));
         var reportsScript = File.ReadAllText(Path.Combine(webRoot, "reports.js"));
+        var anomalyScript = File.ReadAllText(Path.Combine(webRoot, "anomaly-review.js"));
 
         Assert.Matches(
             @"(?s)<div[^>]*\bid=""reportActionFeedback""[^>]*\btabindex=""-1""[^>]*\bhidden[^>]*>"
@@ -448,17 +449,14 @@ public sealed class BoardReadyPresentationTests
         Assert.DoesNotContain("data-action=\"confirm-exclusion\"", doctorPage, StringComparison.Ordinal);
 
         Assert.DoesNotMatch(@"(?:window\.)?alert\s*\(", reportsScript);
-        Assert.Contains("document.createElement(\"article\")", reportsScript, StringComparison.Ordinal);
-        Assert.Contains("message.textContent = entry.message;", reportsScript, StringComparison.Ordinal);
-        Assert.True(Regex.Matches(reportsScript, @"\bconfirm\s*\(").Count >= 2);
-        Assert.Contains("/api/reports/cycles/mark-exception", reportsScript, StringComparison.Ordinal);
-        Assert.Contains("`cycles/${reviewRecordId}`", reportsScript, StringComparison.Ordinal);
-        Assert.Contains("`aborted-assignments/${reviewRecordId}`", reportsScript, StringComparison.Ordinal);
-        Assert.Contains(
-            "`/api/reports/${recordPath}/confirm-exclusion`",
-            reportsScript,
-            StringComparison.Ordinal);
-        Assert.Contains("sourceType === \"AbortedAssignment\"", reportsScript, StringComparison.Ordinal);
+        Assert.DoesNotMatch(@"(?:window\.)?alert\s*\(", anomalyScript);
+        Assert.Contains("data-anomaly-feedback", anomalyScript, StringComparison.Ordinal);
+        Assert.Contains("role=\"${feedbackRole}\"", anomalyScript, StringComparison.Ordinal);
+        Assert.Contains("focusFeedback", anomalyScript, StringComparison.Ordinal);
+        Assert.Contains("confirmAction(confirmation)", anomalyScript, StringComparison.Ordinal);
+        Assert.Contains("/api/reports/anomalies/${encodeURIComponent(detail.sourceType)}", anomalyScript, StringComparison.Ordinal);
+        Assert.DoesNotContain("/api/reports/cycles/mark-exception", reportsScript, StringComparison.Ordinal);
+        Assert.DoesNotContain("confirm-exclusion", reportsScript, StringComparison.Ordinal);
     }
 
     [Fact]

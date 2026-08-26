@@ -9,6 +9,7 @@
     "test:request-utils": "node --test tests/javascript/request-utils.test.mjs",
     "test:realtime-polling": "node --test tests/javascript/realtime-polling.test.mjs",
     "test:report-data": "node --test tests/javascript/report-data.test.mjs",
+    "test:anomaly-review": "node --test tests/javascript/anomaly-review.test.mjs",
     "test:reports": "node --test tests/javascript/reports.test.mjs",
     "test:room-card": "node --test tests/javascript/room-card.test.mjs",
     "test:room-workflow": "node --test tests/javascript/room-workflow.test.mjs",

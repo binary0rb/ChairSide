@@ -1,4 +1,5 @@
 import { wirePressInterruptionGuard } from "./common-interactions.js";
+import { createAnomalyReview } from "./anomaly-review.js";
 import { escapeAttribute, escapeHtml, renderHelpIcon } from "./dom-utils.js";
 import { formatDateTime, formatDuration } from "./format-utils.js";
 import {
@@ -36,6 +37,12 @@ export function createReports({
   const reportActionElements = new Map();
   let nextReportActionOperationId = 0;
   let reportActionCapacityVisible = false;
+  const anomalyReview = createAnomalyReview({
+    reportData,
+    request,
+    adminHeaders: adminRequestHeaders,
+    reloadReports: () => reportData.reloadAfterCurrent()
+  });
 
   async function selectDateRangePreset(preset) {
   clearCompletedReportAction();
@@ -242,7 +249,7 @@ export function createReports({
   renderProcedureIntelligence(r);
   renderAllocationReports(r);
   renderAuditEvidence(r);
-  renderReviewEvidence(r);
+  anomalyReview.onReportRendered(r, reportData.getVersion());
   renderGroupedInsights(r, hasData);
   renderFullMetrics(r, hasData);
 
@@ -741,8 +748,9 @@ export function createReports({
   const quality = r.dataQuality || {};
   const included = quality.includedCount ?? r.includedCompletedCycleCount ?? 0;
   const excluded = quality.reportingExcludedCount ?? r.excludedCompletedCycleCount ?? 0;
-  const reviewCount = quality.pendingReviewCount ?? (r.exceptionReviewRecords || r.exceptionCycles || []).length;
-  const reviewedCount = quality.reviewedExceptionCount ?? 0;
+  const reviewCount = quality.needsReviewCount ?? quality.pendingReviewCount ?? 0;
+  const confirmedCount = quality.confirmedExceptionCount ?? 0;
+  const clearedCount = quality.clearedAnomalyCount ?? 0;
   const status = document.getElementById("dataQualityStatus");
   if (status) {
   const completed = quality.completedCount ?? included + excluded;
@@ -760,14 +768,14 @@ export function createReports({
     ? `<p class="allocation-note">${excluded} ${excluded === 1 ? "record is" : "records are"} excluded from standard metrics.</p>`
     : "";
   const reviewDetail = reviewCount > 0
-    ? `<p class="allocation-note">${reviewCount} ${reviewCount === 1 ? "item requires" : "items require"} review in the action queue.</p>
-       <button type="button" class="secondary-button utility-button" data-action="open-review-queue" aria-controls="reportReviewQueue">Open review queue</button>`
+    ? `<p class="allocation-note">${reviewCount} ${reviewCount === 1 ? "encounter Needs" : "encounters Need"} Review.</p>
+       <button type="button" class="secondary-button utility-button" data-action="open-anomaly-review" data-anomaly-open-status="NeedsReview" aria-controls="reportAnomalyReview">Open anomaly review</button>`
     : "";
   const excludedAction = excluded > 0
     ? renderAuditAction("PracticeCompletedCases", "View reporting-excluded cases", { analyticalStanding: "ReportingExcluded" })
     : "";
-  const reviewedAction = reviewedCount > 0
-    ? `<button type="button" class="secondary-button utility-button" data-action="open-reviewed-history" aria-controls="reportReviewedHistory">View reviewed history (${reviewedCount})</button>`
+  const historyAction = confirmedCount + clearedCount > 0
+    ? `<button type="button" class="secondary-button utility-button" data-action="open-anomaly-review" data-anomaly-open-status="AllAnomalies" aria-controls="reportAnomalyReview">View anomaly history (${confirmedCount + clearedCount})</button>`
     : "";
 
   card.innerHTML = `
@@ -777,7 +785,7 @@ export function createReports({
     ${exclusionDetail}
     ${reviewDetail}
     ${excludedAction}
-    ${reviewedAction}
+    ${historyAction}
     <p class="allocation-footnote">Completed = included + reporting-excluded. Review counts use source-specific lifecycle anchors in the same UTC window.</p>`;
 }
 
@@ -1843,18 +1851,6 @@ export function createReports({
   initializeAuditViewForReportVersion("primary", "reportAuditBody", auditSelection(r, kind));
 }
 
-  function renderReviewEvidence(r) {
-  const quality = r.dataQuality || {};
-  const pendingCount = quality.pendingReviewCount ?? (r.exceptionReviewRecords || r.exceptionCycles || []).length;
-  const reviewedCount = quality.reviewedExceptionCount ?? 0;
-  const pendingLabel = document.getElementById("reportReviewQueueCount");
-  const reviewedLabel = document.getElementById("reportReviewedHistoryCount");
-  if (pendingLabel) pendingLabel.textContent = `(${pendingCount})`;
-  if (reviewedLabel) reviewedLabel.textContent = `(${reviewedCount})`;
-  initializeAuditViewForReportVersion("pending", "reportReviewQueueBody", auditSelection(r, "PendingReview"));
-  initializeAuditViewForReportVersion("reviewed", "reportReviewedHistoryBody", auditSelection(r, "ReviewedExceptionHistory"));
-}
-
   function renderAuditView(viewId, targetId) {
   const target = document.getElementById(targetId);
   const entry = state.auditViews.get(viewId);
@@ -1943,11 +1939,11 @@ export function createReports({
         <div><dt>Tolerance</dt><dd>${escapeHtml(row.calibrationEvidence.toleranceClassification)}</dd></div>
       </dl>` : ""}
       ${(row.reportingExclusionReasons || []).length ? `<p class="report-table-context">Excluded: ${escapeHtml(row.reportingExclusionReasons.join("; "))}</p>` : ""}
-      ${row.canMarkException ? `<button class="secondary-button utility-button" data-action="mark-exception" data-completed-cycle-id="${row.completedCycleId}" data-room-id="${row.roomId}" data-seated-at="${escapeAttribute(row.seatedAt || "")}">Mark Exception</button>` : ""}
+      ${row.canMarkForReview ? `<button class="secondary-button utility-button" data-action="mark-for-review" data-review-source="CompletedCycle" data-review-record-id="${row.completedCycleId}">Mark for Review</button>` : ""}
     </details>`).join("");
 }
 
-  function renderReviewAuditRows(rows, pending) {
+  function renderReviewAuditRows(rows) {
   return rows.map(row => {
     const recordKey = reviewRecordKey(row.sourceType, row.reviewRecordId);
     return `<details class="report-audit-row" data-report-action-row data-report-record-key="${escapeAttribute(recordKey)}">
@@ -1957,9 +1953,9 @@ export function createReports({
         <div><dt>Final state</dt><dd>${escapeHtml(row.finalState || "--")}</dd></div>
         <div><dt>Reason</dt><dd>${escapeHtml(row.reason || "--")}</dd></div>
         <div><dt>Suggested action</dt><dd>${escapeHtml(row.suggestedAction || "--")}</dd></div>
-        <div><dt>Reviewed</dt><dd>${formatDateTime(row.reviewedAt)}</dd></div>
+        <div><dt>Imported reviewed-at evidence</dt><dd>${formatDateTime(row.reviewedAt)}</dd></div>
       </dl>
-      ${pending ? `<button class="secondary-button utility-button" data-action="confirm-exclusion" data-review-source="${escapeAttribute(row.sourceType)}" data-review-record-id="${row.reviewRecordId}" data-room-id="${row.roomId}" data-report-record-key="${escapeAttribute(recordKey)}">Confirm Exclusion</button>` : ""}
+      <button class="secondary-button utility-button" data-action="open-anomaly-encounter" data-review-source="${escapeAttribute(row.sourceType)}" data-review-record-id="${row.reviewRecordId}">Open anomaly detail</button>
     </details>`;
   }).join("");
 }
@@ -2822,7 +2818,7 @@ export function createReports({
     return null;
   }
 
-  const actionWillRemain = entry.actionType === "mark-exception"
+  const actionWillRemain = entry.actionType === "mark-for-review"
     ? completedCycles.some(cycle => completedRecordKey(cycle) === recordKey)
     : exceptionCycles.some(record => {
       const sourceType = record.sourceType || "CompletedCycle";
@@ -3092,7 +3088,7 @@ export function createReports({
     return;
   }
 
-  if (entry.actionType === "mark-exception") {
+  if (entry.actionType === "mark-for-review") {
     const resolution = markExceptionResolution(entry, reportData.getReports());
     if (resolution === "success") {
       setReportActionState({
@@ -3197,7 +3193,7 @@ export function createReports({
   body.dataset.renderKey = token;
   body.innerHTML = exceptions.length
     ? exceptions.map(renderExceptionRow).join("")
-    : `<tr><td colspan="12">No exceptions requiring review.</td></tr>`;
+    : `<tr><td colspan="12">No anomalies need review.</td></tr>`;
 }
 
   function renderExceptionRow(cycle) {
@@ -3206,10 +3202,10 @@ export function createReports({
   const reviewRecordId = Number(cycle.reviewRecordId || cycle.completedCycleId || cycle.abortedAssignmentId || 0);
   const recordKey = reviewRecordKey(sourceType, reviewRecordId);
   const actionState = currentReportAction(recordKey);
-  const locked = isMutationLocked(actionState, "confirm-exclusion");
+  const locked = isMutationLocked(actionState, "open-anomaly-encounter");
   const label = actionState?.phase === "pending" && actionState.requestKind === "mutation"
-    ? "Confirming exclusion..."
-    : "Confirm Exclusion";
+    ? "Opening anomaly..."
+    : "Open anomaly detail";
   return `
     <tr data-report-action-row
         data-report-record-key="${escapeAttribute(recordKey)}"
@@ -3227,13 +3223,13 @@ export function createReports({
       <td>${escapeHtml(cycle.reviewStatus || "--")}</td>
       <td>
         <button class="secondary-button utility-button"
-                 data-action="confirm-exclusion"
+                 data-action="open-anomaly-encounter"
                  data-review-source="${escapeAttribute(sourceType)}"
                  data-review-record-id="${escapeAttribute(String(reviewRecordId || ""))}"
                  data-room-id="${escapeAttribute(String(cycle.roomId || ""))}"
                  data-report-record-key="${escapeAttribute(recordKey)}"
-                 data-default-label="Confirm Exclusion"
-                 data-pending-label="Confirming exclusion..."
+                 data-default-label="Open anomaly detail"
+                 data-pending-label="Opening anomaly..."
                  ${locked ? "disabled" : ""}
                  title="This keeps the record excluded from normal metrics.">
           ${label}
@@ -3453,24 +3449,12 @@ export function createReports({
     return;
   }
 
-  const openReviewQueueButton = event.target.closest("[data-action='open-review-queue']");
-  if (openReviewQueueButton) {
-    const detail = document.getElementById("reportReviewQueue");
-    if (detail) {
-      detail.open = true;
-    }
-    const compatibilityDetail = document.getElementById("reportDetail");
-    if (compatibilityDetail) compatibilityDetail.open = true;
-    const reviewBody = document.getElementById("reportReviewQueueBody");
-    (reviewBody?.querySelector?.("button") || reviewBody)?.focus();
-    return;
-  }
-
-  const openReviewedHistoryButton = event.target.closest("[data-action='open-reviewed-history']");
-  if (openReviewedHistoryButton) {
-    const detail = document.getElementById("reportReviewedHistory");
+  const openAnomalyReview = event.target.closest("[data-action='open-anomaly-review']");
+  if (openAnomalyReview) {
+    const detail = document.getElementById("reportAnomalyReview");
     if (detail) detail.open = true;
-    document.getElementById("reportReviewedHistoryBody")?.focus();
+    await anomalyReview.showStatus(openAnomalyReview.dataset.anomalyOpenStatus);
+    document.getElementById("reportAnomalyReviewBody")?.focus();
     return;
   }
 
@@ -3515,64 +3499,23 @@ export function createReports({
     return;
   }
 
-  const confirmButton = event.target.closest("[data-action='confirm-exclusion']");
-  if (confirmButton) {
-    await handleConfirmExclusionClick(confirmButton);
+  const openEncounter = event.target.closest("[data-action='open-anomaly-encounter']");
+  if (openEncounter) {
+    const disclosure = document.getElementById("reportAnomalyReview");
+    if (disclosure) disclosure.open = true;
+    await anomalyReview.selectEncounter(
+      openEncounter.dataset.reviewSource,
+      Number(openEncounter.dataset.reviewRecordId));
     return;
   }
 
-  const button = event.target.closest("[data-action='mark-exception']");
-  if (!button) {
+  const markButton = event.target.closest("[data-action='mark-for-review']");
+  if (!markButton) {
     return;
   }
-
-  const roomId = Number(button.dataset.roomId);
-  const seatedAt = button.dataset.seatedAt;
-  const completedCycleId = Number(button.dataset.completedCycleId);
-  // Prefer the stable cycle id; fall back to the legacy roomId + seatedAt key when it is absent.
-  const hasCycleId = Number.isInteger(completedCycleId) && completedCycleId > 0;
-  if (!hasCycleId && (!roomId || !seatedAt)) {
-    return;
-  }
-  const recordKey = hasCycleId
-    ? `completed:${completedCycleId}`
-    : `legacy:${roomId}:${normalizeReportIdentityTimestamp(seatedAt)}`;
-  if (button.disabled || isMutationLocked(currentReportAction(recordKey), "mark-exception")) {
-    return;
-  }
-  if (!canStartReportMutation(recordKey)) {
-    return;
-  }
-  button.dataset.reportRecordKey = recordKey;
-  button.dataset.defaultLabel ||= "Mark Exception";
-  button.dataset.pendingLabel ||= "Marking exception...";
-
-  const label = `Room ${roomId} (started ${formatDateTime(seatedAt)})`;
-  const confirmationMessage = `Mark ${label} as an exception?\n\nIt will be removed from normal metrics and appear in Exceptions Requiring Review.`;
-  if (!confirm(confirmationMessage)) {
-    return;
-  }
-
-  // When the stable id is present the server targets by it; roomId is included only so the
-  // server-side audit log keeps room context. Otherwise fall back to the legacy compound key.
-  const requestBody = hasCycleId ? { completedCycleId, roomId } : { roomId, seatedAt };
-  await beginReportMutation({
-    recordKey,
-    actionType: "mark-exception",
-    recordSource: "CompletedCycle",
-    roomLabel: `Room ${roomId}`,
-    confirmationMessage,
-    pendingMessage: `Marking Room ${roomId} as an exception...`,
-    pendingLabel: "Marking exception...",
-    mutationSuccessMessage: `Room ${roomId} was marked as an exception.`,
-    successMessage: `Room ${roomId} was marked as an exception.`,
-    errorLogLabel: "Mark as exception failed.",
-    requestUrl: "/api/reports/cycles/mark-exception",
-    requestBody,
-    completedCycleId: hasCycleId ? completedCycleId : null,
-    roomId,
-    seatedAt
-  }, button);
+  await anomalyReview.openForMark(
+    markButton.dataset.reviewSource || "CompletedCycle",
+    Number(markButton.dataset.reviewRecordId));
 }
 
   async function handleAuditSelectionChange(event) {
@@ -3593,52 +3536,6 @@ export function createReports({
       : entry.selection.analyticalStanding,
     offset: 0
   });
-}
-
-  async function handleConfirmExclusionClick(button) {
-  const sourceType = button.dataset.reviewSource || "CompletedCycle";
-  const reviewRecordId = Number(button.dataset.reviewRecordId || button.dataset.completedCycleId);
-  if (!Number.isInteger(reviewRecordId) || reviewRecordId <= 0) {
-    return;
-  }
-  const recordKey = reviewRecordKey(sourceType, reviewRecordId);
-  if (button.disabled || isMutationLocked(currentReportAction(recordKey), "confirm-exclusion")) {
-    return;
-  }
-  if (!canStartReportMutation(recordKey)) {
-    return;
-  }
-  button.dataset.reportRecordKey = recordKey;
-  button.dataset.defaultLabel ||= "Confirm Exclusion";
-  button.dataset.pendingLabel ||= "Confirming exclusion...";
-
-  const confirmationMessage = "Confirm exclusion of this exception?\n\nThis keeps the record excluded from normal metrics and clears it from the review queue.";
-  if (!confirm(confirmationMessage)) {
-    return;
-  }
-
-  const roomId = Number(button.dataset.roomId);
-  const roomLabel = Number.isInteger(roomId) && roomId > 0 ? `Room ${roomId}` : "Record";
-  const successMessage = roomLabel === "Record"
-    ? "The record remains excluded and was removed from the review queue."
-    : `The ${roomLabel} record remains excluded and was removed from the review queue.`;
-  const recordPath = sourceType === "AbortedAssignment"
-    ? `aborted-assignments/${reviewRecordId}`
-    : `cycles/${reviewRecordId}`;
-  await beginReportMutation({
-    recordKey,
-    actionType: "confirm-exclusion",
-    recordSource: sourceType,
-    roomLabel,
-    confirmationMessage,
-    pendingMessage: `Confirming exclusion for ${roomLabel}...`,
-    pendingLabel: "Confirming exclusion...",
-    mutationSuccessMessage: `Exclusion was confirmed for ${roomLabel}.`,
-    successMessage,
-    errorLogLabel: "Confirm exclusion failed.",
-    requestUrl: `/api/reports/${recordPath}/confirm-exclusion`,
-    reviewRecordId
-  }, button);
 }
 
   function renderReportsAccessPrompt(statusCode) {
@@ -3747,10 +3644,10 @@ export function createReports({
   const doctor = getDoctorName(cycle.assignedDoctor);
   const recordKey = completedRecordKey(cycle);
   const actionState = currentReportAction(recordKey);
-  const locked = isMutationLocked(actionState, "mark-exception");
+  const locked = isMutationLocked(actionState, "mark-for-review");
   const label = actionState?.phase === "pending" && actionState.requestKind === "mutation"
-    ? "Marking exception..."
-    : "Mark Exception";
+    ? "Opening review..."
+    : "Mark for Review";
   return `
     <tr data-report-action-row
         data-report-record-key="${escapeAttribute(recordKey)}"
@@ -3779,13 +3676,15 @@ export function createReports({
       <td>${cycle.staleThresholdReached ? "Yes" : "No"}</td>
       <td>
         <button class="secondary-button utility-button"
-                data-action="mark-exception"
+                data-action="mark-for-review"
+                data-review-source="CompletedCycle"
+                data-review-record-id="${escapeAttribute(String(cycle.completedCycleId || ""))}"
                  data-completed-cycle-id="${escapeAttribute(String(cycle.completedCycleId || ""))}"
                  data-room-id="${cycle.roomId}"
                  data-seated-at="${escapeAttribute(cycle.seatedAt || "")}"
                  data-report-record-key="${escapeAttribute(recordKey)}"
-                 data-default-label="Mark Exception"
-                 data-pending-label="Marking exception..."
+                 data-default-label="Mark for Review"
+                 data-pending-label="Opening review..."
                  ${locked ? "disabled" : ""}>
           ${label}
         </button>
@@ -3802,6 +3701,7 @@ export function createReports({
   function wire() {
     if (context.isReports) {
       wireReportsActions();
+      anomalyReview.wire();
       wireReportFilters();
       wireDateRange();
       wireReportPressGuard();

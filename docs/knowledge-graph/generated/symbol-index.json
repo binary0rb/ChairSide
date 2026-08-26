@@ -1,7 +1,7 @@
 ﻿{
     "generatedStamp":  "deterministic",
     "root":  ".",
-    "fileCount":  200,
+    "fileCount":  203,
     "files":  [
                   {
                       "path":  ".github/pull_request_template.md",
@@ -161,7 +161,7 @@
                   {
                       "path":  "docs/design/exception-handling-design.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  23769,
+                      "sizeBytes":  25337,
                       "typeSymbols":  [
 
                                       ],
@@ -252,7 +252,7 @@
                   {
                       "path":  "docs/design/reporting-design.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  39906,
+                      "sizeBytes":  39907,
                       "typeSymbols":  [
 
                                       ],
@@ -457,7 +457,7 @@
                   {
                       "path":  "docs/knowledge/reports/audit-evidence.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  5836,
+                      "sizeBytes":  6506,
                       "typeSymbols":  [
 
                                       ],
@@ -490,7 +490,7 @@
                   {
                       "path":  "docs/knowledge/reports/historical-administrative-persistence.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  12341,
+                      "sizeBytes":  14075,
                       "typeSymbols":  [
 
                                       ],
@@ -515,6 +515,7 @@
                                        "Integrity and atomicity",
                                        "Canonical anomaly operations",
                                        "Canonical corrections and effective projection",
+                                       "Browser read and review seams",
                                        "Legacy migration",
                                        "Retention and reset",
                                        "Source and test anchors"
@@ -623,7 +624,7 @@
                   {
                       "path":  "docs/knowledge/reports/reporting-population.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  9850,
+                      "sizeBytes":  10353,
                       "typeSymbols":  [
 
                                       ],
@@ -850,7 +851,7 @@
                   {
                       "path":  "docs/knowledge-graph/chairside.graph.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  25390,
+                      "sizeBytes":  25403,
                       "typeSymbols":  [
 
                                       ],
@@ -881,7 +882,7 @@
                   {
                       "path":  "docs/knowledge-graph/decisions.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  31768,
+                      "sizeBytes":  32926,
                       "typeSymbols":  [
 
                                       ],
@@ -1182,7 +1183,7 @@
                   {
                       "path":  "package.json",
                       "kind":  "Json",
-                      "sizeBytes":  1228,
+                      "sizeBytes":  1310,
                       "typeSymbols":  [
 
                                       ],
@@ -1774,7 +1775,7 @@
                   {
                       "path":  "src/ChairSide.Board/Program.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  76282,
+                      "sizeBytes":  76663,
                       "typeSymbols":  [
                                           "LegacyRoomOneRedirect",
                                           "BeginPrestageRequest",
@@ -1815,6 +1816,9 @@
                                      "/api/reports/cycles/mark-exception",
                                      "/api/reports/cycles/{completedCycleId:long}/confirm-exclusion",
                                      "/api/reports/aborted-assignments/{abortedAssignmentId:long}/confirm-exclusion",
+                                     "/api/reports/anomalies/options",
+                                     "/api/reports/anomalies/{sourceType}/{sourceRecordId:long}/detail",
+                                     "/api/reports/anomalies/{sourceType}/{sourceRecordId:long}/ledger",
                                      "/api/reports/anomalies/{sourceType}/{sourceRecordId:long}/mark-for-review",
                                      "/api/reports/anomalies/{sourceType}/{sourceRecordId:long}/refine-reason",
                                      "/api/reports/anomalies/{sourceType}/{sourceRecordId:long}/note",
@@ -1913,7 +1917,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/BoundedReportCollections.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  22739,
+                      "sizeBytes":  22796,
                       "typeSymbols":  [
                                           "ReportSpoolJson",
                                           "BoundedReportCollections",
@@ -2139,7 +2143,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/DemoBoardStore.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  202614,
+                      "sizeBytes":  204782,
                       "typeSymbols":  [
                                           "ExceptionReasons",
                                           "ReportingExceptionReasons",
@@ -2209,14 +2213,14 @@
                                             "MarkRoomAvailable",
                                             "GetReports",
                                             "QueryReportAudit",
+                                            "GetHistoricalReportingExclusionReasons",
                                             "QueryProjectedReviewAudit",
                                             "ResetAndSeedSyntheticTrainingData",
                                             "ResetAllDataForEmptyBeta",
                                             "ClearCompletedAndResetRoomsLocked",
                                             "SeedSyntheticReportData",
                                             "ResetAndSeedLargeSyntheticReportData",
-                                            "SeedLargeSyntheticReportData",
-                                            "ApplySyntheticPlan"
+                                            "SeedLargeSyntheticReportData"
                                         ],
                       "routes":  [
 
@@ -2555,6 +2559,37 @@
                                    ]
                   },
                   {
+                      "path":  "src/ChairSide.Board/Services/HistoricalAnomalyReadEndpointHandler.cs",
+                      "kind":  "CSharp",
+                      "sizeBytes":  5006,
+                      "typeSymbols":  [
+                                          "HistoricalAnomalyReadEndpointHandler"
+                                      ],
+                      "methodSymbols":  [
+                                            "GetDetail",
+                                            "GetLedger",
+                                            "GetOptions",
+                                            "InvalidSource",
+                                            "MissingSource",
+                                            "Error"
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
                       "path":  "src/ChairSide.Board/Services/HistoricalEncounterQuery.cs",
                       "kind":  "CSharp",
                       "sizeBytes":  1412,
@@ -2586,7 +2621,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/HistoricalMetadataCorrectionEndpointHandler.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  17131,
+                      "sizeBytes":  17972,
                       "typeSymbols":  [
                                           "HistoricalMetadataCorrectionEndpointHandler"
                                       ],
@@ -2699,7 +2734,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/HistoricalReportingProjection.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  9930,
+                      "sizeBytes":  10176,
                       "typeSymbols":  [
                                           "HistoricalReportingProjection"
                                       ],
@@ -3001,9 +3036,10 @@
                   {
                       "path":  "src/ChairSide.Board/Services/ReportAudit.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  6704,
+                      "sizeBytes":  7457,
                       "typeSymbols":  [
                                           "ReportAuditContributorKinds",
+                                          "ReportAnomalyStatuses",
                                           "ReportAuditModes",
                                           "ReportAuditStanding",
                                           "ReportAuditSorts",
@@ -3039,7 +3075,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/ReportQuery.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  7233,
+                      "sizeBytes":  7248,
                       "typeSymbols":  [
                                           "ReportScopeKinds",
                                           "ReportSedationSegments",
@@ -3083,7 +3119,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/ReportsSnapshotBuilder.Audit.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  30789,
+                      "sizeBytes":  32254,
                       "typeSymbols":  [
                                           "ReportsSnapshotBuilder"
                                       ],
@@ -3116,6 +3152,8 @@
                                             "OrderReviewRows",
                                             "OrderProjectedReviewRows",
                                             "NormalizeContributorKind",
+                                            "NormalizeAnomalyStatus",
+                                            "MatchesAnomalyStatus",
                                             "NormalizeStanding",
                                             "NormalizeOptional"
                                         ],
@@ -3138,7 +3176,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/ReportsSnapshotBuilder.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  81336,
+                      "sizeBytes":  81396,
                       "typeSymbols":  [
                                           "ReportsSnapshotBuilder",
                                           "ScopedProcedurePopulation"
@@ -3485,7 +3523,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/SqliteBoardRepository.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  200030,
+                      "sizeBytes":  201873,
                       "typeSymbols":  [
                                           "SqliteBoardRepository",
                                           "DoctorWorkingRoomRecord",
@@ -3594,6 +3632,89 @@
                                        ],
                       "scriptFunctions":  [
 
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
+                      "path":  "src/ChairSide.Board/wwwroot/anomaly-review.js",
+                      "kind":  "JavaScript",
+                      "sizeBytes":  40066,
+                      "typeSymbols":  [
+
+                                      ],
+                      "methodSymbols":  [
+
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+                                              "createAnomalyReview",
+                                              "render",
+                                              "statusButton",
+                                              "scopeDescription",
+                                              "renderListSort",
+                                              "renderList",
+                                              "renderListRow",
+                                              "renderDetail",
+                                              "renderMarkForm",
+                                              "renderNeedsReviewActions",
+                                              "renderResolvedActions",
+                                              "renderDoctorCorrection",
+                                              "renderProcedureCorrection",
+                                              "renderSedationCorrection",
+                                              "renderAddOnCorrection",
+                                              "renderAllocationCorrection",
+                                              "reasonSelect",
+                                              "doctorOptions",
+                                              "procedureOptions",
+                                              "findProcedure",
+                                              "noteField",
+                                              "metadataRows",
+                                              "renderLifecycle",
+                                              "renderLedger",
+                                              "formatLedgerValues",
+                                              "loadList",
+                                              "anomalySelection",
+                                              "ensureOptions",
+                                              "selectEncounter",
+                                              "openForMark",
+                                              "showStatus",
+                                              "submit",
+                                              "mutate",
+                                              "refreshSelectedAndList",
+                                              "loadMoreLedger",
+                                              "setFeedback",
+                                              "focusFeedback",
+                                              "getJson",
+                                              "wire",
+                                              "onReportRendered",
+                                              "keyOf",
+                                              "parseKey",
+                                              "sourceLabel",
+                                              "sourceIdentity",
+                                              "statusLabel",
+                                              "reportingEffect",
+                                              "reasonLabel",
+                                              "actorLabel",
+                                              "eventLabel",
+                                              "formatToken",
+                                              "formatRecordedDateTime",
+                                              "reviewAnchor",
+                                              "sedationLabel",
+                                              "yesNo",
+                                              "allocationLabel",
+                                              "readableLedgerValue",
+                                              "doctorLabelFor",
+                                              "procedureLabelFor"
                                           ],
                       "headings":  [
 
@@ -4063,7 +4184,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/reports.html",
                       "kind":  "Html",
-                      "sizeBytes":  10458,
+                      "sizeBytes":  10200,
                       "typeSymbols":  [
 
                                       ],
@@ -4089,7 +4210,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/reports.js",
                       "kind":  "JavaScript",
-                      "sizeBytes":  158061,
+                      "sizeBytes":  153447,
                       "typeSymbols":  [
 
                                       ],
@@ -4184,8 +4305,8 @@
                                               "initializeAuditViewForReportVersion",
                                               "normalizedAuditSelection",
                                               "renderAuditEvidence",
-                                              "renderReviewEvidence",
-                                              "renderAuditView"
+                                              "renderAuditView",
+                                              "renderCompletedAuditRows"
                                           ],
                       "headings":  [
 
@@ -4412,7 +4533,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/styles.css",
                       "kind":  "Css",
-                      "sizeBytes":  113609,
+                      "sizeBytes":  120075,
                       "typeSymbols":  [
 
                                       ],
@@ -4535,7 +4656,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/AfterHoursReviewEndpointTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  9366,
+                      "sizeBytes":  9855,
                       "typeSymbols":  [
                                           "AfterHoursReviewEndpointTests"
                                       ],
@@ -4569,7 +4690,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/AfterHoursSweepRetryTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  14735,
+                      "sizeBytes":  14747,
                       "typeSymbols":  [
                                           "AfterHoursSweepRetryTests"
                                       ],
@@ -4603,7 +4724,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/BoardReadyPresentationTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  29410,
+                      "sizeBytes":  29399,
                       "typeSymbols":  [
                                           "BoardReadyPresentationTests"
                                       ],
@@ -4748,7 +4869,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/BoardStoreFixtureTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  49588,
+                      "sizeBytes":  49593,
                       "typeSymbols":  [
                                           "BoardStoreTests"
                                       ],
@@ -4866,7 +4987,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/BoardStorePersistenceTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  29816,
+                      "sizeBytes":  29817,
                       "typeSymbols":  [
                                           "BoardStoreTests"
                                       ],
@@ -4975,7 +5096,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/BoardStoreRecoveryTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  75384,
+                      "sizeBytes":  75396,
                       "typeSymbols":  [
                                           "BoardStoreTests"
                                       ],
@@ -5040,7 +5161,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/BoardStoreReportingTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  43453,
+                      "sizeBytes":  43483,
                       "typeSymbols":  [
                                           "BoardStoreTests"
                                       ],
@@ -5631,7 +5752,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/HistoricalAdministrativePersistenceTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  36723,
+                      "sizeBytes":  36775,
                       "typeSymbols":  [
                                           "HistoricalAdministrativePersistenceTests"
                                       ],
@@ -5710,7 +5831,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/HistoricalAnomalyEndpointTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  16830,
+                      "sizeBytes":  23787,
                       "typeSymbols":  [
                                           "HistoricalAnomalyEndpointTests"
                                       ],
@@ -5721,6 +5842,8 @@
                                             "Disposition_routes_accept_optional_notes_and_reject_oversized_notes_without_mutation",
                                             "Disposition_routes_preserve_strict_json_validation",
                                             "Canonical_anomaly_routes_are_admin_protected",
+                                            "Canonical_detail_and_bounded_ledger_are_read_only_and_typed",
+                                            "Canonical_options_include_inactive_roster_entries_without_synthetic_sedation_variants",
                                             "Program_maps_only_local_admin_anomaly_mutations_and_no_public_system_finding_route",
                                             "CreateSource",
                                             "FindRepositoryRoot"
@@ -5822,7 +5945,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/HistoricalQueryPersistenceTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  27767,
+                      "sizeBytes":  31120,
                       "typeSymbols":  [
                                           "HistoricalQueryPersistenceTests"
                                       ],
@@ -5832,6 +5955,7 @@
                                             "Typed_durable_identity_loads_exactly_one_source_record",
                                             "Review_anchor_falls_back_to_prestage_started_at",
                                             "Review_page_combines_sources_and_applies_limit_offset_before_materialization",
+                                            "Canonical_anomaly_status_filters_share_one_paged_population",
                                             "Combined_review_pages_use_typed_identity_to_break_cross_source_id_ties",
                                             "Store_audit_returns_exact_paged_result_across_multiple_persistence_batches",
                                             "Store_startup_has_no_lifetime_completed_cycle_collection",
@@ -5864,7 +5988,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/HistoricalReportingIntegrationTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  29458,
+                      "sizeBytes":  30066,
                       "typeSymbols":  [
                                           "HistoricalReportingIntegrationTests"
                                       ],
@@ -5902,7 +6026,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/HistoricalSystemFindingProducerTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  10903,
+                      "sizeBytes":  10924,
                       "typeSymbols":  [
                                           "HistoricalSystemFindingProducerTests"
                                       ],
@@ -6381,7 +6505,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/ReportAuditBuilderTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  25180,
+                      "sizeBytes":  25278,
                       "typeSymbols":  [
                                           "ReportAuditBuilderTests"
                                       ],
@@ -6452,7 +6576,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/ReportsSnapshotBuilderTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  78265,
+                      "sizeBytes":  78331,
                       "typeSymbols":  [
                                           "ReportsSnapshotBuilderTests"
                                       ],
@@ -6995,6 +7119,37 @@
                                    ]
                   },
                   {
+                      "path":  "tests/javascript/anomaly-review.test.mjs",
+                      "kind":  "JavaScript",
+                      "sizeBytes":  16566,
+                      "typeSymbols":  [
+
+                                      ],
+                      "methodSymbols":  [
+
+                                        ],
+                      "routes":  [
+
+                                 ],
+                      "hubs":  [
+
+                               ],
+                      "cssVariables":  [
+
+                                       ],
+                      "scriptFunctions":  [
+                                              "createDocument",
+                                              "report",
+                                              "listPage",
+                                              "detail",
+                                              "ok",
+                                              "harness"
+                                          ],
+                      "headings":  [
+
+                                   ]
+                  },
+                  {
                       "path":  "tests/javascript/common-interactions.test.mjs",
                       "kind":  "JavaScript",
                       "sizeBytes":  10804,
@@ -7192,7 +7347,7 @@
                   {
                       "path":  "tests/javascript/reports.test.mjs",
                       "kind":  "JavaScript",
-                      "sizeBytes":  150961,
+                      "sizeBytes":  90260,
                       "typeSymbols":  [
 
                                       ],
@@ -7214,6 +7369,7 @@
                                               "clearAdminToken",
                                               "storeAdminToken",
                                               "readErrorMessage",
+                                              "createAnomalyReview",
                                               "recordDomMutation",
                                               "targetFor",
                                               "allocation",
@@ -7229,11 +7385,7 @@
                                               "reportPayload",
                                               "createFilterChip",
                                               "createHarness",
-                                              "actionButton",
                                               "dispatchAction",
-                                              "statusAction",
-                                              "feedbackEntry",
-                                              "completedCycle",
                                               "deferred",
                                               "selectedCard",
                                               "openDoctorProceduresTab",

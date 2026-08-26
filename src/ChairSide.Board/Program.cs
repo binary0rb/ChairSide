@@ -350,6 +350,15 @@ app.MapPost(
 
 // Canonical administrative anomaly operations. The typed historical key prevents table-local IDs
 // from colliding, and each request supplies the expected logical administrative revision.
+app.MapGet(
+    "/api/reports/anomalies/options",
+    HistoricalAnomalyReadEndpointHandler.GetOptions);
+app.MapGet(
+    "/api/reports/anomalies/{sourceType}/{sourceRecordId:long}/detail",
+    HistoricalAnomalyReadEndpointHandler.GetDetail);
+app.MapGet(
+    "/api/reports/anomalies/{sourceType}/{sourceRecordId:long}/ledger",
+    HistoricalAnomalyReadEndpointHandler.GetLedger);
 app.MapPost(
     "/api/reports/anomalies/{sourceType}/{sourceRecordId:long}/mark-for-review",
     HistoricalAnomalyEndpointHandler.MarkForReviewAsync);

@@ -14,8 +14,25 @@ public static class ReportAuditContributorKinds
     public const string ProcedureIntelligenceSeatedToDoctorComplete = "ProcedureIntelligenceSeatedToDoctorComplete";
     public const string HistoricalScheduleFit = "HistoricalScheduleFit";
     public const string CalibrationEvidence = "CalibrationEvidence";
+    public const string AnomalyReview = "AnomalyReview";
     public const string PendingReview = "PendingReview";
     public const string ReviewedExceptionHistory = "ReviewedExceptionHistory";
+}
+
+public static class ReportAnomalyStatuses
+{
+    public const string NeedsReview = HistoricalAdministrativeDispositions.NeedsReview;
+    public const string ConfirmedException = HistoricalAdministrativeDispositions.ConfirmedException;
+    public const string ClearedForReporting = HistoricalAdministrativeDispositions.ClearedForReporting;
+    public const string AllAnomalies = "AllAnomalies";
+
+    public static IReadOnlyList<string> All { get; } =
+    [
+        NeedsReview,
+        ConfirmedException,
+        ClearedForReporting,
+        AllAnomalies
+    ];
 }
 
 public static class ReportAuditModes
@@ -75,7 +92,8 @@ public sealed record ReportAuditRequest(
     IReadOnlyList<ReportAuditEvidenceIdentity>? EvidenceIds = null,
     string? Sort = null,
     int Offset = 0,
-    int Limit = 50);
+    int Limit = 50,
+    string? AnomalyStatus = null);
 
 public sealed record ReportAuditSelection(
     ReportQueryContext Query,
@@ -84,7 +102,8 @@ public sealed record ReportAuditSelection(
     string? ProcedureCode,
     string? BaseProcedureCode,
     string AnalyticalStanding,
-    IReadOnlyList<ReportAuditEvidenceIdentity> EvidenceIds);
+    IReadOnlyList<ReportAuditEvidenceIdentity> EvidenceIds,
+    string AnomalyStatus = ReportAnomalyStatuses.NeedsReview);
 
 public sealed record ReportAuditRow(
     long CompletedCycleId,
@@ -123,7 +142,8 @@ public sealed record ReportAuditRow(
     bool StaleThresholdReached,
     IReadOnlyList<string> ReportingExclusionReasons,
     CalibrationEvidenceCase? CalibrationEvidence,
-    bool CanMarkException);
+    bool CanMarkException,
+    bool CanMarkForReview = false);
 
 public sealed record ReportReviewAuditRow(
     string SourceType,
