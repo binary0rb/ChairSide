@@ -1,6 +1,7 @@
 using System.Text;
 using System.Text.Json;
 
+using ChairSide.Board.Options;
 using ChairSide.Board.Services;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Hosting;
@@ -210,6 +211,127 @@ public sealed class HistoricalAnomalyAdministrationTests
     }
 
     [Fact]
+    public async Task Correction_and_disposition_competing_on_one_revision_allow_exactly_one_commit()
+    {
+        using var workspace = TestWorkspace.Create();
+        var context = StoreContext.Create(workspace, Environments.Production);
+        var key = CreateCompletedSource(context, roomId: 1);
+        var administration = new HistoricalAnomalyAdministrationService(context.Repository);
+        var correction = CreateCorrectionService(context);
+        AssertSuccess(administration.MarkForReview(
+            key,
+            0,
+            HistoricalManualReviewReasons.IncorrectDoctor), 1);
+        var gate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        var correctionTask = Task.Run(async () =>
+        {
+            await gate.Task;
+            return correction.CorrectDoctor(key, 1, "pledger");
+        });
+        var dispositionTask = Task.Run(async () =>
+        {
+            await gate.Task;
+            return administration.ClearForReporting(key, 1);
+        });
+        gate.SetResult();
+        await Task.WhenAll(correctionTask, dispositionTask);
+        var correctionResult = await correctionTask;
+        var dispositionResult = await dispositionTask;
+
+        var correctionSucceeded = correctionResult.Outcome == HistoricalMetadataCorrectionOutcome.Success;
+        var dispositionSucceeded = dispositionResult.Outcome == HistoricalAdministrativeOperationOutcome.Success;
+        Assert.True(correctionSucceeded ^ dispositionSucceeded);
+        Assert.Contains(
+            correctionResult.Outcome,
+            [
+                HistoricalMetadataCorrectionOutcome.Success,
+                HistoricalMetadataCorrectionOutcome.StaleWrite,
+                HistoricalMetadataCorrectionOutcome.ReviewNotPending
+            ]);
+        Assert.Contains(
+            dispositionResult.Outcome,
+            [
+                HistoricalAdministrativeOperationOutcome.Success,
+                HistoricalAdministrativeOperationOutcome.StaleWrite
+            ]);
+
+        var state = Assert.IsType<HistoricalEncounterAdministrativeState>(
+            context.Repository.LoadHistoricalAdministrativeState(key));
+        Assert.Equal(2, state.AdministrativeRevision);
+        Assert.Equal(2, context.Repository.LoadHistoricalAdministrativeLedger(key, 0, 10).TotalMatchingCount);
+        if (correctionSucceeded)
+        {
+            Assert.Equal(HistoricalAdministrativeDispositions.NeedsReview, state.Disposition);
+            Assert.Equal("pledger", state.OverrideDoctorId);
+        }
+        else
+        {
+            Assert.Equal(HistoricalAdministrativeDispositions.ClearedForReporting, state.Disposition);
+            Assert.Null(state.OverrideDoctorId);
+        }
+    }
+
+    [Fact]
+    public async Task Reopen_and_system_finding_competing_on_one_revision_allow_exactly_one_commit()
+    {
+        using var workspace = TestWorkspace.Create();
+        var context = StoreContext.Create(workspace, Environments.Production);
+        var key = CreateCompletedSource(context, roomId: 1);
+        var service = new HistoricalAnomalyAdministrationService(context.Repository);
+        AssertSuccess(service.MarkForReview(
+            key,
+            0,
+            HistoricalManualReviewReasons.UnexpectedLifecycle), 1);
+        AssertSuccess(service.ClearForReporting(key, 1), 2);
+        var gate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        var reopenTask = Task.Run(async () =>
+        {
+            await gate.Task;
+            return service.ReopenReview(key, 2);
+        });
+        var findingTask = Task.Run(async () =>
+        {
+            await gate.Task;
+            return service.RecordSystemFinding(
+                key,
+                2,
+                HistoricalSystemFindingKind.ExceededMaxActiveDuration);
+        });
+        gate.SetResult();
+        await Task.WhenAll(reopenTask, findingTask);
+        var reopenResult = await reopenTask;
+        var findingResult = await findingTask;
+
+        var reopenSucceeded = reopenResult.Outcome == HistoricalAdministrativeOperationOutcome.Success;
+        var findingSucceeded = findingResult.Outcome == HistoricalAdministrativeOperationOutcome.Success;
+        Assert.True(reopenSucceeded ^ findingSucceeded);
+        Assert.Contains(
+            reopenResult.Outcome,
+            [
+                HistoricalAdministrativeOperationOutcome.Success,
+                HistoricalAdministrativeOperationOutcome.StaleWrite,
+                HistoricalAdministrativeOperationOutcome.InvalidTransition
+            ]);
+        Assert.Contains(
+            findingResult.Outcome,
+            [
+                HistoricalAdministrativeOperationOutcome.Success,
+                HistoricalAdministrativeOperationOutcome.StaleWrite
+            ]);
+
+        var state = Assert.IsType<HistoricalEncounterAdministrativeState>(
+            context.Repository.LoadHistoricalAdministrativeState(key));
+        Assert.Equal(HistoricalAdministrativeDispositions.NeedsReview, state.Disposition);
+        Assert.Equal(3, state.AdministrativeRevision);
+        Assert.Equal(3, context.Repository.LoadHistoricalAdministrativeLedger(key, 0, 10).TotalMatchingCount);
+        Assert.Equal(
+            findingSucceeded ? HistoricalAdministrativeReasonSources.System : HistoricalAdministrativeReasonSources.LocalAdmin,
+            state.ReasonSource);
+    }
+
+    [Fact]
     public void Stale_and_failed_guarded_writes_leave_projection_and_ledger_unchanged()
     {
         using var workspace = TestWorkspace.Create();
@@ -320,6 +442,18 @@ public sealed class HistoricalAnomalyAdministrationTests
         Assert.Equal(revision, result.LedgerEvent!.AdministrativeRevision);
         return result;
     }
+
+    private static HistoricalMetadataCorrectionService CreateCorrectionService(StoreContext context) =>
+        new(
+            context.Repository,
+            Microsoft.Extensions.Options.Options.Create(new DoctorRosterOptions
+            {
+                Doctors = DoctorRosterOptions.DefaultDoctors()
+            }),
+            Microsoft.Extensions.Options.Options.Create(new ProcedureRosterOptions
+            {
+                Procedures = ProcedureRosterOptions.DefaultProcedures()
+            }));
 
     private static HistoricalEncounterKey CreateAbortedSource(StoreContext context, int roomId)
     {

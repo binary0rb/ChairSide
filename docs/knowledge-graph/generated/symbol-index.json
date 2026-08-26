@@ -161,7 +161,7 @@
                   {
                       "path":  "docs/design/exception-handling-design.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  25337,
+                      "sizeBytes":  25348,
                       "typeSymbols":  [
 
                                       ],
@@ -457,7 +457,7 @@
                   {
                       "path":  "docs/knowledge/reports/audit-evidence.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  6506,
+                      "sizeBytes":  6518,
                       "typeSymbols":  [
 
                                       ],
@@ -490,7 +490,7 @@
                   {
                       "path":  "docs/knowledge/reports/historical-administrative-persistence.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  14075,
+                      "sizeBytes":  14090,
                       "typeSymbols":  [
 
                                       ],
@@ -624,7 +624,7 @@
                   {
                       "path":  "docs/knowledge/reports/reporting-population.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  10353,
+                      "sizeBytes":  10357,
                       "typeSymbols":  [
 
                                       ],
@@ -882,7 +882,7 @@
                   {
                       "path":  "docs/knowledge-graph/decisions.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  32926,
+                      "sizeBytes":  32932,
                       "typeSymbols":  [
 
                                       ],
@@ -1183,7 +1183,7 @@
                   {
                       "path":  "package.json",
                       "kind":  "Json",
-                      "sizeBytes":  1310,
+                      "sizeBytes":  1312,
                       "typeSymbols":  [
 
                                       ],
@@ -1775,7 +1775,7 @@
                   {
                       "path":  "src/ChairSide.Board/Program.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  76663,
+                      "sizeBytes":  76675,
                       "typeSymbols":  [
                                           "LegacyRoomOneRedirect",
                                           "BeginPrestageRequest",
@@ -2143,7 +2143,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/DemoBoardStore.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  204771,
+                      "sizeBytes":  204856,
                       "typeSymbols":  [
                                           "ExceptionReasons",
                                           "ReportingExceptionReasons",
@@ -2561,7 +2561,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/HistoricalAnomalyReadEndpointHandler.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  5019,
+                      "sizeBytes":  5149,
                       "typeSymbols":  [
                                           "HistoricalAnomalyReadEndpointHandler"
                                       ],
@@ -2621,7 +2621,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/HistoricalMetadataCorrectionEndpointHandler.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  17972,
+                      "sizeBytes":  17982,
                       "typeSymbols":  [
                                           "HistoricalMetadataCorrectionEndpointHandler"
                                       ],
@@ -2665,7 +2665,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/HistoricalMetadataCorrectionService.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  34764,
+                      "sizeBytes":  34765,
                       "typeSymbols":  [
                                           "HistoricalMetadataCorrectionFields",
                                           "HistoricalMetadataEvidenceAuthority",
@@ -3036,7 +3036,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/ReportAudit.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  7457,
+                      "sizeBytes":  7491,
                       "typeSymbols":  [
                                           "ReportAuditContributorKinds",
                                           "ReportAnomalyStatuses",
@@ -3119,7 +3119,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/ReportsSnapshotBuilder.Audit.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  32362,
+                      "sizeBytes":  32406,
                       "typeSymbols":  [
                                           "ReportsSnapshotBuilder"
                                       ],
@@ -3523,7 +3523,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/SqliteBoardRepository.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  202915,
+                      "sizeBytes":  202994,
                       "typeSymbols":  [
                                           "SqliteBoardRepository",
                                           "DoctorWorkingRoomRecord",
@@ -3640,7 +3640,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/anomaly-review.js",
                       "kind":  "JavaScript",
-                      "sizeBytes":  40066,
+                      "sizeBytes":  40718,
                       "typeSymbols":  [
 
                                       ],
@@ -4184,7 +4184,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/reports.html",
                       "kind":  "Html",
-                      "sizeBytes":  10200,
+                      "sizeBytes":  10204,
                       "typeSymbols":  [
 
                                       ],
@@ -4210,7 +4210,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/reports.js",
                       "kind":  "JavaScript",
-                      "sizeBytes":  153447,
+                      "sizeBytes":  153516,
                       "typeSymbols":  [
 
                                       ],
@@ -4533,7 +4533,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/styles.css",
                       "kind":  "Css",
-                      "sizeBytes":  120075,
+                      "sizeBytes":  120353,
                       "typeSymbols":  [
 
                                       ],
@@ -4656,7 +4656,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/AfterHoursReviewEndpointTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  9855,
+                      "sizeBytes":  9875,
                       "typeSymbols":  [
                                           "AfterHoursReviewEndpointTests"
                                       ],
@@ -4724,7 +4724,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/BoardReadyPresentationTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  29399,
+                      "sizeBytes":  29411,
                       "typeSymbols":  [
                                           "BoardReadyPresentationTests"
                                       ],
@@ -5752,7 +5752,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/HistoricalAdministrativePersistenceTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  36775,
+                      "sizeBytes":  38311,
                       "typeSymbols":  [
                                           "HistoricalAdministrativePersistenceTests"
                                       ],
@@ -5764,6 +5764,7 @@
                                             "Legacy_migration_maps_both_sources_conservatively_and_preserves_only_known_provenance",
                                             "Repeated_migration_preserves_newer_projection_revision_overlays_and_original_import_event",
                                             "Administrative_state_and_ledger_rollback_together_on_injected_failure",
+                                            "Guarded_write_rolls_back_when_failure_occurs_after_ledger_insert_before_commit",
                                             "Legacy_migration_rolls_back_projection_and_ledger_on_injected_failure",
                                             "Reset_cleanup_removes_completed_administration_without_orphaning_preserved_aborted_history",
                                             "Production_repeated_initialization_imports_once_and_retains_administrative_history_unchanged",
@@ -5794,7 +5795,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/HistoricalAnomalyAdministrationTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  21066,
+                      "sizeBytes":  27005,
                       "typeSymbols":  [
                                           "HistoricalAnomalyAdministrationTests"
                                       ],
@@ -5804,10 +5805,13 @@
                                             "Disposition_notes_share_the_disposition_event_and_revision",
                                             "Oversized_disposition_notes_do_not_mutate_state_or_ledger",
                                             "Concurrent_absent_projection_writers_with_expected_zero_yield_one_success_and_one_stale_write",
+                                            "Correction_and_disposition_competing_on_one_revision_allow_exactly_one_commit",
+                                            "Reopen_and_system_finding_competing_on_one_revision_allow_exactly_one_commit",
                                             "Stale_and_failed_guarded_writes_leave_projection_and_ledger_unchanged",
                                             "Approved_system_finding_reopens_resolved_state_and_repeated_findings_append",
                                             "Every_manual_reason_is_accepted_and_pending_mark_can_be_reapplied",
                                             "AssertSuccess",
+                                            "CreateCorrectionService",
                                             "CreateAbortedSource",
                                             "CreateCompletedSource",
                                             "Event"
@@ -5831,7 +5835,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/HistoricalAnomalyEndpointTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  33709,
+                      "sizeBytes":  34050,
                       "typeSymbols":  [
                                           "HistoricalAnomalyEndpointTests"
                                       ],
@@ -5950,7 +5954,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/HistoricalQueryPersistenceTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  31120,
+                      "sizeBytes":  31190,
                       "typeSymbols":  [
                                           "HistoricalQueryPersistenceTests"
                                       ],
@@ -5993,13 +5997,14 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/HistoricalReportingIntegrationTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  30066,
+                      "sizeBytes":  35896,
                       "typeSymbols":  [
                                           "HistoricalReportingIntegrationTests"
                                       ],
                       "methodSymbols":  [
                                             "Explicit_sedation_state_normalizes_contradictory_transport_suffixes",
                                             "Legacy_review_columns_without_canonical_projection_do_not_create_runtime_administrative_state",
+                                            "Migrated_legacy_review_supports_canonical_correction_disposition_and_immediate_reporting",
                                             "Canonical_gate_and_all_effective_fields_update_reports_audit_and_data_quality_immediately",
                                             "Effective_procedure_reannotations_remain_separate_and_correction_provenance_survives_restore",
                                             "Legacy_sedation_transport_is_normal_only_and_unknown_sedation_matches_no_scoped_review_segment",
@@ -6510,7 +6515,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/ReportAuditBuilderTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  26538,
+                      "sizeBytes":  26568,
                       "typeSymbols":  [
                                           "ReportAuditBuilderTests"
                                       ],
@@ -7127,7 +7132,7 @@
                   {
                       "path":  "tests/javascript/anomaly-review.test.mjs",
                       "kind":  "JavaScript",
-                      "sizeBytes":  17398,
+                      "sizeBytes":  17880,
                       "typeSymbols":  [
 
                                       ],
@@ -7353,7 +7358,7 @@
                   {
                       "path":  "tests/javascript/reports.test.mjs",
                       "kind":  "JavaScript",
-                      "sizeBytes":  106058,
+                      "sizeBytes":  106488,
                       "typeSymbols":  [
 
                                       ],

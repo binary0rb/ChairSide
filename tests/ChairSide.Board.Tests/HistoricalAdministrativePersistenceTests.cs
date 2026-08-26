@@ -402,6 +402,43 @@ public sealed class HistoricalAdministrativePersistenceTests
     }
 
     [Fact]
+    public void Guarded_write_rolls_back_when_failure_occurs_after_ledger_insert_before_commit()
+    {
+        using var workspace = TestWorkspace.Create();
+        var context = StoreContext.Create(workspace, Environments.Production);
+        long sourceId;
+        using (var connection = OpenConnection(context.DatabasePath))
+        {
+            sourceId = InsertCompletedSource(
+                connection,
+                1,
+                DateTimeOffset.Parse("2026-08-08T11:00:00Z"));
+            using var trigger = connection.CreateCommand();
+            trigger.CommandText = """
+                CREATE TRIGGER fail_after_manual_flag_ledger_insert
+                AFTER INSERT ON historical_encounter_ledger
+                WHEN NEW.event_type = 'ManualFlag'
+                BEGIN
+                    SELECT RAISE(ROLLBACK, 'injected post-ledger pre-commit failure');
+                END;
+                """;
+            trigger.ExecuteNonQuery();
+        }
+
+        var key = new HistoricalEncounterKey(
+            HistoricalEncounterSourceTypes.CompletedCycle,
+            sourceId);
+        var service = new HistoricalAnomalyAdministrationService(context.Repository);
+        Assert.Throws<SqliteException>(() => service.MarkForReview(
+            key,
+            0,
+            HistoricalManualReviewReasons.OtherNeedsReview));
+
+        Assert.Null(context.Repository.LoadHistoricalAdministrativeState(key));
+        Assert.Empty(context.Repository.LoadHistoricalAdministrativeLedger(key, 0, 10).Rows);
+    }
+
+    [Fact]
     public void Legacy_migration_rolls_back_projection_and_ledger_on_injected_failure()
     {
         using var workspace = TestWorkspace.Create();

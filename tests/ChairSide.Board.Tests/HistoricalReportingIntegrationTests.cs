@@ -2,6 +2,7 @@ using System.Text.Json;
 
 using ChairSide.Board.Options;
 using ChairSide.Board.Services;
+using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Hosting;
 
 namespace ChairSide.Board.Tests;
@@ -137,6 +138,114 @@ public sealed class HistoricalReportingIntegrationTests
         Assert.Equal(4, aborted.ExpectedAllocationUnits);
         Assert.Equal(40, aborted.ExpectedAllocationMinutes);
         Assert.True(aborted.AllocationAdjustedFromDefault);
+    }
+
+    [Fact]
+    public void Migrated_legacy_review_supports_canonical_correction_disposition_and_immediate_reporting()
+    {
+        using var workspace = TestWorkspace.Create();
+        var clock = new ManualTimeProvider(DateTimeOffset.Parse("2026-08-19T14:00:00Z"));
+        var context = StoreContext.Create(workspace, Environments.Production, timeProvider: clock);
+        var key = CompleteCycle(context, clock, "otte", "EXT", sedation: false, expectedUnits: 3);
+        var sourceBefore = context.Repository.LoadHistoricalEncounter(key)!.CompletedCycle!;
+        var handoffBefore = context.Repository.LoadReadyHandoff(sourceBefore.AcceptedReadyHandoffId!)!;
+        var handoffJson = JsonSerializer.Serialize(handoffBefore);
+        var importedAt = DateTimeOffset.Parse("2026-08-20T09:00:00Z");
+
+        using (var connection = new SqliteConnection(new SqliteConnectionStringBuilder
+        {
+            DataSource = context.DatabasePath
+        }.ToString()))
+        {
+            connection.Open();
+            using var command = connection.CreateCommand();
+            command.CommandText = """
+                UPDATE completed_room_cycles
+                SET is_exception = 1,
+                    requires_review = 1,
+                    exception_reason = 'ManualReview',
+                    review_status = 'PendingReview'
+                WHERE id = $sourceRecordId;
+                """;
+            command.Parameters.AddWithValue("$sourceRecordId", key.SourceRecordId);
+            Assert.Equal(1, command.ExecuteNonQuery());
+            SqliteBoardSchema.MigrateLegacyAdministrativeState(connection, importedAt);
+        }
+
+        var imported = Assert.IsType<HistoricalEncounterAdministrativeState>(
+            context.Repository.LoadHistoricalAdministrativeState(key));
+        Assert.Equal(HistoricalAdministrativeDispositions.NeedsReview, imported.Disposition);
+        Assert.Equal(0, imported.AdministrativeRevision);
+        var importedEvent = Assert.Single(
+            context.Repository.LoadHistoricalAdministrativeLedger(key, 0, 10).Rows);
+        Assert.Equal(HistoricalAdministrativeLedgerEventTypes.LegacyStateImported, importedEvent.EventType);
+        Assert.Equal(importedAt, importedEvent.OccurredAt);
+        Assert.Equal(HistoricalAdministrativeActorClasses.System, importedEvent.ActorClass);
+        Assert.Null(importedEvent.AdminNote);
+        var sourceJson = JsonSerializer.Serialize(
+            context.Repository.LoadHistoricalEncounter(key)!.CompletedCycle!);
+
+        clock.SetUtcNow(importedAt.AddMinutes(1));
+        var administration = new HistoricalAnomalyAdministrationService(context.Repository, clock);
+        var correction = CreateCorrectionService(context, timeProvider: clock);
+        AssertSuccess(administration.RefineReason(
+            key,
+            0,
+            HistoricalManualReviewReasons.IncorrectDoctor), 1);
+        AssertSuccess(administration.AddNote(
+            key,
+            1,
+            "Deterministic operational fixture review; no PHI."), 2);
+        AssertCorrectionSuccess(correction.CorrectDoctor(key, 2, "pledger"), 3);
+        AssertSuccess(administration.ClearForReporting(key, 3), 4);
+
+        var correctedScope = new ReportQuery(
+            ReportDateRange.AllTime,
+            ReportScopeKinds.Doctor,
+            "pledger",
+            ReportSedationSegments.All,
+            ReportProcedureGroupings.DetailedVariant);
+        using (var reports = context.Store.GetReports(correctedScope))
+        {
+            Assert.Equal(1, reports.CompletedRoomCyclesCount);
+            Assert.Equal(1, reports.IncludedCompletedCycleCount);
+            Assert.Equal(1, reports.DataQuality!.ClearedAnomalyCount);
+            Assert.Equal(1, reports.DataQuality.HistoricalCorrectionCount);
+            Assert.Equal("pledger", Assert.Single(reports.RecentCompletedCycles).AssignedDoctor);
+        }
+
+        var review = context.Store.QueryReportAudit(new ReportAuditRequest(
+            Scope: ReportScopeKinds.Doctor,
+            DoctorId: "pledger",
+            ContributorKind: ReportAuditContributorKinds.AnomalyReview,
+            AnomalyStatus: ReportAnomalyStatuses.ClearedForReporting));
+        var reviewRow = Assert.Single(review.ReviewRows);
+        Assert.Equal(key.SourceType, reviewRow.SourceType);
+        Assert.Equal(key.SourceRecordId, reviewRow.ReviewRecordId);
+        Assert.Equal("pledger", reviewRow.DoctorId);
+
+        var ledger = context.Repository.LoadHistoricalAdministrativeLedger(key, 0, 10).Rows;
+        Assert.Equal(
+            [
+                HistoricalAdministrativeLedgerEventTypes.LegacyStateImported,
+                HistoricalAdministrativeLedgerEventTypes.ReasonRefined,
+                HistoricalAdministrativeLedgerEventTypes.NoteAdded,
+                HistoricalAdministrativeLedgerEventTypes.MetadataCorrected,
+                HistoricalAdministrativeLedgerEventTypes.ClearedForReporting
+            ],
+            ledger.Select(row => row.EventType));
+        Assert.Equal([0, 1, 2, 3, 4], ledger.Select(row => row.AdministrativeRevision));
+        Assert.Equal(HistoricalAdministrativeActorClasses.System, ledger[0].ActorClass);
+        Assert.All(ledger.Skip(1), row =>
+            Assert.Equal(HistoricalAdministrativeActorClasses.LocalAdmin, row.ActorClass));
+        Assert.Equal(
+            "Deterministic operational fixture review; no PHI.",
+            ledger[2].AdminNote);
+
+        Assert.Equal(sourceJson, JsonSerializer.Serialize(
+            context.Repository.LoadHistoricalEncounter(key)!.CompletedCycle!));
+        Assert.Equal(handoffJson, JsonSerializer.Serialize(
+            context.Repository.LoadReadyHandoff(sourceBefore.AcceptedReadyHandoffId!)!));
     }
 
     [Fact]
@@ -542,7 +651,8 @@ public sealed class HistoricalReportingIntegrationTests
 
     private static HistoricalMetadataCorrectionService CreateCorrectionService(
         StoreContext context,
-        ProcedureRosterOptions? procedureOptions = null) =>
+        ProcedureRosterOptions? procedureOptions = null,
+        TimeProvider? timeProvider = null) =>
         new(
             context.Repository,
             Microsoft.Extensions.Options.Options.Create(new DoctorRosterOptions
@@ -552,7 +662,8 @@ public sealed class HistoricalReportingIntegrationTests
             Microsoft.Extensions.Options.Options.Create(procedureOptions ?? new ProcedureRosterOptions
             {
                 Procedures = ProcedureRosterOptions.DefaultProcedures()
-            }));
+            }),
+            timeProvider ?? TimeProvider.System);
 
     private static HistoricalReportingProjection Projection(
         string procedureCode,
