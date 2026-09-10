@@ -200,7 +200,7 @@ This file is mechanical output from `tools/knowledge-graph/New-ChairSideKnowledg
 | `tests/javascript/procedure-icons.test.mjs` | JavaScript | - | - |
 | `tests/javascript/realtime-polling.test.mjs` | JavaScript | functions: initialApp, importModule, connectionHarness, callbackHarness, flushPromises | - |
 | `tests/javascript/report-data.test.mjs` | JavaScript | functions: response, deferred, createHarness | - |
-| `tests/javascript/reports.test.mjs` | JavaScript | functions: wirePressInterruptionGuard, adminRequestHeaders, clearAdminToken, storeAdminToken, readErrorMessage, createAnomalyReview, recordDomMutation, targetFor | - |
+| `tests/javascript/reports.test.mjs` | JavaScript | functions: wirePressInterruptionGuard, adminRequestHeaders, clearAdminToken, storeAdminToken, createAnomalyReview, targetFor, allocation, scheduleFitSummary | - |
 | `tests/javascript/request-utils.test.mjs` | JavaScript | - | - |
 | `tests/javascript/room-card.test.mjs` | JavaScript | functions: readyRoom | - |
 | `tests/javascript/room-workflow.test.mjs` | JavaScript | functions: wireTileGroup, wireTilePressCleanup, mutationHeaders, readErrorMessage, dataUrl, assignment, room, createHarness | - |

@@ -4184,7 +4184,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/reports.html",
                       "kind":  "Html",
-                      "sizeBytes":  10204,
+                      "sizeBytes":  9482,
                       "typeSymbols":  [
 
                                       ],
@@ -4210,7 +4210,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/reports.js",
                       "kind":  "JavaScript",
-                      "sizeBytes":  153516,
+                      "sizeBytes":  124624,
                       "typeSymbols":  [
 
                                       ],
@@ -4533,7 +4533,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/styles.css",
                       "kind":  "Css",
-                      "sizeBytes":  120353,
+                      "sizeBytes":  113077,
                       "typeSymbols":  [
 
                                       ],
@@ -4724,7 +4724,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/BoardReadyPresentationTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  29411,
+                      "sizeBytes":  28767,
                       "typeSymbols":  [
                                           "BoardReadyPresentationTests"
                                       ],
@@ -7358,7 +7358,7 @@
                   {
                       "path":  "tests/javascript/reports.test.mjs",
                       "kind":  "JavaScript",
-                      "sizeBytes":  106488,
+                      "sizeBytes":  104682,
                       "typeSymbols":  [
 
                                       ],
@@ -7379,9 +7379,7 @@
                                               "adminRequestHeaders",
                                               "clearAdminToken",
                                               "storeAdminToken",
-                                              "readErrorMessage",
                                               "createAnomalyReview",
-                                              "recordDomMutation",
                                               "targetFor",
                                               "allocation",
                                               "scheduleFitSummary",

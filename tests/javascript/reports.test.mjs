@@ -44,13 +44,6 @@ export function clearAdminToken() {
 }
 export function storeAdminToken(token) {
   globalThis.__chairsideReportsHarness.storedTokens.push(token);
-}
-export async function readErrorMessage(response, fallback) {
-  if (!response.text) {
-    return fallback;
-  }
-  const text = await response.text();
-  return text || fallback;
 }`).toString("base64")}`;
 const domUtilsDataUrl = `data:text/javascript;base64,${Buffer.from(domUtilsSource).toString("base64")}`;
 const formatUtilsDataUrl = `data:text/javascript;base64,${Buffer.from(formatUtilsSource).toString("base64")}`;
@@ -60,8 +53,12 @@ export function createAnomalyReview() {
     onReportRendered() {},
     wire() {},
     showStatus(status) { globalThis.__chairsideReportsHarness.anomalyStatuses.push(status); },
-    openEncounter() {},
-    openForMark() {}
+    selectEncounter(sourceType, sourceRecordId) {
+      globalThis.__chairsideReportsHarness.anomalySelections.push({ sourceType, sourceRecordId });
+    },
+    openForMark(sourceType, sourceRecordId) {
+      globalThis.__chairsideReportsHarness.anomalyMarks.push({ sourceType, sourceRecordId });
+    }
   };
 }`).toString("base64")}`;
 const moduleWithDataImports = moduleSource
@@ -72,15 +69,6 @@ const moduleWithDataImports = moduleSource
   .replace('"./anomaly-review.js"', JSON.stringify(anomalyReviewDataUrl));
 const moduleDataUrl = `data:text/javascript;base64,${Buffer.from(moduleWithDataImports).toString("base64")}`;
 const { createReports } = await import(moduleDataUrl);
-
-function recordDomMutation(type, element, details = {}) {
-  globalThis.__chairsideReportsHarness?.domMutations?.push({
-    type,
-    element,
-    parent: element.parentElement,
-    ...details
-  });
-}
 
 class FakeElement {
   constructor(id = "", tagName = "div", connected = true) {
@@ -117,17 +105,12 @@ class FakeElement {
     };
   }
 
-  get childElementCount() {
-    return this.children.length;
-  }
-
   get hidden() {
     return this._hidden;
   }
 
   set hidden(value) {
     const next = Boolean(value);
-    recordDomMutation("hidden", this, { value: next });
     this._hidden = next;
     if (next && globalThis.document?.activeElement
         && this.contains(globalThis.document.activeElement)) {
@@ -193,10 +176,6 @@ class FakeElement {
 
   append(...nodes) {
     nodes.forEach(node => {
-      recordDomMutation("append", node, {
-        destination: this,
-        previousParent: node.parentElement
-      });
       if (node.parentElement) {
         const index = node.parentElement.children.indexOf(node);
         if (index >= 0) {
@@ -212,7 +191,6 @@ class FakeElement {
   }
 
   replaceChildren(...nodes) {
-    recordDomMutation("replaceChildren", this);
     this.children.forEach(child => child.setConnected(false));
     this.children = [];
     this._innerHTML = "";
@@ -221,7 +199,6 @@ class FakeElement {
   }
 
   remove() {
-    recordDomMutation("remove", this);
     if (this.parentElement) {
       const index = this.parentElement.children.indexOf(this);
       if (index >= 0) {
@@ -246,13 +223,6 @@ class FakeElement {
   }
 
   closest(selector) {
-    if (selector === "[data-report-record-key]" && this.dataset.reportRecordKey) {
-      return this;
-    }
-    if (selector === "[data-report-action-row]"
-        && Object.hasOwn(this.dataset, "reportActionRow")) {
-      return this;
-    }
     return this.parentElement?.closest(selector) || null;
   }
 
@@ -285,7 +255,6 @@ class FakeElement {
     if (this.hidden || this.isConnected === false) {
       return;
     }
-    recordDomMutation("focus", this);
     globalThis.document.activeElement = this;
   }
 }
@@ -296,7 +265,6 @@ class FakeDocument {
     this.filterChips = filterChips;
     this.shell = shell;
     this.listeners = new Map();
-    this.actionControls = [];
     this.body = new FakeElement("body");
     this.activeElement = this.body;
   }
@@ -352,9 +320,6 @@ class FakeDocument {
     }
     if (selector === ".report-range-chip") {
       return [];
-    }
-    if (selector === "[data-report-record-key][data-action]") {
-      return this.actionControls;
     }
     return [];
   }
@@ -804,7 +769,6 @@ function createFilterChip(group, value) {
 function createHarness({
   context = { isReports: true, isDoctor: false },
   payload = reportPayload(),
-  requestResponses = [],
   reloadResponses = [],
   auditResponses = []
 } = {}) {
@@ -823,6 +787,9 @@ function createHarness({
         "dataQualityStatus",
         "reportAuditEvidence",
         "reportAuditBody",
+        "reportAnomalyReview",
+        "reportAnomalyReviewBody",
+        "reportAnomalyReviewCount",
         "reportReviewQueue",
         "reportReviewQueueBody",
         "reportReviewQueueCount",
@@ -839,14 +806,10 @@ function createHarness({
         "reportInsights",
         "reportInsightsGrid",
         "reportInsightsHeading",
-        "reportsMain",
         "reportDateRange",
         "reportRangeCustom",
         "reportRangeStart",
         "reportRangeEnd",
-        "reportActionFeedback",
-        "reportActionStatusPolite",
-        "reportActionStatusAssertive",
         "completedCyclesBody",
         "exceptionCyclesBody"
       ]
@@ -856,13 +819,6 @@ function createHarness({
         "selectedDoctorPanel"
       ];
   ids.forEach(id => elements.set(id, new FakeElement(id)));
-  if (elements.has("reportActionFeedback")) {
-    const feedback = elements.get("reportActionFeedback");
-    feedback.hidden = true;
-    feedback.append(
-      elements.get("reportActionStatusPolite"),
-      elements.get("reportActionStatusAssertive"));
-  }
   const shell = new FakeElement("reportsShell");
   const filterChips = [
     createFilterChip("sedation", "all"),
@@ -910,15 +866,8 @@ function createHarness({
   const requests = [];
   const auditQueries = [];
   const reloadQueries = [];
-  const alerts = [];
-  const confirmations = [];
-  const domMutations = [];
-  let confirmationResult = true;
   const harness = {
     adminHeaders: { "X-ChairSide-Admin-Token": "admin-token" },
-    alerts,
-    confirmations,
-    domMutations,
     clearCount: 0,
     document,
     elements,
@@ -926,6 +875,8 @@ function createHarness({
     pressGuards: [],
     requests,
     auditQueries,
+    anomalyMarks: [],
+    anomalySelections: [],
     anomalyStatuses: [],
     reloadQueries,
     storedTokens: []
@@ -933,11 +884,6 @@ function createHarness({
   globalThis.__chairsideReportsHarness = harness;
   globalThis.document = document;
   globalThis.Element = FakeElement;
-  globalThis.confirm = message => {
-    confirmations.push(message);
-    return confirmationResult;
-  };
-  globalThis.alert = message => alerts.push(message);
 
   const requestContextForRange = range => {
     const allTime = range?.preset === "all";
@@ -1040,14 +986,7 @@ function createHarness({
     },
     request: async (url, options) => {
       requests.push({ url, options });
-      const result = requestResponses.shift();
-      if (result instanceof Error) {
-        throw result;
-      }
-      if (typeof result === "function") {
-        return result();
-      }
-      return result || { ok: true, status: 204 };
+      return { ok: true, status: 204 };
     }
   });
 
@@ -1060,13 +999,6 @@ function createHarness({
       return renderPageCount;
     },
     reports,
-    registerActionControl(control) {
-      document.actionControls.push(control);
-      return control;
-    },
-    setConfirmationResult(value) {
-      confirmationResult = value;
-    },
     setDateRange(value) {
       dateRange = { ...value };
     },
@@ -1740,6 +1672,76 @@ test("Reports markup preserves the accepted integrated reading order", () => {
   assert.ok(intelligenceIndex < allocationIndex);
   assert.ok(allocationIndex < insightsIndex);
   assert.ok(insightsIndex < auditIndex);
+});
+
+test("legacy report action feedback is absent while canonical anomaly feedback stays accessible", () => {
+  assert.doesNotMatch(reportsHtmlSource, /reportActionFeedback|reportActionStatus/);
+  assert.doesNotMatch(stylesSource, /report-action-feedback|report-action-status/);
+  assert.match(
+    reportsHtmlSource,
+    /id="reportAnomalyReviewBody" tabindex="-1" aria-live="polite"/);
+  assert.doesNotMatch(
+    moduleSource,
+    /reportActionStates|executeReportMutation|reconcileReportAction|retry-report-mutation|refresh-report-action/);
+});
+
+test("compatibility table actions enter the canonical anomaly workflow without legacy POSTs", async () => {
+  const harness = createHarness({
+    payload: {
+      ...reportPayload(),
+      recentCompletedCycles: [{
+        completedCycleId: 42,
+        roomId: 3,
+        assignedDoctor: "otte",
+        procedureCode: "EXT",
+        seatedAt: "2026-07-29T12:00:00Z"
+      }],
+      exceptionReviewRecords: [{
+        sourceType: "AbortedAssignment",
+        reviewRecordId: 84,
+        roomId: 4,
+        assignedDoctor: "pledger",
+        procedureCode: "CON",
+        seatedAt: "2026-07-29T13:00:00Z"
+      }]
+    }
+  });
+  harness.reports.wire();
+  harness.reports.render();
+
+  const completedHtml = harness.elements.get("completedCyclesBody").innerHTML;
+  assert.match(completedHtml, /data-action="mark-for-review"/);
+  assert.match(completedHtml, /data-review-source="CompletedCycle"/);
+  assert.match(completedHtml, /data-review-record-id="42"/);
+  assert.doesNotMatch(completedHtml, /data-completed-cycle-id|data-seated-at|data-report-record-key/);
+
+  const exceptionHtml = harness.elements.get("exceptionCyclesBody").innerHTML;
+  assert.match(exceptionHtml, /data-action="open-anomaly-encounter"/);
+  assert.match(exceptionHtml, /data-review-source="AbortedAssignment"/);
+  assert.match(exceptionHtml, /data-review-record-id="84"/);
+  assert.doesNotMatch(exceptionHtml, /data-report-record-key|data-default-label|data-pending-label/);
+
+  const markButton = new FakeElement();
+  markButton.actionSelector = "[data-action='mark-for-review']";
+  markButton.dataset.reviewSource = "CompletedCycle";
+  markButton.dataset.reviewRecordId = "42";
+  await dispatchAction(harness, markButton);
+
+  const openButton = new FakeElement();
+  openButton.actionSelector = "[data-action='open-anomaly-encounter']";
+  openButton.dataset.reviewSource = "AbortedAssignment";
+  openButton.dataset.reviewRecordId = "84";
+  await dispatchAction(harness, openButton);
+
+  assert.deepEqual(harness.anomalyMarks, [
+    { sourceType: "CompletedCycle", sourceRecordId: 42 }
+  ]);
+  assert.deepEqual(harness.anomalySelections, [
+    { sourceType: "AbortedAssignment", sourceRecordId: 84 }
+  ]);
+  assert.equal(harness.elements.get("reportAnomalyReview").open, true);
+  assert.equal(harness.requests.length, 0);
+  assert.doesNotMatch(moduleSource, /mark-exception|confirm-exclusion/);
 });
 
 test("tablet report filters keep the selected doctor readable before wrapping", () => {

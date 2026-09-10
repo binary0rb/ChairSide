@@ -412,7 +412,7 @@ public sealed class BoardReadyPresentationTests
     }
 
     [Fact]
-    public void Reports_actions_use_sibling_live_regions_while_doctor_remains_read_only()
+    public void Reports_actions_use_canonical_anomaly_feedback_while_doctor_remains_read_only()
     {
         var root = FindRepositoryRoot();
         var webRoot = Path.Combine(root, "src", "ChairSide.Board", "wwwroot");
@@ -421,18 +421,14 @@ public sealed class BoardReadyPresentationTests
         var reportsScript = File.ReadAllText(Path.Combine(webRoot, "reports.js"));
         var anomalyScript = File.ReadAllText(Path.Combine(webRoot, "anomaly-review.js"));
 
-        Assert.Matches(
-            @"(?s)<div[^>]*\bid=""reportActionFeedback""[^>]*\btabindex=""-1""[^>]*\bhidden[^>]*>"
-            + @".*?<div[^>]*\bid=""reportActionStatusPolite""[^>]*\brole=""status""[^>]*"
-            + @"\baria-live=""polite""[^>]*\baria-atomic=""false""[^>]*></div>"
-            + @".*?<div[^>]*\bid=""reportActionStatusAssertive""[^>]*\brole=""alert""[^>]*"
-            + @"\baria-live=""assertive""[^>]*\baria-atomic=""false""[^>]*></div>"
-            + @".*?</div>",
-            reportsPage);
         Assert.Contains(
-            "<main class=\"reports-shell\" id=\"reportsMain\" tabindex=\"-1\">",
+            "<div id=\"reportAnomalyReviewBody\" tabindex=\"-1\" aria-live=\"polite\"></div>",
             reportsPage,
             StringComparison.Ordinal);
+        Assert.DoesNotContain("reportActionFeedback", reportsPage, StringComparison.Ordinal);
+        Assert.DoesNotContain("reportActionStatusPolite", reportsPage, StringComparison.Ordinal);
+        Assert.DoesNotContain("reportActionStatusAssertive", reportsPage, StringComparison.Ordinal);
+        Assert.DoesNotContain("id=\"reportsMain\"", reportsPage, StringComparison.Ordinal);
         Assert.Contains(
             "<h2 id=\"reportAccessHeading\" tabindex=\"-1\">Reports Access</h2>",
             reportsScript,
