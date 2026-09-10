@@ -1,6 +1,50 @@
 # AGENTS
 
 Project guidance for AI agents working on ChairSide.
+
+<!-- BEGIN CHAIRSIDE SAFETY INVARIANTS -->
+# CHAIRSIDE NON-NEGOTIABLE SAFETY INVARIANTS
+
+The global Codex safety invariants apply here and may not be weakened by
+project convenience or cleanup behavior.
+
+Rules:
+
+1. The repository root containing this `AGENTS.md` is never an ordinary
+   cleanup/deletion target.
+
+2. Production, publish, deployment, IIS, application, data, log, and staging
+   directories are protected infrastructure: they are never ordinary
+   cleanup/deletion targets and must not be modified during ordinary coding
+   work.
+
+3. Production changes require an explicit production deployment request; that
+   request does not authorize deleting a production, publish, application,
+   data, log, or deployment root.
+
+4. Worktree cleanup may affect only an exact non-primary worktree path listed
+   by `git worktree list --porcelain`, resolved to a canonical absolute path,
+   and displayed before removal.
+
+5. Never infer a worktree root or cleanup target from a partial path.
+
+6. Never use raw rmdir/rd/Remove-Item -Recurse for normal Git worktree
+   cleanup when `git worktree remove` can perform the operation.
+
+7. Never broaden a cleanup target, including in response to worktree
+   creation, setup, or cleanup failure.
+
+8. Use the target environment's native shell, quoting, and path semantics;
+   never translate filesystem-affecting commands between Windows/PowerShell/cmd
+   and Linux/WSL/container by textual substitution.
+
+9. After crossing an environment boundary, re-resolve every filesystem path in
+   the target environment before any write or deletion.
+
+10. Cleanup failure is preferable to any uncertain filesystem operation.
+
+<!-- END CHAIRSIDE SAFETY INVARIANTS -->
+
 # ChairSide Project Brief
 
 ## Project name
