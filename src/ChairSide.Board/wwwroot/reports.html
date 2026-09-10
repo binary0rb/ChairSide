@@ -32,7 +32,7 @@
     </nav>
   </header>
 
-  <main class="reports-shell" id="reportsMain" tabindex="-1">
+  <main class="reports-shell">
     <!-- Headline band: curated cards when data exists, friendly empty-state when not,
          or the reports access prompt when the token is missing/rejected. -->
     <p class="layer-pill layer-pill--population report-layer-label">Report Population</p>
@@ -130,22 +130,6 @@
       <summary>All metrics</summary>
       <section class="report-summary" id="reportSummary" aria-label="Room flow summary"></section>
     </details>
-
-    <div class="report-action-feedback"
-         id="reportActionFeedback"
-         tabindex="-1"
-         hidden>
-      <div class="report-action-feedback__polite"
-           id="reportActionStatusPolite"
-           role="status"
-           aria-live="polite"
-           aria-atomic="false"></div>
-      <div class="report-action-feedback__assertive"
-           id="reportActionStatusAssertive"
-           role="alert"
-           aria-live="assertive"
-           aria-atomic="false"></div>
-    </div>
 
     <section class="report-audit-evidence" aria-labelledby="reportAuditHeading">
       <details class="report-disclosure" id="reportAuditEvidence">

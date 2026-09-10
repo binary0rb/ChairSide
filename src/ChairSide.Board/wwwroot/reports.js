@@ -5,13 +5,10 @@ import { formatDateTime, formatDuration } from "./format-utils.js";
 import {
   adminRequestHeaders,
   clearAdminToken,
-  readErrorMessage,
   storeAdminToken
 } from "./request-utils.js";
 
 const trendAboutSameThresholdSeconds = 60;
-const MAX_UNRESOLVED_REPORT_ACTIONS = 10;
-const REPORT_ACTION_CAPACITY_KEY = "report-action-capacity";
 
 export function createReports({
   context,
@@ -33,10 +30,6 @@ export function createReports({
     auditViews: new Map(),
     customDateRangeDraft: null
   };
-  const reportActionStates = new Map();
-  const reportActionElements = new Map();
-  let nextReportActionOperationId = 0;
-  let reportActionCapacityVisible = false;
   const anomalyReview = createAnomalyReview({
     reportData,
     request,
@@ -45,7 +38,6 @@ export function createReports({
   });
 
   async function selectDateRangePreset(preset) {
-  clearCompletedReportAction();
   if (preset === "custom") {
     const currentRange = reportData.getDateRange();
     state.customDateRangeDraft = {
@@ -77,7 +69,6 @@ export function createReports({
     return; // nothing to apply; leave current window
   }
 
-  clearCompletedReportAction();
   reportData.setDateRange({ preset: "custom", start, end });
   state.customDateRangeDraft = null;
   syncDateRangeControls();
@@ -236,7 +227,6 @@ export function createReports({
   }
   const hasData = (r.completedRoomCyclesCount || 0) > 0;
 
-  renderReportActionFeedback();
   revealReportDisclosures();
   renderReportWindow(r);
   syncDateRangeControls();
@@ -255,16 +245,10 @@ export function createReports({
 
   const exceptionCycles = r.exceptionReviewRecords || r.exceptionCycles || [];
   const compatibilityCycles = r.recentCompletedCycles || [];
-  const focusTransfer = captureReportActionFocusBeforeRender(
-    compatibilityCycles,
-    exceptionCycles);
   // Compatibility renderers remain callable for older embedded markup, but the canonical Reports
   // document no longer contains these capped-table targets.
   renderCompletedCycles(compatibilityCycles);
   renderExceptionCycles(exceptionCycles);
-  if (focusTransfer) {
-    queueMicrotask(() => completeReportActionFocusAfterRender(focusTransfer));
-  }
   renderProcedureSummaries(r.procedureSummaries || []);
 }
 
@@ -1944,9 +1928,8 @@ export function createReports({
 }
 
   function renderReviewAuditRows(rows) {
-  return rows.map(row => {
-    const recordKey = reviewRecordKey(row.sourceType, row.reviewRecordId);
-    return `<details class="report-audit-row" data-report-action-row data-report-record-key="${escapeAttribute(recordKey)}">
+  return rows.map(row => `
+    <details class="report-audit-row">
       <summary><span>Room ${row.roomId}</span><span>${escapeHtml(row.doctorName)}</span><span>${escapeHtml(row.procedureLabel)}</span><span>${formatDateTime(row.reviewAnchor)}</span><span>${escapeHtml(row.reviewStatus)}</span></summary>
       <dl class="report-audit-facts">
         <div><dt>Source</dt><dd>${escapeHtml(row.sourceType)}</dd></div>
@@ -1956,8 +1939,7 @@ export function createReports({
         <div><dt>Imported reviewed-at evidence</dt><dd>${formatDateTime(row.reviewedAt)}</dd></div>
       </dl>
       <button class="secondary-button utility-button" data-action="open-anomaly-encounter" data-review-source="${escapeAttribute(row.sourceType)}" data-review-record-id="${row.reviewRecordId}">Open anomaly detail</button>
-    </details>`;
-  }).join("");
+    </details>`).join("");
 }
 
   function formatAuditSort(value) {
@@ -2476,707 +2458,6 @@ export function createReports({
   `;
 }
 
-  function completedRecordKey(cycle) {
-  const completedCycleId = Number(cycle.completedCycleId);
-  if (Number.isInteger(completedCycleId) && completedCycleId > 0) {
-    return `completed:${completedCycleId}`;
-  }
-  return `legacy:${cycle.roomId}:${normalizeReportIdentityTimestamp(cycle.seatedAt)}`;
-}
-
-  function reviewRecordKey(sourceType, reviewRecordId) {
-  return sourceType === "AbortedAssignment"
-    ? `aborted:${reviewRecordId}`
-    : `completed:${reviewRecordId}`;
-}
-
-  function reportRangeSignature() {
-  return reportData.getRangeSignature(reportData.getDateRange());
-}
-
-  function currentReportAction(recordKey) {
-  return reportActionStates.get(recordKey) || null;
-}
-
-  function normalizeReportIdentityTimestamp(value) {
-  const timestamp = Date.parse(value || "");
-  return Number.isFinite(timestamp) ? new Date(timestamp).toISOString() : String(value || "").trim();
-}
-
-  function isUnresolvedReportAction(entry) {
-  return entry?.phase === "pending"
-    || entry?.phase === "definite-failure"
-    || entry?.phase === "unknown-outcome"
-    || entry?.phase === "refresh-failure";
-}
-
-  function unresolvedReportActionCount() {
-  let count = 0;
-  reportActionStates.forEach(entry => {
-    if (isUnresolvedReportAction(entry)) {
-      count++;
-    }
-  });
-  return count;
-}
-
-  function canStartReportMutation(recordKey) {
-  if (isUnresolvedReportAction(reportActionStates.get(recordKey))
-      || unresolvedReportActionCount() < MAX_UNRESOLVED_REPORT_ACTIONS) {
-    return true;
-  }
-  reportActionCapacityVisible = true;
-  renderReportActionFeedback();
-  return false;
-}
-
-  function isMutationLocked(entry, actionType = entry?.actionType) {
-  if (!entry) {
-    return false;
-  }
-  if (entry.phase === "success" && entry.actionType !== actionType) {
-    return false;
-  }
-  return entry.mutationRetryAllowed !== true;
-}
-
-  function isCurrentOperation(entry) {
-  return currentReportAction(entry.recordKey)?.operationId === entry.operationId;
-}
-
-  function reportActionLabel(entry) {
-  if (entry.phase === "success") {
-    return "Completed";
-  }
-  if (entry.phase === "definite-failure") {
-    return "Could not complete";
-  }
-  if (entry.phase === "unknown-outcome") {
-    return "Outcome uncertain";
-  }
-  if (entry.phase === "refresh-failure") {
-    return "Refresh needed";
-  }
-  return "Working";
-}
-
-  function reportActionRegion(entry) {
-  const assertive = entry.phase === "definite-failure"
-    || entry.phase === "unknown-outcome"
-    || entry.phase === "refresh-failure";
-  return document.getElementById(
-    assertive ? "reportActionStatusAssertive" : "reportActionStatusPolite");
-}
-
-  function createReportActionButton(action, recordKey, label) {
-  const button = document.createElement("button");
-  button.type = "button";
-  button.className = "secondary-button utility-button";
-  button.dataset.action = action;
-  button.dataset.recordKey = recordKey;
-  button.textContent = label;
-  return button;
-}
-
-  function updateReportActionElement(element, entry) {
-  element.className = "report-action-status-entry";
-  element.dataset.recordKey = entry.recordKey;
-  element.dataset.tone = entry.tone;
-  element.dataset.operationId = String(entry.operationId);
-
-  const label = document.createElement("strong");
-  label.textContent = reportActionLabel(entry);
-  const message = document.createElement("span");
-  message.textContent = entry.message;
-  const children = [label, message];
-
-  if (entry.mutationRetryAllowed || entry.refreshRetryAllowed) {
-    const controls = document.createElement("div");
-    controls.className = "report-action-status-controls";
-    if (entry.mutationRetryAllowed) {
-      controls.append(createReportActionButton(
-        "retry-report-mutation",
-        entry.recordKey,
-        "Try action again"));
-    }
-    if (entry.refreshRetryAllowed) {
-      controls.append(createReportActionButton(
-        "refresh-report-action",
-        entry.recordKey,
-        "Refresh reports"));
-    }
-    children.push(controls);
-  }
-
-  element.replaceChildren(...children);
-}
-
-  function renderReportActionCapacity(assertiveRegion) {
-  let capacity = document.getElementById(REPORT_ACTION_CAPACITY_KEY);
-  if (!reportActionCapacityVisible) {
-    capacity?.remove();
-    return;
-  }
-  if (!capacity) {
-    capacity = document.createElement("article");
-    capacity.id = REPORT_ACTION_CAPACITY_KEY;
-    capacity.className = "report-action-status-entry";
-    capacity.dataset.tone = "error";
-    const label = document.createElement("strong");
-    label.textContent = "Action limit reached";
-    const message = document.createElement("span");
-    message.textContent = "Resolve or refresh an existing report action before starting another.";
-    capacity.replaceChildren(label, message);
-    assertiveRegion.append(capacity);
-  }
-}
-
-  function renderReportActionFeedback() {
-  return renderReportActionFeedbackWithRetirement();
-}
-
-  function reportActionFeedbackOwnsFocus(wrapper) {
-  const active = document.activeElement;
-  return Boolean(active && (active === wrapper || wrapper.contains(active)));
-}
-
-  function usableReportFocusDestination(candidate) {
-  return candidate
-    && candidate.isConnected !== false
-    && candidate.hidden !== true
-    && candidate.disabled !== true
-    ? candidate
-    : null;
-}
-
-  function retireEmptyReportActionFeedback(
-    wrapper,
-    polite,
-    assertive,
-    focusDestination,
-    focusWasOwned) {
-  const empty = polite.childElementCount === 0 && assertive.childElementCount === 0;
-  if (!empty) {
-    wrapper.hidden = false;
-    return;
-  }
-
-  if (focusWasOwned || reportActionFeedbackOwnsFocus(wrapper)) {
-    const destination = usableReportFocusDestination(focusDestination)
-      || usableReportFocusDestination(document.getElementById("reportsMain"));
-    destination?.focus({ preventScroll: true });
-    if (reportActionFeedbackOwnsFocus(wrapper)) {
-      return;
-    }
-  }
-
-  wrapper.hidden = true;
-}
-
-  function renderReportActionFeedbackWithRetirement({ focusDestination = null } = {}) {
-  const wrapper = document.getElementById("reportActionFeedback");
-  const polite = document.getElementById("reportActionStatusPolite");
-  const assertive = document.getElementById("reportActionStatusAssertive");
-  if (!wrapper || !polite || !assertive) {
-    return;
-  }
-  const focusWasOwned = reportActionFeedbackOwnsFocus(wrapper);
-
-  reportActionElements.forEach((element, recordKey) => {
-    if (!reportActionStates.has(recordKey)) {
-      element.remove();
-      reportActionElements.delete(recordKey);
-    }
-  });
-
-  [...reportActionStates.values()]
-    .sort((left, right) => left.operationId - right.operationId)
-    .forEach(entry => {
-      let element = reportActionElements.get(entry.recordKey);
-      if (!element) {
-        element = document.createElement("article");
-        reportActionElements.set(entry.recordKey, element);
-      }
-      const region = reportActionRegion(entry);
-      const regionChanged = region && element.parentElement && element.parentElement !== region;
-      const entryChanged = element.dataset.operationId !== String(entry.operationId)
-          || element.dataset.phase !== entry.phase
-          || element.dataset.tone !== entry.tone
-          || element.dataset.message !== entry.message
-          || element.dataset.mutationRetry !== String(entry.mutationRetryAllowed)
-          || element.dataset.refreshRetry !== String(entry.refreshRetryAllowed);
-      if (regionChanged && entryChanged) {
-        element.remove();
-      }
-      if (entryChanged) {
-        updateReportActionElement(element, entry);
-        element.dataset.phase = entry.phase;
-        element.dataset.message = entry.message;
-        element.dataset.mutationRetry = String(entry.mutationRetryAllowed);
-        element.dataset.refreshRetry = String(entry.refreshRetryAllowed);
-      }
-      if (region && element.parentElement !== region) {
-        region.append(element);
-      }
-    });
-
-  renderReportActionCapacity(assertive);
-  retireEmptyReportActionFeedback(
-    wrapper,
-    polite,
-    assertive,
-    focusDestination,
-    focusWasOwned);
-}
-
-  function syncReportActionControls(recordKey) {
-  const entry = currentReportAction(recordKey);
-  const controls = [...document.querySelectorAll("[data-report-record-key][data-action]")];
-  if (entry?.focusOrigin?.dataset?.reportRecordKey === recordKey
-      && !controls.includes(entry.focusOrigin)) {
-    controls.push(entry.focusOrigin);
-  }
-  controls.forEach(control => {
-    if (control.dataset.reportRecordKey !== recordKey) {
-      return;
-    }
-
-    const shouldDisable = isMutationLocked(entry, control.dataset.action);
-    if (shouldDisable && document.activeElement === control) {
-      control.closest("[data-report-action-row]")?.focus({ preventScroll: true });
-    }
-    control.disabled = shouldDisable;
-    const isMutationPending = entry?.phase === "pending" && entry.requestKind === "mutation";
-    control.textContent = isMutationPending
-      ? control.dataset.pendingLabel
-      : control.dataset.defaultLabel;
-  });
-}
-
-  function setReportActionState(entry) {
-  if (entry.phase === "success") {
-    reportActionStates.forEach((existing, key) => {
-      if (key !== entry.recordKey && existing.phase === "success") {
-        reportActionStates.delete(key);
-      }
-    });
-  }
-
-  reportActionStates.set(entry.recordKey, entry);
-  if (unresolvedReportActionCount() < MAX_UNRESOLVED_REPORT_ACTIONS) {
-    reportActionCapacityVisible = false;
-  }
-  renderReportActionFeedback();
-  syncReportActionControls(entry.recordKey);
-}
-
-  function clearCompletedReportAction() {
-  let changed = false;
-  reportActionStates.forEach((entry, key) => {
-    if (entry.phase === "success") {
-      reportActionStates.delete(key);
-      changed = true;
-    }
-  });
-  if (changed) {
-    renderReportActionFeedback();
-  }
-}
-
-  function clearAllReportActions({ focusDestination = null } = {}) {
-  const keys = [...reportActionStates.keys()];
-  reportActionStates.clear();
-  reportActionCapacityVisible = false;
-  renderReportActionFeedbackWithRetirement({ focusDestination });
-  keys.forEach(syncReportActionControls);
-}
-
-  function createPendingReportAction(descriptor, focusOrigin) {
-  return {
-    ...descriptor,
-    operationId: ++nextReportActionOperationId,
-    phase: "pending",
-    message: descriptor.pendingMessage,
-    tone: "pending",
-    mutationRetryAllowed: false,
-    refreshRetryAllowed: false,
-    requestKind: "mutation",
-    rangeSignature: reportRangeSignature(),
-    focusOrigin
-  };
-}
-
-  function captureReportActionFocusBeforeRender(completedCycles, exceptionCycles) {
-  const active = document.activeElement;
-  if (!active || active === document.body || active.isConnected === false) {
-    return null;
-  }
-  const recordKey = active.dataset?.reportRecordKey
-    || active.closest?.("[data-report-record-key]")?.dataset.reportRecordKey;
-  const entry = currentReportAction(recordKey);
-  if (!entry || !isCurrentOperation(entry)) {
-    return null;
-  }
-
-  const actionWillRemain = entry.actionType === "mark-for-review"
-    ? completedCycles.some(cycle => completedRecordKey(cycle) === recordKey)
-    : exceptionCycles.some(record => {
-      const sourceType = record.sourceType || "CompletedCycle";
-      const reviewRecordId = Number(
-        record.reviewRecordId || record.completedCycleId || record.abortedAssignmentId || 0);
-      return reviewRecordKey(sourceType, reviewRecordId) === recordKey;
-    });
-  if (actionWillRemain) {
-    return null;
-  }
-
-  return {
-    recordKey,
-    operationId: entry.operationId,
-    focusedElement: active
-  };
-}
-
-  function completeReportActionFocusAfterRender(candidate) {
-  if (!candidate) {
-    return;
-  }
-  const current = currentReportAction(candidate.recordKey);
-  if (!current
-      || current.operationId !== candidate.operationId
-      || candidate.focusedElement.isConnected !== false
-      || document.activeElement !== document.body) {
-    return;
-  }
-  document.getElementById("reportActionFeedback")?.focus();
-}
-
-  function mutationRequestOptions(entry) {
-  const options = {
-    method: "POST",
-    cache: "no-store",
-    headers: {
-      ...adminRequestHeaders()
-    }
-  };
-  if (entry.requestBody !== undefined) {
-    options.headers["Content-Type"] = "application/json";
-    options.body = JSON.stringify(entry.requestBody);
-  }
-  return options;
-}
-
-  function setUnknownOutcome(entry, error) {
-  if (!isCurrentOperation(entry)) {
-    return;
-  }
-  console.warn(`[ChairSide] ${entry.errorLogLabel}`, error);
-  setReportActionState({
-    ...entry,
-    phase: "unknown-outcome",
-    message: "The request outcome could not be confirmed. Refresh reports before trying this action again.",
-    tone: "unknown",
-    mutationRetryAllowed: false,
-    refreshRetryAllowed: true,
-    requestKind: null
-  });
-}
-
-  async function setDefiniteFailure(entry, response) {
-  if (!isCurrentOperation(entry)) {
-    return;
-  }
-
-  let message;
-  if (response.status === 401) {
-    message = `${entry.roomLabel} could not be updated because Reports access is required. Reload Reports and enter the current internal token.`;
-  } else if (response.status === 403) {
-    message = `${entry.roomLabel} could not be updated because the saved Reports token was rejected. Reload Reports and enter authorized access.`;
-  } else {
-    const fallback = response.status === 404
-      ? `${entry.roomLabel} is no longer available for this action. Refresh reports before trying again.`
-      : `${entry.roomLabel} could not be updated. Refresh reports before trying again.`;
-    try {
-      message = await readErrorMessage(response, fallback);
-    } catch {
-      message = fallback;
-    }
-  }
-
-  if (!isCurrentOperation(entry)) {
-    return;
-  }
-  setReportActionState({
-    ...entry,
-    phase: "definite-failure",
-    message,
-    tone: "error",
-    mutationRetryAllowed: false,
-    refreshRetryAllowed: true,
-    requestKind: null
-  });
-}
-
-  async function executeReportMutation(entry) {
-  let response;
-  try {
-    response = await request(entry.requestUrl, mutationRequestOptions(entry));
-  } catch (error) {
-    setUnknownOutcome(entry, error);
-    return;
-  }
-
-  if (!isCurrentOperation(entry)) {
-    return;
-  }
-
-  if (!response || !Number.isInteger(response.status)) {
-    setUnknownOutcome(entry, new Error("Report action returned an invalid response."));
-    return;
-  }
-
-  if (!response.ok) {
-    if ([400, 401, 403, 404].includes(response.status)) {
-      await setDefiniteFailure(entry, response);
-    } else {
-      setUnknownOutcome(entry, new Error(`HTTP ${response.status}`));
-    }
-    return;
-  }
-
-  if (response.status !== 204) {
-    setUnknownOutcome(entry, new Error(`Unexpected successful HTTP ${response.status}`));
-    return;
-  }
-
-  setReportActionState({
-    ...entry,
-    message: `${entry.mutationSuccessMessage} Refreshing reports...`,
-    mutationCommitted: true
-  });
-
-  try {
-    await reportData.reloadAfterCurrent();
-  } catch (error) {
-    if (!isCurrentOperation(entry)) {
-      return;
-    }
-    console.warn("[ChairSide] Report action succeeded but refresh failed.", error);
-    setReportActionState({
-      ...entry,
-      phase: "refresh-failure",
-      message: "The action succeeded, but the reports could not refresh. Refresh reports to verify the updated row.",
-      tone: "refresh",
-      mutationCommitted: true,
-      mutationRetryAllowed: false,
-      refreshRetryAllowed: true,
-      requestKind: null
-    });
-    return;
-  }
-
-  if (!isCurrentOperation(entry)) {
-    return;
-  }
-  const success = {
-    ...entry,
-    phase: "success",
-    message: entry.successMessage,
-    tone: "success",
-    mutationCommitted: true,
-    mutationRetryAllowed: false,
-    refreshRetryAllowed: false,
-    requestKind: null
-  };
-  setReportActionState(success);
-}
-
-  function reportRecordMatchesMarkIdentity(entry, record) {
-  if (entry.completedCycleId) {
-    return Number(record.completedCycleId || record.reviewRecordId) === entry.completedCycleId;
-  }
-  return Number(record.roomId) === entry.roomId
-    && normalizeReportIdentityTimestamp(record.seatedAt || record.startedAt)
-      === normalizeReportIdentityTimestamp(entry.seatedAt);
-}
-
-  function markExceptionResolution(entry, reports) {
-  const exceptionRecords = reports?.exceptionReviewRecords || reports?.exceptionCycles || [];
-  const exceptionPresent = exceptionRecords.some(record =>
-    (record.sourceType || "CompletedCycle") === "CompletedCycle"
-    && reportRecordMatchesMarkIdentity(entry, record));
-  if (exceptionPresent) {
-    return "success";
-  }
-  const recentPresent = (reports?.recentCompletedCycles || []).some(record =>
-    reportRecordMatchesMarkIdentity(entry, record));
-  return recentPresent ? "unchanged" : "ambiguous";
-}
-
-  function confirmationActionStillApplicable(entry, reports) {
-  return (reports?.exceptionReviewRecords || reports?.exceptionCycles || []).some(record =>
-    (record.sourceType || "CompletedCycle") === entry.recordSource
-    && Number(record.reviewRecordId || record.completedCycleId || record.abortedAssignmentId)
-      === entry.reviewRecordId);
-}
-
-  function actionResolutionIsConclusive(entry, freshLoad) {
-  return entry.recordSource === "AbortedAssignment"
-    || entry.rangeSignature === freshLoad?.requestContext?.rangeSignature;
-}
-
-  async function reconcileReportAction(entry, focusOrigin) {
-  if (!entry || !isCurrentOperation(entry)) {
-    return;
-  }
-
-  const reconciliation = {
-    ...entry,
-    operationId: ++nextReportActionOperationId,
-    phase: "pending",
-    message: `Refreshing reports for ${entry.roomLabel}...`,
-    tone: "refresh",
-    mutationRetryAllowed: false,
-    refreshRetryAllowed: false,
-    requestKind: "refresh",
-    focusOrigin
-  };
-  const focusOriginOwned = document.activeElement === focusOrigin;
-  setReportActionState(reconciliation);
-  if (focusOriginOwned) {
-    document.getElementById("reportActionFeedback")?.focus();
-  }
-
-  let freshLoad;
-  try {
-    freshLoad = await reportData.reloadAfterCurrent();
-  } catch (error) {
-    if (!isCurrentOperation(reconciliation)) {
-      return;
-    }
-    console.warn("[ChairSide] Report action reconciliation failed.", error);
-    setReportActionState({
-      ...reconciliation,
-      phase: entry.mutationCommitted ? "refresh-failure" : entry.phase,
-      message: entry.mutationCommitted
-        ? "The action succeeded, but the reports could not refresh. Refresh reports to verify the updated row."
-        : "Reports could not refresh. The action outcome is still unresolved.",
-      tone: entry.mutationCommitted ? "refresh" : "unknown",
-      mutationCommitted: entry.mutationCommitted,
-      mutationRetryAllowed: false,
-      refreshRetryAllowed: true,
-      requestKind: null
-    });
-    return;
-  }
-
-  if (!isCurrentOperation(reconciliation)) {
-    return;
-  }
-
-  if (entry.mutationCommitted) {
-    setReportActionState({
-      ...reconciliation,
-      phase: "success",
-      message: entry.successMessage,
-      tone: "success",
-      mutationCommitted: true,
-      mutationRetryAllowed: false,
-      refreshRetryAllowed: false,
-      requestKind: null
-    });
-    return;
-  }
-
-  if (entry.actionType === "mark-for-review") {
-    const resolution = markExceptionResolution(entry, reportData.getReports());
-    if (resolution === "success") {
-      setReportActionState({
-        ...reconciliation,
-        phase: "success",
-        message: entry.successMessage,
-        tone: "success",
-        mutationCommitted: true,
-        mutationRetryAllowed: false,
-        refreshRetryAllowed: false,
-        requestKind: null
-      });
-      return;
-    }
-    if (resolution === "ambiguous") {
-      setReportActionState({
-        ...reconciliation,
-        phase: "unknown-outcome",
-        message: "Reports refreshed, but the record is not present in an authoritative action population. The request outcome is still uncertain.",
-        tone: "unknown",
-        mutationRetryAllowed: false,
-        refreshRetryAllowed: true,
-        requestKind: null
-      });
-      return;
-    }
-    setReportActionState({
-      ...reconciliation,
-      phase: "definite-failure",
-      message: `Reports refreshed. ${entry.roomLabel} still allows this action, so it can be tried again.`,
-      tone: "error",
-      mutationRetryAllowed: true,
-      refreshRetryAllowed: false,
-      requestKind: null
-    });
-    return;
-  }
-
-  if (!actionResolutionIsConclusive(entry, freshLoad)) {
-    setReportActionState({
-      ...reconciliation,
-      phase: "unknown-outcome",
-      message: "Reports refreshed in a different range, so the request outcome is still uncertain.",
-      tone: "unknown",
-      mutationRetryAllowed: false,
-      refreshRetryAllowed: true,
-      requestKind: null
-    });
-    return;
-  }
-
-  if (confirmationActionStillApplicable(entry, reportData.getReports())) {
-    setReportActionState({
-      ...reconciliation,
-      phase: "definite-failure",
-      message: `Reports refreshed. ${entry.roomLabel} still allows this action, so it can be tried again.`,
-      tone: "error",
-      mutationRetryAllowed: true,
-      refreshRetryAllowed: false,
-      requestKind: null
-    });
-    return;
-  }
-
-  setReportActionState({
-    ...reconciliation,
-    phase: "success",
-    message: entry.successMessage,
-    tone: "success",
-    mutationCommitted: true,
-    mutationRetryAllowed: false,
-    refreshRetryAllowed: false,
-    requestKind: null
-  });
-}
-
-  function beginReportMutation(descriptor, focusOrigin) {
-  if (!canStartReportMutation(descriptor.recordKey)) {
-    return;
-  }
-  const pending = createPendingReportAction(descriptor, focusOrigin);
-  setReportActionState(pending);
-  if (document.activeElement === focusOrigin && focusOrigin.dataset.recordKey) {
-    document.getElementById("reportActionFeedback")?.focus();
-  }
-  return executeReportMutation(pending);
-}
-
   function renderExceptionCycles(exceptions) {
   const body = document.getElementById("exceptionCyclesBody");
   if (!body) {
@@ -3200,16 +2481,8 @@ export function createReports({
   const doctor = getDoctorName(cycle.assignedDoctor);
   const sourceType = cycle.sourceType || "CompletedCycle";
   const reviewRecordId = Number(cycle.reviewRecordId || cycle.completedCycleId || cycle.abortedAssignmentId || 0);
-  const recordKey = reviewRecordKey(sourceType, reviewRecordId);
-  const actionState = currentReportAction(recordKey);
-  const locked = isMutationLocked(actionState, "open-anomaly-encounter");
-  const label = actionState?.phase === "pending" && actionState.requestKind === "mutation"
-    ? "Opening anomaly..."
-    : "Open anomaly detail";
   return `
-    <tr data-report-action-row
-        data-report-record-key="${escapeAttribute(recordKey)}"
-        tabindex="-1">
+    <tr>
       <td>${formatDateTime(cycle.seatedAt)}</td>
       <td>Room ${cycle.roomId}</td>
       <td>${escapeHtml(doctor)}</td>
@@ -3226,13 +2499,8 @@ export function createReports({
                  data-action="open-anomaly-encounter"
                  data-review-source="${escapeAttribute(sourceType)}"
                  data-review-record-id="${escapeAttribute(String(reviewRecordId || ""))}"
-                 data-room-id="${escapeAttribute(String(cycle.roomId || ""))}"
-                 data-report-record-key="${escapeAttribute(recordKey)}"
-                 data-default-label="Open anomaly detail"
-                 data-pending-label="Opening anomaly..."
-                 ${locked ? "disabled" : ""}
                  title="This keeps the record excluded from normal metrics.">
-          ${label}
+          Open anomaly detail
         </button>
       </td>
     </tr>
@@ -3240,7 +2508,7 @@ export function createReports({
 }
 
 // ---------------------------------------------------------------------------
-// Reports admin actions (mark-as-exception)
+// Reports interactions
 // ---------------------------------------------------------------------------
 
   function wireReportsActions() {
@@ -3250,7 +2518,6 @@ export function createReports({
   document.addEventListener("change", handleAuditSelectionChange);
   // Keyboard activation for the role="button" doctor cards (clicks are already covered above).
   document.addEventListener("keydown", handleReportsCardKeydown);
-  globalThis.addEventListener?.("beforeunload", clearAllReportActions, { once: true });
 }
 
   function handleReportsCardKeydown(event) {
@@ -3292,7 +2559,6 @@ export function createReports({
       }
       reportData.setScope(scope, doctorId);
       syncReportFilterButtons();
-      clearCompletedReportAction();
       await reportData.reloadAfterCurrent();
       return;
     }
@@ -3316,7 +2582,6 @@ export function createReports({
     }
     state.reportFilters[group] = value;
     syncReportFilterButtons();
-    clearCompletedReportAction();
     await reportData.reloadAfterCurrent();
   });
 
@@ -3326,7 +2591,6 @@ export function createReports({
       return;
     }
     reportData.setScope("Doctor", doctorId);
-    clearCompletedReportAction();
     await reportData.reloadAfterCurrent();
   });
 }
@@ -3458,25 +2722,6 @@ export function createReports({
     return;
   }
 
-  const mutationRetryButton = event.target.closest("[data-action='retry-report-mutation']");
-  if (mutationRetryButton) {
-    const entry = currentReportAction(mutationRetryButton.dataset.recordKey);
-    if (!entry?.mutationRetryAllowed || !confirm(entry.confirmationMessage)) {
-      return;
-    }
-    await beginReportMutation(entry, mutationRetryButton);
-    return;
-  }
-
-  const refreshButton = event.target.closest("[data-action='refresh-report-action']");
-  if (refreshButton) {
-    const entry = currentReportAction(refreshButton.dataset.recordKey);
-    if (entry?.refreshRetryAllowed) {
-      await reconcileReportAction(entry, refreshButton);
-    }
-    return;
-  }
-
   const doctorButton = event.target.closest("[data-report-doctor-id]");
   if (doctorButton) {
     if (!isDoctorCardInCurrentScope(doctorButton.dataset.reportDoctorId)) {
@@ -3541,7 +2786,6 @@ export function createReports({
   function renderReportsAccessPrompt(statusCode) {
   const headline = document.getElementById("reportHeadline");
   if (!headline) {
-    clearAllReportActions();
     return;
   }
 
@@ -3564,10 +2808,6 @@ export function createReports({
       <button type="button" class="secondary-button utility-button" id="clearReportAccessToken">Clear Saved Token</button>
     </article>
   `;
-  clearAllReportActions({
-    focusDestination: document.getElementById("reportAccessToken")
-      || document.getElementById("reportAccessHeading")
-  });
   ["reportTrendPanel", "reportFilterBar", "reportProcedureMix", "reportProcedureIntelligence", "reportInsights", "reportMetrics", "reportDetail"].forEach(id => {
     const element = document.getElementById(id);
     if (element) {
@@ -3642,16 +2882,8 @@ export function createReports({
 
   function renderCycleRow(cycle) {
   const doctor = getDoctorName(cycle.assignedDoctor);
-  const recordKey = completedRecordKey(cycle);
-  const actionState = currentReportAction(recordKey);
-  const locked = isMutationLocked(actionState, "mark-for-review");
-  const label = actionState?.phase === "pending" && actionState.requestKind === "mutation"
-    ? "Opening review..."
-    : "Mark for Review";
   return `
-    <tr data-report-action-row
-        data-report-record-key="${escapeAttribute(recordKey)}"
-        tabindex="-1">
+    <tr>
       <td>Room ${cycle.roomId}</td>
       <td>${escapeHtml(doctor)}</td>
       <td>${renderCycleProcedureCell(cycle)}</td>
@@ -3678,15 +2910,8 @@ export function createReports({
         <button class="secondary-button utility-button"
                 data-action="mark-for-review"
                 data-review-source="CompletedCycle"
-                data-review-record-id="${escapeAttribute(String(cycle.completedCycleId || ""))}"
-                 data-completed-cycle-id="${escapeAttribute(String(cycle.completedCycleId || ""))}"
-                 data-room-id="${cycle.roomId}"
-                 data-seated-at="${escapeAttribute(cycle.seatedAt || "")}"
-                 data-report-record-key="${escapeAttribute(recordKey)}"
-                 data-default-label="Mark for Review"
-                 data-pending-label="Opening review..."
-                 ${locked ? "disabled" : ""}>
-          ${label}
+                data-review-record-id="${escapeAttribute(String(cycle.completedCycleId || ""))}">
+          Mark for Review
         </button>
       </td>
     </tr>
