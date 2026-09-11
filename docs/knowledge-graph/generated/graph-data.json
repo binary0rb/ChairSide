@@ -1695,12 +1695,6 @@
                       "path":  "src/ChairSide.Board/Program.cs"
                   },
                   {
-                      "id":  "symbol:type:CancelRoomAssignmentRequest",
-                      "label":  "CancelRoomAssignmentRequest",
-                      "type":  "CodeType",
-                      "path":  "src/ChairSide.Board/Program.cs"
-                  },
-                  {
                       "id":  "symbol:type:CanonicalAssignmentConversionResult",
                       "label":  "CanonicalAssignmentConversionResult",
                       "type":  "CodeType",
@@ -3848,11 +3842,6 @@
                   {
                       "from":  "file:src/ChairSide.Board/Program.cs",
                       "to":  "symbol:type:CancelRequestParser",
-                      "label":  "declares"
-                  },
-                  {
-                      "from":  "file:src/ChairSide.Board/Program.cs",
-                      "to":  "symbol:type:CancelRoomAssignmentRequest",
                       "label":  "declares"
                   },
                   {
