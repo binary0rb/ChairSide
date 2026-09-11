@@ -638,23 +638,6 @@ public sealed class SqliteBoardRepository
         return ReadCompletedCycles(command).SingleOrDefault();
     }
 
-    public IReadOnlyList<CompletedRoomCycle> LoadCompletedReviewCycles(ReportDateRange window)
-    {
-        if (window.IsAllTime) Interlocked.Increment(ref _unboundedHistoricalLoadCount);
-        using var connection = OpenConnection();
-        using var command = connection.CreateCommand();
-        var anchor = "COALESCE(doctor_complete_at, doctor_arrived_at, seated_at, prestage_started_at)";
-        var predicates = new List<string>
-        {
-            $"(reporting_disposition <> '{HistoricalAdministrativeDispositions.NoAnomaly}' OR reporting_has_correction = 1 OR reporting_has_reviewed_provenance = 1)"
-        };
-        AddWindowPredicates(command, predicates, anchor, window);
-        command.CommandText = $"SELECT * FROM ({CompletedReportingSelectSql}) reporting"
-            + $" WHERE {string.Join(" AND ", predicates)}"
-            + $" ORDER BY {anchor} DESC, id DESC;";
-        return ReadCompletedCycles(command);
-    }
-
     public HistoricalQueryPage<CompletedRoomCycle> LoadCompletedReviewCyclesPage(
         ReportDateRange window,
         int offset,
@@ -2361,30 +2344,6 @@ public sealed class SqliteBoardRepository
         return new HistoricalQueryPage<HistoricalEncounterKey>(keys, total, offset, limit);
     }
 
-    public void ReviewAbortedAssignment(long abortedAssignmentId, DateTimeOffset reviewedAt, string reviewedBy)
-    {
-        using var connection = OpenConnection();
-        using var command = connection.CreateCommand();
-        command.CommandText = """
-            UPDATE aborted_room_assignments
-            SET requires_review = 0,
-                review_status = $reviewStatus,
-                reviewed_at = $reviewedAt,
-                reviewed_by = $reviewedBy,
-                updated_at = $reviewedAt
-            WHERE id = $id
-              AND is_exception = 1;
-            """;
-        command.Parameters.AddWithValue("$id", abortedAssignmentId);
-        command.Parameters.AddWithValue("$reviewStatus", ReviewStatuses.Reviewed);
-        command.Parameters.AddWithValue("$reviewedAt", FormatDateTimeOffset(reviewedAt));
-        command.Parameters.AddWithValue("$reviewedBy", reviewedBy);
-        if (command.ExecuteNonQuery() != 1)
-        {
-            throw new InvalidOperationException("Reviewing an aborted assignment exception must update exactly one record.");
-        }
-    }
-
     public IReadOnlyList<PersistedReadyHandoff> LoadReadyHandoffsByEpisode(string episodeId)
     {
         ValidateRequiredId(episodeId, nameof(episodeId));
@@ -2413,23 +2372,6 @@ public sealed class SqliteBoardRepository
             """;
         command.Parameters.AddWithValue("$episodeId", episodeId);
         return ReadReadyHandoffs(command);
-    }
-
-    public PersistedReadyHandoff? LoadActiveReadyHandoff(string episodeId)
-    {
-        ValidateRequiredId(episodeId, nameof(episodeId));
-
-        using var connection = OpenConnection();
-        using var command = connection.CreateCommand();
-        command.CommandText = ReadyHandoffSelectSql + "\n" + """
-            WHERE episode_id = $episodeId
-                AND withdrawn_at IS NULL
-                AND accepted_at IS NULL
-                AND terminated_at IS NULL;
-            """;
-        command.Parameters.AddWithValue("$episodeId", episodeId);
-
-        return ReadReadyHandoffs(command).SingleOrDefault();
     }
 
     public PersistedReadyHandoff? LoadReadyHandoff(string handoffId)
@@ -3737,25 +3679,6 @@ public sealed class SqliteBoardRepository
 
     private static string? NullIfWhiteSpace(string? value) =>
         string.IsNullOrWhiteSpace(value) ? null : value.Trim();
-
-    private static int CountRows(
-        SqliteConnection connection,
-        string table,
-        string whereClause,
-        ReportDateRange window)
-    {
-        using var command = connection.CreateCommand();
-        command.CommandText = $"SELECT COUNT(*) FROM {table}{whereClause};";
-        if (window.FromInclusive is { } from)
-        {
-            command.Parameters.AddWithValue("$fromInclusive", FormatDateTimeOffset(from));
-        }
-        if (window.ToExclusive is { } to)
-        {
-            command.Parameters.AddWithValue("$toExclusive", FormatDateTimeOffset(to));
-        }
-        return Convert.ToInt32(command.ExecuteScalar());
-    }
 
     private SqliteConnection OpenConnection()
     {

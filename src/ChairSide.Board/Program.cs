@@ -623,8 +623,6 @@ public sealed record BeginPrestageRequest(
     // selected procedure's default expected units are used. Operational metadata only - never PHI.
     int? ExpectedAllocationUnits = null);
 
-public sealed record CancelRoomAssignmentRequest(string? CancellationReason = null);
-
 // Resolves the procedureCode / procedureId alias pair supplied to Begin Prestage. Both fields name
 // the same procedure historically;
 // neither is preferred over the other. null means the alias was omitted entirely, which is always

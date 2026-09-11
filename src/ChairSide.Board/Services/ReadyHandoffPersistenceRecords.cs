@@ -235,16 +235,6 @@ public sealed record PersistedRoomAssignment(
         }
     }
 
-    public void ValidateCanonicalValues()
-    {
-        if (SedationState is null && ExpectedAllocationState is null)
-        {
-            return;
-        }
-
-        _ = ToContract();
-    }
-
     public void ValidateCanonicalWrite()
     {
         _ = ToContract();

@@ -60,7 +60,7 @@
                   {
                       "path":  "AGENTS.md",
                       "kind":  "Markdown",
-                      "sizeBytes":  21273,
+                      "sizeBytes":  22588,
                       "typeSymbols":  [
 
                                       ],
@@ -81,6 +81,7 @@
                                           ],
                       "headings":  [
                                        "AGENTS",
+                                       "CHAIRSIDE NON-NEGOTIABLE SAFETY INVARIANTS",
                                        "ChairSide Project Brief",
                                        "Project name",
                                        "Purpose",
@@ -1775,11 +1776,10 @@
                   {
                       "path":  "src/ChairSide.Board/Program.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  76675,
+                      "sizeBytes":  74921,
                       "typeSymbols":  [
                                           "LegacyRoomOneRedirect",
                                           "BeginPrestageRequest",
-                                          "CancelRoomAssignmentRequest",
                                           "ProcedureAliasResolver",
                                           "struct",
                                           "StrictJsonRequestReader",
@@ -2988,7 +2988,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/ReadyHandoffPersistenceRecords.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  10998,
+                      "sizeBytes":  10489,
                       "typeSymbols":  [
                                           "ActiveRoomWriteExpectation",
                                           "GuardedReadyHandoffPersistenceOutcome",
@@ -3014,7 +3014,6 @@
                                             "FromContract",
                                             "ToContract",
                                             "TryToContract",
-                                            "ValidateCanonicalValues",
                                             "ValidateCanonicalWrite"
                                         ],
                       "routes":  [
@@ -3523,7 +3522,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/SqliteBoardRepository.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  202994,
+                      "sizeBytes":  195497,
                       "typeSymbols":  [
                                           "SqliteBoardRepository",
                                           "DoctorWorkingRoomRecord",
@@ -3544,7 +3543,6 @@
                                             "CountCompletedCycles",
                                             "LoadCompletedCycleById",
                                             "LoadCompletedCycleByRoomAndSeatedAt",
-                                            "LoadCompletedReviewCycles",
                                             "LoadCompletedReviewCyclesPage",
                                             "EnumerateCompletedReviewCycles",
                                             "SaveCompletedCycle",
@@ -3569,7 +3567,8 @@
                                             "LoadAbortedAssignmentById",
                                             "LoadHistoricalEncounter",
                                             "LoadHistoricalEncounterForReporting",
-                                            "LoadHistoricalEncounters"
+                                            "LoadHistoricalEncounters",
+                                            "LoadHistoricalAdministrativeState"
                                         ],
                       "routes":  [
 
@@ -4736,7 +4735,7 @@
                                             "Reports_and_doctor_cockpit_share_only_the_selected_doctor_foundation",
                                             "Doctor_operational_header_and_room_panel_contracts_remain_in_place",
                                             "Primary_workflow_highlights_only_the_enabled_next_action",
-                                            "Reports_actions_use_sibling_live_regions_while_doctor_remains_read_only",
+                                            "Reports_actions_use_canonical_anomaly_feedback_while_doctor_remains_read_only",
                                             "All_pages_use_the_ordered_native_module_bootstrap",
                                             "StateKey",
                                             "ElementIds",
@@ -5752,7 +5751,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/HistoricalAdministrativePersistenceTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  38311,
+                      "sizeBytes":  38354,
                       "typeSymbols":  [
                                           "HistoricalAdministrativePersistenceTests"
                                       ],
@@ -5795,7 +5794,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/HistoricalAnomalyAdministrationTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  27005,
+                      "sizeBytes":  27154,
                       "typeSymbols":  [
                                           "HistoricalAnomalyAdministrationTests"
                                       ],
@@ -5997,7 +5996,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/HistoricalReportingIntegrationTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  35896,
+                      "sizeBytes":  36022,
                       "typeSymbols":  [
                                           "HistoricalReportingIntegrationTests"
                                       ],
