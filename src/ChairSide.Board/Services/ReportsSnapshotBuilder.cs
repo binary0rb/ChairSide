@@ -1456,7 +1456,7 @@ internal sealed partial class ReportsSnapshotBuilder
         IReadOnlyList<CompletedRoomCycle> cyclesToAnnotate,
         IReadOnlyList<CompletedRoomCycle> blockerPool)
     {
-        var eligibleBlockers = BoundedReportCollections.Materialize(blockerPool
+        using var eligibleBlockers = OccupiedWaitIntervalIndex.Create(blockerPool
             .Where(cycle =>
                 cycle.ReportingProjection?.IsAdministrativelyExcluded != true &&
                 cycle.DoctorArrivedAt.HasValue &&
@@ -1480,19 +1480,7 @@ internal sealed partial class ReportsSnapshotBuilder
                     continue;
                 }
 
-                var sameDocOtherIntervals = eligibleBlockers
-                    .Where(other =>
-                        other.AssignedDoctor == cycle.AssignedDoctor &&
-                        other.DoctorArrivedAt!.Value < cycle.DoctorArrivedAt.Value &&
-                        other.DoctorCompleteAt!.Value > cycle.ReadyForDoctorAt.Value &&
-                        !(other.RoomId == cycle.RoomId && other.SeatedAt == cycle.SeatedAt))
-                    .Select(other => (Start: other.DoctorArrivedAt!.Value, End: other.DoctorCompleteAt!.Value))
-                    .ToList();
-
-                var occupied = ComputeOverlapSeconds(
-                    cycle.ReadyForDoctorAt.Value,
-                    cycle.DoctorArrivedAt.Value,
-                    sameDocOtherIntervals);
+                var occupied = eligibleBlockers.ComputeOverlapSeconds(cycle);
 
                 var readyToDoctor = cycle.ReadyToDoctorSeconds.Value;
                 var clamped = Math.Min(occupied, readyToDoctor);
@@ -1501,51 +1489,6 @@ internal sealed partial class ReportsSnapshotBuilder
                 yield return cycle;
             }
         }
-    }
-
-    private static int ComputeOverlapSeconds(
-        DateTimeOffset windowStart,
-        DateTimeOffset windowEnd,
-        List<(DateTimeOffset Start, DateTimeOffset End)> intervals)
-    {
-        if (intervals.Count == 0 || windowEnd <= windowStart)
-        {
-            return 0;
-        }
-
-        long totalTicks = 0;
-        foreach (var (start, end) in MergeIntervals(intervals))
-        {
-            var overlapStart = start > windowStart ? start : windowStart;
-            var overlapEnd = end < windowEnd ? end : windowEnd;
-            if (overlapEnd > overlapStart)
-            {
-                totalTicks += (overlapEnd - overlapStart).Ticks;
-            }
-        }
-
-        return (int)Math.Round(totalTicks / (double)TimeSpan.TicksPerSecond);
-    }
-
-    private static IReadOnlyList<(DateTimeOffset Start, DateTimeOffset End)> MergeIntervals(
-        IEnumerable<(DateTimeOffset Start, DateTimeOffset End)> intervals)
-    {
-        var sorted = intervals.OrderBy(interval => interval.Start).ToList();
-        var result = new List<(DateTimeOffset Start, DateTimeOffset End)>();
-
-        foreach (var (start, end) in sorted)
-        {
-            if (result.Count == 0 || start >= result[^1].End)
-            {
-                result.Add((start, end));
-            }
-            else if (end > result[^1].End)
-            {
-                result[^1] = (result[^1].Start, end);
-            }
-        }
-
-        return result;
     }
 
     private string? ResolveDoctorDisplayName(string? doctorId) =>
