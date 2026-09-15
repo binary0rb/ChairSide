@@ -63,71 +63,73 @@ internal static class DoctorFlowTrendSnapshotBuilder
         ArgumentNullException.ThrowIfNull(observedDoctorFlowDays);
 
         var window = BuildSharedWindow(scopedStandardPhaseCycles, selectedRange);
-        return doctors
-            .Select(doctor => BuildSeries(
-                doctor,
-                scopedStandardPhaseCycles,
-                scopedStandardCompletedCycles,
-                observedDoctorFlowDays,
-                window))
-            .ToList();
-    }
-
-    private static DoctorFlowTrendSeries BuildSeries(
-        DoctorFlowTrendIdentity doctor,
-        IReadOnlyList<CompletedRoomCycle> scopedStandardPhaseCycles,
-        IReadOnlyList<CompletedRoomCycle> scopedStandardCompletedCycles,
-        IReadOnlyList<ObservedDoctorFlowDay> observedDoctorFlowDays,
-        TrendWindow? window)
-    {
         if (window is null)
         {
-            return new DoctorFlowTrendSeries(
+            return doctors.Select(doctor => new DoctorFlowTrendSeries(
                 doctor.DoctorId,
                 doctor.DoctorName,
                 WeeklyBucketSize,
                 null,
                 null,
-                []);
+                [])).ToList();
         }
 
-        var doctorDays = observedDoctorFlowDays
-            .Where(day => IsDoctor(day.DoctorId, doctor.DoctorId))
-            .Select(day => new ParsedObservedDoctorFlowDay(day, ParseDate(day.ReportDate)))
-            .Where(item => item.ReportDate.HasValue
-                && item.ReportDate.Value >= window.EffectiveStart
-                && item.ReportDate.Value < window.EffectiveEndExclusive)
-            .ToList();
+        var phaseFacts = BoundedReportCollections.Materialize(
+            ProjectPhaseFacts(doctors, scopedStandardPhaseCycles, window));
+        IReadOnlyList<DoctorFlowCompletedFact>? completedFacts = null;
+        try
+        {
+            completedFacts = BoundedReportCollections.Materialize(
+                ProjectCompletedFacts(doctors, scopedStandardCompletedCycles, window));
+            using var phaseGrouping = BoundedGroupingSet<DoctorFlowPhaseFact, DoctorFlowTrendKey>.Create(
+                phaseFacts,
+                fact => fact.Key);
+            using var completedGrouping = BoundedGroupingSet<DoctorFlowCompletedFact, DoctorFlowTrendKey>.Create(
+                completedFacts,
+                fact => fact.Key);
+            var phaseBuckets = phaseGrouping.Groups.ToDictionary(
+                group => group.Key,
+                BuildPhaseBucket);
+            var completedBuckets = completedGrouping.Groups.ToDictionary(
+                group => group.Key,
+                BuildCompletedBucket);
+            var observedBuckets = BuildObservedBuckets(doctors, observedDoctorFlowDays, window);
 
+            return doctors.Select((doctor, index) => BuildSeries(
+                doctor,
+                index,
+                window,
+                phaseBuckets,
+                completedBuckets,
+                observedBuckets)).ToList();
+        }
+        finally
+        {
+            (phaseFacts as IDisposable)?.Dispose();
+            (completedFacts as IDisposable)?.Dispose();
+        }
+    }
+
+    private static DoctorFlowTrendSeries BuildSeries(
+        DoctorFlowTrendIdentity doctor,
+        int doctorIndex,
+        TrendWindow window,
+        IReadOnlyDictionary<DoctorFlowTrendKey, DoctorFlowPhaseBucket> phaseBuckets,
+        IReadOnlyDictionary<DoctorFlowTrendKey, DoctorFlowCompletedBucket> completedBuckets,
+        IReadOnlyDictionary<DoctorFlowTrendKey, IReadOnlyList<ObservedDoctorFlowDay>> observedBuckets)
+    {
         var buckets = new List<DoctorFlowTrendBucket>();
-        for (var start = window.CalendarStart; start <= window.CalendarEnd; start = start.AddDays(7))
+        var bucketIndex = 0;
+        for (var start = window.CalendarStart; start <= window.CalendarEnd; start = start.AddDays(7), bucketIndex++)
         {
             var end = start.AddDays(7);
             var effectiveStart = start < window.EffectiveStart ? window.EffectiveStart : start;
             var effectiveEnd = end > window.EffectiveEndExclusive ? window.EffectiveEndExclusive : end;
-            var phasePopulation = BoundedReportCollections.Materialize(scopedStandardPhaseCycles
-                .Where(cycle => IsDoctor(cycle.AssignedDoctor, doctor.DoctorId)
-                    && cycle.DoctorCompleteAt.HasValue
-                    && IsInBucket(cycle.DoctorCompleteAt.Value, effectiveStart, effectiveEnd)));
-            var completedPopulation = BoundedReportCollections.Materialize(scopedStandardCompletedCycles
-                .Where(cycle => IsDoctor(cycle.AssignedDoctor, doctor.DoctorId)
-                    && cycle.DoctorCompleteAt.HasValue
-                    && IsInBucket(cycle.DoctorCompleteAt.Value, effectiveStart, effectiveEnd)));
-            var canonicalDays = doctorDays
-                .Where(item => item.ReportDate!.Value >= effectiveStart
-                    && item.ReportDate.Value < effectiveEnd)
-                .Select(item => item.Day)
-                .ToList();
-            var readyWaitValues = BoundedReportCollections.Materialize(phasePopulation
-                .Select(ReportsSnapshotBuilder.TruthfulReadyWaitSeconds)
-                .Where(value => value.HasValue));
-            var doctorTimeValues = BoundedReportCollections.Materialize(phasePopulation
-                .Select(ReportsSnapshotBuilder.TruthfulDoctorTimeSeconds)
-                .Where(value => value.HasValue));
-            var representedCompletedDates = completedPopulation
-                .Select(cycle => DateOnly.FromDateTime(cycle.DoctorCompleteAt!.Value.UtcDateTime))
-                .Distinct()
-                .Count();
+            var key = new DoctorFlowTrendKey(doctorIndex, bucketIndex);
+            phaseBuckets.TryGetValue(key, out var phase);
+            completedBuckets.TryGetValue(key, out var completed);
+            observedBuckets.TryGetValue(key, out var canonicalDays);
+            canonicalDays ??= [];
 
             buckets.Add(new DoctorFlowTrendBucket(
                 FormatDate(start),
@@ -135,17 +137,21 @@ internal static class DoctorFlowTrendSnapshotBuilder
                 FormatDate(effectiveStart),
                 FormatDate(effectiveEnd),
                 effectiveStart != start || effectiveEnd != end,
-                ReportsSnapshotBuilder.MedianSecondsOrNull(readyWaitValues),
-                ReportsSnapshotBuilder.MedianSecondsOrNull(doctorTimeValues),
-                completedPopulation.Count == 0 ? null : completedPopulation.Count,
+                phase?.MedianReadyWaitSeconds,
+                phase?.MedianDoctorTimeSeconds,
+                completed?.PopulationCount,
                 ReportsSnapshotBuilder.MedianWholeMinutesOrNull(
                     canonicalDays.Select(day => day.ObservedClinicalSpanMinutes)),
                 new ReportDoctorFlowTrendMetricSampleContext(
-                    ReadyWait: ReportSampleContext.Create(phasePopulation.Count, readyWaitValues.Count),
-                    DoctorTime: ReportSampleContext.Create(phasePopulation.Count, doctorTimeValues.Count),
-                    CompletedCases: ReportSampleContext.ForPopulation(completedPopulation.Count),
+                    ReadyWait: ReportSampleContext.Create(
+                        phase?.PopulationCount ?? 0,
+                        phase?.ReadyWaitContributorCount ?? 0),
+                    DoctorTime: ReportSampleContext.Create(
+                        phase?.PopulationCount ?? 0,
+                        phase?.DoctorTimeContributorCount ?? 0),
+                    CompletedCases: ReportSampleContext.ForPopulation(completed?.PopulationCount ?? 0),
                     ObservedClinicalSpan: ReportSampleContext.Create(
-                        representedCompletedDates,
+                        completed?.RepresentedDateCount ?? 0,
                         canonicalDays.Count))));
         }
 
@@ -156,6 +162,134 @@ internal static class DoctorFlowTrendSnapshotBuilder
             FormatDate(window.EffectiveStart),
             FormatDate(window.EffectiveEndExclusive),
             buckets);
+    }
+
+    private static IEnumerable<DoctorFlowPhaseFact> ProjectPhaseFacts(
+        IReadOnlyList<DoctorFlowTrendIdentity> doctors,
+        IEnumerable<CompletedRoomCycle> cycles,
+        TrendWindow window)
+    {
+        foreach (var cycle in cycles)
+        {
+            if (!TryGetBucketIndex(cycle.DoctorCompleteAt, window, out var bucketIndex)) continue;
+            for (var doctorIndex = 0; doctorIndex < doctors.Count; doctorIndex++)
+            {
+                if (!IsDoctor(cycle.AssignedDoctor, doctors[doctorIndex].DoctorId)) continue;
+                yield return new DoctorFlowPhaseFact(
+                    new DoctorFlowTrendKey(doctorIndex, bucketIndex),
+                    ReportsSnapshotBuilder.TruthfulReadyWaitSeconds(cycle),
+                    ReportsSnapshotBuilder.TruthfulDoctorTimeSeconds(cycle));
+            }
+        }
+    }
+
+    private static IEnumerable<DoctorFlowCompletedFact> ProjectCompletedFacts(
+        IReadOnlyList<DoctorFlowTrendIdentity> doctors,
+        IEnumerable<CompletedRoomCycle> cycles,
+        TrendWindow window)
+    {
+        foreach (var cycle in cycles)
+        {
+            if (!TryGetBucketIndex(cycle.DoctorCompleteAt, window, out var bucketIndex)) continue;
+            var reportDate = DateOnly.FromDateTime(cycle.DoctorCompleteAt!.Value.UtcDateTime);
+            for (var doctorIndex = 0; doctorIndex < doctors.Count; doctorIndex++)
+            {
+                if (IsDoctor(cycle.AssignedDoctor, doctors[doctorIndex].DoctorId))
+                {
+                    yield return new DoctorFlowCompletedFact(
+                        new DoctorFlowTrendKey(doctorIndex, bucketIndex),
+                        reportDate);
+                }
+            }
+        }
+    }
+
+    private static DoctorFlowPhaseBucket BuildPhaseBucket(IGrouping<DoctorFlowTrendKey, DoctorFlowPhaseFact> group)
+    {
+        var population = BoundedReportCollections.Materialize(group);
+        try
+        {
+            using var readyWait = NumericOrderStatistics.Create(
+                population.Where(fact => fact.ReadyWaitSeconds.HasValue)
+                    .Select(fact => (double)fact.ReadyWaitSeconds!.Value));
+            using var doctorTime = NumericOrderStatistics.Create(
+                population.Where(fact => fact.DoctorTimeSeconds.HasValue)
+                    .Select(fact => (double)fact.DoctorTimeSeconds!.Value));
+            return new DoctorFlowPhaseBucket(
+                population.Count,
+                readyWait.Count,
+                doctorTime.Count,
+                readyWait.Median,
+                doctorTime.Median);
+        }
+        finally
+        {
+            (population as IDisposable)?.Dispose();
+        }
+    }
+
+    private static DoctorFlowCompletedBucket BuildCompletedBucket(
+        IGrouping<DoctorFlowTrendKey, DoctorFlowCompletedFact> group)
+    {
+        var populationCount = 0;
+        HashSet<DateOnly> representedDates = [];
+        foreach (var fact in group)
+        {
+            populationCount++;
+            representedDates.Add(fact.ReportDate);
+        }
+        return new DoctorFlowCompletedBucket(populationCount, representedDates.Count);
+    }
+
+    private static IReadOnlyDictionary<DoctorFlowTrendKey, IReadOnlyList<ObservedDoctorFlowDay>> BuildObservedBuckets(
+        IReadOnlyList<DoctorFlowTrendIdentity> doctors,
+        IEnumerable<ObservedDoctorFlowDay> days,
+        TrendWindow window)
+    {
+        var buckets = new Dictionary<DoctorFlowTrendKey, List<ObservedDoctorFlowDay>>();
+        foreach (var day in days)
+        {
+            var reportDate = ParseDate(day.ReportDate);
+            if (!TryGetBucketIndex(reportDate, window, out var bucketIndex)) continue;
+            for (var doctorIndex = 0; doctorIndex < doctors.Count; doctorIndex++)
+            {
+                if (!IsDoctor(day.DoctorId, doctors[doctorIndex].DoctorId)) continue;
+                var key = new DoctorFlowTrendKey(doctorIndex, bucketIndex);
+                if (!buckets.TryGetValue(key, out var bucket))
+                {
+                    bucket = [];
+                    buckets.Add(key, bucket);
+                }
+                bucket.Add(day);
+            }
+        }
+        return buckets.ToDictionary(pair => pair.Key, pair => (IReadOnlyList<ObservedDoctorFlowDay>)pair.Value);
+    }
+
+    private static bool TryGetBucketIndex(
+        DateTimeOffset? timestamp,
+        TrendWindow window,
+        out int bucketIndex) =>
+        TryGetBucketIndex(
+            timestamp.HasValue ? DateOnly.FromDateTime(timestamp.Value.UtcDateTime) : null,
+            window,
+            out bucketIndex);
+
+    private static bool TryGetBucketIndex(
+        DateOnly? reportDate,
+        TrendWindow window,
+        out int bucketIndex)
+    {
+        if (!reportDate.HasValue
+            || reportDate.Value < window.EffectiveStart
+            || reportDate.Value >= window.EffectiveEndExclusive)
+        {
+            bucketIndex = -1;
+            return false;
+        }
+
+        bucketIndex = (WeekStart(reportDate.Value).DayNumber - window.CalendarStart.DayNumber) / 7;
+        return true;
     }
 
     private static TrendWindow? BuildSharedWindow(
@@ -209,12 +343,6 @@ internal static class DoctorFlowTrendSnapshotBuilder
             effectiveEndExclusive);
     }
 
-    private static bool IsInBucket(DateTimeOffset timestamp, DateOnly start, DateOnly end)
-    {
-        var date = DateOnly.FromDateTime(timestamp.UtcDateTime);
-        return date >= start && date < end;
-    }
-
     private static bool IsDoctor(string? value, string doctorId) =>
         string.Equals(value, doctorId, StringComparison.OrdinalIgnoreCase);
 
@@ -238,7 +366,25 @@ internal static class DoctorFlowTrendSnapshotBuilder
         DateOnly EffectiveStart,
         DateOnly EffectiveEndExclusive);
 
-    private sealed record ParsedObservedDoctorFlowDay(
-        ObservedDoctorFlowDay Day,
-        DateOnly? ReportDate);
+    private sealed record DoctorFlowTrendKey(int DoctorIndex, int BucketIndex);
+
+    private sealed record DoctorFlowPhaseFact(
+        DoctorFlowTrendKey Key,
+        int? ReadyWaitSeconds,
+        int? DoctorTimeSeconds);
+
+    private sealed record DoctorFlowCompletedFact(
+        DoctorFlowTrendKey Key,
+        DateOnly ReportDate);
+
+    private sealed record DoctorFlowPhaseBucket(
+        int PopulationCount,
+        int ReadyWaitContributorCount,
+        int DoctorTimeContributorCount,
+        double? MedianReadyWaitSeconds,
+        double? MedianDoctorTimeSeconds);
+
+    private sealed record DoctorFlowCompletedBucket(
+        int PopulationCount,
+        int RepresentedDateCount);
 }

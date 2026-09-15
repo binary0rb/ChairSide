@@ -1969,7 +1969,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/CalibrationInsightReport.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  14231,
+                      "sizeBytes":  13891,
                       "typeSymbols":  [
                                           "ScheduleFitToleranceClassifications",
                                           "CalibrationRawDirections",
@@ -2145,7 +2145,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/DemoBoardStore.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  204856,
+                      "sizeBytes":  200599,
                       "typeSymbols":  [
                                           "ExceptionReasons",
                                           "ReportingExceptionReasons",
@@ -2383,7 +2383,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/DoctorFlowTrendSnapshot.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  10812,
+                      "sizeBytes":  15849,
                       "typeSymbols":  [
                                           "DoctorFlowTrendSeries",
                                           "DoctorFlowTrendBucket",
@@ -2391,13 +2391,21 @@
                                           "DoctorFlowTrendIdentity",
                                           "DoctorFlowTrendSnapshotBuilder",
                                           "TrendWindow",
-                                          "ParsedObservedDoctorFlowDay"
+                                          "DoctorFlowTrendKey",
+                                          "DoctorFlowPhaseFact",
+                                          "DoctorFlowCompletedFact",
+                                          "DoctorFlowPhaseBucket",
+                                          "DoctorFlowCompletedBucket"
                                       ],
                       "methodSymbols":  [
                                             "BuildWeekly",
                                             "BuildSeries",
+                                            "ProjectPhaseFacts",
+                                            "ProjectCompletedFacts",
+                                            "BuildPhaseBucket",
+                                            "BuildCompletedBucket",
+                                            "TryGetBucketIndex",
                                             "BuildSharedWindow",
-                                            "IsInBucket",
                                             "IsDoctor",
                                             "WeekStart",
                                             "FormatDate",
@@ -3277,7 +3285,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/ReportTrendSnapshot.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  5003,
+                      "sizeBytes":  4895,
                       "typeSymbols":  [
                                           "ReportTrendSnapshot",
                                           "ReportTrendBucket",
@@ -3470,7 +3478,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/ScheduleFitCalculator.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  5286,
+                      "sizeBytes":  5177,
                       "typeSymbols":  [
                                           "ScheduleFitCalculator",
                                           "ScheduleFitResult"
@@ -3497,7 +3505,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/ScheduleFitReport.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  2900,
+                      "sizeBytes":  2848,
                       "typeSymbols":  [
                                           "ScheduleFitReport",
                                           "ScheduleFitReportBuilder"
@@ -5578,9 +5586,10 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/DoctorFlowTrendSnapshotTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  19280,
+                      "sizeBytes":  20801,
                       "typeSymbols":  [
-                                          "DoctorFlowTrendSnapshotTests"
+                                          "DoctorFlowTrendSnapshotTests",
+                                          "CountingReadOnlyList"
                                       ],
                       "methodSymbols":  [
                                             "Finite_range_builds_one_common_monday_skeleton_with_partial_boundaries",
@@ -5597,11 +5606,13 @@
                                             "Empty_unavailable_sufficient_and_truthful_zero_remain_distinct",
                                             "Canonical_ready_anchored_span_is_the_only_clinical_span_authority",
                                             "Practice_and_doctor_scopes_preserve_roster_history_and_sedation_isolation",
+                                            "Large_history_is_replayed_once_per_bounded_trend_projection",
                                             "Build",
                                             "CreateBuilder",
                                             "Cycle",
                                             "ObservedDay",
-                                            "Utc"
+                                            "Utc",
+                                            "GetEnumerator"
                                         ],
                       "routes":  [
 

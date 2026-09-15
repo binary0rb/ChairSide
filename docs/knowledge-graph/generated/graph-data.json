@@ -1803,6 +1803,12 @@
                       "path":  "src/ChairSide.Board/Services/HistoricalMetadataCorrectionService.cs"
                   },
                   {
+                      "id":  "symbol:type:CountingReadOnlyList",
+                      "label":  "CountingReadOnlyList",
+                      "type":  "CodeType",
+                      "path":  "tests/ChairSide.Board.Tests/DoctorFlowTrendSnapshotTests.cs"
+                  },
+                  {
                       "id":  "symbol:type:CycleSnapshot",
                       "label":  "CycleSnapshot",
                       "type":  "CodeType",
@@ -2013,6 +2019,30 @@
                       "path":  "src/ChairSide.Board/Services/DemoBoardStore.cs"
                   },
                   {
+                      "id":  "symbol:type:DoctorFlowCompletedBucket",
+                      "label":  "DoctorFlowCompletedBucket",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/DoctorFlowTrendSnapshot.cs"
+                  },
+                  {
+                      "id":  "symbol:type:DoctorFlowCompletedFact",
+                      "label":  "DoctorFlowCompletedFact",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/DoctorFlowTrendSnapshot.cs"
+                  },
+                  {
+                      "id":  "symbol:type:DoctorFlowPhaseBucket",
+                      "label":  "DoctorFlowPhaseBucket",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/DoctorFlowTrendSnapshot.cs"
+                  },
+                  {
+                      "id":  "symbol:type:DoctorFlowPhaseFact",
+                      "label":  "DoctorFlowPhaseFact",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/DoctorFlowTrendSnapshot.cs"
+                  },
+                  {
                       "id":  "symbol:type:DoctorFlowSummary",
                       "label":  "DoctorFlowSummary",
                       "type":  "CodeType",
@@ -2027,6 +2057,12 @@
                   {
                       "id":  "symbol:type:DoctorFlowTrendIdentity",
                       "label":  "DoctorFlowTrendIdentity",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/DoctorFlowTrendSnapshot.cs"
+                  },
+                  {
+                      "id":  "symbol:type:DoctorFlowTrendKey",
+                      "label":  "DoctorFlowTrendKey",
                       "type":  "CodeType",
                       "path":  "src/ChairSide.Board/Services/DoctorFlowTrendSnapshot.cs"
                   },
@@ -2671,12 +2707,6 @@
                       "label":  "OriginalMetadataEvidence",
                       "type":  "CodeType",
                       "path":  "src/ChairSide.Board/Services/HistoricalMetadataCorrectionService.cs"
-                  },
-                  {
-                      "id":  "symbol:type:ParsedObservedDoctorFlowDay",
-                      "label":  "ParsedObservedDoctorFlowDay",
-                      "type":  "CodeType",
-                      "path":  "src/ChairSide.Board/Services/DoctorFlowTrendSnapshot.cs"
                   },
                   {
                       "id":  "symbol:type:PersistedReadyHandoff",
@@ -4377,6 +4407,26 @@
                   },
                   {
                       "from":  "file:src/ChairSide.Board/Services/DoctorFlowTrendSnapshot.cs",
+                      "to":  "symbol:type:DoctorFlowCompletedBucket",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/DoctorFlowTrendSnapshot.cs",
+                      "to":  "symbol:type:DoctorFlowCompletedFact",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/DoctorFlowTrendSnapshot.cs",
+                      "to":  "symbol:type:DoctorFlowPhaseBucket",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/DoctorFlowTrendSnapshot.cs",
+                      "to":  "symbol:type:DoctorFlowPhaseFact",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/DoctorFlowTrendSnapshot.cs",
                       "to":  "symbol:type:DoctorFlowTrendBucket",
                       "label":  "declares"
                   },
@@ -4387,17 +4437,17 @@
                   },
                   {
                       "from":  "file:src/ChairSide.Board/Services/DoctorFlowTrendSnapshot.cs",
+                      "to":  "symbol:type:DoctorFlowTrendKey",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/DoctorFlowTrendSnapshot.cs",
                       "to":  "symbol:type:DoctorFlowTrendSeries",
                       "label":  "declares"
                   },
                   {
                       "from":  "file:src/ChairSide.Board/Services/DoctorFlowTrendSnapshot.cs",
                       "to":  "symbol:type:DoctorFlowTrendSnapshotBuilder",
-                      "label":  "declares"
-                  },
-                  {
-                      "from":  "file:src/ChairSide.Board/Services/DoctorFlowTrendSnapshot.cs",
-                      "to":  "symbol:type:ParsedObservedDoctorFlowDay",
                       "label":  "declares"
                   },
                   {
@@ -5313,6 +5363,11 @@
                   {
                       "from":  "file:tests/ChairSide.Board.Tests/DeterministicFixtureBuilderTests.cs",
                       "to":  "symbol:type:DeterministicFixtureBuilderTests",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:tests/ChairSide.Board.Tests/DoctorFlowTrendSnapshotTests.cs",
+                      "to":  "symbol:type:CountingReadOnlyList",
                       "label":  "declares"
                   },
                   {
