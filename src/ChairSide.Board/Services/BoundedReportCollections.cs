@@ -373,6 +373,162 @@ internal sealed class DiskBackedReadOnlyList<T> : IReadOnlyList<T>, IDisposable
     }
 }
 
+internal sealed class OccupiedWaitIntervalIndex : IDisposable
+{
+    private readonly string _path;
+    private readonly SqliteConnection _connection;
+
+    private OccupiedWaitIntervalIndex(string path, SqliteConnection connection)
+    {
+        _path = path;
+        _connection = connection;
+    }
+
+    internal static OccupiedWaitIntervalIndex Create(IEnumerable<CompletedRoomCycle> source)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+        var path = Path.Combine(Path.GetTempPath(), $"chairside-occupied-{Guid.NewGuid():N}.sqlite");
+        var connection = new SqliteConnection(new SqliteConnectionStringBuilder
+        {
+            DataSource = path,
+            Mode = SqliteOpenMode.ReadWriteCreate,
+            Pooling = false
+        }.ToString());
+
+        try
+        {
+            connection.Open();
+            using (var schema = connection.CreateCommand())
+            {
+                schema.CommandText = """
+                    CREATE TABLE intervals (
+                        doctor_id TEXT NULL,
+                        room_id INTEGER NOT NULL,
+                        seated_at_ticks INTEGER NOT NULL,
+                        start_ticks INTEGER NOT NULL,
+                        end_ticks INTEGER NOT NULL
+                    );
+                    """;
+                schema.ExecuteNonQuery();
+            }
+
+            using (var transaction = connection.BeginTransaction())
+            using (var insert = connection.CreateCommand())
+            {
+                insert.Transaction = transaction;
+                insert.CommandText = """
+                    INSERT INTO intervals(doctor_id, room_id, seated_at_ticks, start_ticks, end_ticks)
+                    VALUES ($doctor, $room, $seated, $start, $end);
+                    """;
+                var doctor = insert.Parameters.Add("$doctor", SqliteType.Text);
+                var room = insert.Parameters.Add("$room", SqliteType.Integer);
+                var seated = insert.Parameters.Add("$seated", SqliteType.Integer);
+                var start = insert.Parameters.Add("$start", SqliteType.Integer);
+                var end = insert.Parameters.Add("$end", SqliteType.Integer);
+                foreach (var cycle in source)
+                {
+                    doctor.Value = cycle.AssignedDoctor is null ? DBNull.Value : cycle.AssignedDoctor;
+                    room.Value = cycle.RoomId;
+                    seated.Value = cycle.SeatedAt.UtcDateTime.Ticks;
+                    start.Value = cycle.DoctorArrivedAt!.Value.UtcDateTime.Ticks;
+                    end.Value = cycle.DoctorCompleteAt!.Value.UtcDateTime.Ticks;
+                    insert.ExecuteNonQuery();
+                }
+                transaction.Commit();
+            }
+
+            using (var index = connection.CreateCommand())
+            {
+                index.CommandText = "CREATE INDEX ix_intervals_lookup ON intervals(doctor_id, start_ticks, end_ticks);";
+                index.ExecuteNonQuery();
+            }
+            return new OccupiedWaitIntervalIndex(path, connection);
+        }
+        catch
+        {
+            connection.Dispose();
+            DeleteFiles(path);
+            throw;
+        }
+    }
+
+    internal int ComputeOverlapSeconds(CompletedRoomCycle cycle)
+    {
+        var windowStart = cycle.ReadyForDoctorAt!.Value.UtcDateTime.Ticks;
+        var windowEnd = cycle.DoctorArrivedAt!.Value.UtcDateTime.Ticks;
+        if (windowEnd <= windowStart) return 0;
+
+        using var command = _connection.CreateCommand();
+        command.CommandText = """
+            SELECT start_ticks, end_ticks
+            FROM intervals
+            WHERE doctor_id IS $doctor
+              AND start_ticks < $windowEnd
+              AND end_ticks > $windowStart
+              AND NOT (room_id = $room AND seated_at_ticks = $seated)
+            ORDER BY start_ticks, end_ticks;
+            """;
+        command.Parameters.AddWithValue("$doctor", cycle.AssignedDoctor is null ? DBNull.Value : cycle.AssignedDoctor);
+        command.Parameters.AddWithValue("$windowStart", windowStart);
+        command.Parameters.AddWithValue("$windowEnd", windowEnd);
+        command.Parameters.AddWithValue("$room", cycle.RoomId);
+        command.Parameters.AddWithValue("$seated", cycle.SeatedAt.UtcDateTime.Ticks);
+
+        long totalTicks = 0;
+        long? mergedStart = null;
+        long mergedEnd = 0;
+        using var reader = command.ExecuteReader();
+        while (reader.Read())
+        {
+            var start = Math.Max(reader.GetInt64(0), windowStart);
+            var end = Math.Min(reader.GetInt64(1), windowEnd);
+            if (end <= start) continue;
+            if (mergedStart is null)
+            {
+                mergedStart = start;
+                mergedEnd = end;
+            }
+            else if (start >= mergedEnd)
+            {
+                totalTicks += mergedEnd - mergedStart.Value;
+                mergedStart = start;
+                mergedEnd = end;
+            }
+            else if (end > mergedEnd)
+            {
+                mergedEnd = end;
+            }
+        }
+        if (mergedStart.HasValue) totalTicks += mergedEnd - mergedStart.Value;
+        return (int)Math.Round(totalTicks / (double)TimeSpan.TicksPerSecond);
+    }
+
+    public void Dispose()
+    {
+        _connection.Dispose();
+        DeleteFiles(_path);
+    }
+
+    private static void DeleteFiles(string path)
+    {
+        foreach (var candidate in new[] { path, path + "-journal", path + "-wal", path + "-shm" })
+        {
+            try
+            {
+                if (File.Exists(candidate)) File.Delete(candidate);
+            }
+            catch (IOException)
+            {
+                // Temporary-spool cleanup must not fail a report response.
+            }
+            catch (UnauthorizedAccessException)
+            {
+                // Temporary-spool cleanup must not fail a report response.
+            }
+        }
+    }
+}
+
 internal sealed class NumericOrderStatistics : IDisposable
 {
     private readonly IReadOnlyList<double>? _memory;

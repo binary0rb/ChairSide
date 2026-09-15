@@ -2661,6 +2661,12 @@
                       "path":  "src/ChairSide.Board/Services/ProjectionAssumptionChecklist.cs"
                   },
                   {
+                      "id":  "symbol:type:OccupiedWaitIntervalIndex",
+                      "label":  "OccupiedWaitIntervalIndex",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/BoundedReportCollections.cs"
+                  },
+                  {
                       "id":  "symbol:type:OriginalMetadataEvidence",
                       "label":  "OriginalMetadataEvidence",
                       "type":  "CodeType",
@@ -3937,6 +3943,11 @@
                   {
                       "from":  "file:src/ChairSide.Board/Services/BoundedReportCollections.cs",
                       "to":  "symbol:type:NumericOrderStatistics",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/BoundedReportCollections.cs",
+                      "to":  "symbol:type:OccupiedWaitIntervalIndex",
                       "label":  "declares"
                   },
                   {

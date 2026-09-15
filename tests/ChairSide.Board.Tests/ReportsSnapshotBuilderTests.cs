@@ -180,6 +180,79 @@ public sealed class ReportsSnapshotBuilderTests
     }
 
     [Fact]
+    public void Occupied_wait_uses_the_exact_union_of_same_doctor_blocker_intervals()
+    {
+        var waitStart = Utc(2026, 7, 20, 10, 0);
+        var waitEnd = waitStart.AddMinutes(10);
+        var builder = CreateBuilder(doctors:
+        [
+            new("otte", "Dr. Otte", "LDO", "#dc2626"),
+            new("pledger", "Dr. Pledger", "JWP", "#16a34a")
+        ]);
+
+        AssertWait("no blockers", 0);
+        AssertWait("outside", 0, (waitStart.AddMinutes(-30), waitStart.AddMinutes(-20), "otte"));
+        AssertWait("boundary contact", 0,
+            (waitStart.AddMinutes(-10), waitStart, "otte"),
+            (waitEnd, waitEnd.AddMinutes(10), "otte"));
+        AssertWait("partial overlap", 5 * 60,
+            (waitStart.AddMinutes(-5), waitStart.AddMinutes(5), "otte"));
+        AssertWait("blocker contains wait", 10 * 60,
+            (waitStart.AddMinutes(-5), waitEnd.AddMinutes(5), "otte"));
+        AssertWait("wait contains blocker", 6 * 60,
+            (waitStart.AddMinutes(2), waitStart.AddMinutes(8), "otte"));
+        AssertWait("disjoint blockers", 5 * 60,
+            (waitStart.AddMinutes(1), waitStart.AddMinutes(3), "otte"),
+            (waitStart.AddMinutes(5), waitStart.AddMinutes(8), "otte"));
+        AssertWait("overlapping and nested blockers", 8 * 60,
+            (waitStart.AddMinutes(1), waitStart.AddMinutes(6), "otte"),
+            (waitStart.AddMinutes(3), waitStart.AddMinutes(5), "otte"),
+            (waitStart.AddMinutes(4), waitStart.AddMinutes(9), "otte"));
+        AssertWait("different doctor", 0,
+            (waitStart.AddMinutes(-5), waitEnd.AddMinutes(5), "pledger"));
+
+        void AssertWait(
+            string scenario,
+            int expectedOccupiedSeconds,
+            params (DateTimeOffset Start, DateTimeOffset End, string Doctor)[] blockers)
+        {
+            var target = Cycle(
+                id: 1,
+                roomId: 1,
+                procedureCode: "CON",
+                seatedAt: waitStart.AddMinutes(-10),
+                readyAt: waitStart,
+                arrivedAt: waitEnd,
+                completeAt: waitEnd.AddMinutes(10),
+                availableAt: waitEnd.AddMinutes(15),
+                expectedAllocationMinutes: 30);
+            var cycles = new List<CompletedRoomCycle> { target };
+            cycles.AddRange(blockers.Select((blocker, index) =>
+            {
+                var cycle = Cycle(
+                    id: index + 2,
+                    roomId: index + 2,
+                    procedureCode: "CON",
+                    seatedAt: blocker.Start.AddMinutes(-10),
+                    readyAt: blocker.Start.AddMinutes(-5),
+                    arrivedAt: blocker.Start,
+                    completeAt: blocker.End,
+                    availableAt: blocker.End.AddMinutes(5),
+                    expectedAllocationMinutes: 30);
+                cycle.AssignedDoctor = blocker.Doctor;
+                return cycle;
+            }));
+
+            var reported = builder.Build(cycles, [], ReportDateRange.AllTime)
+                .RecentCompletedCycles.Single(cycle => cycle.CompletedCycleId == target.CompletedCycleId);
+            Assert.True(
+                reported.DoctorOccupiedWaitSeconds == expectedOccupiedSeconds,
+                $"{scenario}: expected {expectedOccupiedSeconds} occupied seconds but got {reported.DoctorOccupiedWaitSeconds}.");
+            Assert.Equal(10 * 60 - expectedOccupiedSeconds, reported.DoctorAvailableWaitSeconds);
+        }
+    }
+
+    [Fact]
     public void Adapter_preserves_every_named_section_value_in_flat_contract()
     {
         var recentCompletedCycles = new List<CompletedRoomCycle>();

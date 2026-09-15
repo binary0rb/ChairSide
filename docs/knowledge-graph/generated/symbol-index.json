@@ -1917,12 +1917,13 @@
                   {
                       "path":  "src/ChairSide.Board/Services/BoundedReportCollections.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  22796,
+                      "sizeBytes":  28107,
                       "typeSymbols":  [
                                           "ReportSpoolJson",
                                           "BoundedReportCollections",
                                           "ReportSpoolScope",
                                           "DiskBackedReadOnlyList",
+                                          "OccupiedWaitIntervalIndex",
                                           "NumericOrderStatistics",
                                           "BoundedGroupingSet",
                                           "DiskGrouping"
@@ -1944,6 +1945,7 @@
                                             "Deserialize",
                                             "Open",
                                             "DeleteFiles",
+                                            "ComputeOverlapSeconds",
                                             "Type7Quantile",
                                             "ValueAt",
                                             "Continue"
@@ -3175,7 +3177,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/ReportsSnapshotBuilder.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  81396,
+                      "sizeBytes":  77543,
                       "typeSymbols":  [
                                           "ReportsSnapshotBuilder",
                                           "ScopedProcedurePopulation"
@@ -4868,7 +4870,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/BoardStoreFixtureTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  49593,
+                      "sizeBytes":  48818,
                       "typeSymbols":  [
                                           "BoardStoreTests"
                                       ],
@@ -6586,12 +6588,13 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/ReportsSnapshotBuilderTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  78331,
+                      "sizeBytes":  80204,
                       "typeSymbols":  [
                                           "ReportsSnapshotBuilderTests"
                                       ],
                       "methodSymbols":  [
                                             "Compose_characterizes_all_reporting_populations_without_mutating_source_history",
+                                            "Occupied_wait_uses_the_exact_union_of_same_doctor_blocker_intervals",
                                             "Adapter_preserves_every_named_section_value_in_flat_contract",
                                             "Build_applies_completion_window_before_every_population_and_keeps_all_time_total",
                                             "Reports_snapshot_web_json_property_contract_appends_data_quality",
@@ -6629,8 +6632,7 @@
                                             "AssertProcedureGroup",
                                             "CompletedCycle",
                                             "ProcedureCycle",
-                                            "Cycle",
-                                            "SecondsBetween"
+                                            "Cycle"
                                         ],
                       "routes":  [
 

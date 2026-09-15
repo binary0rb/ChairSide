@@ -517,7 +517,10 @@ public sealed partial class BoardStoreTests
         // The second run cleared exactly what the first seeded - no accumulation across runs.
         Assert.Equal(first.CyclesSeeded, second.CompletedCyclesCleared);
         Assert.Equal(1000, context.Repository.LoadCompletedCycles().Count);
-        Assert.Equal(1000, context.Store.GetReports().IncludedCompletedCycleCount);
+        var reports = context.Store.GetReports();
+        Assert.Equal(1000, reports.IncludedCompletedCycleCount);
+        Assert.Equal(0, reports.AverageDoctorOccupiedWaitSeconds);
+        Assert.Equal(reports.AverageReadyToDoctorSeconds, reports.AverageDoctorAvailableWaitSeconds);
     }
 
     [Fact]
