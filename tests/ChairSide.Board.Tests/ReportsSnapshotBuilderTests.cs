@@ -180,6 +180,74 @@ public sealed class ReportsSnapshotBuilderTests
     }
 
     [Fact]
+    public void Build_procedure_summaries_preserve_distinct_metric_populations_after_fact_spill()
+    {
+        var cycles = Enumerable.Range(1, 101)
+            .Select(id => CompletedCycle(id, "EXT"))
+            .ToList();
+        foreach (var cycle in cycles)
+        {
+            var seconds = (int)cycle.CompletedCycleId;
+            cycle.TotalRoomCycleSeconds = seconds;
+            cycle.ReadyToDoctorSeconds = seconds;
+            cycle.DoctorInRoomSeconds = seconds * 2;
+            cycle.AllocationAdjustedFromDefault = seconds % 10 == 0;
+            if (cycle.AllocationAdjustedFromDefault)
+            {
+                cycle.ExpectedAllocationUnits = 4;
+                cycle.ExpectedAllocationMinutes = 40;
+            }
+        }
+        cycles[0].ReadyToDoctorSeconds = null;
+
+        var sedation = CompletedCycle(102, "EXT+SED");
+        sedation.TotalRoomCycleSeconds = 1_000;
+        sedation.ReadyToDoctorSeconds = null;
+        sedation.DoctorInRoomSeconds = 1_000;
+        sedation.AllocationAdjustedFromDefault = true;
+        sedation.ExpectedAllocationUnits = 4;
+        sedation.ExpectedAllocationMinutes = 40;
+        cycles.Add(sedation);
+
+        var snapshot = CreateBuilder().Build(cycles, [], ReportQuery.Default);
+
+        Assert.Collection(
+            snapshot.ProcedureSummaries,
+            detailed =>
+            {
+                Assert.Equal("EXT", detailed.ProcedureCode);
+                Assert.Equal(101, detailed.CompletedCycleCount);
+                Assert.Equal(51d, detailed.AverageTotalSeconds);
+                Assert.Equal(51d, detailed.MedianTotalSeconds);
+                Assert.Equal(51.5d, detailed.AverageReadyToDoctorSeconds);
+                Assert.Equal(51.5d, detailed.MedianReadyToDoctorSeconds);
+                Assert.Equal(102d, detailed.AverageDoctorTimeSeconds);
+                Assert.Equal(102d, detailed.MedianDoctorTimeSeconds);
+                Assert.Equal(100, detailed.Samples!.ReadyWait.ContributingCount);
+                Assert.Equal(101, detailed.Samples.DoctorTime.ContributingCount);
+                Assert.Equal(101, detailed.Samples.Allocation.ContributingCount);
+                Assert.Equal(10, detailed.Allocation.AdjustedAllocationCycleCount);
+            },
+            detailed =>
+            {
+                Assert.Equal("EXT+SED", detailed.ProcedureCode);
+                Assert.True(detailed.IsSedationCase);
+                Assert.Equal(ReportSampleStates.Unavailable, detailed.Samples!.ReadyWait.State);
+            });
+
+        var family = Assert.Single(snapshot.BaseProcedureSummaries);
+        Assert.Equal("EXT", family.ProcedureCode);
+        Assert.False(family.IsSedationCase);
+        Assert.Equal(102, family.CompletedCycleCount);
+        Assert.Equal(6_151d / 102d, family.AverageTotalSeconds);
+        Assert.Equal(51.5d, family.MedianTotalSeconds);
+        Assert.Equal(100, family.Samples!.ReadyWait.ContributingCount);
+        Assert.Equal(102, family.Samples.DoctorTime.ContributingCount);
+        Assert.Equal(102, family.Samples.Allocation.ContributingCount);
+        Assert.Equal(11, family.Allocation.AdjustedAllocationCycleCount);
+    }
+
+    [Fact]
     public void Occupied_wait_uses_the_exact_union_of_same_doctor_blocker_intervals()
     {
         var waitStart = Utc(2026, 7, 20, 10, 0);

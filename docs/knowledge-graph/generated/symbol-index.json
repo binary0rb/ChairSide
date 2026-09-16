@@ -3184,11 +3184,12 @@
                   {
                       "path":  "src/ChairSide.Board/Services/ReportsSnapshotBuilder.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  82197,
+                      "sizeBytes":  84442,
                       "typeSymbols":  [
                                           "ReportsSnapshotBuilder",
                                           "ScopedProcedurePopulation",
-                                          "ProcedureIntelligenceFact"
+                                          "ProcedureIntelligenceFact",
+                                          "ProcedureSummaryFact"
                                       ],
                       "methodSymbols":  [
                                             "Build",
@@ -3219,6 +3220,7 @@
                                             "ObservedLoadWholeMinutesBetween",
                                             "BuildProcedureSummaries",
                                             "BuildBaseProcedureSummaries",
+                                            "BuildProcedureSummary",
                                             "BuildScopedProcedurePopulations",
                                             "BuildScopedProcedureGroups",
                                             "BuildProcedureIntelligenceRows",
@@ -3229,8 +3231,7 @@
                                             "BuildDoctorProcedureIntelligence",
                                             "BuildProcedureIntelligenceMetrics",
                                             "BuildAllocationValueCounts",
-                                            "DisposeDoctorPopulations",
-                                            "BuildProcedureSamples"
+                                            "DisposeDoctorPopulations"
                                         ],
                       "routes":  [
 
@@ -6602,12 +6603,13 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/ReportsSnapshotBuilderTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  82336,
+                      "sizeBytes":  85504,
                       "typeSymbols":  [
                                           "ReportsSnapshotBuilderTests"
                                       ],
                       "methodSymbols":  [
                                             "Compose_characterizes_all_reporting_populations_without_mutating_source_history",
+                                            "Build_procedure_summaries_preserve_distinct_metric_populations_after_fact_spill",
                                             "Occupied_wait_uses_the_exact_union_of_same_doctor_blocker_intervals",
                                             "Adapter_preserves_every_named_section_value_in_flat_contract",
                                             "Build_applies_completion_window_before_every_population_and_keeps_all_time_total",
@@ -6645,8 +6647,7 @@
                                             "Projection",
                                             "BuildScoped",
                                             "AssertProcedureGroup",
-                                            "CompletedCycle",
-                                            "ProcedureCycle"
+                                            "CompletedCycle"
                                         ],
                       "routes":  [
 

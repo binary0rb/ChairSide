@@ -23,6 +23,20 @@ internal sealed partial class ReportsSnapshotBuilder
         int? HistoricalAssignedAllocationMinutes,
         int? HistoricalCapturedDefaultMinutes);
 
+    private sealed record ProcedureSummaryFact(
+        int? TotalSeconds,
+        int? ReadyWaitSeconds,
+        int? DoctorTimeSeconds,
+        int? DoctorOccupiedWaitSeconds,
+        int? DoctorAvailableWaitSeconds,
+        bool AllocationAdjustedFromDefault,
+        int? AllocationVarianceMinutes,
+        int ExpectedAllocationMinutes,
+        int? MeasuredCaseFlowMinutes,
+        bool IsOverExpectedAllocation,
+        bool IsUnderExpectedAllocation,
+        bool IsAtExpectedAllocation);
+
     private static readonly TimeSpan ExtremeCaseFlowThreshold = TimeSpan.FromHours(4);
     private static readonly TimeSpan ExtremeRoomCycleThreshold = TimeSpan.FromHours(6);
 
@@ -927,24 +941,12 @@ internal sealed partial class ReportsSnapshotBuilder
             cycles,
             cycle => cycle.ProcedureCode ?? "",
             StringComparer.OrdinalIgnoreCase);
-        return grouping.Groups.Select(group => new ProcedureCycleSummary(
+        return grouping.Groups.Select(group => BuildProcedureSummary(
                 group.Key,
                 ResolveProcedureLabel(group.Key),
                 ResolveBaseProcedureCode(group.Key),
                 IsSedationProcedureCode(group.Key),
-                group.Count(),
-                AverageSeconds(group.Select(cycle => cycle.TotalRoomCycleSeconds)),
-                MedianSeconds(group.Select(cycle => cycle.TotalRoomCycleSeconds)),
-                AverageSeconds(group.Select(cycle => cycle.ReadyToDoctorSeconds)),
-                MedianSeconds(group.Select(cycle => cycle.ReadyToDoctorSeconds)),
-                AverageSeconds(group.Select(cycle => cycle.DoctorInRoomSeconds)),
-                MedianSeconds(group.Select(cycle => cycle.DoctorInRoomSeconds)),
-                AverageSeconds(group.Select(cycle => cycle.DoctorOccupiedWaitSeconds)),
-                AverageSeconds(group.Select(cycle => cycle.DoctorAvailableWaitSeconds)),
-                MedianSeconds(group.Select(cycle => cycle.DoctorOccupiedWaitSeconds)),
-                MedianSeconds(group.Select(cycle => cycle.DoctorAvailableWaitSeconds)),
-                BuildAllocationVarianceSummary(group),
-                BuildProcedureSamples(group)))
+                group))
             .OrderByDescending(summary => summary.CompletedCycleCount)
             .ThenBy(summary => summary.ProcedureLabel, StringComparer.OrdinalIgnoreCase)
             .ToList();
@@ -957,27 +959,123 @@ internal sealed partial class ReportsSnapshotBuilder
             cycles,
             cycle => ResolveBaseProcedureCode(cycle.ProcedureCode),
             StringComparer.OrdinalIgnoreCase);
-        return grouping.Groups.Select(group => new ProcedureCycleSummary(
+        return grouping.Groups.Select(group => BuildProcedureSummary(
                 group.Key,
                 ResolveProcedureLabel(group.Key),
                 group.Key,
                 false,
-                group.Count(),
-                AverageSeconds(group.Select(cycle => cycle.TotalRoomCycleSeconds)),
-                MedianSeconds(group.Select(cycle => cycle.TotalRoomCycleSeconds)),
-                AverageSeconds(group.Select(cycle => cycle.ReadyToDoctorSeconds)),
-                MedianSeconds(group.Select(cycle => cycle.ReadyToDoctorSeconds)),
-                AverageSeconds(group.Select(cycle => cycle.DoctorInRoomSeconds)),
-                MedianSeconds(group.Select(cycle => cycle.DoctorInRoomSeconds)),
-                AverageSeconds(group.Select(cycle => cycle.DoctorOccupiedWaitSeconds)),
-                AverageSeconds(group.Select(cycle => cycle.DoctorAvailableWaitSeconds)),
-                MedianSeconds(group.Select(cycle => cycle.DoctorOccupiedWaitSeconds)),
-                MedianSeconds(group.Select(cycle => cycle.DoctorAvailableWaitSeconds)),
-                BuildAllocationVarianceSummary(group),
-                BuildProcedureSamples(group)))
+                group))
             .OrderByDescending(summary => summary.CompletedCycleCount)
             .ThenBy(summary => summary.ProcedureLabel, StringComparer.OrdinalIgnoreCase)
             .ToList();
+    }
+
+    private static ProcedureCycleSummary BuildProcedureSummary(
+        string procedureCode,
+        string procedureLabel,
+        string baseProcedureCode,
+        bool isSedationCase,
+        IEnumerable<CompletedRoomCycle> cycles)
+    {
+        var facts = BoundedReportCollections.Materialize(cycles.Select(cycle => new ProcedureSummaryFact(
+            cycle.TotalRoomCycleSeconds,
+            cycle.ReadyToDoctorSeconds,
+            cycle.DoctorInRoomSeconds,
+            cycle.DoctorOccupiedWaitSeconds,
+            cycle.DoctorAvailableWaitSeconds,
+            cycle.AllocationAdjustedFromDefault,
+            cycle.AllocationVarianceMinutes,
+            cycle.ExpectedAllocationMinutes,
+            cycle.MeasuredCaseFlowMinutes,
+            cycle.IsOverExpectedAllocation,
+            cycle.IsUnderExpectedAllocation,
+            cycle.IsAtExpectedAllocation)));
+        try
+        {
+            long totalSeconds = 0;
+            long readyWaitSeconds = 0;
+            long doctorTimeSeconds = 0;
+            long doctorOccupiedWaitSeconds = 0;
+            long doctorAvailableWaitSeconds = 0;
+            var totalCount = 0;
+            var readyWaitCount = 0;
+            var doctorTimeCount = 0;
+            var doctorOccupiedWaitCount = 0;
+            var doctorAvailableWaitCount = 0;
+            var allocationCount = 0;
+            var totalExpected = 0;
+            var totalMeasured = 0;
+            var over = 0;
+            var under = 0;
+            var atExpected = 0;
+            var adjusted = 0;
+            foreach (var fact in facts)
+            {
+                Add(fact.TotalSeconds, ref totalSeconds, ref totalCount);
+                Add(fact.ReadyWaitSeconds, ref readyWaitSeconds, ref readyWaitCount);
+                Add(fact.DoctorTimeSeconds, ref doctorTimeSeconds, ref doctorTimeCount);
+                Add(fact.DoctorOccupiedWaitSeconds, ref doctorOccupiedWaitSeconds, ref doctorOccupiedWaitCount);
+                Add(fact.DoctorAvailableWaitSeconds, ref doctorAvailableWaitSeconds, ref doctorAvailableWaitCount);
+                if (fact.AllocationAdjustedFromDefault) adjusted++;
+                if (!fact.AllocationVarianceMinutes.HasValue) continue;
+                allocationCount++;
+                totalExpected += fact.ExpectedAllocationMinutes;
+                totalMeasured += fact.MeasuredCaseFlowMinutes ?? 0;
+                if (fact.IsOverExpectedAllocation) over++;
+                if (fact.IsUnderExpectedAllocation) under++;
+                if (fact.IsAtExpectedAllocation) atExpected++;
+            }
+            var net = totalMeasured - totalExpected;
+            var populationCount = facts.Count;
+
+            return new ProcedureCycleSummary(
+                procedureCode,
+                procedureLabel,
+                baseProcedureCode,
+                isSedationCase,
+                populationCount,
+                Average(totalSeconds, totalCount),
+                MedianSeconds(facts.Select(fact => fact.TotalSeconds)),
+                Average(readyWaitSeconds, readyWaitCount),
+                MedianSeconds(facts.Select(fact => fact.ReadyWaitSeconds)),
+                Average(doctorTimeSeconds, doctorTimeCount),
+                MedianSeconds(facts.Select(fact => fact.DoctorTimeSeconds)),
+                Average(doctorOccupiedWaitSeconds, doctorOccupiedWaitCount),
+                Average(doctorAvailableWaitSeconds, doctorAvailableWaitCount),
+                MedianSeconds(facts.Select(fact => fact.DoctorOccupiedWaitSeconds)),
+                MedianSeconds(facts.Select(fact => fact.DoctorAvailableWaitSeconds)),
+                new AllocationVarianceSummary(
+                    allocationCount,
+                    totalExpected,
+                    totalMeasured,
+                    net,
+                    allocationCount == 0 ? 0 : (double)net / allocationCount,
+                    over,
+                    under,
+                    atExpected,
+                    adjusted),
+                new ReportProcedureMetricSampleContext(
+                    ReportSampleContext.ForPopulation(populationCount),
+                    ReportSampleContext.Create(populationCount, totalCount),
+                    ReportSampleContext.Create(populationCount, readyWaitCount),
+                    ReportSampleContext.Create(populationCount, doctorTimeCount),
+                    ReportSampleContext.Create(populationCount, doctorOccupiedWaitCount),
+                    ReportSampleContext.Create(populationCount, doctorAvailableWaitCount),
+                    ReportSampleContext.Create(populationCount, allocationCount)));
+        }
+        finally
+        {
+            (facts as IDisposable)?.Dispose();
+        }
+
+        static void Add(int? value, ref long total, ref int count)
+        {
+            if (!value.HasValue) return;
+            total += value.Value;
+            count++;
+        }
+
+        static double Average(long total, int count) => count == 0 ? 0d : (double)total / count;
     }
 
     private IReadOnlyList<ScopedProcedurePopulation> BuildScopedProcedurePopulations(
@@ -1324,33 +1422,6 @@ internal sealed partial class ReportsSnapshotBuilder
                 (cycles as IDisposable)?.Dispose();
             }
         }
-    }
-
-    private static ReportProcedureMetricSampleContext BuildProcedureSamples(
-        IEnumerable<CompletedRoomCycle> cycles)
-    {
-        var population = BoundedReportCollections.Materialize(cycles);
-        var populationCount = population.Count;
-        return new ReportProcedureMetricSampleContext(
-            ReportSampleContext.ForPopulation(populationCount),
-            ReportSampleContext.Create(
-                populationCount,
-                population.Count(cycle => cycle.TotalRoomCycleSeconds.HasValue)),
-            ReportSampleContext.Create(
-                populationCount,
-                population.Count(cycle => cycle.ReadyToDoctorSeconds.HasValue)),
-            ReportSampleContext.Create(
-                populationCount,
-                population.Count(cycle => cycle.DoctorInRoomSeconds.HasValue)),
-            ReportSampleContext.Create(
-                populationCount,
-                population.Count(cycle => cycle.DoctorOccupiedWaitSeconds.HasValue)),
-            ReportSampleContext.Create(
-                populationCount,
-                population.Count(cycle => cycle.DoctorAvailableWaitSeconds.HasValue)),
-            ReportSampleContext.Create(
-                populationCount,
-                population.Count(cycle => cycle.AllocationVarianceMinutes.HasValue)));
     }
 
     private IReadOnlyList<DoctorProcedureMixRow> BuildDoctorProcedureMix(IReadOnlyList<CompletedRoomCycle> cycles)

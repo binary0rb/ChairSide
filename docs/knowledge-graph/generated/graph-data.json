@@ -2871,6 +2871,12 @@
                       "path":  "src/ChairSide.Board/Services/HistoricalMetadataCorrectionService.cs"
                   },
                   {
+                      "id":  "symbol:type:ProcedureSummaryFact",
+                      "label":  "ProcedureSummaryFact",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/ReportsSnapshotBuilder.cs"
+                  },
+                  {
                       "id":  "symbol:type:ProjectionAssumptionChecklist",
                       "label":  "ProjectionAssumptionChecklist",
                       "type":  "CodeType",
@@ -5044,6 +5050,11 @@
                   {
                       "from":  "file:src/ChairSide.Board/Services/ReportsSnapshotBuilder.cs",
                       "to":  "symbol:type:ProcedureIntelligenceFact",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/ReportsSnapshotBuilder.cs",
+                      "to":  "symbol:type:ProcedureSummaryFact",
                       "label":  "declares"
                   },
                   {
