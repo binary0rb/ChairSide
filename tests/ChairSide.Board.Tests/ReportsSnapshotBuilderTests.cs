@@ -180,6 +180,74 @@ public sealed class ReportsSnapshotBuilderTests
     }
 
     [Fact]
+    public void Build_procedure_summaries_preserve_distinct_metric_populations_after_fact_spill()
+    {
+        var cycles = Enumerable.Range(1, 101)
+            .Select(id => CompletedCycle(id, "EXT"))
+            .ToList();
+        foreach (var cycle in cycles)
+        {
+            var seconds = (int)cycle.CompletedCycleId;
+            cycle.TotalRoomCycleSeconds = seconds;
+            cycle.ReadyToDoctorSeconds = seconds;
+            cycle.DoctorInRoomSeconds = seconds * 2;
+            cycle.AllocationAdjustedFromDefault = seconds % 10 == 0;
+            if (cycle.AllocationAdjustedFromDefault)
+            {
+                cycle.ExpectedAllocationUnits = 4;
+                cycle.ExpectedAllocationMinutes = 40;
+            }
+        }
+        cycles[0].ReadyToDoctorSeconds = null;
+
+        var sedation = CompletedCycle(102, "EXT+SED");
+        sedation.TotalRoomCycleSeconds = 1_000;
+        sedation.ReadyToDoctorSeconds = null;
+        sedation.DoctorInRoomSeconds = 1_000;
+        sedation.AllocationAdjustedFromDefault = true;
+        sedation.ExpectedAllocationUnits = 4;
+        sedation.ExpectedAllocationMinutes = 40;
+        cycles.Add(sedation);
+
+        var snapshot = CreateBuilder().Build(cycles, [], ReportQuery.Default);
+
+        Assert.Collection(
+            snapshot.ProcedureSummaries,
+            detailed =>
+            {
+                Assert.Equal("EXT", detailed.ProcedureCode);
+                Assert.Equal(101, detailed.CompletedCycleCount);
+                Assert.Equal(51d, detailed.AverageTotalSeconds);
+                Assert.Equal(51d, detailed.MedianTotalSeconds);
+                Assert.Equal(51.5d, detailed.AverageReadyToDoctorSeconds);
+                Assert.Equal(51.5d, detailed.MedianReadyToDoctorSeconds);
+                Assert.Equal(102d, detailed.AverageDoctorTimeSeconds);
+                Assert.Equal(102d, detailed.MedianDoctorTimeSeconds);
+                Assert.Equal(100, detailed.Samples!.ReadyWait.ContributingCount);
+                Assert.Equal(101, detailed.Samples.DoctorTime.ContributingCount);
+                Assert.Equal(101, detailed.Samples.Allocation.ContributingCount);
+                Assert.Equal(10, detailed.Allocation.AdjustedAllocationCycleCount);
+            },
+            detailed =>
+            {
+                Assert.Equal("EXT+SED", detailed.ProcedureCode);
+                Assert.True(detailed.IsSedationCase);
+                Assert.Equal(ReportSampleStates.Unavailable, detailed.Samples!.ReadyWait.State);
+            });
+
+        var family = Assert.Single(snapshot.BaseProcedureSummaries);
+        Assert.Equal("EXT", family.ProcedureCode);
+        Assert.False(family.IsSedationCase);
+        Assert.Equal(102, family.CompletedCycleCount);
+        Assert.Equal(6_151d / 102d, family.AverageTotalSeconds);
+        Assert.Equal(51.5d, family.MedianTotalSeconds);
+        Assert.Equal(100, family.Samples!.ReadyWait.ContributingCount);
+        Assert.Equal(102, family.Samples.DoctorTime.ContributingCount);
+        Assert.Equal(102, family.Samples.Allocation.ContributingCount);
+        Assert.Equal(11, family.Allocation.AdjustedAllocationCycleCount);
+    }
+
+    [Fact]
     public void Occupied_wait_uses_the_exact_union_of_same_doctor_blocker_intervals()
     {
         var waitStart = Utc(2026, 7, 20, 10, 0);
@@ -1327,6 +1395,41 @@ public sealed class ReportsSnapshotBuilderTests
     }
 
     [Fact]
+    public void Procedure_intelligence_preserves_exact_timing_and_allocation_statistics()
+    {
+        var cycles = Enumerable.Range(0, 6)
+            .Select(index => ProcedureCycle(
+                index + 1,
+                "EXT",
+                index % 2 == 0 ? "otte" : "pledger",
+                doctorMinutes: 8 + index,
+                readyWaitMinutes: 1 + index,
+                expectedAllocationMinutes: 10 * (index + 1)))
+            .ToArray();
+
+        var metrics = Assert.Single(CreateBuilder().Build(cycles, [], ReportQuery.Default)
+            .ProcedureIntelligenceRows!).Metrics;
+
+        Assert.Equal(6, metrics.CompletedCaseCount);
+        Assert.Equal(10.5 * 60, metrics.MedianDoctorTimeSeconds);
+        Assert.Equal(10.5 * 60, metrics.AverageDoctorTimeSeconds);
+        Assert.Equal(9.25 * 60, metrics.TypicalDoctorTimeLowerSeconds);
+        Assert.Equal(11.75 * 60, metrics.TypicalDoctorTimeUpperSeconds);
+        Assert.Equal(3.5 * 60, metrics.MedianReadyWaitSeconds);
+        Assert.Equal(3.5 * 60, metrics.AverageReadyWaitSeconds);
+        Assert.Equal(19 * 60, metrics.MedianSeatedToDoctorCompleteSeconds);
+        Assert.Equal(19 * 60, metrics.AverageSeatedToDoctorCompleteSeconds);
+        Assert.Equal(35, metrics.MedianHistoricalAssignedAllocationMinutes);
+        Assert.Equal(6, metrics.HistoricalAssignedAllocationSample.ContributingCount);
+        Assert.Equal(
+            [(10, 1), (20, 1), (30, 1), (40, 1), (50, 1), (60, 1)],
+            metrics.HistoricalAssignedAllocationValues.Select(value => (value.Minutes, value.CaseCount)));
+        Assert.Equal(
+            [(10, 1), (20, 1), (30, 1), (40, 1), (50, 1), (60, 1)],
+            metrics.HistoricalCapturedDefaultValues.Select(value => (value.Minutes, value.CaseCount)));
+    }
+
+    [Fact]
     public void Procedure_intelligence_keeps_current_and_historical_allocation_context_separate()
     {
         var first = ProcedureCycle(1, "EXT", "otte", 20, expectedAllocationMinutes: 20);
@@ -1433,10 +1536,11 @@ public sealed class ReportsSnapshotBuilderTests
         [
             new("pledger", "Dr. Pledger", "JWP", "#16a34a"),
             new("otte", "Dr. Otte", "LDO", "#dc2626"),
+            new("gibson", "Dr. Gibson", "JEG", "#9333ea"),
             new("former-z", "Dr. Zed", "ZZZ", "#64748b"),
             new("former-a", "Dr. Able", "AAA", "#64748b")
         ];
-        Doctor[] activeDoctors = [allDoctors[0], allDoctors[1]];
+        Doctor[] activeDoctors = [allDoctors[0], allDoctors[1], allDoctors[2]];
         CompletedRoomCycle[] cycles =
         [
             ProcedureCycle(1, "EXT", "otte", 10),
@@ -1447,18 +1551,21 @@ public sealed class ReportsSnapshotBuilderTests
         ];
         var builder = CreateBuilder(allDoctors, activeDoctors);
 
-        var practiceRow = Assert.Single(builder.Build(cycles, [], ReportQuery.Default)
-            .ProcedureIntelligenceRows!);
+        var practice = builder.Build(cycles, [], ReportQuery.Default);
+        var practiceRow = Assert.Single(practice.ProcedureIntelligenceRows!);
         Assert.Equal(
             ["pledger", "otte", "former-a", "former-z"],
             practiceRow.DoctorBreakdown.Select(segment => segment.DoctorId));
         Assert.All(practiceRow.DoctorBreakdown, segment =>
             Assert.Equal(ReportSampleStates.Limited, segment.Metrics.DoctorTimeSample.State));
-        var practiceScheduleFit = Assert.Single(builder.Build(cycles, [], ReportQuery.Default)
-            .ScheduleFit!.ProcedureSegments!);
+        Assert.Equal(2, practiceRow.DoctorBreakdown.Single(segment => segment.DoctorId == "otte")
+            .Metrics.CompletedCaseCount);
+        var practiceScheduleFit = Assert.Single(practice.ScheduleFit!.ProcedureSegments!);
         Assert.Equal(
             ["pledger", "otte", "former-a", "former-z"],
             practiceScheduleFit.DoctorBreakdown.Select(segment => segment.DoctorId));
+        Assert.Equal(2, practiceScheduleFit.DoctorBreakdown.Single(segment => segment.DoctorId == "otte")
+            .HistoricalAssignedFit.PopulationCount);
 
         var doctorQuery = ReportQuery.FromStrings(
             null, null, ReportScopeKinds.Doctor, "former-a", ReportSedationSegments.All,

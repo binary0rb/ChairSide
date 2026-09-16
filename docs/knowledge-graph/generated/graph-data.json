@@ -1665,12 +1665,6 @@
                       "path":  "tests/ChairSide.Board.Tests/CalibrationInsightReportTests.cs"
                   },
                   {
-                      "id":  "symbol:type:CalibrationPair",
-                      "label":  "CalibrationPair",
-                      "type":  "CodeType",
-                      "path":  "src/ChairSide.Board/Services/CalibrationInsightReport.cs"
-                  },
-                  {
                       "id":  "symbol:type:CalibrationRawDirections",
                       "label":  "CalibrationRawDirections",
                       "type":  "CodeType",
@@ -1801,6 +1795,12 @@
                       "label":  "CorrectionContext",
                       "type":  "CodeType",
                       "path":  "src/ChairSide.Board/Services/HistoricalMetadataCorrectionService.cs"
+                  },
+                  {
+                      "id":  "symbol:type:CountingReadOnlyList",
+                      "label":  "CountingReadOnlyList",
+                      "type":  "CodeType",
+                      "path":  "tests/ChairSide.Board.Tests/DoctorFlowTrendSnapshotTests.cs"
                   },
                   {
                       "id":  "symbol:type:CycleSnapshot",
@@ -2013,6 +2013,30 @@
                       "path":  "src/ChairSide.Board/Services/DemoBoardStore.cs"
                   },
                   {
+                      "id":  "symbol:type:DoctorFlowCompletedBucket",
+                      "label":  "DoctorFlowCompletedBucket",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/DoctorFlowTrendSnapshot.cs"
+                  },
+                  {
+                      "id":  "symbol:type:DoctorFlowCompletedFact",
+                      "label":  "DoctorFlowCompletedFact",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/DoctorFlowTrendSnapshot.cs"
+                  },
+                  {
+                      "id":  "symbol:type:DoctorFlowPhaseBucket",
+                      "label":  "DoctorFlowPhaseBucket",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/DoctorFlowTrendSnapshot.cs"
+                  },
+                  {
+                      "id":  "symbol:type:DoctorFlowPhaseFact",
+                      "label":  "DoctorFlowPhaseFact",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/DoctorFlowTrendSnapshot.cs"
+                  },
+                  {
                       "id":  "symbol:type:DoctorFlowSummary",
                       "label":  "DoctorFlowSummary",
                       "type":  "CodeType",
@@ -2027,6 +2051,12 @@
                   {
                       "id":  "symbol:type:DoctorFlowTrendIdentity",
                       "label":  "DoctorFlowTrendIdentity",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/DoctorFlowTrendSnapshot.cs"
+                  },
+                  {
+                      "id":  "symbol:type:DoctorFlowTrendKey",
+                      "label":  "DoctorFlowTrendKey",
                       "type":  "CodeType",
                       "path":  "src/ChairSide.Board/Services/DoctorFlowTrendSnapshot.cs"
                   },
@@ -2475,12 +2505,6 @@
                       "path":  "src/ChairSide.Board/Services/HistoricalMetadataCorrectionService.cs"
                   },
                   {
-                      "id":  "symbol:type:HistoricalPair",
-                      "label":  "HistoricalPair",
-                      "type":  "CodeType",
-                      "path":  "src/ChairSide.Board/Services/CalibrationInsightReport.cs"
-                  },
-                  {
                       "id":  "symbol:type:HistoricalQueryPage",
                       "label":  "HistoricalQueryPage",
                       "type":  "CodeType",
@@ -2673,12 +2697,6 @@
                       "path":  "src/ChairSide.Board/Services/HistoricalMetadataCorrectionService.cs"
                   },
                   {
-                      "id":  "symbol:type:ParsedObservedDoctorFlowDay",
-                      "label":  "ParsedObservedDoctorFlowDay",
-                      "type":  "CodeType",
-                      "path":  "src/ChairSide.Board/Services/DoctorFlowTrendSnapshot.cs"
-                  },
-                  {
                       "id":  "symbol:type:PersistedReadyHandoff",
                       "label":  "PersistedReadyHandoff",
                       "type":  "CodeType",
@@ -2793,6 +2811,12 @@
                       "path":  "src/ChairSide.Board/Services/DemoBoardStore.cs"
                   },
                   {
+                      "id":  "symbol:type:ProcedureIntelligenceFact",
+                      "label":  "ProcedureIntelligenceFact",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/ReportsSnapshotBuilder.cs"
+                  },
+                  {
                       "id":  "symbol:type:ProcedureIntelligenceMetrics",
                       "label":  "ProcedureIntelligenceMetrics",
                       "type":  "CodeType",
@@ -2845,6 +2869,12 @@
                       "label":  "ProcedureSedationLedgerValue",
                       "type":  "CodeType",
                       "path":  "src/ChairSide.Board/Services/HistoricalMetadataCorrectionService.cs"
+                  },
+                  {
+                      "id":  "symbol:type:ProcedureSummaryFact",
+                      "label":  "ProcedureSummaryFact",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/ReportsSnapshotBuilder.cs"
                   },
                   {
                       "id":  "symbol:type:ProjectionAssumptionChecklist",
@@ -3367,6 +3397,18 @@
                       "label":  "ScheduleFitCalculatorTests",
                       "type":  "CodeType",
                       "path":  "tests/ChairSide.Board.Tests/ScheduleFitCalculatorTests.cs"
+                  },
+                  {
+                      "id":  "symbol:type:ScheduleFitCountingReadOnlyList",
+                      "label":  "ScheduleFitCountingReadOnlyList",
+                      "type":  "CodeType",
+                      "path":  "tests/ChairSide.Board.Tests/CalibrationInsightReportTests.cs"
+                  },
+                  {
+                      "id":  "symbol:type:ScheduleFitFact",
+                      "label":  "ScheduleFitFact",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/CalibrationInsightReport.cs"
                   },
                   {
                       "id":  "symbol:type:ScheduleFitReport",
@@ -3992,11 +4034,6 @@
                   },
                   {
                       "from":  "file:src/ChairSide.Board/Services/CalibrationInsightReport.cs",
-                      "to":  "symbol:type:CalibrationPair",
-                      "label":  "declares"
-                  },
-                  {
-                      "from":  "file:src/ChairSide.Board/Services/CalibrationInsightReport.cs",
                       "to":  "symbol:type:CalibrationRawDirections",
                       "label":  "declares"
                   },
@@ -4022,7 +4059,7 @@
                   },
                   {
                       "from":  "file:src/ChairSide.Board/Services/CalibrationInsightReport.cs",
-                      "to":  "symbol:type:HistoricalPair",
+                      "to":  "symbol:type:ScheduleFitFact",
                       "label":  "declares"
                   },
                   {
@@ -4377,6 +4414,26 @@
                   },
                   {
                       "from":  "file:src/ChairSide.Board/Services/DoctorFlowTrendSnapshot.cs",
+                      "to":  "symbol:type:DoctorFlowCompletedBucket",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/DoctorFlowTrendSnapshot.cs",
+                      "to":  "symbol:type:DoctorFlowCompletedFact",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/DoctorFlowTrendSnapshot.cs",
+                      "to":  "symbol:type:DoctorFlowPhaseBucket",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/DoctorFlowTrendSnapshot.cs",
+                      "to":  "symbol:type:DoctorFlowPhaseFact",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/DoctorFlowTrendSnapshot.cs",
                       "to":  "symbol:type:DoctorFlowTrendBucket",
                       "label":  "declares"
                   },
@@ -4387,17 +4444,17 @@
                   },
                   {
                       "from":  "file:src/ChairSide.Board/Services/DoctorFlowTrendSnapshot.cs",
+                      "to":  "symbol:type:DoctorFlowTrendKey",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/DoctorFlowTrendSnapshot.cs",
                       "to":  "symbol:type:DoctorFlowTrendSeries",
                       "label":  "declares"
                   },
                   {
                       "from":  "file:src/ChairSide.Board/Services/DoctorFlowTrendSnapshot.cs",
                       "to":  "symbol:type:DoctorFlowTrendSnapshotBuilder",
-                      "label":  "declares"
-                  },
-                  {
-                      "from":  "file:src/ChairSide.Board/Services/DoctorFlowTrendSnapshot.cs",
-                      "to":  "symbol:type:ParsedObservedDoctorFlowDay",
                       "label":  "declares"
                   },
                   {
@@ -4992,6 +5049,16 @@
                   },
                   {
                       "from":  "file:src/ChairSide.Board/Services/ReportsSnapshotBuilder.cs",
+                      "to":  "symbol:type:ProcedureIntelligenceFact",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/ReportsSnapshotBuilder.cs",
+                      "to":  "symbol:type:ProcedureSummaryFact",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/ReportsSnapshotBuilder.cs",
                       "to":  "symbol:type:ReportsSnapshotBuilder",
                       "label":  "declares"
                   },
@@ -5276,6 +5343,11 @@
                       "label":  "declares"
                   },
                   {
+                      "from":  "file:tests/ChairSide.Board.Tests/CalibrationInsightReportTests.cs",
+                      "to":  "symbol:type:ScheduleFitCountingReadOnlyList",
+                      "label":  "declares"
+                  },
+                  {
                       "from":  "file:tests/ChairSide.Board.Tests/CanonicalAssignmentDomainValidationTests.cs",
                       "to":  "symbol:type:CanonicalAssignmentDomainValidationTests",
                       "label":  "declares"
@@ -5313,6 +5385,11 @@
                   {
                       "from":  "file:tests/ChairSide.Board.Tests/DeterministicFixtureBuilderTests.cs",
                       "to":  "symbol:type:DeterministicFixtureBuilderTests",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:tests/ChairSide.Board.Tests/DoctorFlowTrendSnapshotTests.cs",
+                      "to":  "symbol:type:CountingReadOnlyList",
                       "label":  "declares"
                   },
                   {

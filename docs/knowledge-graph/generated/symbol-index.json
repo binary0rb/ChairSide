@@ -1969,7 +1969,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/CalibrationInsightReport.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  14231,
+                      "sizeBytes":  16101,
                       "typeSymbols":  [
                                           "ScheduleFitToleranceClassifications",
                                           "CalibrationRawDirections",
@@ -1985,13 +1985,14 @@
                                           "ScheduleFitSegment",
                                           "DoctorScheduleFitSummary",
                                           "ExactScheduleFitCalculator",
-                                          "HistoricalPair",
-                                          "CalibrationPair"
+                                          "ScheduleFitFact"
                                       ],
                       "methodSymbols":  [
                                             "TruthfulObservedCaseFlowSeconds",
+                                            "BuildFacts",
                                             "BuildHistoricalAssignedSummary",
                                             "EvaluateCurrentDefault",
+                                            "HistoricalPairs",
                                             "RawDirection",
                                             "ToleranceClassification",
                                             "Median",
@@ -2145,7 +2146,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/DemoBoardStore.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  204856,
+                      "sizeBytes":  200599,
                       "typeSymbols":  [
                                           "ExceptionReasons",
                                           "ReportingExceptionReasons",
@@ -2383,7 +2384,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/DoctorFlowTrendSnapshot.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  10812,
+                      "sizeBytes":  15849,
                       "typeSymbols":  [
                                           "DoctorFlowTrendSeries",
                                           "DoctorFlowTrendBucket",
@@ -2391,13 +2392,21 @@
                                           "DoctorFlowTrendIdentity",
                                           "DoctorFlowTrendSnapshotBuilder",
                                           "TrendWindow",
-                                          "ParsedObservedDoctorFlowDay"
+                                          "DoctorFlowTrendKey",
+                                          "DoctorFlowPhaseFact",
+                                          "DoctorFlowCompletedFact",
+                                          "DoctorFlowPhaseBucket",
+                                          "DoctorFlowCompletedBucket"
                                       ],
                       "methodSymbols":  [
                                             "BuildWeekly",
                                             "BuildSeries",
+                                            "ProjectPhaseFacts",
+                                            "ProjectCompletedFacts",
+                                            "BuildPhaseBucket",
+                                            "BuildCompletedBucket",
+                                            "TryGetBucketIndex",
                                             "BuildSharedWindow",
-                                            "IsInBucket",
                                             "IsDoctor",
                                             "WeekStart",
                                             "FormatDate",
@@ -2891,7 +2900,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/ProcedureIntelligenceReport.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  4549,
+                      "sizeBytes":  4929,
                       "typeSymbols":  [
                                           "ProcedureIntelligenceRangeMethods",
                                           "ProcedureAllocationValueCount",
@@ -2901,9 +2910,7 @@
                                           "ProcedureIntelligenceStatistics"
                                       ],
                       "methodSymbols":  [
-                                            "Type7Quantile",
-                                            "Median",
-                                            "Average"
+                                            "Type7Quantile"
                                         ],
                       "routes":  [
 
@@ -3177,10 +3184,12 @@
                   {
                       "path":  "src/ChairSide.Board/Services/ReportsSnapshotBuilder.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  77543,
+                      "sizeBytes":  84442,
                       "typeSymbols":  [
                                           "ReportsSnapshotBuilder",
-                                          "ScopedProcedurePopulation"
+                                          "ScopedProcedurePopulation",
+                                          "ProcedureIntelligenceFact",
+                                          "ProcedureSummaryFact"
                                       ],
                       "methodSymbols":  [
                                             "Build",
@@ -3211,6 +3220,7 @@
                                             "ObservedLoadWholeMinutesBetween",
                                             "BuildProcedureSummaries",
                                             "BuildBaseProcedureSummaries",
+                                            "BuildProcedureSummary",
                                             "BuildScopedProcedurePopulations",
                                             "BuildScopedProcedureGroups",
                                             "BuildProcedureIntelligenceRows",
@@ -3221,8 +3231,7 @@
                                             "BuildDoctorProcedureIntelligence",
                                             "BuildProcedureIntelligenceMetrics",
                                             "BuildAllocationValueCounts",
-                                            "BuildProcedureSamples",
-                                            "BuildDoctorProcedureMix"
+                                            "DisposeDoctorPopulations"
                                         ],
                       "routes":  [
 
@@ -3277,7 +3286,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/ReportTrendSnapshot.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  5003,
+                      "sizeBytes":  4895,
                       "typeSymbols":  [
                                           "ReportTrendSnapshot",
                                           "ReportTrendBucket",
@@ -3470,7 +3479,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/ScheduleFitCalculator.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  5286,
+                      "sizeBytes":  5177,
                       "typeSymbols":  [
                                           "ScheduleFitCalculator",
                                           "ScheduleFitResult"
@@ -3497,7 +3506,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/ScheduleFitReport.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  2900,
+                      "sizeBytes":  2848,
                       "typeSymbols":  [
                                           "ScheduleFitReport",
                                           "ScheduleFitReportBuilder"
@@ -5274,9 +5283,10 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/CalibrationInsightReportTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  13058,
+                      "sizeBytes":  14810,
                       "typeSymbols":  [
-                                          "CalibrationInsightReportTests"
+                                          "CalibrationInsightReportTests",
+                                          "ScheduleFitCountingReadOnlyList"
                                       ],
                       "methodSymbols":  [
                                             "Historical_summary_uses_exact_seconds_without_per_case_rounding",
@@ -5298,8 +5308,10 @@
                                             "Current_default_is_separate_from_historical_assigned_and_captured_defaults",
                                             "Missing_current_default_never_uses_historical_values_as_a_baseline",
                                             "Qualified_evidence_reconciles_to_counts_and_median_population",
+                                            "Shared_fact_projection_enumerates_the_completed_cycle_source_once",
                                             "Evaluate",
-                                            "Cycle"
+                                            "Cycle",
+                                            "GetEnumerator"
                                         ],
                       "routes":  [
 
@@ -5578,9 +5590,10 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/DoctorFlowTrendSnapshotTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  19280,
+                      "sizeBytes":  20801,
                       "typeSymbols":  [
-                                          "DoctorFlowTrendSnapshotTests"
+                                          "DoctorFlowTrendSnapshotTests",
+                                          "CountingReadOnlyList"
                                       ],
                       "methodSymbols":  [
                                             "Finite_range_builds_one_common_monday_skeleton_with_partial_boundaries",
@@ -5597,11 +5610,13 @@
                                             "Empty_unavailable_sufficient_and_truthful_zero_remain_distinct",
                                             "Canonical_ready_anchored_span_is_the_only_clinical_span_authority",
                                             "Practice_and_doctor_scopes_preserve_roster_history_and_sedation_isolation",
+                                            "Large_history_is_replayed_once_per_bounded_trend_projection",
                                             "Build",
                                             "CreateBuilder",
                                             "Cycle",
                                             "ObservedDay",
-                                            "Utc"
+                                            "Utc",
+                                            "GetEnumerator"
                                         ],
                       "routes":  [
 
@@ -6588,12 +6603,13 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/ReportsSnapshotBuilderTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  80204,
+                      "sizeBytes":  85504,
                       "typeSymbols":  [
                                           "ReportsSnapshotBuilderTests"
                                       ],
                       "methodSymbols":  [
                                             "Compose_characterizes_all_reporting_populations_without_mutating_source_history",
+                                            "Build_procedure_summaries_preserve_distinct_metric_populations_after_fact_spill",
                                             "Occupied_wait_uses_the_exact_union_of_same_doctor_blocker_intervals",
                                             "Adapter_preserves_every_named_section_value_in_flat_contract",
                                             "Build_applies_completion_window_before_every_population_and_keeps_all_time_total",
@@ -6621,6 +6637,7 @@
                                             "Build_scopes_review_queue_by_effective_attribution_and_window",
                                             "Procedure_intelligence_reuses_scoped_groups_and_recomputes_family_range_from_cases",
                                             "Procedure_intelligence_uses_metric_specific_truthful_contributors_and_completed_membership",
+                                            "Procedure_intelligence_preserves_exact_timing_and_allocation_statistics",
                                             "Procedure_intelligence_keeps_current_and_historical_allocation_context_separate",
                                             "Schedule_fit_uses_exact_seconds_and_preserves_population_coverage_and_reconciliation",
                                             "Calibration_uses_current_roster_default_and_paired_median_not_historical_or_captured_defaults",
@@ -6630,9 +6647,7 @@
                                             "Projection",
                                             "BuildScoped",
                                             "AssertProcedureGroup",
-                                            "CompletedCycle",
-                                            "ProcedureCycle",
-                                            "Cycle"
+                                            "CompletedCycle"
                                         ],
                       "routes":  [
 

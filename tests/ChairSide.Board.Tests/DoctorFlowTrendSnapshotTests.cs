@@ -356,6 +356,39 @@ public sealed class DoctorFlowTrendSnapshotTests
         Assert.Equal("legacy", Assert.Single(historical.DoctorFlowTrends!).DoctorId);
     }
 
+    [Fact]
+    public void Large_history_is_replayed_once_per_bounded_trend_projection()
+    {
+        DoctorFlowTrendIdentity[] doctors =
+        [
+            new("otte", "Dr. Otte"),
+            new("pledger", "Dr. Pledger"),
+            new("gibson", "Dr. Gibson"),
+            new("schroeder", "Dr. Schroeder")
+        ];
+        var start = Utc(2026, 3, 2, 8);
+        var cycles = Enumerable.Range(0, 1000)
+            .Select(index => Cycle(
+                doctors[index % doctors.Length].DoctorId,
+                start.AddDays(index % 84).AddMinutes(index)))
+            .ToList();
+        var phase = new CountingReadOnlyList<CompletedRoomCycle>(cycles);
+        var completed = new CountingReadOnlyList<CompletedRoomCycle>(cycles);
+
+        var series = DoctorFlowTrendSnapshotBuilder.BuildWeekly(
+            doctors,
+            phase,
+            completed,
+            [],
+            ReportDateRange.AllTime);
+
+        Assert.Equal(4, series.Count);
+        Assert.All(series, item => Assert.Equal(12, item.Buckets.Count));
+        Assert.Equal(1000, series.SelectMany(item => item.Buckets).Sum(item => item.CompletedCaseCount));
+        Assert.Equal((2, 2000), (phase.EnumerationCount, phase.RowCount));
+        Assert.Equal((1, 1000), (completed.EnumerationCount, completed.RowCount));
+    }
+
     private static IReadOnlyList<DoctorFlowTrendSeries> Build(
         IReadOnlyList<DoctorFlowTrendIdentity> doctors,
         IReadOnlyList<CompletedRoomCycle> phaseCycles,
@@ -430,4 +463,24 @@ public sealed class DoctorFlowTrendSnapshotTests
 
     private static DateTimeOffset Utc(int year, int month, int day, int hour, int minute = 0) =>
         new(year, month, day, hour, minute, 0, TimeSpan.Zero);
+
+    private sealed class CountingReadOnlyList<T>(IReadOnlyList<T> items) : IReadOnlyList<T>
+    {
+        public int EnumerationCount { get; private set; }
+        public int RowCount { get; private set; }
+        public int Count => items.Count;
+        public T this[int index] => items[index];
+
+        public IEnumerator<T> GetEnumerator()
+        {
+            EnumerationCount++;
+            foreach (var item in items)
+            {
+                RowCount++;
+                yield return item;
+            }
+        }
+
+        System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator() => GetEnumerator();
+    }
 }
