@@ -2899,7 +2899,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/ProcedureIntelligenceReport.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  4549,
+                      "sizeBytes":  4929,
                       "typeSymbols":  [
                                           "ProcedureIntelligenceRangeMethods",
                                           "ProcedureAllocationValueCount",
@@ -2909,9 +2909,7 @@
                                           "ProcedureIntelligenceStatistics"
                                       ],
                       "methodSymbols":  [
-                                            "Type7Quantile",
-                                            "Median",
-                                            "Average"
+                                            "Type7Quantile"
                                         ],
                       "routes":  [
 
@@ -3185,10 +3183,11 @@
                   {
                       "path":  "src/ChairSide.Board/Services/ReportsSnapshotBuilder.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  78850,
+                      "sizeBytes":  80995,
                       "typeSymbols":  [
                                           "ReportsSnapshotBuilder",
-                                          "ScopedProcedurePopulation"
+                                          "ScopedProcedurePopulation",
+                                          "ProcedureIntelligenceFact"
                                       ],
                       "methodSymbols":  [
                                             "Build",
@@ -6599,7 +6598,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/ReportsSnapshotBuilderTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  80546,
+                      "sizeBytes":  82336,
                       "typeSymbols":  [
                                           "ReportsSnapshotBuilderTests"
                                       ],
@@ -6632,6 +6631,7 @@
                                             "Build_scopes_review_queue_by_effective_attribution_and_window",
                                             "Procedure_intelligence_reuses_scoped_groups_and_recomputes_family_range_from_cases",
                                             "Procedure_intelligence_uses_metric_specific_truthful_contributors_and_completed_membership",
+                                            "Procedure_intelligence_preserves_exact_timing_and_allocation_statistics",
                                             "Procedure_intelligence_keeps_current_and_historical_allocation_context_separate",
                                             "Schedule_fit_uses_exact_seconds_and_preserves_population_coverage_and_reconciliation",
                                             "Calibration_uses_current_roster_default_and_paired_median_not_historical_or_captured_defaults",
@@ -6642,8 +6642,7 @@
                                             "BuildScoped",
                                             "AssertProcedureGroup",
                                             "CompletedCycle",
-                                            "ProcedureCycle",
-                                            "Cycle"
+                                            "ProcedureCycle"
                                         ],
                       "routes":  [
 

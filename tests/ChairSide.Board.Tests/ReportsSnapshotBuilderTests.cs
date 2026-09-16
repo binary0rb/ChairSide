@@ -1327,6 +1327,41 @@ public sealed class ReportsSnapshotBuilderTests
     }
 
     [Fact]
+    public void Procedure_intelligence_preserves_exact_timing_and_allocation_statistics()
+    {
+        var cycles = Enumerable.Range(0, 6)
+            .Select(index => ProcedureCycle(
+                index + 1,
+                "EXT",
+                index % 2 == 0 ? "otte" : "pledger",
+                doctorMinutes: 8 + index,
+                readyWaitMinutes: 1 + index,
+                expectedAllocationMinutes: 10 * (index + 1)))
+            .ToArray();
+
+        var metrics = Assert.Single(CreateBuilder().Build(cycles, [], ReportQuery.Default)
+            .ProcedureIntelligenceRows!).Metrics;
+
+        Assert.Equal(6, metrics.CompletedCaseCount);
+        Assert.Equal(10.5 * 60, metrics.MedianDoctorTimeSeconds);
+        Assert.Equal(10.5 * 60, metrics.AverageDoctorTimeSeconds);
+        Assert.Equal(9.25 * 60, metrics.TypicalDoctorTimeLowerSeconds);
+        Assert.Equal(11.75 * 60, metrics.TypicalDoctorTimeUpperSeconds);
+        Assert.Equal(3.5 * 60, metrics.MedianReadyWaitSeconds);
+        Assert.Equal(3.5 * 60, metrics.AverageReadyWaitSeconds);
+        Assert.Equal(19 * 60, metrics.MedianSeatedToDoctorCompleteSeconds);
+        Assert.Equal(19 * 60, metrics.AverageSeatedToDoctorCompleteSeconds);
+        Assert.Equal(35, metrics.MedianHistoricalAssignedAllocationMinutes);
+        Assert.Equal(6, metrics.HistoricalAssignedAllocationSample.ContributingCount);
+        Assert.Equal(
+            [(10, 1), (20, 1), (30, 1), (40, 1), (50, 1), (60, 1)],
+            metrics.HistoricalAssignedAllocationValues.Select(value => (value.Minutes, value.CaseCount)));
+        Assert.Equal(
+            [(10, 1), (20, 1), (30, 1), (40, 1), (50, 1), (60, 1)],
+            metrics.HistoricalCapturedDefaultValues.Select(value => (value.Minutes, value.CaseCount)));
+    }
+
+    [Fact]
     public void Procedure_intelligence_keeps_current_and_historical_allocation_context_separate()
     {
         var first = ProcedureCycle(1, "EXT", "otte", 20, expectedAllocationMinutes: 20);

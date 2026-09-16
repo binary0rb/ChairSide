@@ -16,6 +16,13 @@ internal sealed partial class ReportsSnapshotBuilder
         bool? IsSedationCase,
         IReadOnlyList<CompletedRoomCycle> Cycles);
 
+    private sealed record ProcedureIntelligenceFact(
+        int? DoctorTimeSeconds,
+        int? ReadyWaitSeconds,
+        double? SeatedToDoctorCompleteSeconds,
+        int? HistoricalAssignedAllocationMinutes,
+        int? HistoricalCapturedDefaultMinutes);
+
     private static readonly TimeSpan ExtremeCaseFlowThreshold = TimeSpan.FromHours(4);
     private static readonly TimeSpan ExtremeRoomCycleThreshold = TimeSpan.FromHours(6);
 
@@ -1162,65 +1169,106 @@ internal sealed partial class ReportsSnapshotBuilder
         IReadOnlyList<CompletedRoomCycle> cycles)
     {
         var populationCount = cycles.Count;
-        var doctorTimeValues = BoundedReportCollections.Materialize(cycles
-            .Select(TruthfulDoctorTimeSeconds)
-            .Where(value => value.HasValue)
-            .Select(value => (double)value!.Value));
-        var readyWaitValues = BoundedReportCollections.Materialize(cycles
-            .Select(TruthfulReadyWaitSeconds)
-            .Where(value => value.HasValue)
-            .Select(value => (double)value!.Value));
-        var seatedToDoctorCompleteValues = BoundedReportCollections.Materialize(cycles
-            .Select(TruthfulSeatedToDoctorCompleteSeconds)
-            .Where(value => value.HasValue)
-            .Select(value => value!.Value));
-        var historicalAssignedValues = BoundedReportCollections.Materialize(cycles
-            .Where(cycle => cycle.ExpectedAllocationMinutes > 0)
-            .Select(cycle => cycle.ExpectedAllocationMinutes));
-        var historicalCapturedDefaultValues = BoundedReportCollections.Materialize(cycles
-            .Where(cycle => cycle.OriginalDefaultExpectedUnits > 0)
-            .Select(cycle => cycle.OriginalDefaultExpectedUnits * 10));
+        var facts = BoundedReportCollections.Materialize(cycles.Select(cycle =>
+            new ProcedureIntelligenceFact(
+                TruthfulDoctorTimeSeconds(cycle),
+                TruthfulReadyWaitSeconds(cycle),
+                TruthfulSeatedToDoctorCompleteSeconds(cycle),
+                cycle.ExpectedAllocationMinutes > 0 ? cycle.ExpectedAllocationMinutes : null,
+                cycle.OriginalDefaultExpectedUnits > 0
+                    ? cycle.OriginalDefaultExpectedUnits * 10
+                    : null)));
+        try
+        {
+            var doctorTimeCount = 0;
+            var doctorTimeTotal = 0d;
+            var readyWaitCount = 0;
+            var readyWaitTotal = 0d;
+            var seatedToDoctorCompleteCount = 0;
+            var seatedToDoctorCompleteTotal = 0d;
+            var historicalAssignedCounts = new Dictionary<int, int>();
+            var historicalCapturedDefaultCounts = new Dictionary<int, int>();
+            foreach (var fact in facts)
+            {
+                if (fact.DoctorTimeSeconds is { } doctorTime)
+                {
+                    doctorTimeCount++;
+                    doctorTimeTotal += doctorTime;
+                }
+                if (fact.ReadyWaitSeconds is { } readyWait)
+                {
+                    readyWaitCount++;
+                    readyWaitTotal += readyWait;
+                }
+                if (fact.SeatedToDoctorCompleteSeconds is { } seatedToDoctorComplete)
+                {
+                    seatedToDoctorCompleteCount++;
+                    seatedToDoctorCompleteTotal += seatedToDoctorComplete;
+                }
+                if (fact.HistoricalAssignedAllocationMinutes is { } historicalAssigned)
+                {
+                    historicalAssignedCounts[historicalAssigned] =
+                        historicalAssignedCounts.GetValueOrDefault(historicalAssigned) + 1;
+                }
+                if (fact.HistoricalCapturedDefaultMinutes is { } historicalCapturedDefault)
+                {
+                    historicalCapturedDefaultCounts[historicalCapturedDefault] =
+                        historicalCapturedDefaultCounts.GetValueOrDefault(historicalCapturedDefault) + 1;
+                }
+            }
 
-        var doctorTimeSample = ReportSampleContext.Create(populationCount, doctorTimeValues.Count);
-        var typicalRange = ProcedureIntelligenceStatistics.TypicalDoctorTimeRange(
-            doctorTimeValues,
-            doctorTimeSample);
+            using var doctorTimeOrder = NumericOrderStatistics.Create(facts
+                .Where(fact => fact.DoctorTimeSeconds.HasValue)
+                .Select(fact => (double)fact.DoctorTimeSeconds!.Value));
+            using var readyWaitOrder = NumericOrderStatistics.Create(facts
+                .Where(fact => fact.ReadyWaitSeconds.HasValue)
+                .Select(fact => (double)fact.ReadyWaitSeconds!.Value));
+            using var seatedToDoctorCompleteOrder = NumericOrderStatistics.Create(facts
+                .Where(fact => fact.SeatedToDoctorCompleteSeconds.HasValue)
+                .Select(fact => fact.SeatedToDoctorCompleteSeconds!.Value));
+            using var historicalAssignedOrder = NumericOrderStatistics.Create(facts
+                .Where(fact => fact.HistoricalAssignedAllocationMinutes.HasValue)
+                .Select(fact => (double)fact.HistoricalAssignedAllocationMinutes!.Value));
 
-        return new ProcedureIntelligenceMetrics(
-            populationCount,
-            ReportSampleContext.ForPopulation(populationCount),
-            ProcedureIntelligenceStatistics.Median(doctorTimeValues),
-            ProcedureIntelligenceStatistics.Average(doctorTimeValues),
-            typicalRange.LowerSeconds,
-            typicalRange.UpperSeconds,
-            ProcedureIntelligenceRangeMethods.Type7Iqr,
-            doctorTimeSample,
-            ProcedureIntelligenceStatistics.Median(readyWaitValues),
-            ProcedureIntelligenceStatistics.Average(readyWaitValues),
-            ReportSampleContext.Create(populationCount, readyWaitValues.Count),
-            ProcedureIntelligenceStatistics.Median(seatedToDoctorCompleteValues),
-            ProcedureIntelligenceStatistics.Average(seatedToDoctorCompleteValues),
-            ReportSampleContext.Create(populationCount, seatedToDoctorCompleteValues.Count),
-            ProcedureIntelligenceStatistics.Median(
-                BoundedReportCollections.Materialize(historicalAssignedValues.Select(value => (double)value))),
-            ReportSampleContext.Create(populationCount, historicalAssignedValues.Count),
-            BuildAllocationValueCounts(historicalAssignedValues),
-            BuildAllocationValueCounts(historicalCapturedDefaultValues));
+            var doctorTimeSample = ReportSampleContext.Create(populationCount, doctorTimeCount);
+            var typicalRange = ProcedureIntelligenceStatistics.TypicalDoctorTimeRange(
+                doctorTimeOrder,
+                doctorTimeSample);
+
+            return new ProcedureIntelligenceMetrics(
+                populationCount,
+                ReportSampleContext.ForPopulation(populationCount),
+                doctorTimeOrder.Median,
+                doctorTimeCount == 0 ? null : doctorTimeTotal / doctorTimeCount,
+                typicalRange.LowerSeconds,
+                typicalRange.UpperSeconds,
+                ProcedureIntelligenceRangeMethods.Type7Iqr,
+                doctorTimeSample,
+                readyWaitOrder.Median,
+                readyWaitCount == 0 ? null : readyWaitTotal / readyWaitCount,
+                ReportSampleContext.Create(populationCount, readyWaitCount),
+                seatedToDoctorCompleteOrder.Median,
+                seatedToDoctorCompleteCount == 0
+                    ? null
+                    : seatedToDoctorCompleteTotal / seatedToDoctorCompleteCount,
+                ReportSampleContext.Create(populationCount, seatedToDoctorCompleteCount),
+                historicalAssignedOrder.Median,
+                ReportSampleContext.Create(populationCount, historicalAssignedOrder.Count),
+                BuildAllocationValueCounts(historicalAssignedCounts),
+                BuildAllocationValueCounts(historicalCapturedDefaultCounts));
+        }
+        finally
+        {
+            (facts as IDisposable)?.Dispose();
+        }
     }
 
     private static IReadOnlyList<ProcedureAllocationValueCount> BuildAllocationValueCounts(
-        IEnumerable<int> values)
-    {
-        var counts = new Dictionary<int, int>();
-        foreach (var value in values)
-        {
-            counts[value] = counts.GetValueOrDefault(value) + 1;
-        }
-        return counts
+        IReadOnlyDictionary<int, int> counts) =>
+        counts
             .OrderBy(pair => pair.Key)
             .Select(pair => new ProcedureAllocationValueCount(pair.Key, pair.Value))
             .ToList();
-    }
 
     private static IReadOnlyDictionary<string, IReadOnlyList<CompletedRoomCycle>> BuildDoctorPopulations(
         IReadOnlyList<CompletedRoomCycle> cycles)

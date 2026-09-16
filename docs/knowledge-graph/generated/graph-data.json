@@ -2823,6 +2823,12 @@
                       "path":  "src/ChairSide.Board/Services/DemoBoardStore.cs"
                   },
                   {
+                      "id":  "symbol:type:ProcedureIntelligenceFact",
+                      "label":  "ProcedureIntelligenceFact",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/ReportsSnapshotBuilder.cs"
+                  },
+                  {
                       "id":  "symbol:type:ProcedureIntelligenceMetrics",
                       "label":  "ProcedureIntelligenceMetrics",
                       "type":  "CodeType",
@@ -5038,6 +5044,11 @@
                   {
                       "from":  "file:src/ChairSide.Board/Services/ReportsSnapshotBuilder.Audit.cs",
                       "to":  "symbol:type:ReportsSnapshotBuilder",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:src/ChairSide.Board/Services/ReportsSnapshotBuilder.cs",
+                      "to":  "symbol:type:ProcedureIntelligenceFact",
                       "label":  "declares"
                   },
                   {

@@ -78,7 +78,33 @@ internal static class ProcedureIntelligenceStatistics
                 nameof(orderedOrUnorderedValues));
         }
 
-        return BoundedReportCollections.Type7Quartiles(orderedOrUnorderedValues);
+        using var orderedValues = NumericOrderStatistics.Create(orderedOrUnorderedValues);
+        return TypicalDoctorTimeRange(orderedValues, doctorTimeSample);
+    }
+
+    internal static (double? LowerSeconds, double? UpperSeconds) TypicalDoctorTimeRange(
+        NumericOrderStatistics orderedValues,
+        ReportSampleContext doctorTimeSample)
+    {
+        ArgumentNullException.ThrowIfNull(orderedValues);
+        ArgumentNullException.ThrowIfNull(doctorTimeSample);
+
+        if (!string.Equals(
+                doctorTimeSample.State,
+                ReportSampleStates.Sufficient,
+                StringComparison.Ordinal))
+        {
+            return (null, null);
+        }
+
+        if (orderedValues.Count != doctorTimeSample.ContributingCount)
+        {
+            throw new ArgumentException(
+                "Doctor Time values must match the shared contributing sample count.",
+                nameof(orderedValues));
+        }
+
+        return (orderedValues.Type7Quantile(0.25d), orderedValues.Type7Quantile(0.75d));
     }
 
     internal static double Type7Quantile(IReadOnlyList<double> orderedValues, double probability)
@@ -106,20 +132,4 @@ internal static class ProcedureIntelligenceStatistics
             + fraction * (orderedValues[lowerIndex + 1] - orderedValues[lowerIndex]);
     }
 
-    internal static double? Median(IReadOnlyList<double> values)
-    {
-        ArgumentNullException.ThrowIfNull(values);
-        if (values.Count == 0)
-        {
-            return null;
-        }
-
-        return BoundedReportCollections.Median(values);
-    }
-
-    internal static double? Average(IReadOnlyList<double> values)
-    {
-        ArgumentNullException.ThrowIfNull(values);
-        return values.Count == 0 ? null : values.Average();
-    }
 }
