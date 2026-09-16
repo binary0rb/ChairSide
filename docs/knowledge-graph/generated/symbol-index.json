@@ -1969,7 +1969,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/CalibrationInsightReport.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  13891,
+                      "sizeBytes":  16101,
                       "typeSymbols":  [
                                           "ScheduleFitToleranceClassifications",
                                           "CalibrationRawDirections",
@@ -1985,13 +1985,14 @@
                                           "ScheduleFitSegment",
                                           "DoctorScheduleFitSummary",
                                           "ExactScheduleFitCalculator",
-                                          "HistoricalPair",
-                                          "CalibrationPair"
+                                          "ScheduleFitFact"
                                       ],
                       "methodSymbols":  [
                                             "TruthfulObservedCaseFlowSeconds",
+                                            "BuildFacts",
                                             "BuildHistoricalAssignedSummary",
                                             "EvaluateCurrentDefault",
+                                            "HistoricalPairs",
                                             "RawDirection",
                                             "ToleranceClassification",
                                             "Median",
@@ -3183,7 +3184,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/ReportsSnapshotBuilder.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  80995,
+                      "sizeBytes":  82197,
                       "typeSymbols":  [
                                           "ReportsSnapshotBuilder",
                                           "ScopedProcedurePopulation",
@@ -5281,9 +5282,10 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/CalibrationInsightReportTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  13058,
+                      "sizeBytes":  14810,
                       "typeSymbols":  [
-                                          "CalibrationInsightReportTests"
+                                          "CalibrationInsightReportTests",
+                                          "ScheduleFitCountingReadOnlyList"
                                       ],
                       "methodSymbols":  [
                                             "Historical_summary_uses_exact_seconds_without_per_case_rounding",
@@ -5305,8 +5307,10 @@
                                             "Current_default_is_separate_from_historical_assigned_and_captured_defaults",
                                             "Missing_current_default_never_uses_historical_values_as_a_baseline",
                                             "Qualified_evidence_reconciles_to_counts_and_median_population",
+                                            "Shared_fact_projection_enumerates_the_completed_cycle_source_once",
                                             "Evaluate",
-                                            "Cycle"
+                                            "Cycle",
+                                            "GetEnumerator"
                                         ],
                       "routes":  [
 

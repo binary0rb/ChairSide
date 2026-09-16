@@ -1665,12 +1665,6 @@
                       "path":  "tests/ChairSide.Board.Tests/CalibrationInsightReportTests.cs"
                   },
                   {
-                      "id":  "symbol:type:CalibrationPair",
-                      "label":  "CalibrationPair",
-                      "type":  "CodeType",
-                      "path":  "src/ChairSide.Board/Services/CalibrationInsightReport.cs"
-                  },
-                  {
                       "id":  "symbol:type:CalibrationRawDirections",
                       "label":  "CalibrationRawDirections",
                       "type":  "CodeType",
@@ -2509,12 +2503,6 @@
                       "label":  "HistoricalMetadataEvidenceAuthority",
                       "type":  "CodeType",
                       "path":  "src/ChairSide.Board/Services/HistoricalMetadataCorrectionService.cs"
-                  },
-                  {
-                      "id":  "symbol:type:HistoricalPair",
-                      "label":  "HistoricalPair",
-                      "type":  "CodeType",
-                      "path":  "src/ChairSide.Board/Services/CalibrationInsightReport.cs"
                   },
                   {
                       "id":  "symbol:type:HistoricalQueryPage",
@@ -3405,6 +3393,18 @@
                       "path":  "tests/ChairSide.Board.Tests/ScheduleFitCalculatorTests.cs"
                   },
                   {
+                      "id":  "symbol:type:ScheduleFitCountingReadOnlyList",
+                      "label":  "ScheduleFitCountingReadOnlyList",
+                      "type":  "CodeType",
+                      "path":  "tests/ChairSide.Board.Tests/CalibrationInsightReportTests.cs"
+                  },
+                  {
+                      "id":  "symbol:type:ScheduleFitFact",
+                      "label":  "ScheduleFitFact",
+                      "type":  "CodeType",
+                      "path":  "src/ChairSide.Board/Services/CalibrationInsightReport.cs"
+                  },
+                  {
                       "id":  "symbol:type:ScheduleFitReport",
                       "label":  "ScheduleFitReport",
                       "type":  "CodeType",
@@ -4028,11 +4028,6 @@
                   },
                   {
                       "from":  "file:src/ChairSide.Board/Services/CalibrationInsightReport.cs",
-                      "to":  "symbol:type:CalibrationPair",
-                      "label":  "declares"
-                  },
-                  {
-                      "from":  "file:src/ChairSide.Board/Services/CalibrationInsightReport.cs",
                       "to":  "symbol:type:CalibrationRawDirections",
                       "label":  "declares"
                   },
@@ -4058,7 +4053,7 @@
                   },
                   {
                       "from":  "file:src/ChairSide.Board/Services/CalibrationInsightReport.cs",
-                      "to":  "symbol:type:HistoricalPair",
+                      "to":  "symbol:type:ScheduleFitFact",
                       "label":  "declares"
                   },
                   {
@@ -5334,6 +5329,11 @@
                   {
                       "from":  "file:tests/ChairSide.Board.Tests/CalibrationInsightReportTests.cs",
                       "to":  "symbol:type:CalibrationInsightReportTests",
+                      "label":  "declares"
+                  },
+                  {
+                      "from":  "file:tests/ChairSide.Board.Tests/CalibrationInsightReportTests.cs",
+                      "to":  "symbol:type:ScheduleFitCountingReadOnlyList",
                       "label":  "declares"
                   },
                   {

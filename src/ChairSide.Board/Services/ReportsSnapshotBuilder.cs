@@ -181,6 +181,7 @@ internal sealed partial class ReportsSnapshotBuilder
             standardCompletedCycles,
             query.ProcedureGrouping);
         var calibrationRules = CalibrationRuleSet.VersionOne;
+        var scheduleFitFacts = ExactScheduleFitCalculator.BuildFacts(standardCompletedCycles);
         IReadOnlyList<IReadOnlyDictionary<string, IReadOnlyList<CompletedRoomCycle>>>
             procedureDoctorPopulations = query.Scope == ReportScopeKinds.Doctor
                 ? []
@@ -194,7 +195,7 @@ internal sealed partial class ReportsSnapshotBuilder
             scheduleFit = compatibilityScheduleFit with
             {
                 Practice = ExactScheduleFitCalculator.BuildHistoricalAssignedSummary(
-                    standardCompletedCycles,
+                    scheduleFitFacts,
                     calibrationRules),
                 ProcedureSegments = BuildScheduleFitProcedureSegments(
                     scopedProcedurePopulations,
@@ -202,7 +203,7 @@ internal sealed partial class ReportsSnapshotBuilder
                     query,
                     calibrationRules),
                 DoctorSummaries = BuildDoctorScheduleFitSummaries(
-                    standardCompletedCycles,
+                    scheduleFitFacts,
                     query,
                     calibrationRules),
                 Rules = calibrationRules
@@ -215,6 +216,7 @@ internal sealed partial class ReportsSnapshotBuilder
         finally
         {
             DisposeDoctorPopulations(procedureDoctorPopulations);
+            (scheduleFitFacts as IDisposable)?.Dispose();
         }
         var scopedProcedureGroups = BuildScopedProcedureGroups(
             scopedProcedurePopulations,
@@ -1074,24 +1076,32 @@ internal sealed partial class ReportsSnapshotBuilder
                 var currentDefaultMinutes = rosterProcedure?.DefaultExpectedUnits is > 0
                     ? rosterProcedure.DefaultExpectedUnits * 10
                     : (int?)null;
-                return new ScheduleFitSegment(
-                    population.ProcedureCode,
-                    population.ProcedureLabel,
-                    population.BaseProcedureCode,
-                    query.ProcedureGrouping,
-                    population.IsSedationCase,
-                    currentDefaultMinutes,
-                    ExactScheduleFitCalculator.BuildHistoricalAssignedSummary(population.Cycles, rules),
-                    ExactScheduleFitCalculator.EvaluateCurrentDefault(
-                        population.Cycles,
+                var facts = ExactScheduleFitCalculator.BuildFacts(population.Cycles);
+                try
+                {
+                    return new ScheduleFitSegment(
+                        population.ProcedureCode,
+                        population.ProcedureLabel,
+                        population.BaseProcedureCode,
+                        query.ProcedureGrouping,
+                        population.IsSedationCase,
                         currentDefaultMinutes,
-                        rules),
-                    query.Scope == ReportScopeKinds.Doctor
-                        ? []
-                        : BuildDoctorScheduleFitSegments(
-                            doctorPopulations[index],
+                        ExactScheduleFitCalculator.BuildHistoricalAssignedSummary(facts, rules),
+                        ExactScheduleFitCalculator.EvaluateCurrentDefault(
+                            facts,
                             currentDefaultMinutes,
-                            rules));
+                            rules),
+                        query.Scope == ReportScopeKinds.Doctor
+                            ? []
+                            : BuildDoctorScheduleFitSegments(
+                                doctorPopulations[index],
+                                currentDefaultMinutes,
+                                rules));
+                }
+                finally
+                {
+                    (facts as IDisposable)?.Dispose();
+                }
             })
             .ToList();
 
@@ -1113,29 +1123,48 @@ internal sealed partial class ReportsSnapshotBuilder
     }
 
     private IReadOnlyList<DoctorScheduleFitSummary> BuildDoctorScheduleFitSummaries(
-        IReadOnlyList<CompletedRoomCycle> cycles,
+        IReadOnlyList<ExactScheduleFitCalculator.ScheduleFitFact> facts,
         ReportQuery query,
         CalibrationRuleSet rules)
     {
-        var represented = BuildDoctorPopulations(cycles);
-        IEnumerable<string> doctorIds = query.Scope == ReportScopeKinds.Doctor
-            ? new[] { query.DoctorId }.Where(id => !string.IsNullOrWhiteSpace(id)).Select(id => id!)
-            : _activeDoctors.Select(doctor => doctor.Id).Concat(
-                OrderedRepresentedDoctorIds(represented.Keys)
-                    .Where(doctorId => !_activeDoctors.Any(active =>
-                        string.Equals(active.Id, doctorId, StringComparison.OrdinalIgnoreCase))));
+        using var grouping = BoundedGroupingSet<ExactScheduleFitCalculator.ScheduleFitFact, string>.Create(
+            facts,
+            fact => fact.AssignedDoctor ?? "",
+            StringComparer.OrdinalIgnoreCase);
+        var represented = grouping.Groups
+            .Where(group => !string.IsNullOrWhiteSpace(group.Key))
+            .ToDictionary(
+                group => group.Key,
+                group => BoundedReportCollections.Materialize(group),
+                StringComparer.OrdinalIgnoreCase);
+        try
+        {
+            IEnumerable<string> doctorIds = query.Scope == ReportScopeKinds.Doctor
+                ? new[] { query.DoctorId }.Where(id => !string.IsNullOrWhiteSpace(id)).Select(id => id!)
+                : _activeDoctors.Select(doctor => doctor.Id).Concat(
+                    OrderedRepresentedDoctorIds(represented.Keys)
+                        .Where(doctorId => !_activeDoctors.Any(active =>
+                            string.Equals(active.Id, doctorId, StringComparison.OrdinalIgnoreCase))));
 
-        return doctorIds
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .Select(doctorId =>
+            return doctorIds
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .Select(doctorId =>
+                {
+                    var population = represented.GetValueOrDefault(doctorId) ?? [];
+                    return new DoctorScheduleFitSummary(
+                        doctorId,
+                        ResolveDoctorDisplayName(doctorId) ?? doctorId,
+                        ExactScheduleFitCalculator.BuildHistoricalAssignedSummary(population, rules));
+                })
+                .ToList();
+        }
+        finally
+        {
+            foreach (var population in represented.Values)
             {
-                var population = represented.GetValueOrDefault(doctorId) ?? [];
-                return new DoctorScheduleFitSummary(
-                    doctorId,
-                    ResolveDoctorDisplayName(doctorId) ?? doctorId,
-                    ExactScheduleFitCalculator.BuildHistoricalAssignedSummary(population, rules));
-            })
-            .ToList();
+                (population as IDisposable)?.Dispose();
+            }
+        }
     }
 
     private IEnumerable<string> OrderedRepresentedDoctorIds(IEnumerable<string> representedDoctorIds)

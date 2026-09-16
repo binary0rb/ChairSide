@@ -137,70 +137,132 @@ public sealed record DoctorScheduleFitSummary(
 
 internal static class ExactScheduleFitCalculator
 {
-    public sealed record HistoricalPair(
-        CompletedRoomCycle Cycle,
-        double ExpectedSeconds,
-        double ObservedSeconds,
-        double VarianceSeconds);
-
-    public sealed record CalibrationPair(
-        CompletedRoomCycle Cycle,
-        double ObservedSeconds,
-        double VarianceSeconds,
-        string RawDirection,
-        string ToleranceClassification);
+    internal sealed record ScheduleFitFact(
+        long CompletedCycleId,
+        string? AcceptedReadyHandoffId,
+        string? AssignedDoctor,
+        int ExpectedAllocationMinutes,
+        double? ObservedCaseFlowSeconds);
 
     internal static double? TruthfulObservedCaseFlowSeconds(CompletedRoomCycle cycle) =>
         cycle.DoctorCompleteAt is { } completeAt && cycle.SeatedAt <= completeAt
             ? (completeAt - cycle.SeatedAt).TotalSeconds
             : null;
 
+    internal static IReadOnlyList<ScheduleFitFact> BuildFacts(
+        IReadOnlyList<CompletedRoomCycle> population)
+    {
+        ArgumentNullException.ThrowIfNull(population);
+        return BoundedReportCollections.Materialize(population.Select(cycle => new ScheduleFitFact(
+            cycle.CompletedCycleId,
+            cycle.AcceptedReadyHandoffId,
+            cycle.AssignedDoctor,
+            cycle.ExpectedAllocationMinutes,
+            TruthfulObservedCaseFlowSeconds(cycle))));
+    }
+
     internal static ScheduleFitSummary BuildHistoricalAssignedSummary(
         IReadOnlyList<CompletedRoomCycle> population,
         CalibrationRuleSet? rules = null)
     {
         ArgumentNullException.ThrowIfNull(population);
+        var facts = BuildFacts(population);
+        try
+        {
+            return BuildHistoricalAssignedSummary(facts, rules);
+        }
+        finally
+        {
+            (facts as IDisposable)?.Dispose();
+        }
+    }
+
+    internal static ScheduleFitSummary BuildHistoricalAssignedSummary(
+        IReadOnlyList<ScheduleFitFact> population,
+        CalibrationRuleSet? rules = null)
+    {
+        ArgumentNullException.ThrowIfNull(population);
         var activeRules = rules ?? CalibrationRuleSet.VersionOne;
-        var pairs = BoundedReportCollections.Materialize(population
-            .Where(cycle => cycle.ExpectedAllocationMinutes > 0)
-            .Select(cycle =>
-            {
-                var observed = TruthfulObservedCaseFlowSeconds(cycle);
-                if (!observed.HasValue)
-                {
-                    return null;
-                }
-
-                var expected = cycle.ExpectedAllocationMinutes * 60d;
-                return new HistoricalPair(cycle, expected, observed.Value, observed.Value - expected);
-            })
-            .Where(pair => pair is not null)
-            .Select(pair => pair!));
-
-        var totalExpected = pairs.Sum(pair => pair.ExpectedSeconds);
-        var totalObserved = pairs.Sum(pair => pair.ObservedSeconds);
+        var pairedCaseCount = 0;
+        var totalExpected = 0d;
+        var totalObserved = 0d;
+        var totalSlack = 0d;
+        var totalDebt = 0d;
+        var lessTimeCaseCount = 0;
+        var atExpectedCaseCount = 0;
+        var moreTimeCaseCount = 0;
         var tolerance = activeRules.AtExpectedToleranceSeconds;
+        foreach (var fact in population)
+        {
+            if (fact.ExpectedAllocationMinutes <= 0 || fact.ObservedCaseFlowSeconds is not { } observed)
+            {
+                continue;
+            }
+
+            var expected = fact.ExpectedAllocationMinutes * 60d;
+            var variance = observed - expected;
+            pairedCaseCount++;
+            totalExpected += expected;
+            totalObserved += observed;
+            totalSlack += Math.Max(-variance, 0d);
+            totalDebt += Math.Max(variance, 0d);
+            if (variance < -tolerance) lessTimeCaseCount++;
+            else if (variance > tolerance) moreTimeCaseCount++;
+            else atExpectedCaseCount++;
+        }
+
+        using var expectedOrder = NumericOrderStatistics.Create(HistoricalPairs(population)
+            .Select(fact => fact.ExpectedAllocationMinutes * 60d));
+        using var observedOrder = NumericOrderStatistics.Create(HistoricalPairs(population)
+            .Select(fact => fact.ObservedCaseFlowSeconds!.Value));
+        using var varianceOrder = NumericOrderStatistics.Create(HistoricalPairs(population)
+            .Select(fact => fact.ObservedCaseFlowSeconds!.Value - (fact.ExpectedAllocationMinutes * 60d)));
 
         return new ScheduleFitSummary(
             PopulationCount: population.Count,
-            PairedCaseCount: pairs.Count,
-            PopulationCoverage: population.Count == 0 ? 0d : (double)pairs.Count / population.Count,
+            PairedCaseCount: pairedCaseCount,
+            PopulationCoverage: population.Count == 0 ? 0d : (double)pairedCaseCount / population.Count,
             TotalExpectedSeconds: totalExpected,
             TotalObservedSeconds: totalObserved,
-            TotalSlackSeconds: pairs.Sum(pair => Math.Max(-pair.VarianceSeconds, 0d)),
-            TotalDebtSeconds: pairs.Sum(pair => Math.Max(pair.VarianceSeconds, 0d)),
+            TotalSlackSeconds: totalSlack,
+            TotalDebtSeconds: totalDebt,
             NetVarianceSeconds: totalObserved - totalExpected,
-            MedianExpectedSeconds: Median(pairs.Select(pair => pair.ExpectedSeconds)),
-            MedianObservedSeconds: Median(pairs.Select(pair => pair.ObservedSeconds)),
-            MedianPairedVarianceSeconds: Median(pairs.Select(pair => pair.VarianceSeconds)),
-            LessTimeCaseCount: pairs.Count(pair => pair.VarianceSeconds < -tolerance),
-            AtExpectedCaseCount: pairs.Count(pair => pair.VarianceSeconds >= -tolerance && pair.VarianceSeconds <= tolerance),
-            MoreTimeCaseCount: pairs.Count(pair => pair.VarianceSeconds > tolerance),
-            Sample: ReportSampleContext.Create(population.Count, pairs.Count));
+            MedianExpectedSeconds: expectedOrder.Median,
+            MedianObservedSeconds: observedOrder.Median,
+            MedianPairedVarianceSeconds: varianceOrder.Median,
+            LessTimeCaseCount: lessTimeCaseCount,
+            AtExpectedCaseCount: atExpectedCaseCount,
+            MoreTimeCaseCount: moreTimeCaseCount,
+            Sample: ReportSampleContext.Create(population.Count, pairedCaseCount));
     }
 
     internal static CalibrationEvaluation EvaluateCurrentDefault(
         IReadOnlyList<CompletedRoomCycle> population,
+        int? currentDefaultAllocationMinutes,
+        CalibrationRuleSet? rules = null)
+    {
+        ArgumentNullException.ThrowIfNull(population);
+        if (currentDefaultAllocationMinutes is not > 0)
+        {
+            return EvaluateCurrentDefault(
+                Array.Empty<ScheduleFitFact>(),
+                currentDefaultAllocationMinutes,
+                rules);
+        }
+
+        var facts = BuildFacts(population);
+        try
+        {
+            return EvaluateCurrentDefault(facts, currentDefaultAllocationMinutes, rules);
+        }
+        finally
+        {
+            (facts as IDisposable)?.Dispose();
+        }
+    }
+
+    internal static CalibrationEvaluation EvaluateCurrentDefault(
+        IReadOnlyList<ScheduleFitFact> population,
         int? currentDefaultAllocationMinutes,
         CalibrationRuleSet? rules = null)
     {
@@ -216,33 +278,34 @@ internal static class ExactScheduleFitCalculator
 
         var baselineSeconds = currentDefaultAllocationMinutes.Value * 60d;
         var tolerance = activeRules.AtExpectedToleranceSeconds;
-        var pairs = BoundedReportCollections.Materialize(population
-            .Select(cycle =>
-            {
-                var observed = TruthfulObservedCaseFlowSeconds(cycle);
-                if (!observed.HasValue)
-                {
-                    return null;
-                }
+        var pairedCaseCount = 0;
+        var aboveCount = 0;
+        var belowCount = 0;
+        var equalCount = 0;
+        var moreThanToleranceCount = 0;
+        var lessThanToleranceCount = 0;
+        var atExpectedCount = 0;
+        foreach (var fact in population)
+        {
+            if (fact.ObservedCaseFlowSeconds is not { } observed) continue;
+            var variance = observed - baselineSeconds;
+            pairedCaseCount++;
+            if (variance > 0d) aboveCount++;
+            else if (variance < 0d) belowCount++;
+            else equalCount++;
 
-                var variance = observed.Value - baselineSeconds;
-                return new CalibrationPair(
-                    cycle,
-                    observed.Value,
-                    variance,
-                    RawDirection(variance),
-                    ToleranceClassification(variance, tolerance));
-            })
-            .Where(pair => pair is not null)
-            .Select(pair => pair!));
+            if (variance > tolerance) moreThanToleranceCount++;
+            else if (variance < -tolerance) lessThanToleranceCount++;
+            else atExpectedCount++;
+        }
 
-        var aboveCount = pairs.Count(pair => pair.VarianceSeconds > 0d);
-        var belowCount = pairs.Count(pair => pair.VarianceSeconds < 0d);
-        var equalCount = pairs.Count - aboveCount - belowCount;
-        var aboveShare = pairs.Count == 0 ? 0d : (double)aboveCount / pairs.Count;
-        var belowShare = pairs.Count == 0 ? 0d : (double)belowCount / pairs.Count;
+        var aboveShare = pairedCaseCount == 0 ? 0d : (double)aboveCount / pairedCaseCount;
+        var belowShare = pairedCaseCount == 0 ? 0d : (double)belowCount / pairedCaseCount;
         var directionalShare = Math.Max(aboveShare, belowShare);
-        var medianVariance = Median(pairs.Select(pair => pair.VarianceSeconds));
+        using var varianceOrder = NumericOrderStatistics.Create(population
+            .Where(fact => fact.ObservedCaseFlowSeconds.HasValue)
+            .Select(fact => fact.ObservedCaseFlowSeconds!.Value - baselineSeconds));
+        var medianVariance = varianceOrder.Median;
 
         string? candidateDirection = null;
         if (aboveShare >= activeRules.MinimumDirectionalShare)
@@ -254,7 +317,7 @@ internal static class ExactScheduleFitCalculator
             candidateDirection = CalibrationInsightDirections.LessTimeThanCurrentDefault;
         }
 
-        var decision = pairs.Count < activeRules.MinimumPairedCases
+        var decision = pairedCaseCount < activeRules.MinimumPairedCases
             ? CalibrationDecisions.BelowMinimumSample
             : candidateDirection is null
                 ? CalibrationDecisions.InsufficientDirectionalConsistency
@@ -271,45 +334,55 @@ internal static class ExactScheduleFitCalculator
             var oppositeCount = candidateDirection == CalibrationInsightDirections.MoreTimeThanCurrentDefault
                 ? belowCount
                 : aboveCount;
-            var evidence = BoundedReportCollections.OrderBy(pairs
-                .Select(pair => new CalibrationEvidenceCase(
-                    pair.Cycle.CompletedCycleId,
-                    pair.Cycle.AcceptedReadyHandoffId,
-                    CalibrationBaselineSources.CurrentRosterDefault,
-                    currentDefaultAllocationMinutes.Value,
-                    pair.ObservedSeconds,
-                    pair.VarianceSeconds,
-                    pair.RawDirection,
-                    pair.ToleranceClassification)),
+            var evidence = BoundedReportCollections.OrderBy(population
+                .Where(fact => fact.ObservedCaseFlowSeconds.HasValue)
+                .Select(fact =>
+                {
+                    var observed = fact.ObservedCaseFlowSeconds!.Value;
+                    var variance = observed - baselineSeconds;
+                    return new CalibrationEvidenceCase(
+                        fact.CompletedCycleId,
+                        fact.AcceptedReadyHandoffId,
+                        CalibrationBaselineSources.CurrentRosterDefault,
+                        currentDefaultAllocationMinutes.Value,
+                        observed,
+                        variance,
+                        RawDirection(variance),
+                        ToleranceClassification(variance, tolerance));
+                }),
                 item => item.CompletedCycleId.ToString("D20", System.Globalization.CultureInfo.InvariantCulture),
                 descending: false);
 
             insight = new CalibrationInsight(
                 candidateDirection,
                 medianVariance.Value,
-                pairs.Count,
+                pairedCaseCount,
                 directionalCount,
                 oppositeCount,
                 equalCount,
-                pairs.Count(pair => pair.ToleranceClassification == ScheduleFitToleranceClassifications.AtExpected),
+                atExpectedCount,
                 evidence);
         }
 
         return new CalibrationEvaluation(
             decision,
             currentDefaultAllocationMinutes,
-            pairs.Count,
+            pairedCaseCount,
             aboveCount,
             belowCount,
             equalCount,
-            pairs.Count(pair => pair.ToleranceClassification == ScheduleFitToleranceClassifications.MoreTimeThanAllocation),
-            pairs.Count(pair => pair.ToleranceClassification == ScheduleFitToleranceClassifications.LessTimeThanAllocation),
-            pairs.Count(pair => pair.ToleranceClassification == ScheduleFitToleranceClassifications.AtExpected),
+            moreThanToleranceCount,
+            lessThanToleranceCount,
+            atExpectedCount,
             directionalShare,
             medianVariance,
             candidateDirection,
             insight);
     }
+
+    private static IEnumerable<ScheduleFitFact> HistoricalPairs(IEnumerable<ScheduleFitFact> population) =>
+        population.Where(fact =>
+            fact.ExpectedAllocationMinutes > 0 && fact.ObservedCaseFlowSeconds.HasValue);
 
     internal static string RawDirection(double varianceSeconds) => varianceSeconds switch
     {

@@ -230,16 +230,23 @@ public sealed class CalibrationInsightReportTests
         Assert.Null(calibration.Insight);
     }
 
-    [Fact]
-    public void Missing_current_default_never_uses_historical_values_as_a_baseline()
+    [Theory]
+    [InlineData(null)]
+    [InlineData(0)]
+    [InlineData(-1)]
+    public void Missing_current_default_never_uses_historical_values_as_a_baseline(
+        int? currentDefaultAllocationMinutes)
     {
+        var source = new ScheduleFitCountingReadOnlyList<CompletedRoomCycle>(
+            [Cycle(1, expectedMinutes: 40, observedSeconds: 50 * 60d, originalDefaultUnits: 3)]);
         var evaluation = ExactScheduleFitCalculator.EvaluateCurrentDefault(
-            [Cycle(1, expectedMinutes: 40, observedSeconds: 50 * 60d, originalDefaultUnits: 3)],
-            currentDefaultAllocationMinutes: null);
+            source,
+            currentDefaultAllocationMinutes);
 
         Assert.Equal(CalibrationDecisions.CurrentDefaultUnavailable, evaluation.Decision);
         Assert.Equal(0, evaluation.TotalPairedCaseCount);
         Assert.Null(evaluation.Insight);
+        Assert.Equal(0, source.EnumerationCount);
     }
 
     [Fact]
@@ -261,6 +268,30 @@ public sealed class CalibrationInsightReportTests
             Assert.Equal(CalibrationBaselineSources.CurrentRosterDefault, item.BaselineSource);
             Assert.Equal(30, item.BaselineMinutesUsed);
         });
+    }
+
+    [Fact]
+    public void Shared_fact_projection_enumerates_the_completed_cycle_source_once()
+    {
+        var source = new ScheduleFitCountingReadOnlyList<CompletedRoomCycle>(Enumerable.Range(1, 101)
+            .Select(id => Cycle(id, expectedMinutes: 40, observedSeconds: 31 * 60d))
+            .ToArray());
+        var facts = ExactScheduleFitCalculator.BuildFacts(source);
+        try
+        {
+            var historical = ExactScheduleFitCalculator.BuildHistoricalAssignedSummary(facts);
+            var current = ExactScheduleFitCalculator.EvaluateCurrentDefault(facts, 30);
+
+            Assert.Equal(1, source.EnumerationCount);
+            Assert.Equal(101, historical.PairedCaseCount);
+            Assert.Equal(-540d, historical.MedianPairedVarianceSeconds);
+            Assert.Equal(101, current.TotalPairedCaseCount);
+            Assert.Equal(60d, current.MedianPairedVarianceSeconds);
+        }
+        finally
+        {
+            (facts as IDisposable)?.Dispose();
+        }
     }
 
     private static CalibrationEvaluation Evaluate(IEnumerable<double> variances)
@@ -290,4 +321,19 @@ public sealed class CalibrationInsightReportTests
             ExpectedAllocationUnits = expectedMinutes / 10,
             ExpectedAllocationMinutes = expectedMinutes
         };
+
+    private sealed class ScheduleFitCountingReadOnlyList<T>(IReadOnlyList<T> source) : IReadOnlyList<T>
+    {
+        public int EnumerationCount { get; private set; }
+        public int Count => source.Count;
+        public T this[int index] => source[index];
+
+        public IEnumerator<T> GetEnumerator()
+        {
+            EnumerationCount++;
+            return source.GetEnumerator();
+        }
+
+        System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator() => GetEnumerator();
+    }
 }
