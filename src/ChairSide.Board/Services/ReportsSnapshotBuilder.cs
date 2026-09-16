@@ -174,27 +174,44 @@ internal sealed partial class ReportsSnapshotBuilder
             standardCompletedCycles,
             query.ProcedureGrouping);
         var calibrationRules = CalibrationRuleSet.VersionOne;
-        var scheduleFit = compatibilityScheduleFit with
+        IReadOnlyList<IReadOnlyDictionary<string, IReadOnlyList<CompletedRoomCycle>>>
+            procedureDoctorPopulations = query.Scope == ReportScopeKinds.Doctor
+                ? []
+                : scopedProcedurePopulations
+                    .Select(population => BuildDoctorPopulations(population.Cycles))
+                    .ToList();
+        ScheduleFitReport scheduleFit;
+        IReadOnlyList<ProcedureIntelligenceRow> procedureIntelligenceRows;
+        try
         {
-            Practice = ExactScheduleFitCalculator.BuildHistoricalAssignedSummary(
-                standardCompletedCycles,
-                calibrationRules),
-            ProcedureSegments = BuildScheduleFitProcedureSegments(
+            scheduleFit = compatibilityScheduleFit with
+            {
+                Practice = ExactScheduleFitCalculator.BuildHistoricalAssignedSummary(
+                    standardCompletedCycles,
+                    calibrationRules),
+                ProcedureSegments = BuildScheduleFitProcedureSegments(
+                    scopedProcedurePopulations,
+                    procedureDoctorPopulations,
+                    query,
+                    calibrationRules),
+                DoctorSummaries = BuildDoctorScheduleFitSummaries(
+                    standardCompletedCycles,
+                    query,
+                    calibrationRules),
+                Rules = calibrationRules
+            };
+            procedureIntelligenceRows = BuildProcedureIntelligenceRows(
                 scopedProcedurePopulations,
-                query,
-                calibrationRules),
-            DoctorSummaries = BuildDoctorScheduleFitSummaries(
-                standardCompletedCycles,
-                query,
-                calibrationRules),
-            Rules = calibrationRules
-        };
+                procedureDoctorPopulations,
+                query);
+        }
+        finally
+        {
+            DisposeDoctorPopulations(procedureDoctorPopulations);
+        }
         var scopedProcedureGroups = BuildScopedProcedureGroups(
             scopedProcedurePopulations,
             standardCompletedCycles.Count);
-        var procedureIntelligenceRows = BuildProcedureIntelligenceRows(
-            scopedProcedurePopulations,
-            query);
         var observedDoctorFlowDays = BuildObservedDoctorFlowDays(standardCompletedCycles);
         var doctorFlowIdentities = BuildDoctorFlowIdentities(scopedStandardCycles, query);
         var doctorFlowSummaries = BuildDoctorFlowSummaries(
@@ -1017,9 +1034,10 @@ internal sealed partial class ReportsSnapshotBuilder
 
     private IReadOnlyList<ProcedureIntelligenceRow> BuildProcedureIntelligenceRows(
         IReadOnlyList<ScopedProcedurePopulation> populations,
+        IReadOnlyList<IReadOnlyDictionary<string, IReadOnlyList<CompletedRoomCycle>>> doctorPopulations,
         ReportQuery query) =>
         populations
-            .Select(population =>
+            .Select((population, index) =>
             {
                 var rosterProcedure = FindActiveProcedure(population.BaseProcedureCode);
                 return new ProcedureIntelligenceRow(
@@ -1033,16 +1051,17 @@ internal sealed partial class ReportsSnapshotBuilder
                     BuildProcedureIntelligenceMetrics(population.Cycles),
                     query.Scope == ReportScopeKinds.Doctor
                         ? []
-                        : BuildDoctorProcedureIntelligence(population.Cycles));
+                        : BuildDoctorProcedureIntelligence(doctorPopulations[index]));
             })
             .ToList();
 
     private IReadOnlyList<ScheduleFitSegment> BuildScheduleFitProcedureSegments(
         IReadOnlyList<ScopedProcedurePopulation> populations,
+        IReadOnlyList<IReadOnlyDictionary<string, IReadOnlyList<CompletedRoomCycle>>> doctorPopulations,
         ReportQuery query,
         CalibrationRuleSet rules) =>
         populations
-            .Select(population =>
+            .Select((population, index) =>
             {
                 var rosterProcedure = FindActiveProcedure(population.BaseProcedureCode);
                 var currentDefaultMinutes = rosterProcedure?.DefaultExpectedUnits is > 0
@@ -1063,19 +1082,17 @@ internal sealed partial class ReportsSnapshotBuilder
                     query.Scope == ReportScopeKinds.Doctor
                         ? []
                         : BuildDoctorScheduleFitSegments(
-                            population.Cycles,
+                            doctorPopulations[index],
                             currentDefaultMinutes,
                             rules));
             })
             .ToList();
 
     private IReadOnlyList<DoctorScheduleFitSegment> BuildDoctorScheduleFitSegments(
-        IReadOnlyList<CompletedRoomCycle> cycles,
+        IReadOnlyDictionary<string, IReadOnlyList<CompletedRoomCycle>> represented,
         int? currentDefaultMinutes,
         CalibrationRuleSet rules)
     {
-        var represented = BuildDoctorPopulations(cycles);
-
         return OrderedRepresentedDoctorIds(represented.Keys)
             .Select(doctorId => new DoctorScheduleFitSegment(
                 doctorId,
@@ -1131,9 +1148,8 @@ internal sealed partial class ReportsSnapshotBuilder
     }
 
     private IReadOnlyList<DoctorProcedureIntelligenceSegment> BuildDoctorProcedureIntelligence(
-        IReadOnlyList<CompletedRoomCycle> cycles)
+        IReadOnlyDictionary<string, IReadOnlyList<CompletedRoomCycle>> represented)
     {
-        var represented = BuildDoctorPopulations(cycles);
         return OrderedRepresentedDoctorIds(represented.Keys)
             .Select(doctorId => new DoctorProcedureIntelligenceSegment(
                 doctorId,
@@ -1219,6 +1235,18 @@ internal sealed partial class ReportsSnapshotBuilder
             group => group.Key,
             group => BoundedReportCollections.Materialize(group),
             StringComparer.OrdinalIgnoreCase);
+    }
+
+    private static void DisposeDoctorPopulations(
+        IEnumerable<IReadOnlyDictionary<string, IReadOnlyList<CompletedRoomCycle>>> populations)
+    {
+        foreach (var population in populations)
+        {
+            foreach (var cycles in population.Values)
+            {
+                (cycles as IDisposable)?.Dispose();
+            }
+        }
     }
 
     private static ReportProcedureMetricSampleContext BuildProcedureSamples(

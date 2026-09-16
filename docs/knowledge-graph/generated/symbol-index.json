@@ -3185,7 +3185,7 @@
                   {
                       "path":  "src/ChairSide.Board/Services/ReportsSnapshotBuilder.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  77543,
+                      "sizeBytes":  78850,
                       "typeSymbols":  [
                                           "ReportsSnapshotBuilder",
                                           "ScopedProcedurePopulation"
@@ -3229,8 +3229,8 @@
                                             "BuildDoctorProcedureIntelligence",
                                             "BuildProcedureIntelligenceMetrics",
                                             "BuildAllocationValueCounts",
-                                            "BuildProcedureSamples",
-                                            "BuildDoctorProcedureMix"
+                                            "DisposeDoctorPopulations",
+                                            "BuildProcedureSamples"
                                         ],
                       "routes":  [
 
@@ -6599,7 +6599,7 @@
                   {
                       "path":  "tests/ChairSide.Board.Tests/ReportsSnapshotBuilderTests.cs",
                       "kind":  "CSharp",
-                      "sizeBytes":  80204,
+                      "sizeBytes":  80546,
                       "typeSymbols":  [
                                           "ReportsSnapshotBuilderTests"
                                       ],

@@ -1433,10 +1433,11 @@ public sealed class ReportsSnapshotBuilderTests
         [
             new("pledger", "Dr. Pledger", "JWP", "#16a34a"),
             new("otte", "Dr. Otte", "LDO", "#dc2626"),
+            new("gibson", "Dr. Gibson", "JEG", "#9333ea"),
             new("former-z", "Dr. Zed", "ZZZ", "#64748b"),
             new("former-a", "Dr. Able", "AAA", "#64748b")
         ];
-        Doctor[] activeDoctors = [allDoctors[0], allDoctors[1]];
+        Doctor[] activeDoctors = [allDoctors[0], allDoctors[1], allDoctors[2]];
         CompletedRoomCycle[] cycles =
         [
             ProcedureCycle(1, "EXT", "otte", 10),
@@ -1447,18 +1448,21 @@ public sealed class ReportsSnapshotBuilderTests
         ];
         var builder = CreateBuilder(allDoctors, activeDoctors);
 
-        var practiceRow = Assert.Single(builder.Build(cycles, [], ReportQuery.Default)
-            .ProcedureIntelligenceRows!);
+        var practice = builder.Build(cycles, [], ReportQuery.Default);
+        var practiceRow = Assert.Single(practice.ProcedureIntelligenceRows!);
         Assert.Equal(
             ["pledger", "otte", "former-a", "former-z"],
             practiceRow.DoctorBreakdown.Select(segment => segment.DoctorId));
         Assert.All(practiceRow.DoctorBreakdown, segment =>
             Assert.Equal(ReportSampleStates.Limited, segment.Metrics.DoctorTimeSample.State));
-        var practiceScheduleFit = Assert.Single(builder.Build(cycles, [], ReportQuery.Default)
-            .ScheduleFit!.ProcedureSegments!);
+        Assert.Equal(2, practiceRow.DoctorBreakdown.Single(segment => segment.DoctorId == "otte")
+            .Metrics.CompletedCaseCount);
+        var practiceScheduleFit = Assert.Single(practice.ScheduleFit!.ProcedureSegments!);
         Assert.Equal(
             ["pledger", "otte", "former-a", "former-z"],
             practiceScheduleFit.DoctorBreakdown.Select(segment => segment.DoctorId));
+        Assert.Equal(2, practiceScheduleFit.DoctorBreakdown.Single(segment => segment.DoctorId == "otte")
+            .HistoricalAssignedFit.PopulationCount);
 
         var doctorQuery = ReportQuery.FromStrings(
             null, null, ReportScopeKinds.Doctor, "former-a", ReportSedationSegments.All,
