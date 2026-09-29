@@ -49,7 +49,9 @@ export function createRoomCardPresentation({
           ${badge}
         </div>
         ${isAvailable ? "" : `<div class="procedure-lockup${displayedProcedure ? " procedure-lockup--chip" : " procedure-lockup--pending"}">
-          ${displayedProcedure ? procedure.renderIcon(displayedProcedure) : procedure.renderEmptyIcon()}
+          ${displayedProcedure
+            ? `<span class="procedure-icon-frame">${procedure.renderIcon(displayedProcedure)}</span>`
+            : procedure.renderEmptyIcon()}
           <span>${escapeHtml(procedureLabel)}</span>
           ${procedureName ? `<small class="room-procedure-label">${escapeHtml(procedureName)}</small>` : ""}
         </div>`}
