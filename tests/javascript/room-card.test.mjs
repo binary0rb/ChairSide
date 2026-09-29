@@ -130,6 +130,24 @@ test("active procedure markup exposes the configured label beneath its code", ()
   assert.match(html, /<small class="room-procedure-label">Extraction<\/small>/);
 });
 
+test("active procedure artwork is wrapped in the explicit procedure-light frame", () => {
+  const html = presentation.renderRoomTile(readyRoom("Aging"));
+
+  assert.match(
+    html,
+    /<span class="procedure-icon-frame"><svg data-icon="forceps"><\/svg><\/span>/);
+  assert.match(stylesSource, /\.procedure-icon-frame\s*\{[^}]*linear-gradient\(/);
+  assert.match(
+    stylesSource,
+    /color-mix\(in srgb, var\(--procedure-accent, var\(--ink\)\) 42%, #ffffff\)/);
+  assert.match(
+    stylesSource,
+    /color-mix\(in srgb, var\(--procedure-accent, var\(--ink\)\) 58%, #ffffff\)/);
+  assert.match(
+    stylesSource,
+    /\.procedure-icon-frame \.procedure-icon--png\s*\{[^}]*filter:\s*drop-shadow\(/);
+});
+
 test("large Room card preserves canonical procedure, assignment, doctor, and timer details", () => {
   const html = presentation.renderRoomTile(readyRoom("None"), true);
 
