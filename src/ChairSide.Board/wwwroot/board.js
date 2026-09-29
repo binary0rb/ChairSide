@@ -275,7 +275,7 @@ function renderLegend() {
   if (agingLabel) {
     const agingMinutes = getAgingMinutes();
     if (agingMinutes !== null) {
-      agingLabel.innerHTML = `<i class="state-dot aging"></i> Aging: Ready wait &gt; ${Math.round(agingMinutes)} min`;
+      agingLabel.innerHTML = `<i class="state-dot aging"></i> Handoff &gt; ${Math.round(agingMinutes)} min: attention`;
     }
   }
 
@@ -283,7 +283,7 @@ function renderLegend() {
   if (staleLabel) {
     const staleMinutes = getStaleMinutes();
     if (staleMinutes !== null) {
-      staleLabel.innerHTML = `<i class="state-dot stale"></i> Stale: Ready wait &gt; ${Math.round(staleMinutes)} min`;
+      staleLabel.innerHTML = `<i class="state-dot stale"></i> Handoff &gt; ${Math.round(staleMinutes)} min: urgent`;
     }
   }
 }

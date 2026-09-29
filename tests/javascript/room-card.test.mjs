@@ -95,7 +95,7 @@ test("canonical assignment wins over legacy display fields and doctor membership
   assert.doesNotMatch(html, />IMP/);
 });
 
-test("Ready stays primary while Aging and Stale render as subordinate urgency", () => {
+test("Ready stays primary while urgency is carried by the numeric handoff timer", () => {
   for (const urgency of ["Aging", "Stale"]) {
     const normalizedUrgency = urgency.toLowerCase();
     const html = presentation.renderRoomTile(readyRoom(urgency));
@@ -103,31 +103,57 @@ test("Ready stays primary while Aging and Stale render as subordinate urgency", 
     assert.match(
       html,
       new RegExp(`class="room-tile ready-for-doctor urgency-${normalizedUrgency}`));
-    assert.match(html, /<span class="ready-primary-badge">READY<\/span>/);
+    assert.match(html, /<span class="room-state-badge">READY<\/span>/);
     assert.match(
       html,
-      new RegExp(`<span class="ready-urgency-badge ready-timer-badge ${normalizedUrgency}">${urgency.toUpperCase()}</span>`));
+      new RegExp(`<time class="room-phase-timer urgency-${normalizedUrgency}">[\\s\\S]*<span>Handoff<\\/span>[\\s\\S]*<strong>10:45<\\/strong>`));
+    assert.doesNotMatch(html, />AGING<|>STALE<|>ON TIME</);
     assert.doesNotMatch(html, /class="room-tile (aging|stale)\b/);
   }
 });
 
-test("Ready without urgency renders the Master ON TIME timer presentation", () => {
+test("Ready without urgency still exposes precise handoff elapsed time", () => {
   const room = readyRoom("None");
   room.readyForDoctorAt = "2026-07-29T15:29:00Z";
   const html = presentation.renderRoomTile(room);
 
   assert.match(html, /class="room-tile ready-for-doctor /);
   assert.doesNotMatch(html, /urgency-(aging|stale)/);
-  assert.match(html, /aria-label="Ready for Doctor, on time"/);
-  assert.match(html, /<span class="ready-primary-badge">READY<\/span>/);
-  assert.match(html, /<span class="ready-urgency-badge ready-timer-badge on-time">ON TIME<\/span>/);
+  assert.match(html, /<span class="room-state-badge">READY<\/span>/);
+  assert.match(html, /<span>Handoff<\/span>/);
+  assert.match(html, /<strong>01:45<\/strong>/);
+  assert.doesNotMatch(html, />ON TIME</);
 });
 
-test("active procedure markup exposes the configured label beneath its code", () => {
+test("active procedure markup shows the abbreviation without duplicating the full label", () => {
   const html = presentation.renderRoomTile(readyRoom("Aging"));
 
-  assert.match(html, />EXT \+ SED<\/span>/);
-  assert.match(html, /<small class="room-procedure-label">Extraction<\/small>/);
+  assert.match(html, /<span class="room-procedure-code">EXT \+ SED<\/span>/);
+  assert.doesNotMatch(html, /room-procedure-label|Extraction/);
+});
+
+test("active procedure artwork is wrapped in the explicit procedure-light frame", () => {
+  const html = presentation.renderRoomTile(readyRoom("Aging"));
+
+  assert.match(
+    html,
+    /<div class="procedure-icon-frame"><svg data-icon="forceps"><\/svg><\/div>/);
+  assert.match(stylesSource, /\.procedure-icon-frame\s*\{[^}]*linear-gradient\(/);
+  assert.match(
+    stylesSource,
+    /color-mix\(in srgb, var\(--procedure-accent, var\(--ink\)\) 42%, #ffffff\)/);
+  assert.match(
+    stylesSource,
+    /color-mix\(in srgb, var\(--procedure-accent, var\(--ink\)\) 58%, #ffffff\)/);
+  assert.match(
+    stylesSource,
+    /\.procedure-icon-frame \.procedure-icon--png\s*\{[^}]*filter:\s*drop-shadow\(/);
+  assert.match(
+    stylesSource,
+    /body\[data-view="master"\][^{}]*\.procedure-icon-frame\s*\{[^}]*width:\s*112px;[^}]*height:\s*112px;/);
+  assert.match(
+    stylesSource,
+    /body\[data-view="room"\][^{}]*\.procedure-icon-frame\s*\{[^}]*width:\s*76px;[^}]*height:\s*76px;/);
 });
 
 test("large Room card preserves canonical procedure, assignment, doctor, and timer details", () => {
@@ -135,11 +161,13 @@ test("large Room card preserves canonical procedure, assignment, doctor, and tim
 
   assert.match(html, /class="room-tile ready-for-doctor[^"]*\blarge\b/);
   assert.match(html, />Room 4<\/strong>/);
-  assert.match(html, /<span class="ready-primary-badge">READY<\/span>/);
+  assert.match(html, /<span class="room-state-badge">READY<\/span>/);
   assert.match(html, /<svg data-icon="forceps"><\/svg>/);
   assert.match(html, />EXT \+ SED<\/span>/);
-  assert.match(html, /<small class="room-procedure-label">Extraction<\/small>/);
+  assert.doesNotMatch(html, /room-procedure-label|Extraction/);
   assert.match(html, /Sedation on \| 4 units confirmed/);
+  assert.match(html, /<span>Handoff<\/span>/);
+  assert.match(html, /<strong>10:45<\/strong>/);
   assert.match(html, />Dr\. Pledger<\/span>/);
   assert.match(html, />Room time<\/span>/);
   assert.match(html, />30:45<\/strong>/);
@@ -192,6 +220,26 @@ test("standard room cards expose lifecycle timers for representative active stat
   }
 });
 
+test("Ready and Doctor In Room expose phase timers while Room time continues", () => {
+  const readyHtml = presentation.renderRoomTile(readyRoom("None"));
+  assert.match(readyHtml, /<span>Handoff<\/span>/);
+  assert.match(readyHtml, /<strong>10:45<\/strong>/);
+  assert.match(readyHtml, /<span>Room time<\/span>/);
+  assert.match(readyHtml, /<strong>30:45<\/strong>/);
+
+  const doctorRoom = {
+    ...readyRoom("None"),
+    state: "DoctorInRoom",
+    doctorArrivedAt: "2026-07-29T15:25:00Z"
+  };
+  const doctorHtml = presentation.renderRoomTile(doctorRoom);
+  assert.match(doctorHtml, /<span>Doctor<\/span>/);
+  assert.match(doctorHtml, /<strong>05:45<\/strong>/);
+  assert.match(doctorHtml, /<span>Room time<\/span>/);
+  assert.match(doctorHtml, /<strong>30:45<\/strong>/);
+  assert.doesNotMatch(doctorHtml, /Handoff/);
+});
+
 test("room-card presentation CSS keeps lifecycle timers visible and stable", () => {
   const hiddenTimerRules = [...stylesSource.matchAll(/([^{}]+)\{([^{}]*)\}/g)]
     .filter(([, selectors, declarations]) =>
@@ -200,6 +248,9 @@ test("room-card presentation CSS keeps lifecycle timers visible and stable", () 
   assert.deepEqual(hiddenTimerRules, []);
   assert.match(stylesSource, /\.room-timer\s*\{[^}]*display:\s*grid;/);
   assert.match(stylesSource, /\.room-timer\s*\{[^}]*font-variant-numeric:\s*tabular-nums;/);
+  assert.match(stylesSource, /\.room-phase-timer\s*\{[^}]*font-variant-numeric:\s*tabular-nums;/);
+  assert.match(stylesSource, /\.state-dot\.aging,[\s\S]*\.state-dot\.stale\s*\{[^}]*animation:\s*none;/);
+  assert.match(stylesSource, /Operational card timing\/layout refinement/);
 });
 
 test("Master four-column cards reserve meaningful width for doctor and timer", () => {

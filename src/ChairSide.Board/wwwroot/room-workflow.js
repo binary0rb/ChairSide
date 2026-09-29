@@ -530,13 +530,16 @@ export function createRoomWorkflow({
         style="${procedureAccentStyle(selectedProcedure.code)}"
         type="button"
         role="radio"
+        aria-label="${escapeAttribute(`${selectedProcedure.code}: ${selectedProcedure.label}`)}"
+        title="${escapeAttribute(selectedProcedure.label)}"
         aria-checked="${selectedProcedure.code === draft.selectedProcedureId}"
         data-procedure-id="${escapeAttribute(selectedProcedure.code)}"
         ${isEnabled ? "" : "disabled"}>
-        ${procedure.renderIcon(selectedProcedure)}
+        <div class="procedure-icon-frame procedure-option-icon-frame">
+          ${procedure.renderIcon(selectedProcedure)}
+        </div>
         <span class="selection-copy">
           <strong>${escapeHtml(selectedProcedure.code)}</strong>
-          <small>${escapeHtml(selectedProcedure.label)}</small>
         </span>
         ${selectedProcedure.code === draft.selectedProcedureId ? `<span class="selected-indicator" aria-hidden="true">&#10003;</span>` : ""}
       </button>
