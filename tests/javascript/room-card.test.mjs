@@ -135,7 +135,7 @@ test("active procedure artwork is wrapped in the explicit procedure-light frame"
 
   assert.match(
     html,
-    /<span class="procedure-icon-frame"><svg data-icon="forceps"><\/svg><\/span>/);
+    /<div class="procedure-icon-frame"><svg data-icon="forceps"><\/svg><\/div>/);
   assert.match(stylesSource, /\.procedure-icon-frame\s*\{[^}]*linear-gradient\(/);
   assert.match(
     stylesSource,
@@ -146,6 +146,12 @@ test("active procedure artwork is wrapped in the explicit procedure-light frame"
   assert.match(
     stylesSource,
     /\.procedure-icon-frame \.procedure-icon--png\s*\{[^}]*filter:\s*drop-shadow\(/);
+  assert.match(
+    stylesSource,
+    /body\[data-view="master"\][^{}]*\.procedure-icon-frame\s*\{[^}]*width:\s*112px;[^}]*height:\s*112px;/);
+  assert.match(
+    stylesSource,
+    /body\[data-view="room"\][^{}]*\.procedure-icon-frame\s*\{[^}]*width:\s*76px;[^}]*height:\s*76px;/);
 });
 
 test("large Room card preserves canonical procedure, assignment, doctor, and timer details", () => {
