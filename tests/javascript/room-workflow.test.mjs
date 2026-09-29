@@ -334,6 +334,17 @@ test("durable assignment initializes draft and unchanged polling preserves a dir
   assert.equal(selected(harness.controls.get("doctorTiles").innerHTML, "pledger", "data-doctor-id"), true);
 });
 
+test("Room View procedure choices use the procedure-light frame with code-only visible copy", () => {
+  const harness = createHarness();
+  const html = harness.controls.get("procedureTiles").innerHTML;
+
+  assert.match(html, /class="procedure-icon-frame procedure-option-icon-frame"/);
+  assert.match(html, /aria-label="EXT: Extraction"/);
+  assert.match(html, /title="Extraction"/);
+  assert.match(html, /<strong>EXT<\/strong>/);
+  assert.doesNotMatch(html, /<small>Extraction<\/small>/);
+});
+
 test("changed episode or durable assignment reconciles the draft", () => {
   const harness = createHarness();
   globalThis.__roomWorkflowTileGroups.get("doctorId")({
