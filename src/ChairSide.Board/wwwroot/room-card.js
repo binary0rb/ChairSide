@@ -46,13 +46,11 @@ export function createRoomCardPresentation({
       <article class="room-tile ${state} ${presentation.readyUrgency ? `urgency-${presentation.readyUrgency}` : ""} ${room.assignmentLocked ? "assignment-locked" : ""} ${large ? "large" : ""}" style="${tileStyle}">
         <div class="room-topline">
           <strong>Room ${roomId}</strong>
-          <div class="room-state-block">
-            ${badge}
-            ${phaseTimer ? `<time class="room-phase-timer${presentation.readyUrgency ? ` urgency-${presentation.readyUrgency}` : ""}">
-              <span>${phaseTimer.label}</span>
-              <strong>${phaseTimer.value}</strong>
-            </time>` : ""}
-          </div>
+          ${badge}
+          ${phaseTimer ? `<time class="room-phase-timer${presentation.readyUrgency ? ` urgency-${presentation.readyUrgency}` : ""}">
+            <span>${phaseTimer.label}</span>
+            <strong>${phaseTimer.value}</strong>
+          </time>` : ""}
         </div>
         ${isAvailable ? "" : `<div class="procedure-lockup${displayedProcedure ? " procedure-lockup--chip" : " procedure-lockup--pending"}">
           ${displayedProcedure
