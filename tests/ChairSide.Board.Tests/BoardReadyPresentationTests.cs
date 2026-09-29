@@ -162,7 +162,7 @@ public sealed class BoardReadyPresentationTests
         Assert.Contains("state-dot prestaging", master, StringComparison.Ordinal);
         Assert.Contains("Handoff timer: attention threshold", master, StringComparison.Ordinal);
         Assert.Contains("Handoff timer: urgent threshold", master, StringComparison.Ordinal);
-        Assert.Equal(StateKey(master), StateKey(index));
+        Assert.Equal(StateKey(master).ReplaceLineEndings("\n"), StateKey(index).ReplaceLineEndings("\n"));
     }
 
     [Fact]
