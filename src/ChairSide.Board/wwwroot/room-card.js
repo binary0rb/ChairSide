@@ -20,6 +20,7 @@ export function createRoomCardPresentation({
     const doctorColor = display.doctor ? display.doctor.color : "#8b949e";
     const displayedProcedure = display.procedure;
     const badge = renderRoomStatusBadge(presentation);
+    const phaseTimer = roomPhaseTimer(room, state);
     const timer = roomTimerLabel(room);
     const fullDoctorName = display.doctor?.name || (state === "empty" ? "No assignment" : "Doctor pending");
     const doctorDisplayName = large
@@ -32,7 +33,6 @@ export function createRoomCardPresentation({
     const procedureLabel = procedureDisplayCode
       ? procedure.formatCode(procedureDisplayCode)
       : "PROCEDURE PENDING";
-    const procedureName = displayedProcedure?.label || "";
     const assignmentSummary = roomAssignmentSummary(room, display, state);
     const addOnBadge = display.isAddOn
       ? '<span class="room-case-modifier-badge">ADD-ON</span>'
@@ -46,16 +46,21 @@ export function createRoomCardPresentation({
       <article class="room-tile ${state} ${presentation.readyUrgency ? `urgency-${presentation.readyUrgency}` : ""} ${room.assignmentLocked ? "assignment-locked" : ""} ${large ? "large" : ""}" style="${tileStyle}">
         <div class="room-topline">
           <strong>Room ${roomId}</strong>
-          ${badge}
+          <div class="room-state-block">
+            ${badge}
+            ${phaseTimer ? `<time class="room-phase-timer${presentation.readyUrgency ? ` urgency-${presentation.readyUrgency}` : ""}">
+              <span>${phaseTimer.label}</span>
+              <strong>${phaseTimer.value}</strong>
+            </time>` : ""}
+          </div>
         </div>
         ${isAvailable ? "" : `<div class="procedure-lockup${displayedProcedure ? " procedure-lockup--chip" : " procedure-lockup--pending"}">
           ${displayedProcedure
             ? `<div class="procedure-icon-frame">${procedure.renderIcon(displayedProcedure)}</div>`
             : procedure.renderEmptyIcon()}
-          <span>${escapeHtml(procedureLabel)}</span>
-          ${procedureName ? `<small class="room-procedure-label">${escapeHtml(procedureName)}</small>` : ""}
+          <span class="room-procedure-code">${escapeHtml(procedureLabel)}</span>
+          ${addOnBadge}
         </div>`}
-        ${addOnBadge}
         ${assignmentSummary ? `<small class="room-assignment-summary">${escapeHtml(assignmentSummary)}</small>` : ""}
         ${isAvailable ? "" : `<div class="room-footer">
           <span class="room-doctor">
@@ -90,17 +95,7 @@ export function createRoomCardPresentation({
   }
 
   function renderRoomStatusBadge(presentation) {
-    if (presentation.primaryState !== "ready-for-doctor") {
-      return `<span class="room-state-badge">${stateBadge(presentation.primaryState)}</span>`;
-    }
-
-    const timerState = presentation.readyUrgency || "on-time";
-    const timerLabel = timerState === "on-time" ? "ON TIME" : timerState.toUpperCase();
-    const accessibleTimerLabel = timerState === "on-time" ? "on time" : `${timerState} urgency`;
-    return `<span class="ready-status-stack" aria-label="Ready for Doctor, ${accessibleTimerLabel}">
-      <span class="ready-primary-badge">READY</span>
-      <span class="ready-urgency-badge ready-timer-badge ${timerState}">${timerLabel}</span>
-    </span>`;
+    return `<span class="room-state-badge">${stateBadge(presentation.primaryState)}</span>`;
   }
 
   function roomAssignedDoctorId(room) {
@@ -268,6 +263,24 @@ export function createRoomCardPresentation({
     }
 
     return state.toUpperCase();
+  }
+
+  function roomPhaseTimer(room, state) {
+    if (state === "ready-for-doctor" && room.readyForDoctorAt) {
+      return {
+        label: "Handoff",
+        value: formatElapsed(room.readyForDoctorAt)
+      };
+    }
+
+    if (state === "doctor-in-room" && room.doctorArrivedAt) {
+      return {
+        label: "Doctor",
+        value: formatElapsed(room.doctorArrivedAt)
+      };
+    }
+
+    return null;
   }
 
   function roomTimerLabel(room) {
