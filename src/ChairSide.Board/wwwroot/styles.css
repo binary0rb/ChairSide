@@ -5092,7 +5092,7 @@ body[data-view="room"] .panel-status .room-tile.large.ready-for-doctor.urgency-s
 
 :is(body[data-view="master"] .room-grid, body[data-view="doctor"] .doctor-list) .procedure-lockup {
   position: absolute;
-  top: 52%;
+  top: 54%;
   left: 50%;
   transform: translate(-50%, -50%);
 }
@@ -5157,7 +5157,10 @@ body[data-view="room"] .panel-status .room-tile.large.ready-for-doctor.urgency-s
 }
 
 :is(body[data-view="master"] .room-grid, body[data-view="doctor"] .doctor-list) .room-doctor-name {
-  line-height: 1.08;
+  padding-bottom: 2px;
+  font-size: clamp(15px, 1.35vw, 18px);
+  line-height: 1.18;
+  transform: translateY(-3px);
 }
 
 :is(body[data-view="master"] .room-grid, body[data-view="doctor"] .doctor-list) .room-assignment-summary {
