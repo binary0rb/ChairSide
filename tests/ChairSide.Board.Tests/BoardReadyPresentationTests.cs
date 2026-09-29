@@ -140,8 +140,10 @@ public sealed class BoardReadyPresentationTests
 
         Assert.Contains("const presentation = roomPresentationState(room);", roomCardScript, StringComparison.Ordinal);
         Assert.Contains("return { primaryState: \"ready-for-doctor\", readyUrgency };", roomCardScript, StringComparison.Ordinal);
-        Assert.Contains("class=\"ready-status-stack\"", roomCardScript, StringComparison.Ordinal);
-        Assert.Contains("<span class=\"ready-primary-badge\">READY</span>", roomCardScript, StringComparison.Ordinal);
+        Assert.Contains("class=\"room-state-badge\"", roomCardScript, StringComparison.Ordinal);
+        Assert.Contains("label: \"Handoff\"", roomCardScript, StringComparison.Ordinal);
+        Assert.Contains("room.readyForDoctorAt", roomCardScript, StringComparison.Ordinal);
+        Assert.Contains("class=\"room-phase-timer", roomCardScript, StringComparison.Ordinal);
         Assert.Contains("const assignment = room?.assignment || null;", roomCardScript, StringComparison.Ordinal);
         Assert.Contains("roomAssignedDoctorId(room) === doctor.id", boardScript, StringComparison.Ordinal);
         Assert.DoesNotContain("room.assignedDoctor === doctor.id", boardScript, StringComparison.Ordinal);
@@ -151,16 +153,16 @@ public sealed class BoardReadyPresentationTests
         Assert.Contains("Allocation pending", roomCardScript, StringComparison.Ordinal);
         Assert.Contains("class=\"room-case-modifier-badge\">ADD-ON", roomCardScript, StringComparison.Ordinal);
         Assert.Contains(".room-case-modifier-badge", styles, StringComparison.Ordinal);
-        Assert.Contains("Aging: Ready wait &gt;", boardScript, StringComparison.Ordinal);
-        Assert.Contains("Stale: Ready wait &gt;", boardScript, StringComparison.Ordinal);
+        Assert.Contains("Handoff &gt; ${Math.round(agingMinutes)} min: attention", boardScript, StringComparison.Ordinal);
+        Assert.Contains("Handoff &gt; ${Math.round(staleMinutes)} min: urgent", boardScript, StringComparison.Ordinal);
         Assert.Contains(".room-tile.ready-for-doctor.urgency-aging", styles, StringComparison.Ordinal);
         Assert.Contains(".room-tile.ready-for-doctor.urgency-stale", styles, StringComparison.Ordinal);
         Assert.DoesNotContain(".room-tile.aging", styles, StringComparison.Ordinal);
         Assert.DoesNotContain(".room-tile.stale", styles, StringComparison.Ordinal);
         Assert.Contains("state-dot prestaging", master, StringComparison.Ordinal);
-        Assert.Contains("Aging: Ready wait needs attention", master, StringComparison.Ordinal);
-        Assert.Contains("Stale: Ready wait needs urgent attention", master, StringComparison.Ordinal);
-        Assert.Equal(StateKey(master), StateKey(index));
+        Assert.Contains("Handoff timer: attention threshold", master, StringComparison.Ordinal);
+        Assert.Contains("Handoff timer: urgent threshold", master, StringComparison.Ordinal);
+        Assert.Equal(StateKey(master).ReplaceLineEndings("\n"), StateKey(index).ReplaceLineEndings("\n"));
     }
 
     [Fact]
