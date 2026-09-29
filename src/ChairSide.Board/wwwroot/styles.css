@@ -635,7 +635,7 @@ body[data-view="doctor"] .primary-nav [data-nav="doctor"] .nav-pill-toggle {
   height: clamp(28px, 3vw, 44px);
 }
 
-.room-tile.large .procedure-lockup--chip::before {
+.room-tile.large .procedure-icon-frame {
   width: clamp(28px, 3vw, 44px);
   height: clamp(28px, 3vw, 44px);
 }
@@ -971,15 +971,13 @@ label,
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--procedure-accent, transparent) 10%, transparent);
 }
 
-/* The approved PNGs remain transparent foreground artwork. Give the image itself
-   no baked presentation treatment inside room cards; instead, place it over a
-   stronger procedure-color badge derived from the existing code-to-color map.
-   The gradient averages roughly 50% procedure color so the cue reads like the
-   physical procedure light without changing any procedure's assigned hue. */
-.procedure-lockup--chip::before {
-  content: "";
-  grid-column: 1;
-  grid-row: 1;
+/* The approved PNGs remain transparent foreground artwork. Room cards give that
+   artwork an explicit procedure-light frame whose hue comes directly from the
+   existing code-to-color map. The gradient averages roughly 50% procedure color;
+   only intensity changes, never the procedure's assigned hue. */
+.procedure-icon-frame {
+  display: grid;
+  place-items: center;
   width: clamp(38px, 5vw, 72px);
   height: clamp(38px, 5vw, 72px);
   border: 1px solid color-mix(in srgb, var(--procedure-accent, var(--line)) 72%, #ffffff);
@@ -990,13 +988,12 @@ label,
     color-mix(in srgb, var(--procedure-accent, var(--ink)) 58%, #ffffff)
   );
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.38);
+  overflow: hidden;
 }
 
-.procedure-lockup--chip .procedure-icon--png {
-  grid-column: 1;
-  grid-row: 1;
-  position: relative;
-  z-index: 1;
+.procedure-icon-frame .procedure-icon--png {
+  width: 100%;
+  height: 100%;
   box-sizing: border-box;
   padding: 4px;
   border: 0;
