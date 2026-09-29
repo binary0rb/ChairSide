@@ -4984,3 +4984,246 @@ body[data-view="workshop"] .workshop-readiness-assumption {
   color: var(--ink);
   font-weight: 700;
 }
+
+
+/* ------------------------------------------------------------------
+   Operational card timing/layout refinement
+   Four anchored card corners:
+   room (upper-left), state/phase timer (upper-right),
+   doctor (lower-left), persistent encounter timer (lower-right).
+   Procedure artwork/code remains centered.
+   ------------------------------------------------------------------ */
+
+/* Aging/Stale remain meaningful projections, but no longer animate or
+   thicken the entire room card. Urgency is carried by the Handoff timer. */
+.state-dot.aging,
+.state-dot.stale {
+  animation: none;
+  transform: none;
+}
+
+.room-tile.ready-for-doctor.urgency-aging,
+.room-tile.ready-for-doctor.urgency-stale,
+body[data-view="master"] .room-tile.ready-for-doctor.urgency-aging,
+body[data-view="master"] .room-tile.ready-for-doctor.urgency-stale,
+body[data-view="doctor"] .doctor-list .room-tile.ready-for-doctor.urgency-aging,
+body[data-view="doctor"] .doctor-list .room-tile.ready-for-doctor.urgency-stale,
+body[data-view="room"] .panel-status .room-tile.large.ready-for-doctor.urgency-aging,
+body[data-view="room"] .panel-status .room-tile.large.ready-for-doctor.urgency-stale {
+  border-width: 2px;
+  animation: none;
+  box-shadow: none;
+}
+
+.room-tile.ready-for-doctor.urgency-aging .room-timer,
+.room-tile.ready-for-doctor.urgency-stale .room-timer {
+  color: inherit;
+}
+
+.room-phase-timer {
+  display: grid;
+  gap: 2px;
+  justify-items: end;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.02;
+  text-align: right;
+}
+
+.room-phase-timer span {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 850;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.room-phase-timer strong {
+  font-size: 18px;
+  font-weight: 900;
+}
+
+.room-phase-timer.urgency-aging {
+  color: #9a3412;
+}
+
+.room-phase-timer.urgency-stale {
+  color: #b91c1c;
+}
+
+.room-phase-timer.urgency-aging span,
+.room-phase-timer.urgency-stale span {
+  color: currentColor;
+}
+
+/* Master and Doctor views use the room card as a four-corner status surface. */
+:is(body[data-view="master"] .room-grid, body[data-view="doctor"] .doctor-list) .room-tile {
+  position: relative;
+  display: block;
+  min-height: 236px;
+  padding: 10px 12px 10px 20px;
+}
+
+:is(body[data-view="master"] .room-grid, body[data-view="doctor"] .doctor-list) .room-topline {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  left: 20px;
+  display: block;
+}
+
+:is(body[data-view="master"] .room-grid, body[data-view="doctor"] .doctor-list) .room-topline strong {
+  position: static;
+  display: block;
+  font-size: clamp(22px, 2.2vw, 36px);
+  line-height: 1;
+}
+
+:is(body[data-view="master"] .room-grid, body[data-view="doctor"] .doctor-list) .room-topline > .room-state-badge {
+  position: absolute;
+  top: 0;
+  right: 0;
+}
+
+:is(body[data-view="master"] .room-grid, body[data-view="doctor"] .doctor-list) .room-topline > .room-phase-timer {
+  position: absolute;
+  top: 33px;
+  right: 0;
+}
+
+:is(body[data-view="master"] .room-grid, body[data-view="doctor"] .doctor-list) .procedure-lockup {
+  position: absolute;
+  top: 52%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+:is(body[data-view="master"] .room-grid, body[data-view="doctor"] .doctor-list) .procedure-lockup--chip {
+  display: grid;
+  grid-template-columns: 112px;
+  grid-template-rows: 112px auto auto;
+  justify-items: center;
+  width: 112px;
+  min-height: 0;
+  padding: 0;
+  gap: 5px;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+:is(body[data-view="master"] .room-grid, body[data-view="doctor"] .doctor-list) .procedure-lockup--chip .procedure-icon-frame {
+  grid-column: 1;
+  grid-row: 1;
+  width: 112px;
+  height: 112px;
+}
+
+:is(body[data-view="master"] .room-grid, body[data-view="doctor"] .doctor-list) .procedure-lockup--chip > .room-procedure-code {
+  grid-column: 1;
+  grid-row: 2;
+  align-self: start;
+  justify-self: center;
+  max-width: 112px;
+  font-size: clamp(16px, 1.45vw, 21px);
+  line-height: 1;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+
+:is(body[data-view="master"] .room-grid, body[data-view="doctor"] .doctor-list) .procedure-lockup--chip > .room-case-modifier-badge {
+  position: static;
+  grid-column: 1;
+  grid-row: 3;
+  justify-self: center;
+  transform: none;
+  margin: 0;
+}
+
+:is(body[data-view="master"] .room-grid, body[data-view="doctor"] .doctor-list) .room-footer {
+  position: absolute;
+  top: auto;
+  right: 12px;
+  bottom: 10px;
+  left: 20px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(72px, auto);
+  align-items: end;
+  gap: 12px;
+  font-size: clamp(13px, 1.15vw, 16px);
+}
+
+:is(body[data-view="master"] .room-grid, body[data-view="doctor"] .doctor-list) .room-footer .room-timer {
+  justify-self: end;
+}
+
+:is(body[data-view="master"] .room-grid, body[data-view="doctor"] .doctor-list) .room-doctor-name {
+  line-height: 1.08;
+}
+
+:is(body[data-view="master"] .room-grid, body[data-view="doctor"] .doctor-list) .room-assignment-summary {
+  display: none;
+}
+
+/* Room-panel status card keeps the same timing semantics while retaining its
+   compact 76px procedure composition. */
+body[data-view="room"] .panel-status .room-tile.large .room-topline {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-rows: auto auto;
+  align-items: start;
+  gap: 4px 8px;
+}
+
+body[data-view="room"] .panel-status .room-tile.large .room-topline > strong {
+  grid-column: 1;
+  grid-row: 1 / span 2;
+}
+
+body[data-view="room"] .panel-status .room-tile.large .room-topline > .room-state-badge {
+  grid-column: 2;
+  grid-row: 1;
+  justify-self: end;
+}
+
+body[data-view="room"] .panel-status .room-tile.large .room-topline > .room-phase-timer {
+  grid-column: 2;
+  grid-row: 2;
+  justify-self: end;
+}
+
+/* Room View procedure choices use the same procedure-light treatment as the
+   operational cards. The full procedure name remains available to assistive
+   technology/title text, while the visible tile uses the familiar abbreviation. */
+.procedure-selection-grid .selection-tile .procedure-option-icon-frame {
+  width: 96px;
+  height: 96px;
+  flex: 0 0 96px;
+  border-radius: 12px;
+}
+
+.procedure-selection-grid .selection-tile .procedure-option-icon-frame .procedure-icon {
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  padding: 4px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  object-fit: contain;
+  filter: drop-shadow(0 5px 4px rgba(15, 23, 42, 0.24));
+}
+
+.procedure-selection-grid .selection-tile .selection-copy {
+  align-content: center;
+  gap: 0;
+  padding-right: 30px;
+}
+
+.procedure-selection-grid .selection-tile .selection-copy strong {
+  font-size: 18px;
+  line-height: 1;
+}
+
+.procedure-selection-grid .selection-tile .selection-copy small {
+  display: none;
+}
