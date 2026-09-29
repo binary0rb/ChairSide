@@ -11,9 +11,13 @@ const domUtilsUrl = new URL(
 const boardUrl = new URL(
   "../../src/ChairSide.Board/wwwroot/board.js",
   import.meta.url);
+const stylesUrl = new URL(
+  "../../src/ChairSide.Board/wwwroot/styles.css",
+  import.meta.url);
 const roomCardSource = await readFile(roomCardUrl, "utf8");
 const domUtilsSource = await readFile(domUtilsUrl, "utf8");
 const boardSource = await readFile(boardUrl, "utf8");
+const stylesSource = await readFile(stylesUrl, "utf8");
 const domUtilsDataUrl =
   `data:text/javascript;base64,${Buffer.from(domUtilsSource).toString("base64")}`;
 const roomCardWithDataImport = roomCardSource.replace(
@@ -141,12 +145,114 @@ test("large Room card preserves canonical procedure, assignment, doctor, and tim
   assert.match(html, />30:45<\/strong>/);
 });
 
+test("standard room cards expose lifecycle timers for representative active states", () => {
+  const baseRoom = readyRoom("None");
+  const lifecycleCases = [
+    {
+      name: "Prestaging",
+      room: {
+        roomId: 4,
+        state: "Prestaging",
+        prestageStartedAt: "2026-07-29T15:25:00Z"
+      },
+      label: "Prep time",
+      value: "05:45"
+    },
+    {
+      name: "In Prep",
+      room: { ...baseRoom, state: "Seated", readyForDoctorAt: null },
+      label: "Room time",
+      value: "30:45"
+    },
+    {
+      name: "Ready",
+      room: baseRoom,
+      label: "Room time",
+      value: "30:45"
+    },
+    {
+      name: "Doctor In Room",
+      room: { ...baseRoom, state: "DoctorInRoom", doctorArrivedAt: "2026-07-29T15:25:00Z" },
+      label: "Room time",
+      value: "30:45"
+    },
+    {
+      name: "Turnover",
+      room: { ...baseRoom, state: "Turnover" },
+      label: "Room time",
+      value: "30:45"
+    }
+  ];
+
+  for (const lifecycle of lifecycleCases) {
+    const html = presentation.renderRoomTile(lifecycle.room);
+    assert.match(html, /<time class="room-timer">/, lifecycle.name);
+    assert.ok(html.includes(`<span>${lifecycle.label}</span>`), lifecycle.name);
+    assert.ok(html.includes(`<strong>${lifecycle.value}</strong>`), lifecycle.name);
+  }
+});
+
+test("room-card presentation CSS keeps lifecycle timers visible and stable", () => {
+  const hiddenTimerRules = [...stylesSource.matchAll(/([^{}]+)\{([^{}]*)\}/g)]
+    .filter(([, selectors, declarations]) =>
+      selectors.includes(".room-timer") && /display\s*:\s*none/.test(declarations));
+
+  assert.deepEqual(hiddenTimerRules, []);
+  assert.match(stylesSource, /\.room-timer\s*\{[^}]*display:\s*grid;/);
+  assert.match(stylesSource, /\.room-timer\s*\{[^}]*font-variant-numeric:\s*tabular-nums;/);
+});
+
+test("Master four-column cards reserve meaningful width for doctor and timer", () => {
+  const fourColumnRule = stylesSource.match(
+    /@media \(min-width:\s*(\d+)px\)\s*\{\s*body\[data-view="master"\] \.room-grid\s*\{[^}]*grid-template-columns:\s*repeat\(4,\s*minmax\((\d+)px,\s*1fr\)\);/);
+  const intermediateRule = stylesSource.match(
+    /@media \(min-width:\s*(\d+)px\) and \(max-width:\s*(\d+)px\)\s*\{\s*body\[data-view="master"\] \.room-grid\s*\{[^}]*grid-template-columns:\s*repeat\(2,/);
+  const shellInset = stylesSource.match(
+    /\.master-shell,[^{}]*\{[^}]*width:\s*min\(1540px,\s*calc\(100vw\s*-\s*(\d+)px\)\);/);
+  const masterGap = stylesSource.match(
+    /body\[data-view="master"\] \.room-grid\s*\{[^}]*gap:\s*(\d+)px;/);
+  const footerOffsets = stylesSource.match(
+    /\.doctor-list\) \.room-footer\s*\{[^}]*right:\s*(\d+)px;[^}]*left:\s*(\d+)px;/);
+  const footerGap = stylesSource.match(
+    /\.room-topline,\s*\.room-footer\s*\{[^}]*gap:\s*(\d+)px;/);
+  const timerMinimum = stylesSource.match(
+    /\.room-footer\s*\{[^}]*grid-template-columns:\s*minmax\(0,\s*1fr\) minmax\((\d+)px,\s*auto\);/);
+  const urgencyBorder = stylesSource.match(
+    /\.room-tile\.ready-for-doctor\.urgency-aging,[^{}]*\{[^}]*border-width:\s*(\d+)px;/);
+
+  for (const match of [fourColumnRule, intermediateRule, shellInset, masterGap,
+    footerOffsets, footerGap, timerMinimum, urgencyBorder]) {
+    assert.ok(match, "expected responsive room-card layout contract");
+  }
+
+  const fourColumnBreakpoint = Number(fourColumnRule[1]);
+  const minimumCardWidth = Number(fourColumnRule[2]);
+  const cardWidthAtBreakpoint = (
+    fourColumnBreakpoint - Number(shellInset[1]) - (3 * Number(masterGap[1]))) / 4;
+  const doctorWidth = cardWidthAtBreakpoint
+    - (2 * Number(urgencyBorder[1]))
+    - Number(footerOffsets[1])
+    - Number(footerOffsets[2])
+    - Number(footerGap[1])
+    - Number(timerMinimum[1]);
+
+  assert.equal(Number(intermediateRule[1]), 561);
+  assert.equal(Number(intermediateRule[2]), fourColumnBreakpoint - 1);
+  assert.ok(doctorWidth >= 80, `doctor column is only ${doctorWidth}px wide`);
+  assert.ok(cardWidthAtBreakpoint >= minimumCardWidth,
+    "four-column breakpoint cannot fit its minimum card widths");
+  assert.match(stylesSource,
+    /body\[data-view="master"\] \.room-grid\s*\{[^}]*grid-auto-rows:\s*1fr;/);
+  assert.match(stylesSource,
+    /body\[data-view="master"\] \.room-tile\s*\{[^}]*height:\s*100%;/);
+});
+
 test("Add-on badge renders only for flagged canonical assignments", () => {
   assert.match(presentation.renderRoomTile(readyRoom("None", true)), />ADD-ON</);
   assert.doesNotMatch(presentation.renderRoomTile(readyRoom("None", false)), />ADD-ON</);
 });
 
-test("standard and large cards use the same renderer with only the large modifier", () => {
+test("Available standard and large cards use one canonical lifecycle term", () => {
   const room = {
     roomId: 8,
     state: "Available",
@@ -157,6 +263,10 @@ test("standard and large cards use the same renderer with only the large modifie
 
   assert.doesNotMatch(standard, /class="room-tile[^"]*\blarge\b/);
   assert.match(large, /class="room-tile[^"]*\blarge\b/);
+  for (const html of [standard, large]) {
+    assert.match(html, /<span class="room-state-badge">AVAILABLE<\/span>/);
+    assert.doesNotMatch(html, />OPEN<|Available|--:--|procedure-lockup|room-footer|No assignment/);
+  }
   assert.equal(large.replace(/\blarge\b/, ""), standard);
 });
 

@@ -14,6 +14,7 @@ export function createRoomCardPresentation({
   function renderRoomTile(room, large = false) {
     const presentation = roomPresentationState(room);
     const state = presentation.primaryState;
+    const isAvailable = state === "empty";
     const roomId = getRoomId(room);
     const display = roomDisplayAssignment(room);
     const doctorColor = display.doctor ? display.doctor.color : "#8b949e";
@@ -30,7 +31,7 @@ export function createRoomCardPresentation({
       : null;
     const procedureLabel = procedureDisplayCode
       ? procedure.formatCode(procedureDisplayCode)
-      : state === "empty" ? "OPEN" : "PROCEDURE PENDING";
+      : "PROCEDURE PENDING";
     const procedureName = displayedProcedure?.label || "";
     const assignmentSummary = roomAssignmentSummary(room, display, state);
     const addOnBadge = display.isAddOn
@@ -47,14 +48,14 @@ export function createRoomCardPresentation({
           <strong>Room ${roomId}</strong>
           ${badge}
         </div>
-        <div class="procedure-lockup${displayedProcedure ? " procedure-lockup--chip" : state === "empty" ? "" : " procedure-lockup--pending"}">
+        ${isAvailable ? "" : `<div class="procedure-lockup${displayedProcedure ? " procedure-lockup--chip" : " procedure-lockup--pending"}">
           ${displayedProcedure ? procedure.renderIcon(displayedProcedure) : procedure.renderEmptyIcon()}
           <span>${escapeHtml(procedureLabel)}</span>
           ${procedureName ? `<small class="room-procedure-label">${escapeHtml(procedureName)}</small>` : ""}
-        </div>
+        </div>`}
         ${addOnBadge}
         ${assignmentSummary ? `<small class="room-assignment-summary">${escapeHtml(assignmentSummary)}</small>` : ""}
-        <div class="room-footer">
+        ${isAvailable ? "" : `<div class="room-footer">
           <span class="room-doctor">
             ${coinInitials ? `<span class="room-doctor-coin" aria-hidden="true">${escapeHtml(coinInitials)}</span>` : ""}
             <span class="room-doctor-name" title="${escapeAttribute(fullDoctorName)}">${escapeHtml(doctorDisplayName)}</span>
@@ -63,7 +64,7 @@ export function createRoomCardPresentation({
             <span>${timer.label}</span>
             <strong>${timer.value}</strong>
           </time>
-        </div>
+        </div>`}
       </article>
     `;
   }

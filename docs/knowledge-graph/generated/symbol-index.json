@@ -4382,7 +4382,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/room-card.js",
                       "kind":  "JavaScript",
-                      "sizeBytes":  11466,
+                      "sizeBytes":  11477,
                       "typeSymbols":  [
 
                                       ],
@@ -4543,7 +4543,7 @@
                   {
                       "path":  "src/ChairSide.Board/wwwroot/styles.css",
                       "kind":  "Css",
-                      "sizeBytes":  113077,
+                      "sizeBytes":  113102,
                       "typeSymbols":  [
 
                                       ],
@@ -7452,7 +7452,7 @@
                   {
                       "path":  "tests/javascript/room-card.test.mjs",
                       "kind":  "JavaScript",
-                      "sizeBytes":  7105,
+                      "sizeBytes":  11541,
                       "typeSymbols":  [
 
                                       ],
