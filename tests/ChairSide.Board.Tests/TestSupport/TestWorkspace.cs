@@ -1,5 +1,7 @@
 using ChairSide.Board.Services;
 
+using Microsoft.Data.Sqlite;
+
 namespace ChairSide.Board.Tests;
 
 internal sealed class TestWorkspace : IDisposable
@@ -46,13 +48,44 @@ internal sealed class TestWorkspace : IDisposable
 
     public void Dispose()
     {
-        try
+        const int maxAttempts = 5;
+        const int retryDelayMilliseconds = 25;
+
+        if (!Directory.Exists(Root))
         {
-            Directory.Delete(Root, recursive: true);
+            return;
         }
-        catch
+
+        Exception? lastFailure = null;
+        for (var attempt = 1; attempt <= maxAttempts; attempt++)
         {
-            // Best-effort cleanup for SQLite handles released just after test completion.
+            try
+            {
+                Directory.Delete(Root, recursive: true);
+                return;
+            }
+            catch (DirectoryNotFoundException)
+            {
+                return;
+            }
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+            {
+                lastFailure = exception;
+
+                if (attempt == 1)
+                {
+                    SqliteConnection.ClearAllPools();
+                }
+
+                if (attempt < maxAttempts)
+                {
+                    Thread.Sleep(retryDelayMilliseconds);
+                }
+            }
         }
+
+        throw new IOException(
+            $"Unable to clean ChairSide test workspace '{Root}' after {maxAttempts} attempts.",
+            lastFailure);
     }
 }
