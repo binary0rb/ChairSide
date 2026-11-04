@@ -4,6 +4,10 @@ ChairSide Board is an internal surgical room status and doctor dispatch dashboar
 
 It tracks rooms, assigned doctors, procedure categories, timers, and seated-to-doctor operational timing. It does not track patients and does not store, request, display, import, or infer PHI.
 
+## Architecture and workflow diagrams
+
+See [ChairSide architecture and room workflow](docs/architecture.md) for Mermaid diagrams of the application components, canonical room state machine, and Ready-for-Doctor event sequence. GitHub renders them directly; no setup is required.
+
 ## Scaffold
 
 - ASP.NET Core 8 minimal web app
